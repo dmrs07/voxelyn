@@ -11,6 +11,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0a0b" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <!--
+      A VIRGULA SONORA do estudio, pedida antes de qualquer script.
+
+      Ela precisa estar decodificada nos primeiros ~400 ms — e a assinatura que
+      toca sobre a marca, e uma peca que chega depois da tela dela nao e uma
+      assinatura, e um som solto. Sem esta linha o `fetch` dela nasce dentro do
+      modulo, ou seja, DEPOIS de o renderizador ja ter disparado 8,4 MB de
+      atlas: numa conexao HTTP/1.1 os seis slots ficam ocupados e o arquivo de
+      106 KB espera na fila. Medido: chegava aos 2,9 s, com a identidade ja
+      terminada.
+
+      `as="fetch"` porque quem a consome e `fetch()` + `decodeAudioData`, e nao
+      um `<audio>`. Arquivo ausente = um aviso no console e nada mais; a
+      abertura ja trata a virgula como opcional em todos os caminhos.
+    -->
+    <link
+      rel="preload"
+      href="./ident/danitools-sound-logo.mp3"
+      as="fetch"
+      fetchpriority="high"
+      crossorigin
+    />
     <link rel="icon" href="./icon-192.png" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>Voxelyn Survival</title>

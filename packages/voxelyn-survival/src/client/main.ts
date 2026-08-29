@@ -76,6 +76,7 @@ import { inviteUrlFrom } from './invite';
 import { deployVeil, veilActive } from './deploy-veil';
 import { runBootSequence } from './boot';
 import { buildBootPlan } from './boot/boot-plan';
+import { identitySting } from './boot/developer-ident';
 import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
@@ -89,6 +90,14 @@ import {
   type Locale,
   type MessageKey,
 } from './i18n';
+
+/**
+ * A URL da virgula sonora do estudio, resolvida no topo do modulo.
+ *
+ * Vazia quando nao ha identidade sonora cadastrada — nesse caso o adiantamento
+ * abaixo nao acontece e a abertura segue muda, como sempre.
+ */
+const IDENTITY_STING_URL = identitySting() ?? '';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -182,6 +191,18 @@ let advertisedContract: DeathEchoContract | null = null;
  * nao pode ficar preso a um contrato antigo depois de o jogador trocar a seed.
  */
 let contractRun: DeathEchoContract | null = null;
+
+// A VIRGULA SONORA e adiantada AQUI, antes do renderizador existir.
+//
+// O construtor do renderizador dispara os 57 atlas, e cada um constroi a
+// mascara de halo com uma leitura de pixel na thread principal — tudo o que
+// depende de uma tarefa espera atras disso. Pedir a peca ANTES tira o decode
+// dessa fila (422 ms -> 34 ms, medido). O que sobra e a leitura do corpo, que
+// continua atras das mascaras; ver `prepareIdentitySting`.
+//
+// Nada toca aqui: `prepare` so busca e decodifica, e quem decide se ha som e o
+// `playIdentitySting` la embaixo, com o mudo ja carregado.
+if (IDENTITY_STING_URL) void audio.prepareIdentitySting(IDENTITY_STING_URL);
 
 const renderer = new SurvivalRenderer(canvas);
 const deathEchoes = new DeathEchoController();
@@ -359,6 +380,9 @@ audio.setVolume(audioSettings.volume);
 audio.setMusicVolume(audioSettings.musicVolume);
 audio.setSfxVolume(audioSettings.sfxVolume);
 audio.setMuted(audioSettings.muted);
+// A abertura e da assinatura do estudio: a trilha do terminal so ganha voz
+// quando a sequencia chega a tela de carregamento (ver `onSplash` abaixo).
+audio.setScreen('boot');
 audio.setMusicSource(audioSettings.musicSource);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
@@ -2773,6 +2797,13 @@ if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
 
 void runBootSequence({
   buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),
+  // A VIRGULA SONORA do estudio, sobre a tela de identidade.
+  //
+  // Devolve a duracao so quando a peca REALMENTE comecou — e e isso que faz a
+  // marca ficar na tela ate o ultimo acorde. Onde o navegador nao autoriza
+  // audio sem gesto, devolve `null` e a identidade segue curta e silenciosa,
+  // como era. Nunca ha uma tela preta esperando um som que nao veio.
+  onIdentitySting: (url) => audio.playIdentitySting(url),
   // A trilha do terminal comeca na SPLASH, e nao no menu.
   //
   // `unlock` e o mesmo caminho de sempre, chamado mais cedo — nao ha truque
@@ -2784,7 +2815,12 @@ void runBootSequence({
   //
   // Mudo continua mudo: `unlock` respeita a preferencia, que ja foi aplicada
   // la em cima com o resto das configuracoes de audio.
-  onSplash: () => audio.unlock(),
+  onSplash: () => {
+    // Sai de 'boot' e entra em 'menu': ate aqui a trilha do terminal ficou
+    // calada de proposito, para nao tocar por baixo da assinatura do estudio.
+    audio.setScreen('menu');
+    audio.unlock();
+  },
   onReady: () => {
     // O menu entra sob o escurecimento da abertura — nunca por cima da barra
     // ainda visivel. Sem `deployVeil` aqui de proposito: o veu e a ficcao da

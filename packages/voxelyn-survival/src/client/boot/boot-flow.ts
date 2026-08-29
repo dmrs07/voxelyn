@@ -205,8 +205,33 @@ export type BootEvent =
   | { type: 'tick'; nowMs: number }
   /** O preload liquidou (todas as tarefas resolveram ou falharam). */
   | { type: 'preload-settled'; nowMs: number; criticalFailed: boolean }
+  /**
+   * A virgula sonora do estudio COMECOU a tocar, e termina em `untilMs`.
+   *
+   * A marca passa a durar o tempo do som. Nao ha versao disto que funcione com
+   * dois numeros fixos: a peca so toca onde o navegador permite (ver
+   * `boot/index.ts`), e uma tela silenciosa segurada pela duracao de um audio
+   * que nunca soou seria uma espera inventada — exatamente o que esta feature
+   * se proibiu. Entao quem estica a fase e o som, depois de ter comecado.
+   *
+   * Ignorado fora da fase de identidade: um som que chega tarde demais nao
+   * traz a marca de volta.
+   */
+  | { type: 'identity-hold-until'; nowMs: number; untilMs: number }
   /** O jogador pediu nova tentativa depois de uma falha critica. */
   | { type: 'retry'; nowMs: number };
+
+/**
+ * Teto da identidade estendida, ms.
+ *
+ * Existe porque a duracao vem de um arquivo, e um arquivo trocado por engano
+ * (ou um `decodeAudioData` que devolve uma duracao absurda) nao pode prender o
+ * jogador numa tela preta. Folgado o bastante para a assinatura completa de
+ * 3,5 s caber MESMO comecando com um atraso de rede, curto o bastante para
+ * nunca virar castigo. Ele so morde no caso patologico: com a peca comecando
+ * cedo, quem termina a fase e o proprio som.
+ */
+export const IDENTITY_MAX_MS = 5200;
 
 export const initialBootState = (
   nowMs: number,
@@ -262,6 +287,17 @@ const step = (state: BootState, event: BootEvent): BootState => {
     // para que exista um caminho unico de transicao (e um so lugar onde os
     // minimos de tela sao cobrados).
     return step({ ...state, preload }, { type: 'tick', nowMs: event.nowMs });
+  }
+
+  if (event.type === 'identity-hold-until') {
+    if (state.phase !== 'identity') return state;
+    const { identityFadeInMs: fadeIn, identityFadeOutMs: fadeOut } = state.timing;
+    // A fase inteira tem de cobrir o som E a saida da marca: o ultimo acorde
+    // nao pode ser cortado pela troca de tela.
+    const total = Math.min(IDENTITY_MAX_MS, event.untilMs - state.phaseStartedMs + fadeOut);
+    const hold = Math.max(state.timing.identityHoldMs, total - fadeIn - fadeOut);
+    if (hold === state.timing.identityHoldMs) return state;
+    return { ...state, timing: { ...state.timing, identityHoldMs: hold } };
   }
 
   if (event.type === 'retry') {

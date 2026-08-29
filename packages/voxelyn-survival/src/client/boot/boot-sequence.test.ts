@@ -241,6 +241,64 @@ describe('abertura ligada de ponta a ponta', () => {
     expect(phase()).toBe('done');
   });
 
+  it('a virgula sonora segura a identidade ate o fim do som', async () => {
+    const gate = deferredTask('atlas-core', true);
+    // 2600 ms: o bumper do kit da marca.
+    const onIdentitySting = vi.fn(async () => 2600);
+    void runBootSequence({
+      buildTasks: () => [gate.task],
+      onIdentitySting,
+      onReady: () => {},
+      ident: { name: '', markUrl: 'ident/m.webp', stingUrl: 'ident/sting.mp3' },
+      env: { withoutIdentity: false },
+    });
+    gate.settle(true);
+    await advanceFrames(3);
+    expect(onIdentitySting).toHaveBeenCalledWith('ident/sting.mp3');
+
+    // No fim da identidade CURTA a marca ainda esta na tela: o som manda.
+    now = identityTotalMs(BOOT_TIMING_FULL);
+    await advanceFrames(2);
+    expect(currentStage()).toBe('boot-identity');
+
+    // Passado o som e a saida da marca, a splash entra.
+    now = 2600 + BOOT_TIMING_FULL.identityFadeOutMs;
+    await advanceFrames(2);
+    expect(currentStage()).toBe('boot-loading');
+  });
+
+  it('som que nao toca nao segura a tela — a identidade fica curta e muda', async () => {
+    // O caso do navegador que nao autoriza audio sem gesto: `null`.
+    const gate = deferredTask('atlas-core', true);
+    void runBootSequence({
+      buildTasks: () => [gate.task],
+      onIdentitySting: async () => null,
+      onReady: () => {},
+      ident: { name: '', markUrl: 'ident/m.webp', stingUrl: 'ident/sting.mp3' },
+      env: { withoutIdentity: false },
+    });
+    gate.settle(true);
+    await advanceFrames(3);
+    now = identityTotalMs(BOOT_TIMING_FULL);
+    await advanceFrames(2);
+    expect(currentStage()).toBe('boot-loading');
+  });
+
+  it('identidade sem som cadastrado nem pede a virgula', async () => {
+    const gate = deferredTask('atlas-core', true);
+    const onIdentitySting = vi.fn(async () => 2600);
+    void runBootSequence({
+      buildTasks: () => [gate.task],
+      onIdentitySting,
+      onReady: () => {},
+      ident: { name: 'ESTUDIO', markUrl: '' },
+      env: { withoutIdentity: false },
+    });
+    await advanceFrames(2);
+    expect(onIdentitySting).not.toHaveBeenCalled();
+    gate.settle(true);
+  });
+
   it('arma o audio na SPLASH — uma vez, depois da identidade e antes do menu', async () => {
     // A ordem e a garantia: o gancho nao pode disparar durante a identidade
     // (que e muda de proposito) nem so no menu (que e o comportamento antigo,

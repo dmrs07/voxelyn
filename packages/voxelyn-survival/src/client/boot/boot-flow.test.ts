@@ -4,6 +4,7 @@ import {
   BOOT_TIMING_FULL,
   BOOT_TIMING_REDUCED,
   BOOT_TIMING_SKIPPED,
+  IDENTITY_MAX_MS,
   advanceBoot,
   bootTiming,
   handoffTotalMs,
@@ -149,6 +150,62 @@ describe('a curva da marca', () => {
   });
 });
 
+describe('a virgula sonora estica a identidade', () => {
+  const t = BOOT_TIMING_FULL;
+
+  it('a marca fica ate o som acabar, e a saida dela cabe depois disso', () => {
+    let state = initialBootState(0, t);
+    // A peca comecou em 300ms e dura 2600ms: termina em 2900ms.
+    state = advanceBoot(state, { type: 'identity-hold-until', nowMs: 300, untilMs: 2900 });
+    // A fase inteira tem de cobrir o som E o fade de saida — o ultimo acorde
+    // nao pode ser cortado pela troca de tela.
+    expect(identityTotalMs(state.timing)).toBe(2900 + t.identityFadeOutMs);
+    state = advanceBoot(state, { type: 'tick', nowMs: 2899 });
+    expect(state.phase).toBe('identity');
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(state.timing) });
+    expect(state.phase).toBe('loading');
+  });
+
+  it('NUNCA encurta: um som mais curto que a leitura da marca nao rouba tela', () => {
+    let state = initialBootState(0, t);
+    const antes = identityTotalMs(state.timing);
+    state = advanceBoot(state, { type: 'identity-hold-until', nowMs: 0, untilMs: 400 });
+    expect(identityTotalMs(state.timing)).toBe(antes);
+  });
+
+  it('tem teto: uma duracao absurda nao prende o jogador', () => {
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'identity-hold-until', nowMs: 0, untilMs: 999_999 });
+    expect(identityTotalMs(state.timing)).toBe(IDENTITY_MAX_MS);
+    // E o teto ainda deixa a assinatura completa de 3,5 s caber.
+    expect(IDENTITY_MAX_MS).toBeGreaterThan(3502 + t.identityFadeOutMs);
+  });
+
+  it('um som que chega tarde nao traz a marca de volta', () => {
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(t) });
+    expect(state.phase).toBe('loading');
+    const antes = state;
+    state = advanceBoot(state, { type: 'identity-hold-until', nowMs: 2000, untilMs: 6000 });
+    expect(state).toBe(antes);
+  });
+
+  it('a curva da marca acompanha o tempo esticado', () => {
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'identity-hold-until', nowMs: 300, untilMs: 2900 });
+    // Cheia durante o som inteiro, e zerada quando a fase acaba.
+    expect(identityOpacity(state.timing, 1500)).toBe(1);
+    expect(identityOpacity(state.timing, 2900)).toBe(1);
+    expect(identityOpacity(state.timing, identityTotalMs(state.timing))).toBe(0);
+  });
+
+  it('sem som, a identidade continua abaixo de dois segundos', () => {
+    // A garantia antiga, agora explicitamente condicionada ao caso mudo: quem
+    // abre o jogo pela decima vez com o audio bloqueado nao paga por isso.
+    expect(identityTotalMs(BOOT_TIMING_FULL)).toBeLessThan(2000);
+  });
+});
+
 describe('falha critica', () => {
   it('para em `failed` e NUNCA entra no menu sozinho', () => {
     const { phases, final } = play({
@@ -240,12 +297,6 @@ describe('perfis de tempo', () => {
     expect(bootTiming({ skip: true, reduced: true })).toBe(BOOT_TIMING_SKIPPED);
     expect(bootTiming({ reduced: true })).toBe(BOOT_TIMING_REDUCED);
     expect(bootTiming({})).toBe(BOOT_TIMING_FULL);
-  });
-
-  it('a identidade cabe abaixo de dois segundos', () => {
-    // O teto e um requisito de produto, nao um detalhe: quem abre o jogo pela
-    // decima vez no dia nao pode ser cobrado por isso.
-    expect(identityTotalMs(BOOT_TIMING_FULL)).toBeLessThan(2000);
   });
 
   it('o perfil mora no estado — duas aberturas nao se contaminam', () => {

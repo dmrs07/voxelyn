@@ -21,14 +21,19 @@
 // - nao cria run, nao gera mundo, nao roda tick de simulacao. Preparar o
 //   aplicativo e comecar uma partida sao coisas diferentes, e o preload so
 //   toca em recursos COMPARTILHADOS (fontes, atlas, imagem de fundo).
-// - nao burla a politica de autoplay. A identidade e muda, e o `AudioContext`
-//   continua nascendo pelos caminhos legitimos. O que a abertura faz e ARMAR o
-//   audio quando a tela de carregamento entra (`onSplash`), em vez de esperar o
-//   primeiro toque: onde o navegador permite (um PWA instalado, um site com
-//   engajamento de midia) o contexto ja nasce tocando e a trilha do terminal
-//   comeca na splash; onde nao permite, o contexto nasce suspenso, o arquivo da
-//   trilha comeca a viajar mais cedo, e o primeiro gesto o retoma. Nos dois
-//   casos e melhor do que antes, e em nenhum deles o navegador e contrariado.
+// - nao burla a politica de autoplay. O `AudioContext` continua nascendo pelos
+//   caminhos legitimos; o que mudou e QUANDO ele e pedido.
+//
+//   A identidade pede a virgula sonora do estudio no primeiro quadro
+//   (`onIdentitySting`) e a tela de carregamento arma o resto (`onSplash`).
+//   Onde o navegador permite — um PWA instalado, um site com engajamento de
+//   midia —, a assinatura toca sobre a marca e a trilha do terminal entra na
+//   splash. Onde nao permite, nada soa: o contexto nasce suspenso, os arquivos
+//   comecam a viajar mais cedo, e o primeiro gesto retoma tudo.
+//
+//   E a identidade so estica ate o fim do som SE o som comecou. Segurar uma
+//   tela preta pela duracao de um audio que ninguem ouviu seria uma espera
+//   inventada — a mesma coisa que a regra 1 proibe na barra de progresso.
 
 import {
   advanceBoot,
@@ -41,7 +46,12 @@ import {
 } from './boot-flow';
 import { runBootTasks, type BootReport, type BootTask } from './boot-tasks';
 import { BootScreen } from './boot-screen';
-import { DEVELOPER_IDENT, hasDeveloperIdent, type DeveloperIdent } from './developer-ident';
+import {
+  DEVELOPER_IDENT,
+  hasDeveloperIdent,
+  identitySting,
+  type DeveloperIdent,
+} from './developer-ident';
 
 export type BootOptions = {
   /**
@@ -71,6 +81,16 @@ export type BootOptions = {
    * de "a abertura passou da identidade", nao de um quadro especifico.
    */
   onSplash?: () => void;
+  /**
+   * Chamado no PRIMEIRO quadro, com a URL da virgula sonora do estudio.
+   *
+   * Resolve com a duracao da peca em ms se ela realmente comecou a tocar, e com
+   * `null` se nao tocou (mudo, navegador sem autorizacao, arquivo ausente). O
+   * boot usa a resposta para esticar a identidade ate o som acabar — e so
+   * nesse caso. Uma tela preta segurada pela duracao de um audio que ninguem
+   * ouviu seria a espera inventada que esta abertura se proibiu.
+   */
+  onIdentitySting?: (url: string) => Promise<number | null>;
   /** Chamado UMA vez, com a abertura ja escurecida: e a hora de revelar o menu. */
   onReady: () => void;
   /**
@@ -119,6 +139,7 @@ const failureDetail = (report: BootReport): string =>
 export const runBootSequence = async ({
   buildTasks,
   onSplash,
+  onIdentitySting,
   onReady,
   ident = DEVELOPER_IDENT,
   env,
@@ -149,6 +170,24 @@ export const runBootSequence = async ({
   const tasks: BootTask[] = buildTasks({ keyart, identMark });
 
   let state: BootState = initialBootState(performance.now(), timing);
+
+  // A VIRGULA SONORA, pedida no primeiro quadro — junto da marca, nao depois
+  // dela. Se tocar, a identidade estica ate o som acabar; se nao tocar, nada
+  // muda e a tela fica exatamente o que ficaria em silencio.
+  const sting = identitySting(ident);
+  if (sting && onIdentitySting) {
+    void onIdentitySting(sting).then((durationMs) => {
+      if (!durationMs || durationMs <= 0) return;
+      // `performance.now()` AQUI: a peca comecou quando a promessa resolveu, e
+      // nao quando foi pedida — entre as duas coisas houve rede e decode.
+      const now = performance.now();
+      state = advanceBoot(state, {
+        type: 'identity-hold-until',
+        nowMs: now,
+        untilMs: now + durationMs,
+      });
+    });
+  }
   let delivered = false;
   let armed = false;
 

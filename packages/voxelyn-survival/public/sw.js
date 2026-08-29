@@ -48,6 +48,7 @@ const OPTIONAL = [
   './audio/voxelyn-survival-menu.flac',
   './boot/keyart-1600.webp',
   './ident/developer-mark.webp',
+  './ident/danitools-sound-logo.mp3',
 ];
 
 self.addEventListener('install', (event) => {

@@ -87,6 +87,9 @@ export class AudioDirector {
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
 
+  /** A virgula sonora decodificada (ou a promessa dela). Ver `prepareIdentitySting`. */
+  private identSting: Promise<AudioBuffer | null> | null = null;
+
   private readonly mixer = new CueMixer();
   private levels: AmbienceLevels = SILENT_AMBIENCE;
   private targetLevels: AmbienceLevels = SILENT_AMBIENCE;
@@ -113,7 +116,11 @@ export class AudioDirector {
    * menu sob o veu de deploy — o audio nao adivinha tela por DOM. A trilha de
    * menu toca em 'menu' (quando o arquivo existe), cala em 'run'.
    */
-  private screen: 'menu' | 'run' = 'menu';
+  // 'boot' e o padrao, e nao 'menu': assim um `unlock()` chamado cedo — antes
+  // de a sequencia de abertura sequer existir — nao acorda a trilha do
+  // terminal por baixo da assinatura do estudio. Quem liga o terminal e um
+  // `setScreen('menu')` explicito.
+  private screen: 'boot' | 'menu' | 'run' = 'boot';
   /**
    * Fase do quadro anterior, para detectar a transicao para 'dead'.
    *
@@ -198,13 +205,91 @@ export class AudioDirector {
    * veu. Toda a politica da trilha de menu vive aqui: acorda no terminal,
    * cala na descida. Idempotente — wake/silence ja o sao.
    */
-  setScreen(screen: 'menu' | 'run'): void {
+  setScreen(screen: 'boot' | 'menu' | 'run'): void {
     this.screen = screen;
-    if (screen === 'run') {
-      this.menuTrackBus?.silence();
-    } else if (!this.muted) {
-      this.menuTrackBus?.wake();
-    }
+    // 'boot' cala a trilha do terminal pelo mesmo motivo que 'run': a tela de
+    // identidade e da VIRGULA SONORA do estudio, e uma trilha por baixo dela
+    // roubaria a peca inteira. O terminal so ganha voz quando a abertura chega
+    // a tela de carregamento — e `main.ts` que faz a troca.
+    if (screen === 'menu' && !this.muted) this.menuTrackBus?.wake();
+    else this.menuTrackBus?.silence();
+  }
+
+  /**
+   * Busca e decodifica a virgula sonora, SEM tocar nada.
+   *
+   * Separada de `playIdentitySting` por uma razao medida, e nao por gosto: no
+   * primeiro segundo de vida da pagina a thread principal esta tomada
+   * construindo as mascaras de halo dos 57 atlas (`emissiveMask`, uma leitura
+   * de pixel por atlas), e tudo o que depende de uma tarefa espera atras disso.
+   *
+   * Medido, com o pedido saindo antes do renderizador: resposta aos 337 ms,
+   * corpo lido so aos 1171 ms, decode em 34 ms. Adiantar o pedido tirou o
+   * DECODE da fila (eram 422 ms), mas a leitura do corpo continua atras das
+   * mascaras — o gargalo e a thread, nao a rede, e resolve-lo de verdade
+   * significa fatiar `emissiveMask` ou leva-lo para um worker, que e uma
+   * mudanca do banco de sprites e nao desta abertura.
+   *
+   * Idempotente: a segunda chamada devolve a mesma promessa.
+   */
+  prepareIdentitySting(url: string): Promise<AudioBuffer | null> {
+    if (this.identSting) return this.identSting;
+    this.identSting = (async () => {
+      this.unlock();
+      const ctx = this.ctx;
+      if (!ctx) return null;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch {
+        return null;
+      }
+    })();
+    return this.identSting;
+  }
+
+  /**
+   * A VIRGULA SONORA do estudio, tocada uma vez sobre a tela de identidade.
+   *
+   * Resolve com a duracao da peca em ms quando ela REALMENTE comecou a tocar, e
+   * com `null` quando nao tocou. Esse retorno nao e um detalhe: e ele que
+   * decide quanto tempo a marca fica na tela (ver `identity-hold-until` em
+   * `boot-flow.ts`). Segurar uma tela preta pela duracao de um audio que nunca
+   * soou seria uma espera inventada, e esta abertura se proibiu isso.
+   *
+   * Os tres motivos de `null`, todos legitimos e nenhum um erro:
+   *
+   * - o jogador esta no mudo;
+   * - o navegador nao autorizou o audio ainda (nao houve gesto, e este site
+   *   nao tem engajamento de midia suficiente) — o contexto fica suspenso e a
+   *   peca seria tocada para ninguem;
+   * - o arquivo nao existe, nao baixou ou nao decodificou.
+   *
+   * Governada pelo MESTRE e pelo mudo, e nao pelos sliders de efeitos ou
+   * musica: a assinatura do estudio nao e som do mundo nem trilha do jogo — e
+   * a apresentacao, e responde ao "quanto o jogo inteiro fala".
+   */
+  async playIdentitySting(url: string): Promise<number | null> {
+    const buffer = await this.prepareIdentitySting(url);
+    const ctx = this.ctx;
+    const master = this.master;
+    // As checagens acontecem no momento de TOCAR, e nao no de preparar: entre
+    // as duas coisas o jogador pode ter chegado com o mudo ligado, e o
+    // navegador so decide sobre o contexto quando ele e retomado.
+    //
+    // `running` e a pergunta certa, e nao "existe contexto": um contexto
+    // suspenso aceita `start()` sem erro e nao produz som nenhum — a marca
+    // ficaria parada 2,6 s de gracas.
+    if (!buffer || !ctx || !master || this.muted || ctx.state !== 'running') return null;
+    // A peca ja vem masterizada em -14 LUFS com teto de -1,8 dBFS (ver o
+    // manifesto em docs/audio/danitools/): o ganho aqui e unitario de
+    // proposito. Recalibra-la seria desfazer a mixagem que ela tem.
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(master);
+    source.start();
+    return buffer.duration * 1000;
   }
 
   /**

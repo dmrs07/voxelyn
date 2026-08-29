@@ -55,6 +55,16 @@ export type DeveloperIdent = {
   markUrl: string;
   /** Texto alternativo da marca, para leitor de tela. */
   markAlt?: string;
+  /**
+   * A VIRGULA SONORA do estudio: a peca curta que toca sobre a marca.
+   *
+   * Vazio = a identidade e muda, e dura o tempo de leitura de sempre. Com
+   * arquivo, a marca fica na tela ate o som acabar — mas SO se ele realmente
+   * tocar. Onde o navegador nao autoriza audio antes de um gesto, a tela
+   * continua curta e silenciosa em vez de segurar o jogador por um som que
+   * ninguem ouviu (ver `playIdentitySting` e `identity-hold-until`).
+   */
+  stingUrl?: string;
 };
 
 /**
@@ -72,6 +82,11 @@ export type DeveloperIdent = {
 export const DEVELOPER_IDENT: DeveloperIdent = {
   name: '',
   markUrl: 'ident/developer-mark.webp',
+  // O bumper de 2,60 s do kit da marca — a variante que o proprio kit indica
+  // para "splash de app". MP3 e nao OGG por alcance: o Safari nao decodifica
+  // Vorbis, e um PWA que abre no iPhone abriria mudo. Ver
+  // `docs/audio/danitools/README.md`.
+  stingUrl: 'ident/danitools-sound-logo.mp3',
 };
 
 /**
@@ -82,3 +97,13 @@ export const DEVELOPER_IDENT: DeveloperIdent = {
  */
 export const hasDeveloperIdent = (ident: DeveloperIdent = DEVELOPER_IDENT): boolean =>
   ident.name.trim().length > 0 || ident.markUrl.trim().length > 0;
+
+/**
+ * A virgula sonora e MUDA por si so — quem decide se ela soa e o navegador.
+ *
+ * Separada de `hasDeveloperIdent` porque as duas perguntas sao independentes:
+ * ha identidade cadastrada (a fase existe) e ha som para ela (a fase pode
+ * esticar). Uma marca sem som continua sendo uma marca.
+ */
+export const identitySting = (ident: DeveloperIdent = DEVELOPER_IDENT): string | null =>
+  ident.stingUrl && ident.stingUrl.trim().length > 0 ? ident.stingUrl : null;
