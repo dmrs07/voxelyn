@@ -10,17 +10,17 @@ function kWeight(x) {
 }
 
 /**
- * Loudness integrada com gating duplo (absoluto -70 LUFS, relativo -10 LU),
- * loudness range simplificada e o pico de cada canal.
+ * Serie de loudness por janela deslizante, em LUFS.
+ *
+ * A EBU R128 define DUAS janelas com nomes que nao sao intercambiaveis:
+ * *momentary* (M) usa 400 ms e *short-term* (S) usa 3 s. Esta funcao gera
+ * qualquer uma das duas; quem chama escolhe e nomeia o que pediu.
  */
-export function measureLoudness(channels, sr = SR) {
-  if (sr !== 48000) throw new Error('measureLoudness assume 48 kHz (coeficientes K normativos)');
-  const weighted = channels.map(kWeight);
-  const blockLen = Math.round(0.4 * sr);
-  const hop = Math.round(0.1 * sr); // 75% de sobreposicao
-  const n = channels[0].length;
-
-  const blocks = [];
+function blockSeries(weighted, blockSec, hopSec, sr) {
+  const blockLen = Math.round(blockSec * sr);
+  const hop = Math.round(hopSec * sr);
+  const n = weighted[0].length;
+  const out = [];
   for (let s = 0; s + blockLen <= n; s += hop) {
     let sum = 0;
     for (const ch of weighted) {
@@ -28,9 +28,42 @@ export function measureLoudness(channels, sr = SR) {
       for (let i = s; i < s + blockLen; i++) acc += ch[i] * ch[i];
       sum += acc / blockLen; // peso de canal 1.0 para L e R
     }
-    blocks.push(-0.691 + 10 * Math.log10(Math.max(sum, 1e-20)));
+    out.push(-0.691 + 10 * Math.log10(Math.max(sum, 1e-20)));
   }
-  if (!blocks.length) return { integratedLufs: -Infinity, shortTermMaxLufs: -Infinity, blocks: 0 };
+  return out;
+}
+
+/**
+ * Loudness integrada com gating duplo (absoluto -70 LUFS, relativo -10 LU), mais
+ * os maximos das duas janelas da R128.
+ *
+ * `momentaryMaxLufs` vem da janela de 400 ms e `shortTermMaxLufs` da de 3 s — sao
+ * metricas diferentes e o campo diz qual e qual. Numa peca com menos de 3 s nao
+ * cabe uma unica janela short-term, e ai o campo vem `null` em vez de um numero
+ * inventado a partir de uma janela curta demais.
+ *
+ * O gating da integrada continua sobre os blocos de 400 ms, como manda a
+ * BS.1770-4 — la a janela de 400 ms e a correta.
+ */
+export function measureLoudness(channels, sr = SR) {
+  if (sr !== 48000) throw new Error('measureLoudness assume 48 kHz (coeficientes K normativos)');
+  const weighted = channels.map(kWeight);
+  const n = channels[0].length;
+
+  const blocks = blockSeries(weighted, 0.4, 0.1, sr);          // momentary
+  const shortTerm = blockSeries(weighted, 3.0, 0.1, sr);       // short-term
+  const shortTermMax = shortTerm.length ? round1(Math.max(...shortTerm)) : null;
+  const durationSec = round1(n / sr);
+
+  const empty = {
+    integratedLufs: -Infinity,
+    momentaryMaxLufs: -Infinity,
+    shortTermMaxLufs: shortTermMax,
+    shortTermWindows: shortTerm.length,
+    durationSec,
+    blocks: blocks.length,
+  };
+  if (!blocks.length) return empty;
 
   const meanOf = (list) => {
     let acc = 0;
@@ -39,14 +72,17 @@ export function measureLoudness(channels, sr = SR) {
   };
 
   const absGated = blocks.filter((l) => l > -70);
-  if (!absGated.length) return { integratedLufs: -Infinity, shortTermMaxLufs: -Infinity, blocks: blocks.length };
+  if (!absGated.length) return empty;
   const relThreshold = meanOf(absGated) - 10;
   const relGated = absGated.filter((l) => l > relThreshold);
   const integrated = relGated.length ? meanOf(relGated) : meanOf(absGated);
 
   return {
     integratedLufs: round1(integrated),
-    shortTermMaxLufs: round1(Math.max(...blocks)),
+    momentaryMaxLufs: round1(Math.max(...blocks)),
+    shortTermMaxLufs: shortTermMax,
+    shortTermWindows: shortTerm.length,
+    durationSec,
     gatingThresholdLufs: round1(relThreshold),
     blocks: blocks.length,
     gatedBlocks: relGated.length,

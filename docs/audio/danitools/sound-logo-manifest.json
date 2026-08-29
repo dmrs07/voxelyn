@@ -2,7 +2,12 @@
   "nome": "DaniTools — logo sonoro",
   "descricao": "Assinatura sonora do estudio DaniTools. Sintetizada por inteiro: nenhum sample, nenhuma biblioteca de audio, nenhum plugin.",
   "geradoPor": "scripts/audio-logo/render.mjs",
-  "reprodutibilidade": "Deterministico. Todo ruido vem de um PRNG semeado (mulberry32) e nao ha estado global; rodar de novo produz os mesmos bytes.",
+  "reprodutibilidade": {
+    "garantia": "Os quatro mestres WAV saem byte a byte iguais a cada execucao NA MESMA build do Node/V8. Todo ruido vem de um PRNG semeado (mulberry32) e nao ha estado global nem relogio no caminho.",
+    "ressalva": "A garantia nao atravessa versoes de motor. A sintese usa Math.sin, Math.cos, Math.exp, Math.tanh e o operador **, que a especificacao do ECMAScript deixa a cargo da implementacao (ECMA-262, sec. 21.3): uma build de V8 diferente pode divergir no ultimo bit, o que aparece como um punhado de bytes diferentes num WAV de 24 bits. Reproducao exata entre maquinas exige a mesma versao do Node.",
+    "comprovacao": "node scripts/audio-logo/render.mjs --verify confere os mestres contra os hashes abaixo sem escrever nada. O teste audio-logo.test.mjs roda a mesma checagem.",
+    "escopo": "A garantia forte e dos WAV, que saem deste codigo. MP3, OGG e FLAC saem do ffmpeg com -fflags +bitexact, o que os torna estaveis entre execucoes na mesma build do encoder — sem essa flag o multiplexador Ogg sorteia o numero de serie do fluxo a cada execucao e re-renderizar sujava o repositorio sem nenhuma mudanca de audio. Entre builds diferentes de ffmpeg os bytes ainda podem mudar; os hashes desses tres formatos valem como integridade, nao como garantia de reproducao."
+  },
   "dependencias": {
     "execucao": "Node >= 22. Nenhum pacote externo.",
     "opcional": "ffmpeg, so para MP3/OGG. Os WAV mestres saem sem ele (--no-encode).",
@@ -135,6 +140,7 @@
   "medicao": {
     "norma": "ITU-R BS.1770-4 com gating duplo (-70 LUFS absoluto, -10 LU relativo); filtros K com os coeficientes normativos de 48 kHz.",
     "afericao": "O medidor foi conferido contra o caso 1 do EBU Tech 3341: seno de 1 kHz estereo a -20 dBFS mede -20,0 LUFS.",
+    "janelas": "A EBU R128 define duas janelas que nao sao intercambiaveis: momentary (M) usa 400 ms e short-term (S) usa 3 s. Os campos loudnessMomentaneaMaximaLufs e loudnessCurtoPrazoMaximaLufs dizem qual e qual. Numa peca com menos de 3 s nao cabe uma unica janela short-term: o campo vem null e janelasCurtoPrazo vem 0, em vez de um numero tirado de uma janela curta demais. O gating da integrada continua sobre os blocos de 400 ms, que e o que a BS.1770-4 manda ali.",
     "ressalva": "O pico inter-amostra e ESTIMADO por sobreamostragem 8x com interpolacao de Hermite, nao pelo FIR normativo de 4x. Vale como margem de seguranca, nao como certificado de conformidade.",
     "margemDaVoz": "Energia RMS da voz menos a da soma das outras faixas, por banda, na janela exata da palavra. Nas bandas de 1 a 8 kHz — onde mora a inteligibilidade da fala — a margem TEM que ser positiva. Em banda larga e em 200-800 Hz a margem negativa e o projeto: ali o corpo do acorde e o sub e que mandam, e a voz foi cortada de proposito nessa regiao."
   },
@@ -147,7 +153,9 @@
       "duracaoSec": 3.502,
       "medicao": {
         "loudnessIntegradaLufs": -14,
-        "loudnessMaximaCurtoPrazoLufs": -11.9,
+        "loudnessMomentaneaMaximaLufs": -11.9,
+        "loudnessCurtoPrazoMaximaLufs": -14.3,
+        "janelasCurtoPrazo": 6,
         "alvoLufs": -14,
         "picoDeAmostraDbfs": [
           -2.9,
@@ -283,49 +291,58 @@
         {
           "nome": "danitools-sound-logo.wav",
           "formato": "WAV PCM 48 kHz / 24 bits / estereo",
-          "bytes": 1008602
+          "bytes": 1008602,
+          "sha256": "2e69c16fda8ecb44a1b7ff19694ff29ee43e962e72ccabb9a66f312c2f9d253d"
         },
         {
           "nome": "stems/danitools-sound-logo-anacruse.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 111194
+          "bytes": 111162,
+          "sha256": "87fbf68e02d8eade59df5c11baedba8860c460f9b2526d6ee0324a41cabe9bc6"
         },
         {
           "nome": "stems/danitools-sound-logo-impacto.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 47855
+          "bytes": 47823,
+          "sha256": "1da16990722be65cf4a7cd83e53f70dd1a0b7c70fa803c7799d79febe3deff1d"
         },
         {
           "nome": "stems/danitools-sound-logo-acorde.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 307067
+          "bytes": 307035,
+          "sha256": "900ee167bce2755fdf5d39d1688368e19ed727d3cbc7ebd1b5af5b7d02b73e12"
         },
         {
           "nome": "stems/danitools-sound-logo-voz.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 188205
+          "bytes": 188173,
+          "sha256": "e3857af520f0036ce52631233eee73afe509428e2fd3862dbee8c9f3e32a251c"
         },
         {
           "nome": "stems/danitools-sound-logo-sinos.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 194225
+          "bytes": 194193,
+          "sha256": "cc4cabeaddc2cc321dd3974a8259621e02fe0cc6fa81e47948c96f7c5ba66e68"
         },
         {
           "nome": "stems/danitools-sound-logo-caudas.flac",
           "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
-          "bytes": 564912
+          "bytes": 564880,
+          "sha256": "2793976bdc41f77eaa5c073dec6eaf4743b063952a6f23d3f2eb1b0788db11a6"
         },
         {
           "nome": "danitools-sound-logo.mp3",
           "formato": "MP3 320 kbps CBR",
-          "bytes": 142125,
-          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libmp3lame -b:a 320k danitools-sound-logo.mp3"
+          "bytes": 142100,
+          "sha256": "2a1b3dd0f9d171cc9118cf714b3ab3b51334627b580a552861f6e6e6ce57fe51",
+          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo.mp3"
         },
         {
           "nome": "danitools-sound-logo.ogg",
           "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
-          "bytes": 79879,
-          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libvorbis -qscale:a 7 danitools-sound-logo.ogg"
+          "bytes": 79863,
+          "sha256": "9e8f29c8a1cac3e6d9ea9b8823bc32c681f339fb82a37badf5455f14ab3d5864",
+          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo.ogg"
         }
       ]
     },
@@ -337,7 +354,9 @@
       "duracaoSec": 2.602,
       "medicao": {
         "loudnessIntegradaLufs": -14,
-        "loudnessMaximaCurtoPrazoLufs": -12.2,
+        "loudnessMomentaneaMaximaLufs": -12.2,
+        "loudnessCurtoPrazoMaximaLufs": null,
+        "janelasCurtoPrazo": 0,
         "alvoLufs": -14,
         "picoDeAmostraDbfs": [
           -1.8,
@@ -447,19 +466,22 @@
         {
           "nome": "danitools-sound-logo-short.wav",
           "formato": "WAV PCM 48 kHz / 24 bits / estereo",
-          "bytes": 749402
+          "bytes": 749402,
+          "sha256": "6e1d4a865351f4623ef7963f6e10663f5f56ebb00b71e01140458e1f3e94ffaf"
         },
         {
           "nome": "danitools-sound-logo-short.mp3",
           "formato": "MP3 320 kbps CBR",
-          "bytes": 106605,
-          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libmp3lame -b:a 320k danitools-sound-logo-short.mp3"
+          "bytes": 106580,
+          "sha256": "7d29164476043ecf51f34a90b424a7e61417b1028b9b8eaac4bc5dc24ea82f59",
+          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-short.mp3"
         },
         {
           "nome": "danitools-sound-logo-short.ogg",
           "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
-          "bytes": 59966,
-          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libvorbis -qscale:a 7 danitools-sound-logo-short.ogg"
+          "bytes": 59950,
+          "sha256": "dabdd5bac699d1b34afd7d8fb1a75ddf3aac178ef4124f0602217062d6e4e801",
+          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-short.ogg"
         }
       ]
     },
@@ -471,7 +493,9 @@
       "duracaoSec": 2.402,
       "medicao": {
         "loudnessIntegradaLufs": -16,
-        "loudnessMaximaCurtoPrazoLufs": -14.4,
+        "loudnessMomentaneaMaximaLufs": -14.4,
+        "loudnessCurtoPrazoMaximaLufs": null,
+        "janelasCurtoPrazo": 0,
         "alvoLufs": -16,
         "picoDeAmostraDbfs": [
           -3.7,
@@ -539,19 +563,22 @@
         {
           "nome": "danitools-sound-logo-tag.wav",
           "formato": "WAV PCM 48 kHz / 24 bits / estereo",
-          "bytes": 691802
+          "bytes": 691802,
+          "sha256": "1eb3861b58ea76f70b5937b26e32209467098e60fd7968827319c91c52325f91"
         },
         {
           "nome": "danitools-sound-logo-tag.mp3",
           "formato": "MP3 320 kbps CBR",
-          "bytes": 98925,
-          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libmp3lame -b:a 320k danitools-sound-logo-tag.mp3"
+          "bytes": 98900,
+          "sha256": "92299da20da78ee5a3a74dd53fd9548cb525a46e3ed0412858f43ef4ffcb4507",
+          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-tag.mp3"
         },
         {
           "nome": "danitools-sound-logo-tag.ogg",
           "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
-          "bytes": 62822,
-          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libvorbis -qscale:a 7 danitools-sound-logo-tag.ogg"
+          "bytes": 62806,
+          "sha256": "37b0845ccf23aec34c56791fe241fa051cbd859338ea91e3dfc4fd1bc0d9a93d",
+          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-tag.ogg"
         }
       ]
     },
@@ -563,7 +590,9 @@
       "duracaoSec": 3.401,
       "medicao": {
         "loudnessIntegradaLufs": -14,
-        "loudnessMaximaCurtoPrazoLufs": -11.8,
+        "loudnessMomentaneaMaximaLufs": -11.8,
+        "loudnessCurtoPrazoMaximaLufs": -14.4,
+        "janelasCurtoPrazo": 5,
         "alvoLufs": -14,
         "picoDeAmostraDbfs": [
           -2.6,
@@ -699,19 +728,22 @@
         {
           "nome": "danitools-sound-logo-ptbr.wav",
           "formato": "WAV PCM 48 kHz / 24 bits / estereo",
-          "bytes": 979448
+          "bytes": 979448,
+          "sha256": "6d5859c641b7f5e2bb87019ef921c7035e20de32b6f3db209b7d68e2234f750a"
         },
         {
           "nome": "danitools-sound-logo-ptbr.mp3",
           "formato": "MP3 320 kbps CBR",
-          "bytes": 138285,
-          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libmp3lame -b:a 320k danitools-sound-logo-ptbr.mp3"
+          "bytes": 138260,
+          "sha256": "3112706044f6b8748daedc330979b1e9ce48e4c4b9fe11bca80d8d763784a708",
+          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-ptbr.mp3"
         },
         {
           "nome": "danitools-sound-logo-ptbr.ogg",
           "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
-          "bytes": 75984,
-          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libvorbis -qscale:a 7 danitools-sound-logo-ptbr.ogg"
+          "bytes": 75968,
+          "sha256": "db169a992983f899a5eaf9189f01846df71fb1d3480c3ef0b902da802786141f",
+          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-ptbr.ogg"
         }
       ]
     }

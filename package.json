@@ -28,6 +28,7 @@
     "build:electron": "pnpm --filter @voxelforge/electron dist",
     "icons:generate": "node scripts/generate-icons.mjs",
     "audio-logo": "node scripts/audio-logo/render.mjs",
+    "audio-logo:verify": "node scripts/audio-logo/render.mjs --verify",
     "audio-logo:test": "node --test scripts/audio-logo/audio-logo.test.mjs",
     "devlog:plan": "node scripts/devlog/plan.mjs",
     "devlog:shoot": "node scripts/devlog/shoot.mjs",

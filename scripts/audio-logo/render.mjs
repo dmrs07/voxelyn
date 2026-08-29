@@ -2,15 +2,17 @@
 // Renderiza o kit completo do logo sonoro da DaniTools.
 //
 //   node scripts/audio-logo/render.mjs [--out docs/audio/danitools] [--no-encode] [--no-stems]
+//   node scripts/audio-logo/render.mjs --verify   # confere os mestres contra o manifesto
 //
 // Escreve os WAV mestres (48 kHz / 24 bits), as versoes comprimidas (se houver
 // ffmpeg no PATH), a forma de onda em SVG e o manifesto com todas as medicoes.
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readWav, SR, writeWav } from './dsp.mjs';
+import { encodeWav, readWav, SR, writeWav } from './dsp.mjs';
 import { bandEnergy, measureLoudness, samplePeakDb, stereoCorrelation, truePeakDb, voiceMargin } from './loudness.mjs';
 import { arrange, ARP, BELLS, BPM, CHORD, master, TIMELINE } from './arrangement.mjs';
 import { hz } from './synth.mjs';
@@ -18,6 +20,7 @@ import { hz } from './synth.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
 const round3 = (v) => Math.round(v * 1000) / 1000;
+const sha256 = (b) => createHash('sha256').update(b).digest('hex');
 
 const TAKES = {
   'en-us': {
@@ -39,10 +42,15 @@ const DELIVERABLES = [
   { id: 'danitools-sound-logo-ptbr', variant: 'full', take: 'pt-br', lufs: -14, uso: 'Mesma assinatura com a pronuncia aportuguesada, para peca em pt-BR.' },
 ];
 
+// -fflags +bitexact nao e enfeite: sem ele o multiplexador Ogg sorteia o numero de
+// serie do fluxo a cada execucao (48 bytes divergentes num arquivo de 80 kB), e
+// re-renderizar o kit sujava o repositorio sem nenhuma mudanca de audio.
+const BITEXACT = ['-fflags', '+bitexact'];
 const ENCODERS = {
-  mp3: { label: 'MP3 320 kbps CBR', args: ['-codec:a', 'libmp3lame', '-b:a', '320k'] },
-  ogg: { label: 'Ogg Vorbis q7 (~224 kbps VBR)', args: ['-codec:a', 'libvorbis', '-qscale:a', '7'] },
+  mp3: { label: 'MP3 320 kbps CBR', args: ['-codec:a', 'libmp3lame', '-b:a', '320k', ...BITEXACT] },
+  ogg: { label: 'Ogg Vorbis q7 (~224 kbps VBR)', args: ['-codec:a', 'libvorbis', '-qscale:a', '7', ...BITEXACT] },
 };
+const FLAC_ARGS = ['-codec:a', 'flac', '-compression_level', '8', ...BITEXACT];
 
 // ---------------------------------------------------------------------------
 
@@ -102,12 +110,62 @@ function waveformSvg(wavPath, events) {
 `;
 }
 
+/**
+ * Confere os mestres WAV contra os hashes do manifesto versionado, sem escrever nada.
+ *
+ * Existe porque "e reprodutivel" e uma promessa em prosa ate alguem conseguir
+ * conferir. Repare no escopo: so os WAV, que saem deste codigo. Os MP3/OGG/FLAC
+ * passam pelo ffmpeg e podem mudar entre builds do encoder — os hashes deles ficam
+ * no manifesto como integridade, nao como garantia de reproducao.
+ */
+function runVerify(outDir) {
+  const manifestPath = join(outDir, 'sound-logo-manifest.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    console.error(`sem manifesto em ${manifestPath} — rode o render antes.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  let falhas = 0;
+  for (const d of DELIVERABLES) {
+    const esperado = manifest.entregas
+      .find((e) => e.id === d.id)?.arquivos
+      .find((f) => f.nome === `${d.id}.wav`)?.sha256;
+
+    const arr = arrange(TAKES[d.take].file, { variant: d.variant, sr: SR });
+    const m = master(arr.L, arr.R, {
+      targetLufs: d.lufs, ceilingDb: -1.0, measure: (ch) => measureLoudness(ch, SR), sr: SR,
+    });
+    const obtido = sha256(encodeWav([m.L, m.R], SR, 24));
+    const ok = esperado === obtido;
+    if (!ok) falhas++;
+    console.log(`${ok ? 'ok  ' : 'FALHA'} ${d.id.padEnd(30)} ${obtido.slice(0, 16)}${ok ? '' : `  esperado ${String(esperado).slice(0, 16)}`}`);
+  }
+
+  console.log(`\n${DELIVERABLES.length - falhas}/${DELIVERABLES.length} mestres conferem.`);
+  if (falhas) {
+    console.error(
+      'Divergencia. Antes de suspeitar do codigo: a sintese usa Math.sin/cos/exp/tanh e **, '
+      + 'que a especificacao do ECMAScript deixa a cargo da implementacao. Uma build de V8 '
+      + 'diferente pode render o ultimo bit de forma diferente. Confira a versao do Node '
+      + `(esta rodando ${process.version}) antes de regerar os arquivos.`,
+    );
+    process.exitCode = 1;
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const flag = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
   const outDir = resolve(ROOT, flag('--out') ?? 'docs/audio/danitools');
-  const ffmpeg = args.includes('--no-encode') ? null : findFfmpeg();
-  const wantStems = !args.includes('--no-stems');
+  const verify = args.includes('--verify');
+  const ffmpeg = verify || args.includes('--no-encode') ? null : findFfmpeg();
+  const wantStems = !verify && !args.includes('--no-stems');
+
+  if (verify) return runVerify(outDir);
 
   mkdirSync(outDir, { recursive: true });
   if (wantStems) mkdirSync(join(outDir, 'stems'), { recursive: true });
@@ -125,11 +183,12 @@ function main() {
 
     const wavName = `${d.id}.wav`;
     const wavPath = join(outDir, wavName);
-    writeWav(wavPath, [m.L, m.R], SR, 24);
+    const wavBytes = encodeWav([m.L, m.R], SR, 24);
+    writeFileSync(wavPath, wavBytes);
 
     const channels = [m.L, m.R];
     const loud = measureLoudness(channels, SR);
-    const files = [{ nome: wavName, formato: 'WAV PCM 48 kHz / 24 bits / estereo', bytes: statSync(wavPath).size }];
+    const files = [{ nome: wavName, formato: 'WAV PCM 48 kHz / 24 bits / estereo', bytes: wavBytes.length, sha256: sha256(wavBytes) }];
 
     // Stems: so para a assinatura — e a peca que um editor vai querer reequilibrar.
     // Em FLAC porque sao seis arquivos e o formato e sem perda; o mestre continua WAV.
@@ -139,11 +198,11 @@ function main() {
         writeWav(wav, [sL, sR], SR, 24);
         if (ffmpeg) {
           const flac = join(outDir, 'stems', `${d.id}-${name}.flac`);
-          execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', wav, '-codec:a', 'flac', '-compression_level', '8', flac]);
+          execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', wav, ...FLAC_ARGS, flac]);
           rmSync(wav);
-          files.push({ nome: `stems/${d.id}-${name}.flac`, formato: 'FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)', bytes: statSync(flac).size });
+          files.push({ nome: `stems/${d.id}-${name}.flac`, formato: 'FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)', bytes: statSync(flac).size, sha256: sha256(readFileSync(flac)) });
         } else {
-          files.push({ nome: `stems/${d.id}-${name}.wav`, formato: 'WAV PCM 48 kHz / 24 bits / estereo (stem, antes da masterizacao)', bytes: statSync(wav).size });
+          files.push({ nome: `stems/${d.id}-${name}.wav`, formato: 'WAV PCM 48 kHz / 24 bits / estereo (stem, antes da masterizacao)', bytes: statSync(wav).size, sha256: sha256(readFileSync(wav)) });
         }
       }
     }
@@ -156,6 +215,7 @@ function main() {
           nome: name,
           formato: enc.label,
           bytes: statSync(join(outDir, name)).size,
+          sha256: sha256(readFileSync(join(outDir, name))),
           comando: `ffmpeg -i ${wavName} ${enc.args.join(' ')} ${name}`,
         });
       }
@@ -169,7 +229,9 @@ function main() {
       duracaoSec: round3(m.L.length / SR),
       medicao: {
         loudnessIntegradaLufs: loud.integratedLufs,
-        loudnessMaximaCurtoPrazoLufs: loud.shortTermMaxLufs,
+        loudnessMomentaneaMaximaLufs: loud.momentaryMaxLufs,
+        loudnessCurtoPrazoMaximaLufs: loud.shortTermMaxLufs,
+        janelasCurtoPrazo: loud.shortTermWindows,
         alvoLufs: d.lufs,
         picoDeAmostraDbfs: samplePeakDb(channels),
         picoInterAmostraEstimadoDbtp: truePeakDb(channels),
@@ -205,7 +267,12 @@ function main() {
     nome: 'DaniTools — logo sonoro',
     descricao: 'Assinatura sonora do estudio DaniTools. Sintetizada por inteiro: nenhum sample, nenhuma biblioteca de audio, nenhum plugin.',
     geradoPor: 'scripts/audio-logo/render.mjs',
-    reprodutibilidade: 'Deterministico. Todo ruido vem de um PRNG semeado (mulberry32) e nao ha estado global; rodar de novo produz os mesmos bytes.',
+    reprodutibilidade: {
+      garantia: 'Os quatro mestres WAV saem byte a byte iguais a cada execucao NA MESMA build do Node/V8. Todo ruido vem de um PRNG semeado (mulberry32) e nao ha estado global nem relogio no caminho.',
+      ressalva: 'A garantia nao atravessa versoes de motor. A sintese usa Math.sin, Math.cos, Math.exp, Math.tanh e o operador **, que a especificacao do ECMAScript deixa a cargo da implementacao (ECMA-262, sec. 21.3): uma build de V8 diferente pode divergir no ultimo bit, o que aparece como um punhado de bytes diferentes num WAV de 24 bits. Reproducao exata entre maquinas exige a mesma versao do Node.',
+      comprovacao: 'node scripts/audio-logo/render.mjs --verify confere os mestres contra os hashes abaixo sem escrever nada. O teste audio-logo.test.mjs roda a mesma checagem.',
+      escopo: 'A garantia forte e dos WAV, que saem deste codigo. MP3, OGG e FLAC saem do ffmpeg com -fflags +bitexact, o que os torna estaveis entre execucoes na mesma build do encoder — sem essa flag o multiplexador Ogg sorteia o numero de serie do fluxo a cada execucao e re-renderizar sujava o repositorio sem nenhuma mudanca de audio. Entre builds diferentes de ffmpeg os bytes ainda podem mudar; os hashes desses tres formatos valem como integridade, nao como garantia de reproducao.',
+    },
     dependencias: {
       execucao: 'Node >= 22. Nenhum pacote externo.',
       opcional: 'ffmpeg, so para MP3/OGG. Os WAV mestres saem sem ele (--no-encode).',
@@ -246,6 +313,7 @@ function main() {
     medicao: {
       norma: 'ITU-R BS.1770-4 com gating duplo (-70 LUFS absoluto, -10 LU relativo); filtros K com os coeficientes normativos de 48 kHz.',
       afericao: 'O medidor foi conferido contra o caso 1 do EBU Tech 3341: seno de 1 kHz estereo a -20 dBFS mede -20,0 LUFS.',
+      janelas: 'A EBU R128 define duas janelas que nao sao intercambiaveis: momentary (M) usa 400 ms e short-term (S) usa 3 s. Os campos loudnessMomentaneaMaximaLufs e loudnessCurtoPrazoMaximaLufs dizem qual e qual. Numa peca com menos de 3 s nao cabe uma unica janela short-term: o campo vem null e janelasCurtoPrazo vem 0, em vez de um numero tirado de uma janela curta demais. O gating da integrada continua sobre os blocos de 400 ms, que e o que a BS.1770-4 manda ali.',
       ressalva: 'O pico inter-amostra e ESTIMADO por sobreamostragem 8x com interpolacao de Hermite, nao pelo FIR normativo de 4x. Vale como margem de seguranca, nao como certificado de conformidade.',
       margemDaVoz: 'Energia RMS da voz menos a da soma das outras faixas, por banda, na janela exata da palavra. Nas bandas de 1 a 8 kHz — onde mora a inteligibilidade da fala — a margem TEM que ser positiva. Em banda larga e em 200-800 Hz a margem negativa e o projeto: ali o corpo do acorde e o sub e que mandam, e a voz foi cortada de proposito nessa regiao.',
     },

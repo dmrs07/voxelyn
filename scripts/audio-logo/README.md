@@ -6,6 +6,7 @@ do resto do repositório. A entrega fica em
 
 ```sh
 pnpm audio-logo                    # kit completo
+pnpm audio-logo:verify             # confere os mestres contra os hashes do manifesto
 pnpm audio-logo:test               # afere o medidor e valida as entregas
 node scripts/audio-logo/render.mjs --no-encode --no-stems   # só os WAV mestres
 ```
@@ -18,8 +19,8 @@ node scripts/audio-logo/render.mjs --no-encode --no-stems   # só os WAV mestres
 | `synth.mjs` | Instrumentos: osciladores PolyBLEP, supersaw, sinos aditivos, sub do impacto, estalo, riser, arpejo chiptune. |
 | `voice.mjs` | A cadeia de voz — quatro camadas derivadas de uma tomada só. |
 | `arrangement.mjs` | O arranjo em *stems*, o *ducking* e a masterização. |
-| `loudness.mjs` | Medição: BS.1770-4 com gating, picos, correlação, energia por banda, margem da voz. |
-| `render.mjs` | Entrada. Escreve WAV, MP3, OGG, stems FLAC, a onda em SVG e o manifesto. |
+| `loudness.mjs` | Medição: BS.1770-4 com gating, janelas *momentary* e *short-term*, picos, correlação, energia por banda, margem da voz. |
+| `render.mjs` | Entrada. Escreve WAV, MP3, OGG, stems FLAC, a onda em SVG e o manifesto; `--verify` confere os mestres sem escrever. |
 | `audio-logo.test.mjs` | O que precisa ser verdade para a peça servir de marca. |
 | `takes/*.wav` | As tomadas de voz cruas, versionadas. |
 
@@ -81,7 +82,14 @@ que precisa ser verdade para a peça servir de marca registrada:
   −23 dBFS tem que medir −23,0 LUFS. Sem isso, toda medição do manifesto é
   decoração.
 - **A afinação está certa.** A4 = 440 Hz, oitava exatamente 2×.
-- **O render é determinístico.** Duas execuções, amostra por amostra.
+- **O render é determinístico.** Duas execuções, amostra por amostra, nas quatro
+  entregas.
+- **Os WAV versionados batem com o renderizador**, por SHA-256 contra o manifesto.
+  É o que impede a promessa de reprodutibilidade de virar prosa: se alguém mexer na
+  síntese sem regerar os arquivos, isto falha e aponta qual entrega ficou para trás.
+- ***Momentary* e *short-term* não se confundem.** São janelas de 400 ms e de 3 s,
+  e o teste exige que venham por campos distintos — e que uma peça de menos de 3 s
+  reporte `null` em vez de um número tirado de uma janela curta demais.
 - **A palavra passa por cima da música**, com mais de +3 dB de margem em 1–2, 2–4
   e 4–8 kHz.
 - **As entregas respeitam o teto** de −1 dBTP e o alvo de loudness (±0,5 LU), sem
@@ -100,3 +108,16 @@ que precisa ser verdade para a peça servir de marca registrada:
   art, lê como caráter. Não use essa função esperando qualidade de PSOLA.
 - `ffmpeg` é opcional e só faz a codificação. Sem ele saem os WAV mestres e os
   stems em WAV; o resto do pipeline não muda.
+- **O determinismo não atravessa versões de motor.** A síntese usa `Math.sin`,
+  `Math.cos`, `Math.exp`, `Math.tanh` e o operador `**`, que o ECMAScript deixa a
+  cargo da implementação (ECMA-262 §21.3). Numa build de V8 diferente o último bit
+  pode divergir, o que aparece como um punhado de bytes diferentes num WAV de
+  24 bits. Se `--verify` acusar divergência, confira a versão do Node antes de
+  suspeitar do código. Reprodução exata entre máquinas exige o mesmo Node — o
+  `engines` do repositório fixa a major.
+- Os hashes de MP3, OGG e FLAC no manifesto são **integridade, não reprodução**:
+  esses bytes podem mudar entre builds do `ffmpeg`. Dentro de uma mesma build eles
+  são estáveis, mas só por causa do `-fflags +bitexact` que o `render.mjs` passa: sem
+  ele o multiplexador Ogg sorteia o número de série do fluxo a cada execução, e
+  re-renderizar o kit sujava o repositório com 48 bytes diferentes por arquivo sem
+  nenhuma mudança de áudio.

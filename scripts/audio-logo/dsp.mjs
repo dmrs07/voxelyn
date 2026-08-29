@@ -57,6 +57,15 @@ export function readWav(path) {
 
 /** Escreve WAV PCM inteiro (16 ou 24 bits) a partir de canais Float64. */
 export function writeWav(path, channels, sampleRate = SR, bits = 24) {
+  writeFileSync(path, encodeWav(channels, sampleRate, bits));
+}
+
+/**
+ * Serializa canais Float64 num RIFF/WAVE completo, em memoria.
+ * Existe separado de `writeWav` para o modo --verify poder somar o hash do que
+ * SERIA escrito sem tocar no disco.
+ */
+export function encodeWav(channels, sampleRate = SR, bits = 24) {
   const nch = channels.length;
   const frames = channels[0].length;
   const bytes = bits >> 3;
@@ -92,7 +101,7 @@ export function writeWav(path, channels, sampleRate = SR, bits = 24) {
       o += bytes;
     }
   }
-  writeFileSync(path, buf);
+  return buf;
 }
 
 // -------------------------------------------------------------- basico -----

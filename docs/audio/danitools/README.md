@@ -86,6 +86,8 @@ Todas as versões saem calibradas por medição ITU-R BS.1770-4, não por ouvido
 | | assinatura | bumper | tag | pt-BR |
 |---|---:|---:|---:|---:|
 | Loudness integrada | −14,0 LUFS | −14,0 LUFS | −16,0 LUFS | −14,0 LUFS |
+| Máxima *momentary* (400 ms) | −11,9 LUFS | −12,2 LUFS | −14,4 LUFS | −11,8 LUFS |
+| Máxima *short-term* (3 s) | −14,3 LUFS | — | — | −14,4 LUFS |
 | Pico inter-amostra | −2,9 dBTP | −1,8 dBTP | −3,6 dBTP | −2,6 dBTP |
 | Correlação estéreo | 0,97 | 0,96 | 0,92 | 0,97 |
 
@@ -95,12 +97,35 @@ pode gerar picos acima do que o WAV mostra. A correlação alta é deliberada:
 **a peça soma para mono sem perder nada** (o teste mede menos de 1,5 dB de perda),
 porque metade do público vai ouvir isso no alto-falante de um celular.
 
+As duas linhas de máxima são janelas diferentes da mesma norma e **não são
+intercambiáveis**: a EBU R128 define *momentary* sobre 400 ms e *short-term* sobre
+3 s. O bumper e a tag têm menos de três segundos, então não cabe uma única janela
+short-term neles — o traço é literal, e o manifesto traz `null`, não um número
+tirado de uma janela curta demais.
+
 ## Nada disso é sample
 
 Não há um único arquivo de áudio de origem externa aqui. Nenhum sample, nenhuma
 biblioteca, nenhum plugin, nenhum áudio gerado por IA. Cada forma de onda é
-calculada por `scripts/audio-logo/`, em Node puro, e o render é determinístico:
-rodar de novo produz os mesmos bytes.
+calculada por `scripts/audio-logo/`, em Node puro.
+
+O render é **determinístico dentro de uma mesma build do Node/V8**: não há relógio
+nem estado global no caminho e todo ruído vem de um PRNG semeado, então rodar de
+novo produz os mesmos bytes. A garantia não atravessa versões de motor — a síntese
+usa `Math.sin`, `Math.exp`, `Math.tanh` e `**`, que o ECMAScript deixa a cargo da
+implementação, e uma build de V8 diferente pode divergir no último bit. Por isso a
+promessa é conferível em vez de escrita: o manifesto traz o SHA-256 de cada arquivo
+e `pnpm audio-logo:verify` recalcula os mestres e compara, sem escrever nada. O
+mesmo teste roda em `pnpm audio-logo:test`.
+
+A garantia forte é dos **WAV**, que saem deste código. MP3, OGG e FLAC passam pelo
+`ffmpeg`, com `-fflags +bitexact` — sem essa flag o multiplexador Ogg sorteia o
+número de série do fluxo a cada execução, e re-renderizar o kit sujava o
+repositório com 48 bytes diferentes por arquivo sem que uma única amostra de áudio
+tivesse mudado. Com ela, as duas execuções seguidas saem idênticas nos quatro
+formatos. Entre builds diferentes de `ffmpeg` os bytes ainda podem mudar, então os
+hashes desses três formatos valem como integridade, não como garantia de
+reprodução.
 
 A única exceção declarada é a **voz**, que veio do sintetizador de formantes
 `espeak-ng` — chamado uma única vez, com o comando que está no manifesto, para
@@ -115,6 +140,7 @@ O código, o raciocínio e as medições estão em
 
 ```sh
 pnpm audio-logo            # renderiza o kit inteiro em docs/audio/danitools/
+pnpm audio-logo:verify     # confere os mestres contra os hashes do manifesto
 pnpm audio-logo:test       # afere o medidor e valida as entregas
 ```
 
