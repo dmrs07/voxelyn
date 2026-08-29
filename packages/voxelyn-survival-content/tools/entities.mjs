@@ -346,7 +346,7 @@ const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_I
 // e UMA massa continua, mais larga que alta ate a linha do cume — e sao as
 // torres que devolvem a altura de chefe final.
 // ---------------------------------------------------------------------------
-const guardianModel = (anim, f) => {
+export const guardianModel = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
   const swing = anim === 'attack' ? [0, 1, 3, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;

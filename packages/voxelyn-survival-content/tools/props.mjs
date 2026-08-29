@@ -75,7 +75,7 @@ const ring = (boxes, z, inset, h, mat) => {
  * junto — so mudar de cor devolveria o problema original, um brilho piscando
  * sem volume.
  */
-const coreModel = (phase, taken) => {
+export const coreModel = (phase, taken) => {
   const boxes = [];
   const bob = Math.round(Math.sin(phase * Math.PI * 2) * 1.5);
   const swell = Math.sin(phase * Math.PI * 2) > 0.4 ? 1 : 0;
