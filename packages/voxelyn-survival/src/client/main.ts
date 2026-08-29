@@ -79,6 +79,8 @@ import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
 import { deployVeil, veilActive } from './deploy-veil';
+import { runBootSequence } from './boot';
+import { buildBootPlan } from './boot/boot-plan';
 import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
@@ -2729,13 +2731,49 @@ if (new URLSearchParams(location.search).get('dev') === '1') {
 // CACHE, entao nao espera a rede. A busca do perfil ao vivo o reescreve depois.
 renderDescentClearance();
 
-// auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
-// que e como as pessoas realmente compartilham: quem recebe entra direto.
+// ---------------------------------------------------------------------------
+// A sequencia de abertura
+// ---------------------------------------------------------------------------
+//
+// Ate aqui este arquivo terminava revelando nada: o `#menu` ja estava pintado
+// desde o HTML e o modulo so pendurava handlers nele. Agora o menu nasce
+// `hidden` e QUEM O REVELA e o fim da abertura — a identidade da companhia, a
+// tela de carregamento com preload real, e so entao o terminal.
+//
+// Tres cuidados que esta ligacao precisa ter, e que o resto do arquivo assume:
+//
+// 1) NENHUMA RUN COMECA AQUI. O preload prepara recursos compartilhados
+//    (fontes, atlas, imagem de fundo) e nada mais: nenhum `createRun`, nenhum
+//    tick, nenhum mundo. O auto-start por query — que E um pedido explicito do
+//    jogador, feito no link — foi movido para DEPOIS do boot pelo mesmo
+//    motivo: uma descida nao pode nascer atras de uma tela de carregamento.
+//
+// 2) O AUDIO NAO E TOCADO. O `AudioContext` continua nascendo do primeiro
+//    gesto, como o navegador exige; a abertura e muda de propósito.
+//
+// 3) A ENTREGA ACONTECE UMA VEZ. `onReady` roda no maximo uma vez em toda a
+//    vida da pagina (garantido por `boot/index.ts`), entao nada aqui pode ser
+//    inicializado duas vezes.
 const params = new URLSearchParams(location.search);
 const roomParam = params.get('room');
 if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
-if (roomParam || params.get('online') === '1') startOnline();
-else if (params.get('solo') === '1') startSolo();
+
+void runBootSequence({
+  buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),
+  onReady: () => {
+    // O menu entra sob o escurecimento da abertura — nunca por cima da barra
+    // ainda visivel. Sem `deployVeil` aqui de proposito: o veu e a ficcao da
+    // DESCIDA (o casco se abrindo para o Veio), e usa-lo para entrar no
+    // terminal gastaria o gesto no lugar errado.
+    menu.classList.remove('hidden');
+    // auto-start por query (?online=1). ?room=XYZ transforma o convite num
+    // LINK, que e como as pessoas realmente compartilham: quem recebe entra
+    // direto — agora com os atlas ja carregados, entao a run que nasce do
+    // link nasce desenhada.
+    if (roomParam || params.get('online') === '1') startOnline();
+    else if (params.get('solo') === '1') startSolo();
+  },
+});
 
 // PWA: registra o service worker (app shell offline para o solo)
 if ('serviceWorker' in navigator) {

@@ -34,12 +34,19 @@ const SHELL = ['./', './index.html'];
 // toca o backup procedural (que vive no bundle) — musica ausente nao pode
 // custar o install do PWA. E como e um arquivo de public/ (nao passa pelo
 // rollup), a lista injetada do precache nunca o veria.
+//
+// A key art da abertura entra pelo MESMO criterio e pela mesma porta: e um
+// arquivo de public/, e sem ela a tela de carregamento fica com o leito escuro
+// do design system — que e uma tela completa, so mais sobria. O que NAO pode
+// acontecer e a abertura ficar dependendo de rede num PWA aberto offline; por
+// isso ela e precacheada, e por isso a falha do precache dela e engolida.
 const OPTIONAL = [
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
   './audio/voxelyn-survival-theme.flac',
   './audio/voxelyn-survival-menu.flac',
+  './boot/keyart-1600.webp',
 ];
 
 self.addEventListener('install', (event) => {
