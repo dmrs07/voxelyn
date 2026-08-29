@@ -1266,6 +1266,33 @@
       #options-controls .row {
         justify-content: space-between;
       }
+      /* A faixa de creditos.
+         O rotulo corre NA MESMA LINHA do texto, e nao acima dele com a regra
+         de secao que os grupos de controle usam. Os outros quatro grupos sao
+         formularios — a regra separa o rotulo do campo que ele nomeia; este e
+         um colofao, onde "CRÉDITOS: fulano" e uma frase so. A linha
+         economizada e o que faz a folha caber numa paisagem de celular. */
+      .ax-credits {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 12px;
+      }
+      .ax-credits .ax-section-label {
+        border-bottom: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        flex: 0 0 auto;
+      }
+      /* As duas linhas correm lado a lado e so quebram quando a largura acaba.
+         `gap` em duas medidas — pouco entre elas empilhadas, mais lado a lado
+         — para que os dois estados fiquem legiveis sem uma segunda regra. */
+      .ax-credits-lines {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px 22px;
+        min-width: 0;
+      }
       #options-controls .row label {
         min-width: 72px;
       }
@@ -1276,15 +1303,67 @@
       #options #options-controls {
         max-width: 860px;
       }
-      /* Na folha de opcoes em paisagem, a grade 2×2 do board 3c: tudo visivel
-         de uma vez, sem rolagem — a rolagem so volta como rede de seguranca em
-         telas realmente curtas. */
-      @media (min-width: 701px) {
+      /* Na folha de opcoes em paisagem, DUAS COLUNAS: tudo visivel de uma vez,
+         sem rolagem — a rolagem so volta como rede de seguranca em telas
+         realmente curtas.
+
+         Fluxo em colunas (`columns`) e nao grade, e a diferenca e o que faz a
+         tela caber. Uma grade posiciona por LINHA: com cinco grupos em duas
+         colunas, o quinto abre uma terceira linha sozinho e empurra os
+         Creditos para fora do enquadro — enquanto a coluna da direita fica
+         vazia abaixo de Telemetria. O fluxo em coluna preenche esse vazio: os
+         grupos escorrem, o navegador equilibra as duas alturas, e a folha
+         inteira encolhe para a altura da coluna mais alta.
+         `break-inside: avoid` e o que impede um grupo de ser partido no meio.
+         O `gap` do flex nao vale em fluxo de blocos, entao o respiro volta
+         como margem.
+         O ponto de corte e 560px e nao 701px porque paisagens curtas de
+         celular (667x375, 740x360) sao justamente as que mais precisam da
+         segunda coluna: empilhadas, elas nao caberiam de jeito nenhum. */
+      @media (min-width: 560px) {
         #options #options-controls {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px 32px;
-          align-content: start;
+          display: block;
+          columns: 2;
+          column-gap: 32px;
+        }
+        #options #options-controls .ax-optgroup {
+          break-inside: avoid;
+          margin-bottom: 12px;
+        }
+        #options #options-controls .ax-optgroup:last-child {
+          margin-bottom: 0;
+        }
+        /* O colofao atravessa: uma faixa larga sob as colunas custa uma linha
+           curta, enquanto o mesmo bloco DENTRO de uma coluna custa tres (o
+           nome completo quebra numa coluna estreita). */
+        #options #options-controls .ax-credits {
+          column-span: all;
+          margin-top: 4px;
+        }
+      }
+
+      /* Retrato estreito: sem largura para a segunda coluna, os cinco grupos
+         empilham e a folha fica alta. A compactacao e a mesma da paisagem
+         baixa — e pelo mesmo motivo, so que pelo outro eixo: o respiro encolhe
+         antes do conteudo, e nenhum alvo de toque fica menor.
+
+         Aqui a folha ainda pode rolar num aparelho realmente pequeno (a soma
+         dos cinco grupos passa da altura util), mas os creditos deixam de ser
+         o unico bloco sempre cortado: eles custam UMA linha em vez de tres. */
+      @media (max-width: 700px) {
+        #options #options-controls .ax-optgroup {
+          gap: 6px;
+        }
+        #options #options-controls .ax-section-label {
+          margin-top: 0;
+          padding-bottom: 2px;
+        }
+        #options .ax-sheet-head {
+          padding: 5px 14px;
+        }
+        #options .ax-sheet-foot {
+          padding: 4px 14px;
+          min-height: 24px;
         }
       }
 
@@ -2238,8 +2317,39 @@
         .overlay {
           gap: 8px;
         }
+        /* A folha de opcoes numa tela baixa: o respiro encolhe ANTES do
+           conteudo. Cada um destes numeros vale poucos pixels sozinho, e
+           juntos valem a diferenca entre a folha inteira caber e os creditos
+           ficarem cortados na borda de baixo — que era exatamente o defeito.
+           Nenhum controle muda de tamanho: o que encolhe e o espaco entre
+           eles. */
         #options-controls {
           gap: 7px;
+        }
+        #options #options-controls .ax-optgroup {
+          gap: 6px;
+          margin-bottom: 6px;
+        }
+        #options #options-controls .ax-credits {
+          margin-top: 2px;
+        }
+        #options #options-controls .ax-section-label {
+          margin-top: 0;
+          padding-bottom: 1px;
+        }
+        #options .ax-sheet-body {
+          padding: 3px 14px;
+        }
+        /* O cromo da folha e o maior gasto de altura numa paisagem de celular:
+           cabecalho e rodape somavam 97px dos 360 da tela. Encolhe-los aqui
+           devolve a altura para o CONTEUDO — nenhum controle fica menor, e o
+           alvo de toque de cada linha continua o mesmo. */
+        #options .ax-sheet-head {
+          padding: 5px 14px;
+        }
+        #options .ax-sheet-foot {
+          padding: 3px 14px;
+          min-height: 22px;
         }
         h1 {
           font-size: clamp(14px, 3.4vw, 20px);
@@ -3030,13 +3140,23 @@
                   dados anônimos de sessão, sem identificação
                 </div>
               </div>
-              <div class="ax-optgroup">
+              <!--
+                Os creditos sao a unica secao que nao configura NADA: sao o
+                colofao da folha. Por isso eles atravessam as duas colunas em
+                vez de disputar uma delas (`column-span: all`), e as duas
+                linhas correm lado a lado quando ha largura — o que os tira do
+                caminho vertical e mantem a folha inteira dentro do enquadro
+                numa paisagem de celular.
+              -->
+              <div class="ax-optgroup ax-credits">
                 <div class="ax-section-label" data-i18n="aurix.options.credits">Créditos</div>
-                <div class="sub" data-i18n="credits.game">
-                  jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)
-                </div>
-                <div class="sub" data-i18n="credits.music">
-                  trilha sonora por Clevo (@clevoclevoclevo)
+                <div class="ax-credits-lines">
+                  <span class="sub" data-i18n="credits.game">
+                    jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)
+                  </span>
+                  <span class="sub" data-i18n="credits.music">
+                    trilha sonora por Clevo (@clevoclevoclevo)
+                  </span>
                 </div>
               </div>
             </div>
