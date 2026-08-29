@@ -211,6 +211,7 @@ export const renderBrandingLayer = async ({ width, height }) => {
     // As fontes sao data URI, entao carregam sincronamente com o documento — mas
     // esperar por `document.fonts.ready` e barato e elimina a unica corrida que
     // sobraria: capturar antes de o layout reflowar com a metrica certa.
+    // eslint-disable-next-line no-undef -- roda dentro da pagina, nao no Node
     await page.evaluate(() => document.fonts.ready);
     const buffer = await page.screenshot({ type: 'png', omitBackground: true });
     return PNG.sync.read(buffer);

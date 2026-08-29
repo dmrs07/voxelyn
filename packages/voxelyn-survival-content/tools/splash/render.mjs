@@ -178,7 +178,7 @@ export const renderBand = (scene, cam, lights, buffers, rowStart, rowEnd, option
   const samples = options.samples ?? 1;
   // Calculado uma vez por faixa: o padrao depende so da contagem de amostras.
   const offsets = sampleOffsets(samples);
-  const { width, height } = buffers;
+  const { width } = buffers;
 
   for (let py = rowStart; py < rowEnd; py++) {
     for (let px = 0; px < width; px++) {

@@ -51,7 +51,6 @@ import {
  */
 export const chargeVein = (state, segment, oreBudget = 64) => {
   const w = state.config.width;
-  const h = state.config.height;
   const events = [];
 
   // A nascente: a celula do segmento mais proxima do berco. E de la que a

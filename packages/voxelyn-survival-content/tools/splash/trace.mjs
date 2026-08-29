@@ -124,7 +124,7 @@ export const trace = (scene, ox, oy, oz, dx, dy, dz, maxT, out) => {
   let tMaxY = dy !== 0 ? ((dy > 0 ? y + 1 - (oy + dy * t) : oy + dy * t - y) * invY) + t : Infinity;
   let tMaxZ = dz !== 0 ? ((dz > 0 ? z + 1 - (oz + dz * t) : oz + dz * t - z) * invZ) + t : Infinity;
 
-  const { width, height, depth, mat, obj, brick, bw, bh, bd } = scene;
+  const { width, height, depth, mat, obj, brick, bw, bh } = scene;
   let axis = AXIS_Z;
   let sign = -stepZ;
 

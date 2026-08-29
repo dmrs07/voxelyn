@@ -20,7 +20,7 @@ import { createCamera, tileToVoxel, projectPoint } from './camera.mjs';
 import { buildLights } from './lights.mjs';
 import { chargeVein } from './vein.mjs';
 import { veinAxis } from './scout-seed.mjs';
-import { createBuffers, renderBand } from './render.mjs';
+import { createBuffers } from './render.mjs';
 import { renderBrandingLayer, composite } from './branding.mjs';
 import {
   compose,
