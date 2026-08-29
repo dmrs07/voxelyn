@@ -570,6 +570,14 @@ const projectileLightSpec = (projectile: {
   if (projectile.kind === 'return_disc') return { r: 1.6, power: 0.34, hex: PAL.loot };
   if (projectile.kind === 'rock') return { r: 1.4, power: 0.26, hex: PAL.electric };
   if (projectile.kind === 'seeker') return { r: 2.1, power: 0.44, hex: '#ffa63f' };
+  // FLECHETTE: a luz mais fraca do arsenal, e a razao e aritmetica. Com a
+  // Minigun na cadencia maxima ha ate quinze balas vivas ao mesmo tempo; se
+  // cada uma acendesse como um estilhaco comum (raio 1,8), a arma
+  // sozinha apagaria o escuro que e a materia-prima do jogo. Um sexto do raio
+  // e menos de um terco da potencia: as quinze somadas custam pouco mais que
+  // um bolt, e o que sobra e o corredor CINTILANDO enquanto o muro passa, que
+  // e exatamente o que a arma deve parecer.
+  if (projectile.kind === 'flechette') return { r: 0.62, power: 0.12, hex: PAL.biolum };
   if (projectile.hostile) return { r: 1.5, power: 0.3, hex: PAL.acid };
   const armed =
     projectile.modules?.explosive &&

@@ -170,10 +170,20 @@ export class ModulePropField {
     module: ModuleId,
     slot: number,
     origin: PropOrigin | null,
-    tick: number,
+    /**
+     * O que torna ESTE evento distinto dos outros do mesmo slot e modulo.
+     *
+     * Quem chama passa o `sourceSiteId` do `module_selected`: um cofre abre
+     * uma vez, entao a tripla (slot, modulo, cofre) identifica a selecao sem
+     * ambiguidade — e o mesmo evento reentregue por um resync cai na mesma
+     * chave e nao encena duas vezes. Um tick tambem serviria; o que nao
+     * serviria e deduplicar so por (slot, modulo), porque pegar e depois
+     * RECARREGAR o mesmo cartucho sao duas coisas que aconteceram.
+     */
+    identity: number,
     nowMs: number,
   ): void {
-    if (!this.claim(`sel:${slot}:${module}:${tick}`, nowMs)) return;
+    if (!this.claim(`sel:${slot}:${module}:${identity}`, nowMs)) return;
     if (this.flights.length >= MAX_INSTALL_FLIGHTS) this.flights.shift();
     this.flights.push({ module, slot, origin, startedAt: nowMs, seatUntil: 0 });
   }
@@ -191,7 +201,8 @@ export class ModulePropField {
     slot: number,
     x: number,
     y: number,
-    tick: number,
+    /** Ver `install`: o que separa duas expiracoes do mesmo modulo. */
+    identity: number,
     nowMs: number,
     facingX = 0,
     facingY = 0,
@@ -204,7 +215,7 @@ export class ModulePropField {
      */
     reducedMotion = false,
   ): void {
-    if (!this.claim(`exp:${slot}:${module}:${tick}`, nowMs)) return;
+    if (!this.claim(`exp:${slot}:${module}:${identity}`, nowMs)) return;
     if (this.ejected.length >= MAX_EJECTED_PROPS) this.ejected.shift();
     // Para FORA e para CIMA, oposto ao rumo do corpo: a peca e cuspida pelo
     // hardpoint, e sair na direcao em que o jogador esta olhando faria o

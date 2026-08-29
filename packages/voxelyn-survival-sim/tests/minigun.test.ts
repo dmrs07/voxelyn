@@ -22,7 +22,12 @@ import {
   minigunRateMilli,
   minigunSpread,
 } from '../src/minigun';
-import { MODULE_DEFINITIONS, activeWeaponModule, grantOrRechargeModule } from '../src/modules';
+import {
+  MODULE_DEFINITIONS,
+  activeWeaponModule,
+  grantOrRechargeModule,
+  rollModuleChoice,
+} from '../src/modules';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
 import type { PlayerCommand, SemanticEvent, SurvivalState } from '../src/types';
 
@@ -456,6 +461,36 @@ describe('minigun — projetil, dano acumulado e compatibilidade', () => {
     // Cinco janelas por segundo, no maximo — nunca dezesseis.
     expect(bursts.length).toBeLessThanOrEqual(Math.ceil(40 / MINIGUN_BURST_EVENT_TICKS));
     expect(roundsIn(events)).toBeGreaterThan(bursts.length);
+  });
+});
+
+describe('minigun — o cofre pode oferece-la', () => {
+  it('aparece no pool de classe III e em nenhum abaixo dele', () => {
+    const state = createRun({ seed: 7 });
+    const tierOf = (tier: 1 | 2 | 3): Set<string> => {
+      const seen = new Set<string>();
+      for (let site = 0; site < 60; site++) {
+        for (const id of rollModuleChoice(state.config.seed, site, tier, state.playerExtra, 0)) {
+          seen.add(id);
+        }
+      }
+      return seen;
+    };
+    expect(tierOf(3).has('minigun')).toBe(true);
+    expect(tierOf(2).has('minigun')).toBe(false);
+    expect(tierOf(1).has('minigun')).toBe(false);
+    expect(MODULE_DEFINITIONS.minigun.tier).toBe(3);
+  });
+
+  it('a oferta continua deterministica com o modulo novo no pool', () => {
+    const state = createRun({ seed: 7 });
+    for (let site = 0; site < 12; site++) {
+      const first = rollModuleChoice(state.config.seed, site, 3, state.playerExtra, 0);
+      const again = rollModuleChoice(state.config.seed, site, 3, state.playerExtra, 0);
+      expect(again).toEqual(first);
+      // Nunca duas vezes o mesmo cartucho: o terminal oferece uma ESCOLHA.
+      expect(first[0]).not.toBe(first[1]);
+    }
   });
 });
 
