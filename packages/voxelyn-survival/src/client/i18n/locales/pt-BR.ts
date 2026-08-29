@@ -90,7 +90,7 @@ export const PT_BR = {
   'aurix.options.audio': 'Áudio',
   'aurix.options.telemetry': 'Telemetria',
   'aurix.options.credits': 'Créditos',
-  'credits.game': 'jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.game': 'jogo por DaniTools (@dani.tools)',
   'credits.music': 'trilha sonora por Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'alterações salvas localmente',
 

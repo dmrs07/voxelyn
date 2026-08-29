@@ -74,7 +74,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'aurix.options.audio': 'Audio',
   'aurix.options.telemetry': 'Telemetry',
   'aurix.options.credits': 'Credits',
-  'credits.game': 'game by Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.game': 'game by DaniTools (@dani.tools)',
   'credits.music': 'soundtrack by Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'changes saved locally',
 
