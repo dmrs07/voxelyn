@@ -697,6 +697,12 @@ export const PT_BR = {
   'module.return_disc.label': 'RETURN DISC',
   'module.return_disc.description': 'Causa dano na ida e retorna perseguindo o Prospector.',
   'module.return_disc.proc': 'RETORNOS',
+  'module.minigun.label': 'CANHÃO ROTATIVO',
+  'module.minigun.description':
+    'Os canos precisam pegar no tranco. Depois disso, despeja balas fracas até o cano travar.',
+  'module.minigun.proc': 'BALAS',
+  'hud.minigun.spinup': 'GIRANDO',
+  'hud.minigun.overheated': 'CANO TRAVADO',
   'module.lifetime.charges': '{count} {proc}',
   'module.lifetime.duration': '{seconds}s',
 

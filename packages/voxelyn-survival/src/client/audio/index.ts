@@ -11,11 +11,17 @@
 // 'suspended' em todo browser movel e depois soa com atraso ou nao soa; criar
 // no primeiro toque e o que garante que o primeiro tiro da run ja tenha som.
 
-import { TICK_HZ, normalizedDepth, runSectorCount } from '@voxelyn/survival-sim';
+import {
+  MINIGUN_SPIN_MAX,
+  TICK_HZ,
+  normalizedDepth,
+  runSectorCount,
+} from '@voxelyn/survival-sim';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
 import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents } from './cues';
+import { MinigunBus } from './minigun-bus';
 import { CueMixer, NEAR_CUTOFF_HZ } from './mixer';
 import { MusicBus } from './music-bus';
 import {
@@ -68,6 +74,7 @@ export class AudioDirector {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
+  private minigunBus: MinigunBus | null = null;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
@@ -141,6 +148,7 @@ export class AudioDirector {
     this.applyMasterGain();
     if (muted) {
       this.ambienceBus?.silence();
+      this.minigunBus?.silence();
       // O scheduler para junto (update retorna cedo com muted); silenciar o
       // barramento evita que o desmute volte com um acorde pendurado.
       this.musicBus?.silence();
@@ -234,6 +242,13 @@ export class AudioDirector {
       this.noise = createNoiseBuffer(ctx);
       this.ambienceBus = new AmbienceBus(ctx, master, this.noise);
       this.ambienceBus.start();
+      // O motor do canhao rotativo nasce junto com a ambiencia e em ganho
+      // zero, como ela: e um leito, e leito nao e criado no meio do combate.
+      // Criar sob demanda pouparia tres nos numa run que nunca ve a arma, e
+      // custaria um estalo de alocacao no primeiro tick de rotacao — que e
+      // exatamente o instante em que o jogador esta esperando o som.
+      this.minigunBus = new MinigunBus(ctx, master, this.noise);
+      this.minigunBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
       this.musicBus.setVolume(this.musicVolume);
@@ -333,6 +348,20 @@ export class AudioDirector {
       this.soundtrackBus?.silence();
     }
 
+    // O MOTOR do canhao rotativo segue o ESTADO autoritativo do jogador local,
+    // e nunca um contador do cliente: um relogio proprio divergiria do gatilho
+    // na primeira reconexao e o motor aceleraria depois de a arma ja estar
+    // cuspindo. `strain` e a mesma fracao de calor que o HUD desenha — o
+    // desafino do motor perto do travamento e a unica antecipacao sonora que
+    // o superaquecimento tem.
+    if (state.phase === 'running') {
+      const mg = state.playerExtra.minigun;
+      const strain = Math.min(1, state.playerExtra.heat / Math.max(1, state.config.tuning.heatMax));
+      this.minigunBus?.set(mg.spin / MINIGUN_SPIN_MAX, strain);
+    } else {
+      this.minigunBus?.silence();
+    }
+
     if (nowMs - this.lastSampleMs >= AMBIENCE_SAMPLE_MS) {
       this.lastSampleMs = nowMs;
       // Run terminada nao tem ambiencia: o silencio e o efeito. Os leitos
@@ -368,6 +397,7 @@ export class AudioDirector {
     this.lastStratum = null;
     this.lastOccupation = null;
     this.ambienceBus?.silence();
+    this.minigunBus?.silence();
     this.musicBus?.silence();
     this.soundtrackBus?.silence();
     this.activeSource = null;

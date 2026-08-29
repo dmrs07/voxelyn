@@ -41,6 +41,8 @@ import {
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
   HEAT_MAX,
+  MINIGUN_SPIN_FIRE_AT,
+  MINIGUN_SPIN_MAX,
   RICOCHET_BOUNCES,
   liveProjectileModules,
   moduleHasCapacity,
@@ -133,6 +135,10 @@ import {
   type Rect,
   type SafeInsets,
 } from './module-layout';
+import { CasingField } from './casings';
+import { drawMinigunMount } from './minigun-mount';
+import { MinigunViews } from './minigun-view';
+import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
 import { RouteMemory, drawSurveyHud, drawSurveyWorld, hasSurvey } from './survey-overlay';
 import {
@@ -926,6 +932,16 @@ const drawModuleGlyph = (
     ctx.lineTo(cx + 4 * u, cy + 2 * u);
     ctx.stroke();
     ctx.fillRect(cx + 2 * u, cy, 3 * u, u);
+  } else if (id === 'minigun') {
+    // Tres canos empilhados apontando para a direita, com o tambor atras.
+    // MULTIPLICIDADE e a leitura, no glifo como no cartucho: um tubo unico
+    // seria o perfurante em 22 pixels.
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(cx - u, cy + (i - 1) * 2 * u - u / 2, (i === 1 ? 6 : 5) * u, u);
+    }
+    ctx.beginPath();
+    ctx.arc(cx - 2.5 * u, cy, 2.4 * u, 0, Math.PI * 2);
+    ctx.stroke();
   } else {
     ctx.beginPath();
     ctx.arc(cx, cy, 4 * u, 0, Math.PI * 2);
@@ -1188,6 +1204,51 @@ export class SurvivalRenderer {
   readonly particles = new VoxelParticles();
   readonly projectileView = new ProjectileView();
   /**
+   * O latao da Minigun. Apresentacao pura, com anel de reuso e teto por
+   * jogador — ver `casings.ts`. Vive no renderer e nao no `VoxelParticles`
+   * porque uma capsula nao e uma particula: ela gira, quica um numero
+   * DECLARADO de vezes e assenta, e o sistema de particulas nao tem nenhuma
+   * dessas tres coisas.
+   */
+  readonly casings = new CasingField();
+  /**
+   * Os cartuchos voando para dentro e para fora do Prospector. Generico: vale
+   * para os sete modulos, nao so para a Minigun. Ver `module-props.ts`.
+   */
+  readonly moduleProps = new ModulePropField();
+  /**
+   * A rotacao do canhao COMO O CLIENTE A CONHECE, por slot.
+   *
+   * Existe pelo parceiro remoto: o snapshot dele nao carrega `minigun`, e sem
+   * isto o Prospector do outro apareceria com a arma parada cuspindo dezesseis
+   * balas por segundo. Ver `minigun-view.ts` — a rampa e reconstruida das
+   * transicoes com as constantes da propria simulacao, e o slot local
+   * sobrescreve tudo com o valor autoritativo.
+   */
+  private readonly minigunViews = new MinigunViews();
+  /**
+   * Onde o card de cada modulo do terminal foi desenhado por ultimo.
+   *
+   * Medido no DESENHO e nao recalculado: o layout depende da viewport, do
+   * modo de toque e das margens seguras, e uma segunda conta divergiria da
+   * primeira em alguma tela — o cartucho sairia voando de um ponto vazio.
+   * Sobrevive ao fechamento do painel de proposito: o `module_selected` chega
+   * no tick seguinte ao toque, quando o painel ja sumiu.
+   */
+  private readonly choiceCardCenters = new Map<ModuleId, { x: number; y: number; at: number }>();
+  /**
+   * Modulos que acabaram e ainda nao foram cuspidos.
+   *
+   * O `module_expired` chega em `ingestEvents`, que roda FORA do desenho e nao
+   * tem estado: a posicao e o rumo do Prospector que perdeu a peca so existem
+   * no quadro seguinte. Enfileirar aqui e resolver la e o que evita a
+   * alternativa — obrigar a simulacao a carregar coordenadas num evento que
+   * so serve para animar.
+   */
+  private pendingEjections: Array<{ module: ModuleId; slot: number; at: number }> = [];
+  /** Sal incremental das capsulas: duas rajadas iguais nao caem no mesmo lugar. */
+  private casingSalt = 0;
+  /**
    * A grade de luz do quadro. Vive na instancia e nao na funcao de desenho
    * porque ela REAPROVEITA o buffer: alocar vinte mil floats por quadro
    * entregaria ao coletor de lixo exatamente o orcamento que o espalhamento
@@ -1412,6 +1473,14 @@ export class SurvivalRenderer {
    */
   resetRunPresentation(): void {
     this.presentation.reset();
+    // O latao e os cartuchos sao memoria da RUN: sem a limpeza, a run nova
+    // comeca com o chao coberto pelas capsulas da anterior e com um cartucho
+    // ejetado quicando numa sala que nunca o viu sair.
+    this.casings.clear();
+    this.moduleProps.clear();
+    this.minigunViews.clear();
+    this.choiceCardCenters.clear();
+    this.pendingEjections = [];
     // Run nova na MESMA seed/setor nao muda o decorKey — mas os rastros sao
     // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
@@ -1672,11 +1741,47 @@ export class SurvivalRenderer {
         case 'module_charge_consumed':
           this.modulePulseUntil.set(ev.module, nowMs + 260);
           break;
+        case 'module_selected': {
+          // A INCORPORACAO. A origem preferida e o card do terminal, que este
+          // cliente acabou de desenhar; sem ela (parceiro remoto, cliente que
+          // entrou no meio, resync) o voo cai no clarao curto sobre o proprio
+          // jogador — a selecao ja aconteceu na simulacao e nao depende disto.
+          const card = this.choiceCardCenters.get(ev.module);
+          const origin: PropOrigin | null =
+            card && nowMs - card.at < 4000 ? { space: 'screen', x: card.x, y: card.y } : null;
+          this.moduleProps.install(ev.module, ev.slot, origin, ev.sourceSiteId, nowMs);
+          this.choiceCardCenters.clear();
+          break;
+        }
         case 'module_expired':
           this.messages.push({
             text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
             until: nowMs + 1800,
           });
+          // A EJECAO. Posicao e rumo vem do estado no proprio quadro do
+          // desenho (`stepModuleProps`), porque o evento nao os carrega — e
+          // nao deve: um evento cosmetico que exigisse posicao obrigaria a
+          // simulacao a saber que existe animacao.
+          this.pendingEjections.push({ module: ev.module, slot: ev.slot, at: nowMs });
+          break;
+        case 'minigun_spin':
+          this.minigunViews.applySpin(ev.slot, ev.phase, ev.spin);
+          break;
+        case 'minigun_burst':
+          this.minigunViews.applyBurst(ev.slot, ev.rounds, ev.spin, nowMs);
+          // As capsulas nascem da rajada AGREGADA, e por isso o jogo cospe
+          // logicamente mais balas do que desenha latao quando a carga aperta.
+          // E a decisao certa: o olho le densidade, nao contagem.
+          this.casings.emitBurst(
+            ev.slot,
+            ev.x,
+            ev.y,
+            ev.dx,
+            ev.dy,
+            ev.rounds,
+            Math.imul(ev.slot + 1, 0x9e3779b9) ^ Math.imul(ev.rounds, 0x85ebca6b) ^ this.casingSalt++,
+            this.quality.maxFx / PRESETS.high.maxFx,
+          );
           break;
         case 'salvage_cache_opened':
           this.messages.push({ text: t('toast.cache.opened'), until: nowMs + 2200 });
@@ -3140,6 +3245,47 @@ export class SurvivalRenderer {
                   allyTint: !isLocal,
                 });
               }
+              // O CANHAO ROTATIVO por cima da arma. Sobreposicao procedural e
+              // nao quadro de atlas: oito rumos x quatro posicoes de cano
+              // seriam trinta e dois quadros por animacao para uma peca que
+              // dura vinte segundos — e um quadro pre-renderizado nunca
+              // poderia responder a rotacao real. Ver `minigun-mount.ts`.
+              //
+              // A condicao e a ROTACAO, e nao a posse do modulo: o parceiro
+              // remoto nao tem `activeModules` neste cliente, e os canos
+              // continuam desacelerando por um instante depois da bala 300.
+              const gunView = this.minigunViews.get(slot);
+              if (gunView.spin > 0.001) {
+                drawMinigunMount(
+                  ctx,
+                  psx,
+                  psy,
+                  presented.facingX,
+                  presented.facingY,
+                  z,
+                  {
+                    spin: gunView.spin,
+                    // O calor so e conhecido do jogador local; no parceiro o
+                    // cano fica frio em vez de inventar um estado que este
+                    // cliente nao recebe.
+                    heat: isLocal ? Math.min(1, ex.heat / HEAT_MAX) : 0,
+                    flash: this.minigunViews.firingFlash(slot, nowMs),
+                    overheated: gunView.phase === 'overheated',
+                  },
+                );
+                // VAPOR so perto do travamento, nunca durante a rajada: fumaca
+                // continua taparia o proprio alvo, e o que ela tem a dizer e
+                // "esta prestes a travar", nao "esta atirando".
+                if (isLocal && (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82)) {
+                  this.particles.emitOverheatSmoke(
+                    slot,
+                    pl.x,
+                    pl.y,
+                    nowMs,
+                    this.quality.maxFx / PRESETS.high.maxFx,
+                  );
+                }
+              }
               // Os marcos geracionais vao DEPOIS do corpo, por cima dele, e so
               // no Prospector local: o parceiro do co-op e padronizado enquanto
               // o modo for G-00, e desenhar a geracao de quem nao a tem seria
@@ -3524,6 +3670,33 @@ export class SurvivalRenderer {
     // chao e do bloco, mas continuam atras do HUD.
     this.particles.step(dtFx);
     this.particles.draw(ctx, toScreen, z, TILE_H);
+
+    // O LATAO e os CARTUCHOS EJETADOS. Depois das particulas e antes dos
+    // numeros de dano: sao objetos no chao, entao passam por cima do terreno
+    // e por baixo de tudo que informa. `visible` corta pela camera antes de
+    // qualquer conta — capsula fora da tela nao pode custar nada.
+    const onCamera = (sx: number, sy: number): boolean =>
+      sx > -60 && sx < vw + 60 && sy > -60 && sy < vh + 60;
+    this.stepModuleProps(state, dtFx, nowMs);
+    // A rampa reconstruida anda com o tempo REAL; os slots cujo estado o
+    // cliente conhece por inteiro sao reancorados logo depois, entao a
+    // integracao so vale para quem nao tem outra fonte.
+    this.minigunViews.step(dtFx);
+    // So o slot LOCAL e reancorado no estado. `net.ts` preenche `minigun`
+    // apenas para o viewer, entao reancorar um slot remoto zeraria a
+    // reconstrucao com um `idle` que nunca foi atualizado. Os demais vivem da
+    // integracao acima, que e o que este registro existe para fazer.
+    const localExtra = state.playerExtras[this.localPlayerId - 1];
+    if (localExtra?.joined) {
+      this.minigunViews.applyAuthoritative(
+        this.localPlayerId - 1,
+        localExtra.minigun.phase,
+        localExtra.minigun.spin,
+      );
+    }
+    this.casings.step(dtFx);
+    this.casings.draw(ctx, toScreen, z, TILE_H, onCamera);
+    this.moduleProps.drawWorld(ctx, toScreen, z, TILE_H, onCamera, nowMs);
     this.fxList = this.fxList.filter((fx) => (fx.life -= dtFx) > 0);
     for (const fx of this.fxList) {
       const t = 1 - fx.life / fx.maxLife;
@@ -3557,6 +3730,11 @@ export class SurvivalRenderer {
 
     this.renderRewardFlight(toScreen, nowMs);
     this.renderCargoFlights(toScreen, nowMs);
+    // O voo de incorporacao e desenhado em espaco de TELA, depois do mundo e
+    // antes da HUD: o cartucho sai de um card de interface e chega a um corpo
+    // do mundo, entao ele nao pertence a nenhum dos dois — mas nunca pode
+    // passar por cima do painel de vida.
+    this.renderModuleInstallFlights(state, toScreen, nowMs);
     this.trackSector(state, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
@@ -4387,7 +4565,95 @@ export class SurvivalRenderer {
     this.cargoFlights = alive;
   }
 
-  private renderRewardFlight(
+/**
+   * Resolve as ejecoes pendentes e adianta a fisica dos cartuchos.
+   *
+   * As duas coisas juntas porque as duas precisam do MESMO quadro: a ejecao
+   * so pode nascer quando ha um corpo no mundo de onde sair, e a fisica so
+   * anda com o passo real que o desenho acabou de medir.
+   *
+   * Uma pendencia que nao acha o dono (parceiro que saiu, jogador que morreu
+   * no mesmo tick) e DESCARTADA depois de meio segundo em vez de esperar para
+   * sempre: um cartucho que sai de um corpo que ja nao esta la nao conta
+   * nada, e a fila nao pode crescer sem teto.
+   */
+  private stepModuleProps(state: SurvivalState, dtMs: number, nowMs: number): void {
+    if (this.pendingEjections.length > 0) {
+      const stillPending: typeof this.pendingEjections = [];
+      for (const pending of this.pendingEjections) {
+        const player = state.players[pending.slot];
+        const extra = state.playerExtras[pending.slot];
+        if (!player || !extra?.joined || !player.alive) {
+          if (nowMs - pending.at < 500) stillPending.push(pending);
+          continue;
+        }
+        // A Minigun sai FUMEGANTE: o calor do cano no instante da ultima bala
+        // vira o brilho residual da peca no ar. Os outros modulos saem frios,
+        // porque nenhum deles aquece nada.
+        const heat =
+          pending.module === 'minigun'
+            ? Math.min(1, extra.heat / HEAT_MAX)
+            : 0;
+        this.moduleProps.eject(
+          pending.module,
+          pending.slot,
+          player.x,
+          player.y,
+          pending.at,
+          nowMs,
+          player.facing.x,
+          player.facing.y,
+          heat,
+        );
+      }
+      this.pendingEjections = stillPending;
+    }
+    this.moduleProps.step(dtMs, nowMs);
+  }
+
+  /**
+   * Os cartuchos que estao voando para dentro do Prospector.
+   *
+   * O destino e resolvido A CADA QUADRO a partir do corpo: o bot anda durante
+   * os 620 ms do voo, e um destino congelado no inicio faria o cartucho pousar
+   * onde ele estava, nao onde ele esta. Quando o corpo nao pode ser resolvido
+   * — fora da camera, ainda nao entrou, caiu no meio do voo — o recuo e o
+   * painel da HUD, que e onde o modulo passa a existir de qualquer forma.
+   */
+  private renderModuleInstallFlights(
+    state: SurvivalState,
+    toScreen: (x: number, y: number) => [number, number],
+    nowMs: number,
+  ): void {
+    if (this.moduleProps.flightCount === 0) return;
+    const hudFallback = { x: this.safeArea.left + 30, y: this.safeArea.top + 80 };
+    this.moduleProps.drawScreen(
+      this.ctx,
+      nowMs,
+      (slot) => {
+        const player = state.players[slot];
+        const extra = state.playerExtras[slot];
+        if (!player || !extra?.joined || !player.alive) return null;
+        const [sx, sy] = toScreen(player.x, player.y);
+        // Uns pixels acima dos pes: o hardpoint fica no ombro, e um cartucho
+        // pousando na sombra do bot leria como algo caindo no chao.
+        return { x: sx, y: sy - 18 * this.zoom };
+      },
+      (origin) => {
+        if (origin.space === 'screen') return { x: origin.x, y: origin.y };
+        const [sx, sy] = toScreen(origin.x, origin.y);
+        // Cofre fora da camera: sem origem visivel nao ha arco honesto a
+        // desenhar, e o recuo assume.
+        if (sx < -80 || sx > window.innerWidth + 80 || sy < -80 || sy > window.innerHeight + 80) {
+          return null;
+        }
+        return { x: sx, y: sy };
+      },
+      hudFallback,
+    );
+  }
+
+    private renderRewardFlight(
     toScreen: (x: number, y: number) => [number, number],
     nowMs: number,
   ): void {
@@ -4586,6 +4852,54 @@ export class SurvivalRenderer {
     ctx.fillStyle = 'rgba(232,241,255,0.45)';
     ctx.fillRect(hpBarX + Math.round(hpBarW * HEAT_WARN_AT), safeTop + 31, 1, 6);
 
+    // ROTACAO DO CANHAO, colada ao trilho de calor.
+    //
+    // Dois pixels sob a barra que ja existe, e nao um medidor novo. O jogador
+    // ja tem de olhar para o calor enquanto segura o gatilho da Minigun — as
+    // duas leituras sao a MESMA decisao ("posso continuar?"), e separa-las em
+    // dois cantos do painel obrigaria a dividir a atencao no unico momento em
+    // que ela esta toda no combate.
+    //
+    // O trilho so aparece quando ha rotacao para mostrar: com a arma parada e
+    // sem municao ele nao ocupa pixel nenhum.
+    const minigunEquipped = extra.activeModules.some((module) => module.id === 'minigun');
+    const spinFrac = extra.minigun.spin / MINIGUN_SPIN_MAX;
+    if (minigunEquipped || spinFrac > 0) {
+      const spinY = safeTop + 37;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(hpBarX, spinY, hpBarW, 2);
+      // Verde enquanto sobe, ambar quando ja esta cuspindo: a cor troca no
+      // MESMO ponto em que a arma comeca a atirar, entao a barra ensina o
+      // limiar sem numero nenhum.
+      const firing = extra.minigun.phase === 'firing';
+      ctx.fillStyle = firing ? PAL.loot : PAL.biolum;
+      ctx.fillRect(hpBarX, spinY, hpBarW * spinFrac, 2);
+      // A marca do limiar operacional: o ponto a partir do qual sai bala.
+      ctx.fillStyle = 'rgba(232,241,255,0.5)';
+      ctx.fillRect(
+        hpBarX + Math.round((hpBarW * MINIGUN_SPIN_FIRE_AT) / MINIGUN_SPIN_MAX),
+        spinY - 1,
+        1,
+        4,
+      );
+      // O ESTADO em palavra, so nos dois momentos em que ele nao e obvio pela
+      // barra: girando sem atirar, e travado. "Atirando" nao precisa de
+      // legenda — a tela inteira ja esta dizendo isso.
+      const label =
+        extra.minigun.phase === 'spinning_up'
+          ? t('hud.minigun.spinup')
+          : extra.minigun.phase === 'overheated'
+            ? t('hud.minigun.overheated')
+            : '';
+      if (label) {
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = extra.minigun.phase === 'overheated' ? PAL.blood : PAL.biolum;
+        ctx.fillText(label, hpBarX + hpBarW, spinY - 4);
+        ctx.textAlign = 'left';
+      }
+    }
+
     ctx.strokeStyle = 'rgba(232,241,255,0.17)';
     ctx.beginPath();
     ctx.moveTo(safeLeft + 12, safeTop + 43);
@@ -4622,6 +4936,7 @@ export class SurvivalRenderer {
         safeLeft + 12,
         moduleY,
         safeLeft + panelW,
+        extra.minigun.spin / MINIGUN_SPIN_MAX,
       );
     }
 
@@ -4840,6 +5155,12 @@ export class SurvivalRenderer {
     x: number,
     y: number,
     viewportWidth: number,
+    /**
+     * Fase de rotacao 0..1 do canhao, quando ha um. O icone da Minigun GIRA
+     * com ela: e a leitura mais barata possivel de "os canos ja estao no
+     * ponto", e ela chega ao olho sem custar uma linha de HUD.
+     */
+    minigunSpin = 0,
   ): void {
     const ctx = this.ctx;
     const availableWidth = Math.max(0, viewportWidth - 12 - x);
@@ -4857,7 +5178,19 @@ export class SurvivalRenderer {
       ctx.strokeStyle = PAL.player;
       ctx.lineWidth = pulse ? 2.5 : 1.5;
       ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      drawModuleGlyph(ctx, module.id, cx, cy, size * 0.47, PAL.biolum);
+      if (module.id === 'minigun' && minigunSpin > 0) {
+        // Gira em torno do proprio centro. O angulo sai da rotacao
+        // AUTORITATIVA, e nao de `nowMs`: um relogio proprio faria o icone
+        // girar durante o travamento por superaquecimento, que e exatamente o
+        // instante em que ele tem de estar parando.
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(minigunSpin * Math.PI * 2);
+        drawModuleGlyph(ctx, module.id, 0, 0, size * 0.47, PAL.biolum);
+        ctx.restore();
+      } else {
+        drawModuleGlyph(ctx, module.id, cx, cy, size * 0.47, PAL.biolum);
+      }
 
       let fraction = 1;
       let label = '';
@@ -4923,7 +5256,16 @@ export class SurvivalRenderer {
     );
     pending.options.forEach((id, index) => {
       const active = state.playerExtra.activeModules.some((module) => module.id === id);
-      drawModuleChoiceCard(ctx, layout.cards[index], { id, index, active }, boot, nowMs);
+      const card = layout.cards[index];
+      drawModuleChoiceCard(ctx, card, { id, index, active }, boot, nowMs);
+      // De ONDE o cartucho vai voar quando este for o escolhido. Guardado no
+      // proprio desenho: o layout depende da viewport, do modo de toque e das
+      // margens seguras, e recalcula-lo no voo divergiria em alguma tela.
+      this.choiceCardCenters.set(id, {
+        x: card.x + card.w / 2,
+        y: card.y + card.h * 0.36,
+        at: nowMs,
+      });
     });
     // Os embelezamentos de vidro (vinheta, reflexo) seguem a qualidade; o
     // conteudo — classe, tier, cartucho, CTA — nunca depende dela.

@@ -26,6 +26,23 @@ export type VoiceId =
   | 'dodge'
   | 'pulse'
   | 'overheat'
+  // --- canhao rotativo ----------------------------------------------------
+  //
+  // Tres identidades, e nao uma. O GIRO e o motor (arranque e parada); a
+  // RAJADA e a saraivada; a CAPSULA e o latao no chao. Sao tres coisas que o
+  // jogador precisa distinguir sem olhar — "esta pegando no tranco", "esta
+  // cuspindo", "isto e so enfeite" — e uma voz so para as tres soaria como
+  // ruido continuo, que e exatamente o que uma minigun de brinquedo soa.
+  //
+  // O que NAO esta aqui e tao importante quanto o que esta: nao ha
+  // `minigunShot`. Dezesseis vozes por segundo estourariam o orcamento de
+  // dezesseis sozinhas e mascarariam todo telegrafo da tela. Quem carrega a
+  // cadencia e o `minigunBurst`, que soa cinco vezes por segundo e sintetiza
+  // a saraivada INTEIRA da janela dentro de uma voz so.
+  | 'minigunSpinStart'
+  | 'minigunSpinStop'
+  | 'minigunBurst'
+  | 'minigunCasing'
   // --- impactos -----------------------------------------------------------
   | 'hitEnemy'
   | 'hitPlayer'
@@ -130,6 +147,37 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   dodge: { priority: 6, gain: 0.35, minIntervalMs: 60, spatial: true },
   pulse: { priority: 7, gain: 0.5, minIntervalMs: 60, spatial: true },
   overheat: { priority: 8, gain: 0.6, minIntervalMs: 400, spatial: false },
+
+  // O arranque e a parada do motor. Espaciais porque o parceiro remoto tambem
+  // as emite, e ouvir de que lado da sala uma minigun esta pegando no tranco e
+  // informacao de posicionamento. Trava de 200 ms: o gatilho batido produz
+  // transicoes rapidas, e sem ela um jogador nervoso viraria um motor de
+  // partida em loop.
+  minigunSpinStart: { priority: 6, gain: 0.4, minIntervalMs: 200, spatial: true },
+  minigunSpinStop: { priority: 4, gain: 0.3, minIntervalMs: 200, spatial: true },
+  /**
+   * A SARAIVADA. Prioridade 6 — a mesma do tiro comum, e nao mais.
+   *
+   * Esta e a decisao de mixagem mais importante da arma, e ela e deliberada:
+   * a Minigun NAO pode calar telegrafo. Um jogador com o gatilho preso ja
+   * ocupa a tela inteira de projetil; se ele tambem ocupasse o orcamento de
+   * vozes, o aviso do bruiser que vem por tras simplesmente nao existiria, e
+   * a promessa de "morte por decisao, nunca por algo que nao deu para ler"
+   * morreria na arma mais divertida do jogo.
+   *
+   * `minIntervalMs` de 150 casa com a janela de quatro ticks (200 ms) do
+   * evento agregado: passa todas as janelas sem nunca empilhar duas.
+   */
+  minigunBurst: { priority: 6, gain: 0.34, minIntervalMs: 150, spatial: true },
+  /**
+   * O LATAO. Prioridade 1, a mais baixa do banco, junto de `corrode` e `chip`.
+   *
+   * E textura, e o design pede explicitamente que ela SUMA quando o orcamento
+   * apertar. A trava de 130 ms transforma a chuva inteira em ate sete toques
+   * por segundo, agregados: um som por capsula seria a mesma armadilha do som
+   * por bala, um andar abaixo.
+   */
+  minigunCasing: { priority: 1, gain: 0.16, minIntervalMs: 130, spatial: true },
 
   hitEnemy: { priority: 4, gain: 0.28, minIntervalMs: 45, spatial: true },
   // Dano em MIM e informacao de sobrevivencia, nao textura: prioridade alta e

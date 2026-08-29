@@ -243,9 +243,7 @@ describe('minigun — maquina de estados na simulacao', () => {
     }
     const held = roundsIn(run(armed(5), 60, fire));
     expect(taps).toBeLessThan(held);
-    expect(taps + tapped.playerExtra.minigun.pendingRounds).toBe(
-      MINIGUN_AMMO - remaining(tapped),
-    );
+    expect(taps + tapped.playerExtra.minigun.pendingRounds).toBe(MINIGUN_AMMO - remaining(tapped));
   });
 });
 
@@ -469,9 +467,7 @@ describe('minigun — determinismo e transicoes', () => {
       const cmd = i % 7 === 3 ? idle() : fire();
       stepRun(a, [cmd]);
       stepRun(b, [cmd]);
-      expect(hashAuthoritativeState(a), `divergencia no tick ${i}`).toBe(
-        hashAuthoritativeState(b),
-      );
+      expect(hashAuthoritativeState(a), `divergencia no tick ${i}`).toBe(hashAuthoritativeState(b));
     }
   });
 

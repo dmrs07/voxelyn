@@ -153,6 +153,14 @@ export const hitMaterialOf = (archetype: string | undefined): ParticleKind =>
  * — nada aqui e autoritativo — mas precisa ser DETERMINISTA por evento, para os
  * dois clientes de uma sala verem o mesmo estilhaco.
  */
+/**
+ * Gerador uniforme 0..1 semeado. Exportado porque as capsulas da Minigun
+ * (`casings.ts`) semeiam a chuva de latao a partir do MESMO evento
+ * autoritativo, e duas fontes de aleatorio no cliente dariam duas chuvas
+ * diferentes na mesma sala de co-op — cosmetico, mas de graca evitar.
+ */
+export const seededUnit = (seed: number): (() => number) => seeded(seed);
+
 const seeded = (seed: number) => {
   let s = (seed | 0) || 1;
   return () => {
