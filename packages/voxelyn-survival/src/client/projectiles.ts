@@ -11,7 +11,13 @@
 // legivel — e um rastro curto que mostra para onde ele vai.
 
 import { PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
-import { COMBAT_PLANE_TILES, heightToScreenPx, projectileHeightTiles } from './combat-plane';
+import {
+  COMBAT_PLANE_TILES,
+  heightToScreenPx,
+  muzzleForProjectile,
+  muzzleLateralTiles,
+  projectileHeightTiles,
+} from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawGroundShadow, drawVoxel } from './voxel-draw';
 
@@ -22,6 +28,17 @@ export type ProjectileLike = {
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
   kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone' | 'flechette';
+  /**
+   * Velocidade, quando o chamador a tem.
+   *
+   * Serve a UM quadro: o primeiro. O rumo do projetil e normalmente deduzido do
+   * deslocamento entre dois quadros observados, e no quadro de estreia nao ha
+   * dois — sem isto o tiro nasceria no eixo do corpo e pularia para a boca no
+   * quadro seguinte. O snapshot online nao carrega velocidade (nem precisa: um
+   * quadro a 60 Hz), entao o campo e opcional e o co-op cai no rumo deduzido.
+   */
+  vx?: number;
+  vy?: number;
   modules?: {
     explosive?: { armAfterDistance: number };
     piercing?: true;
@@ -523,7 +540,18 @@ export class ProjectileView {
         previous.y = p.y;
         previous.seenAt = nowMs;
       } else {
-        this.tracks.set(p.id, { x: p.x, y: p.y, dx: 0, dy: 0, seenAt: nowMs, travelled: 0 });
+        // Semeia o rumo pela VELOCIDADE quando ela existe: e o unico jeito de
+        // o quadro de estreia — justamente aquele em que o tiro esta na boca —
+        // saber para que lado a arma aponta.
+        const speed = Math.hypot(p.vx ?? 0, p.vy ?? 0);
+        this.tracks.set(p.id, {
+          x: p.x,
+          y: p.y,
+          dx: speed > 1e-4 ? (p.vx ?? 0) / speed : 0,
+          dy: speed > 1e-4 ? (p.vy ?? 0) / speed : 0,
+          seenAt: nowMs,
+          travelled: 0,
+        });
       }
     }
     // Projeteis que sumiram (acertaram algo, expiraram) nao podem deixar
@@ -544,7 +572,27 @@ export class ProjectileView {
     zoom: number,
     tileH: number
   ): void {
-    const [sx, sy] = project(projectile.x, projectile.y);
+    const track = this.tracks.get(projectile.id);
+    const muzzle = muzzleForProjectile(projectile.kind, projectile.hostile);
+
+    // A ORIGEM DO DESENHO E A BOCA DA ARMA, e nao o centro do bot.
+    //
+    // A simulacao nasce o projetil no eixo do corpo, porque e ali que a
+    // colisao dele comeca; a arma esta um terco de tile a DIREITA disso, e o
+    // jogador via o tiro sair do peito. O deslocamento converge para zero em
+    // pouco mais de um tile — o mesmo contrato da altura, pelo mesmo motivo:
+    // um deslocamento permanente faria o tiro desenhado passar ao lado do que
+    // ele de fato acerta.
+    //
+    // A direita da trajetoria, em mundo, e `(-dy, dx)`: no modelo o eixo do
+    // corpo e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no
+    // outro. A arma nao troca de lado porque o bot sempre vira o corpo para
+    // onde mira.
+    const lateral = track ? muzzleLateralTiles(track.travelled, muzzle) : 0;
+    const [sx, sy] = project(
+      projectile.x + (track ? -track.dy : 0) * lateral,
+      projectile.y + (track ? track.dx : 0) * lateral
+    );
     const rock = projectile.kind === 'rock';
     const disc = projectile.kind === 'return_disc';
     // O missil e um corpo, nao uma faisca: ele precisa ler como algo que voce
@@ -572,7 +620,6 @@ export class ProjectileView {
       VOXEL_PX *
       zoom *
       (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : flechette ? 0.6 : 1);
-    const track = this.tracks.get(projectile.id);
 
     // ALTURA. Tudo o que nao e hostil saiu da arma do Prospector — estilhaco,
     // disco e drone —, e por isso PARTE da altura do cano; o estilhaco e o disco
@@ -585,7 +632,7 @@ export class ProjectileView {
     // quadro em que o tiro aparece, que e o quadro em que ele saiu da arma.
     const heightTiles = seeker
       ? DRONE_CRUISE_HEIGHT
-      : projectileHeightTiles(track?.travelled ?? 0, !projectile.hostile);
+      : projectileHeightTiles(track?.travelled ?? 0, muzzle);
     const lift = heightToScreenPx(heightTiles, tileH, zoom);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao

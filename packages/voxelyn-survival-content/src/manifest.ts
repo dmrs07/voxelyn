@@ -259,20 +259,53 @@ export const EMISSIVE_HEX = [
 export const PROSPECTOR_WALK_CYCLE_TILES = 1.5;
 
 /**
- * Altura da BOCA DO CANO, em tiles de mundo.
+ * ONDE FICA A BOCA DO CANO, em tiles de mundo, por arma montada.
  *
- * O tiro do jogador saia da mesma altura que o cuspe de um bicho rasteiro —
- * meio tile, na barriga do bot — e por isso nascia atravessando o proprio
- * chassi em vez de sair da arma. A altura de voo do estilhaco e puramente
- * visual (a colisao acontece no plano do chao), entao ela pode e deve ser a
- * altura de onde a peca esta montada no modelo.
+ * Tres numeros e nao um, e o que estava faltando eram os outros dois. A arma do
+ * Prospector e montada no ombro DIREITO — nao no eixo do corpo —, e o tiro
+ * nascia no centro do bot: um terco de tile ao lado da boca que visivelmente o
+ * cuspia. A altura sozinha resolvia so a metade vertical do problema (o
+ * estilhaco saia da barriga), e a metade lateral seguiu aberta ate agora.
  *
- * Um tile tem oito voxels de lado e a boca do cano esta montada a dez voxels do
- * chao. O teste do pacote de conteudo acha essa boca sozinho — e o voxel da arma
- * que troca de material quando o clarao acende — e recalcula a altura a partir
- * dela, entao mover o hardpoint no modelo cobra o numero aqui.
+ * As tres medidas saem do CENTRO do voxel que acende no clarao, que e o voxel
+ * que cospe. O teste do pacote acha esse voxel sozinho — e o unico que troca de
+ * material entre `flash: false` e `flash: true` — e recalcula os tres numeros a
+ * partir dele, entao mover o hardpoint no modelo cobra os valores aqui.
+ *
+ * POR ARMA porque a Minigun nao e o Cravador com outra pintura: ela substitui a
+ * camada da arma e a boca dela fica quase um terco de tile mais a frente e mais
+ * alta. Com um numero unico, trocar de arma deixava o tiro nascendo atras dos
+ * canos — e era pior justamente na arma que dispara dezesseis vezes por
+ * segundo, onde o erro aparece dezesseis vezes mais.
+ *
+ * Um tile tem oito voxels autorados; os denominadores estao a vista de
+ * proposito, para o numero continuar legivel como posicao no modelo.
  */
-export const PROSPECTOR_MUZZLE_HEIGHT_TILES = 10 / 8;
+export type MuzzleOffsetTiles = {
+  /** Tiles a FRENTE do centro do bot, no eixo da mira. */
+  forward: number;
+  /**
+   * Tiles a DIREITA da mira.
+   *
+   * Sempre positivo: a arma vive no ombro direito, e o bot vira o corpo para
+   * onde mira — entao a boca esta sempre do mesmo lado da linha de tiro.
+   */
+  lateral: number;
+  /** Tiles ACIMA do chao. */
+  height: number;
+};
+
+export const PROSPECTOR_MUZZLES: Record<'bolt' | 'minigun', MuzzleOffsetTiles> = {
+  bolt: { forward: 3.5 / 8, lateral: 2.5 / 8, height: 10.5 / 8 },
+  minigun: { forward: 6 / 8, lateral: 3 / 8, height: 11 / 8 },
+};
+
+/**
+ * Altura da boca do Cravador. Mantida por nome porque ela e o padrao de tudo o
+ * que sai do jogador sem ser bala de Minigun — inclusive o drone, que nao tem
+ * boca nenhuma e so precisa de uma altitude de cruzeiro coerente com a arma.
+ */
+export const PROSPECTOR_MUZZLE_HEIGHT_TILES = PROSPECTOR_MUZZLES.bolt.height;
 
 /**
  * Quadro de `attack` em que a arma CUSPE.
