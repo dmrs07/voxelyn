@@ -19,6 +19,7 @@ import {
   type PropManifest,
   type TerrainManifest,
   EMISSIVE_HEX,
+  moduleLayerSpriteId,
 } from '@voxelyn/survival-content';
 import { armFaceLight, orderFacesForDraw } from './face-light';
 
@@ -56,6 +57,36 @@ import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cy
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
+
+// AS CAMADAS DE MODULO entram por aqui, e o `?url` delas NAO vira `SOURCES`.
+//
+// A politica de peso deste arquivo esta escrita alguns paragrafos abaixo, em
+// `requestNormal`: a proxima adicao de bytes se paga com carregamento SOB
+// DEMANDA, e nao com um teto maior. Sete atlas de modulo somam 63 kB de arte
+// mais 15 kB de mapa de faces, e uma run encontra no maximo alguns deles — o
+// manifesto (JSON minusculo) vem no bundle, a IMAGEM chega na primeira vez que
+// o jogador equipa a peca.
+import modulePiercingManifest from '@voxelyn/survival-content/assets/atlases/layer-module-piercing.json';
+import modulePiercingUrl from '@voxelyn/survival-content/assets/atlases/layer-module-piercing.png?url';
+import modulePiercingNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-piercing.normal.png?url';
+import moduleExplosiveManifest from '@voxelyn/survival-content/assets/atlases/layer-module-explosive.json';
+import moduleExplosiveUrl from '@voxelyn/survival-content/assets/atlases/layer-module-explosive.png?url';
+import moduleExplosiveNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-explosive.normal.png?url';
+import moduleConductiveManifest from '@voxelyn/survival-content/assets/atlases/layer-module-conductive.json';
+import moduleConductiveUrl from '@voxelyn/survival-content/assets/atlases/layer-module-conductive.png?url';
+import moduleConductiveNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-conductive.normal.png?url';
+import moduleReturnDiscManifest from '@voxelyn/survival-content/assets/atlases/layer-module-return-disc.json';
+import moduleReturnDiscUrl from '@voxelyn/survival-content/assets/atlases/layer-module-return-disc.png?url';
+import moduleReturnDiscNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-return-disc.normal.png?url';
+import moduleRicochetManifest from '@voxelyn/survival-content/assets/atlases/layer-module-ricochet.json';
+import moduleRicochetUrl from '@voxelyn/survival-content/assets/atlases/layer-module-ricochet.png?url';
+import moduleRicochetNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-ricochet.normal.png?url';
+import moduleSiphonManifest from '@voxelyn/survival-content/assets/atlases/layer-module-siphon.json';
+import moduleSiphonUrl from '@voxelyn/survival-content/assets/atlases/layer-module-siphon.png?url';
+import moduleSiphonNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-siphon.normal.png?url';
+import moduleMinigunManifest from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.json';
+import moduleMinigunUrl from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.png?url';
+import moduleMinigunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.normal.png?url';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
@@ -130,6 +161,13 @@ import playerProspectorNormalUrl from '@voxelyn/survival-content/assets/atlases/
 
 /** Nome de arquivo publicado no manifest -> URL empacotada pelo bundler. */
 const NORMAL_URLS: Record<string, string> = {
+  'layer-module-piercing.normal.png': modulePiercingNormalUrl,
+  'layer-module-explosive.normal.png': moduleExplosiveNormalUrl,
+  'layer-module-conductive.normal.png': moduleConductiveNormalUrl,
+  'layer-module-return-disc.normal.png': moduleReturnDiscNormalUrl,
+  'layer-module-ricochet.normal.png': moduleRicochetNormalUrl,
+  'layer-module-siphon.normal.png': moduleSiphonNormalUrl,
+  'layer-module-minigun.normal.png': moduleMinigunNormalUrl,
   'world-props.normal.png': worldPropsNormalUrl,
   'enemy-archcantor.normal.png': enemyArchcantorNormalUrl,
   'enemy-bellows.normal.png': enemyBellowsNormalUrl,
@@ -181,9 +219,50 @@ export type LayeredPlayerAnimation = {
   heat: number;
   /** Gatilho travado pelo superaquecimento: o cano esta incandescente e esfriando. */
   overheated: boolean;
+  /**
+   * Os modulos MONTADOS na arma agora, por `ModuleId`.
+   *
+   * Cada um vira uma camada desenhada junto com o Cravador, na mesma ordem de
+   * profundidade dele — eles estao parafusados nela. A lista pode vir vazia (o
+   * caso comum: um Prospector sem modulo), e pode conter ate cinco.
+   *
+   * `minigun` nao se soma: ela SUBSTITUI a camada da arma, porque a simulacao
+   * bloqueia o tiro comum enquanto ela tem municao. Desenhar as duas juntas
+   * faria a silhueta mentir sobre qual delas dispara.
+   */
+  modules?: readonly string[];
 };
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
+
+/**
+ * O que a arma do Prospector MOSTRA, dada a lista de modulos instalados.
+ *
+ * Funcao pura, separada do desenho, porque a regra que ela codifica e da
+ * SIMULACAO e nao da apresentacao — e uma regra que ja existe em `modules.ts`,
+ * escrita como matriz de compatibilidade. Aqui ela so vira imagem:
+ *
+ *  - a Minigun tem a tag `weapon` e ocupa o gatilho: `activeWeaponModule`
+ *    bloqueia o tiro comum enquanto ela tem municao, entao ela SUBSTITUI a
+ *    camada da arma em vez de se somar a ela. Duas armas desenhadas fariam a
+ *    silhueta mentir sobre qual delas dispara.
+ *  - e, pela mesma matriz, os seis acoplados NAO valem na bala da Minigun.
+ *    Continuam instalados e com as cargas intactas — e por isso somem do metal
+ *    em vez de sumirem do inventario. Quando a bala 300 sai, eles voltam
+ *    sozinhos, e o corpo do bot conta isso sem uma linha de HUD.
+ *
+ * Testada sozinha porque o desenho precisa de canvas e de sete atlas
+ * carregados, e a regra nao precisa de nenhum dos dois.
+ */
+export const weaponComposition = (
+  mounted: readonly string[] = []
+): { weapon: string | null; attachments: readonly string[] } => {
+  const weapon = mounted.includes('minigun') ? 'minigun' : null;
+  return {
+    weapon,
+    attachments: weapon ? [] : mounted.filter((id) => id !== 'minigun'),
+  };
+};
 
 export type Tint = { color: string; alpha: number };
 
@@ -398,6 +477,23 @@ export const REQUIRED_ATLAS_IDS: readonly string[] = [
   'enemy-bruiser',
   'enemy-guardian',
 ];
+
+/**
+ * Os atlas de MODULO, indexados pelo id de camada — carregados sob demanda.
+ *
+ * Fora de `SOURCES` de proposito: ver o comentario dos imports. `requestModule`
+ * e quem os traz, e ate la o Prospector aparece com a arma limpa, que e
+ * exatamente o que ele tinha antes de o modulo existir.
+ */
+const MODULE_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'layer-module-piercing': { manifest: modulePiercingManifest as unknown as SpriteManifestEntry, url: modulePiercingUrl },
+  'layer-module-explosive': { manifest: moduleExplosiveManifest as unknown as SpriteManifestEntry, url: moduleExplosiveUrl },
+  'layer-module-conductive': { manifest: moduleConductiveManifest as unknown as SpriteManifestEntry, url: moduleConductiveUrl },
+  'layer-module-return-disc': { manifest: moduleReturnDiscManifest as unknown as SpriteManifestEntry, url: moduleReturnDiscUrl },
+  'layer-module-ricochet': { manifest: moduleRicochetManifest as unknown as SpriteManifestEntry, url: moduleRicochetUrl },
+  'layer-module-siphon': { manifest: moduleSiphonManifest as unknown as SpriteManifestEntry, url: moduleSiphonUrl },
+  'layer-module-minigun': { manifest: moduleMinigunManifest as unknown as SpriteManifestEntry, url: moduleMinigunUrl },
+};
 
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
@@ -1004,6 +1100,28 @@ export class SpriteBank {
     image.src = url;
   }
 
+  /**
+   * Pede o atlas de um MODULO, se ainda nao foi pedido.
+   *
+   * Mesmo mecanismo do mapa de faces, pela mesma razao e com o mesmo custo: a
+   * peca aparece um punhado de quadros depois de o jogador equipa-la, e nesse
+   * intervalo a arma fica limpa — que e como ela estava um segundo antes. O que
+   * se compra com isso e nao carregar sete atlas no boot para uma run que
+   * encontra no maximo alguns.
+   *
+   * Passa por `loadSource`, o mesmo caminho dos atlas do boot: assim a camada
+   * de modulo ganha de graca a mascara de halo, a liquidacao observavel e a
+   * nova tentativa depois de uma falha. A unica diferenca e QUANDO o pedido
+   * sai — aqui, na primeira vez que o jogador equipa a peca, e nao no boot.
+   *
+   * Idempotente: `loadSource` ignora um atlas ja pronto, entao chamar isto por
+   * quadro nao produz um segundo download nem um segundo `emissiveMask`.
+   */
+  requestModule(layerId: string): void {
+    const source = MODULE_SOURCES[layerId];
+    if (source) this.loadSource(source);
+  }
+
   get(id: string): Loaded | null {
     const entry = this.byId.get(id);
     return entry && entry.ready ? entry : null;
@@ -1098,6 +1216,36 @@ export class SpriteBank {
     const gun = this.get(PLAYER_GUN_ID);
     if (!lower || !upper || !gun) return false;
 
+    // A ARMA E OS MODULOS.
+    //
+    // `minigun` nao entra na pilha: ela TROCA a camada da arma. E a mesma regra
+    // que a simulacao ja aplica — `activeWeaponModule` bloqueia o tiro comum
+    // enquanto ela tem municao —, e desenhar as duas juntas faria a silhueta
+    // mentir sobre qual delas dispara.
+    //
+    // E, pela mesma matriz de compatibilidade (`modules.ts`), os acoplados
+    // SOMEM enquanto ela esta montada: perfura, condutivo, explosivo, sifao,
+    // ricochete e disco continuam instalados e com as cargas intactas, mas nao
+    // valem na bala da Minigun. O corpo do bot passa a contar isso sozinho, sem
+    // uma linha de HUD.
+    const mounted = animation.modules ?? [];
+    for (const id of mounted) this.requestModule(moduleLayerSpriteId(id));
+    const composition = weaponComposition(mounted);
+    const minigun = composition.weapon
+      ? this.get(moduleLayerSpriteId(composition.weapon))
+      : null;
+    // O atlas da Minigun ainda pode estar viajando. Ate ele chegar o Prospector
+    // segue com o Cravador — nunca desarmado, que e o unico desfecho que a
+    // composicao nao pode entregar.
+    const weapon = minigun ?? gun;
+    // Se o atlas da Minigun ainda nao chegou, o Cravador continua no lugar — e
+    // com ele os acoplados, que e o estado coerente com o que se ve. Ler a
+    // composicao pelo ATLAS carregado, e nao pela lista, evita o meio-termo de
+    // uma arma antiga sem os modulos dela.
+    const attachments = (minigun ? [] : mounted.filter((id) => id !== 'minigun'))
+      .map((id) => this.get(moduleLayerSpriteId(id)))
+      .filter((entry): entry is Loaded => entry !== null);
+
     // LUZ DO DISPARO na armadura.
     //
     // O clarao ja existia como tres voxels acesos na boca do cano, e parava ali:
@@ -1112,7 +1260,7 @@ export class SpriteBank {
     const firing = animation.upper.animation === 'attack';
     const muzzleLit =
       firing &&
-      frameAtTime(gun.manifest, 'attack', animation.upper.elapsedMs) === PROSPECTOR_MUZZLE_FLASH_FRAME;
+      frameAtTime(weapon.manifest, 'attack', animation.upper.elapsedMs) === PROSPECTOR_MUZZLE_FLASH_FRAME;
     // Enquanto acende, a luz manda no corpo: ela e mais forte que o tint frio que
     // separa um parceiro do outro, e dura um quadro.
     const bodyTint = muzzleLit ? MUZZLE_LIGHT : tint;
@@ -1171,21 +1319,27 @@ export class SpriteBank {
     // estado que machuca, e nenhum deles precisa ser lido ao mesmo tempo — o
     // parceiro remoto nao transmite calor, entao na pratica os dois nunca
     // disputam o mesmo cano.
+    // A arma e tudo o que esta parafusado nela recebem o MESMO deslocamento e o
+    // MESMO tint de calor: o modulo esta montado no cano, e um acessorio que
+    // ignorasse o coice deslizaria para dentro do peito a cada disparo.
     const drawGun = (): void => {
-      this.drawLoadedFrame(
-        ctx,
-        gun,
-        animation.upper.animation,
-        animation.upper.facingX,
-        animation.upper.facingY,
-        animation.upper.elapsedMs,
-        upperX,
-        upperY,
-        zoom,
-        gunHeatTint(animation.heat, animation.overheated) ?? tint,
-        light,
-        faces
-      );
+      const heatTint = gunHeatTint(animation.heat, animation.overheated) ?? tint;
+      for (const layer of [weapon, ...attachments]) {
+        this.drawLoadedFrame(
+          ctx,
+          layer,
+          animation.upper.animation,
+          animation.upper.facingX,
+          animation.upper.facingY,
+          animation.upper.elapsedMs,
+          upperX,
+          upperY,
+          zoom,
+          heatTint,
+          light,
+          faces
+        );
+      }
     };
 
     // Profundidade entre tronco e arma. Dentro de um modelo so, o rasterizador

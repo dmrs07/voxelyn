@@ -226,16 +226,22 @@ export const minigunGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, fan = 0, f
     // qual arma o Prospector esta carregando — inclusive a do parceiro, do
     // outro lado da sala —, e e o unico volume do bot que fica abaixo da linha
     // do cano.
-    box(a.x, a.y - 3, a.z - 1.5, 2, 2, 1, 'rockDeep'),
-    box(a.x, a.y - 3, a.z - 0.75, 2, 2, 0.25, 'rust'),
+    // Em LATAO, e nao em aco escuro. A primeira versao pintou o tambor de
+    // `rockDeep` e a arma inteira virou uma mancha escura contra um chassi
+    // tambem escuro — o Cravador que ela substitui le porque e OSSO palido
+    // contra o corpo, e a arma que toma o lugar dele tem de ganhar a mesma
+    // disputa de contraste. Havia tambem uma cinta de altura 0,25 aqui: a
+    // grade real e 0,5 autorado = 1 voxel fino, entao ela nem existia como
+    // volume — nascia arredondada para dentro do proprio tambor.
+    box(a.x, a.y - 3, a.z - 1.5, 2, 2, 1, 'rust'),
 
     // OS CANOS: um feixe GROSSO, com a mesma chapa escura por cima pela mesma
     // razao. Dois tubos finos nao existem nesta escala — a 4px por voxel eles
     // viram um borrao de tres pixels —, e o que diz "minigun" aqui e calibre.
     // Saem na altura da boca do Cravador para a arma nao mudar de altura ao
     // trocar (`PROSPECTOR_MUZZLE_HEIGHT_TILES`).
-    box(a.x, a.y - 4.5, a.z + 0.5, 2, 1.5, 0.5, 'bone'),
-    box(a.x, a.y - 4.5, a.z + 1, 2, 1.5, 0.5, 'rockDeep'),
+    box(a.x, a.y - 4.5, a.z + 0.5, 2, 1.5, 1, 'bone'),
+    box(a.x, a.y - 4.5, a.z + 1.5, 2, 1.5, 0.5, 'rockDeep'),
 
     // A VENTOINHA, na face externa da carcaca: um voxel dourado em quatro
     // posicoes de orbita. E o unico elemento que ANDA entre quadros, e vai para

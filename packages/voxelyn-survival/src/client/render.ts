@@ -136,7 +136,6 @@ import {
   type SafeInsets,
 } from './module-layout';
 import { CasingField } from './casings';
-import { drawMinigunMount } from './minigun-mount';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
@@ -3255,41 +3254,27 @@ export class SurvivalRenderer {
                   allyTint: !isLocal,
                 });
               }
-              // O CANHAO ROTATIVO por cima da arma. Sobreposicao procedural e
-              // nao quadro de atlas: oito rumos x quatro posicoes de cano
-              // seriam trinta e dois quadros por animacao para uma peca que
-              // dura vinte segundos — e um quadro pre-renderizado nunca
-              // poderia responder a rotacao real. Ver `minigun-mount.ts`.
+              // O CANHAO ROTATIVO nao e mais desenhado aqui.
               //
-              // A condicao e a ROTACAO, e nao a posse do modulo: o parceiro
-              // remoto nao tem `activeModules` neste cliente, e os canos
-              // continuam desacelerando por um instante depois da bala 300.
-              const gunView = this.minigunViews.get(slot);
-              if (gunView.spin > 0.001) {
-                drawMinigunMount(
-                  ctx,
-                  psx,
-                  psy,
-                  presented.facingX,
-                  presented.facingY,
-                  z,
-                  {
-                    // ANGULO, nao velocidade: a velocidade satura em 1 na
-                    // rajada inteira e congelaria os canos justamente no
-                    // trecho em que eles giram mais rapido.
-                    phase: gunView.barrelPhase,
-                    // O calor so e conhecido do jogador local; no parceiro o
-                    // cano fica frio em vez de inventar um estado que este
-                    // cliente nao recebe.
-                    heat: isLocal ? Math.min(1, ex.heat / HEAT_MAX) : 0,
-                    flash: this.minigunViews.firingFlash(slot, nowMs),
-                    overheated: gunView.phase === 'overheated',
-                  },
-                );
-                // VAPOR so perto do travamento, nunca durante a rajada: fumaca
-                // continua taparia o proprio alvo, e o que ela tem a dizer e
-                // "esta prestes a travar", nao "esta atirando".
-                if (isLocal && (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82)) {
+              // Ele era uma sobreposicao procedural (`minigun-mount.ts`), com o
+              // argumento de que quadros por rumo x posicao de cano sairiam
+              // caros demais. A conta estava errada — a camada inteira pesa 15
+              // kB — e o custo real era outro: desenho de runtime nao participa
+              // do rasterizador, entao a arma nao tinha mapa de faces, nem
+              // oclusao de ambiente, nem a luz por face que o resto do bot
+              // recebe. Ficava CHAPADA ao lado de um chassi facetado.
+              //
+              // Agora ela e `layer-module-minigun`, montada por `sprites.ts` no
+              // lugar da camada da arma. A rotacao vem dos quatro quadros de
+              // `attack`, que a rajada mantem continuos (o `action_start` da
+              // Minigun cobre a janela seguinte de proposito).
+              //
+              // O VAPOR fica, porque ele nunca foi da arma: e o aviso de que o
+              // gatilho esta prestes a travar, e sai perto do travamento e nunca
+              // durante a rajada — fumaca continua taparia o proprio alvo.
+              if (isLocal && this.minigunViews.get(slot).spin > 0.001) {
+                const gunView = this.minigunViews.get(slot);
+                if (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82) {
                   this.particles.emitOverheatSmoke(
                     slot,
                     pl.x,

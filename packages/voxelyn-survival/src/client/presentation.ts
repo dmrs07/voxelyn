@@ -1,4 +1,14 @@
-import { DEVOURER_STUCK, HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import {
+  DEVOURER_STUCK,
+  HEAT_MAX,
+  TICK_HZ,
+  moduleHasCapacity,
+  type Entity,
+  type EntityActionKind,
+  type ModuleId,
+  type SemanticEvent,
+  type SurvivalState,
+} from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
@@ -122,14 +132,31 @@ export const recoilAtElapsed = (elapsedMs: number, releaseMs: number, durationMs
  * O parceiro remoto nao transmite calor no snapshot: `heat` fica em 0 e a arma
  * dele sai fria. E o silencio certo — inventar calor para o outro seria desenhar
  * um estado que ninguem mediu.
+ *
+ * O MESMO vale para os modulos montados, e pelo mesmo motivo: `activeModules`
+ * vive em `playerExtras`, que este cliente so tem do proprio jogador. O
+ * `EntitySnapshot` do parceiro carrega posicao, vida e acao, e nada mais. No
+ * solo (e para o jogador local em qualquer modo) a lista e completa; para o
+ * parceiro remoto ela sai vazia e a arma dele aparece limpa. Preencher isso
+ * exigiria campo novo no protocolo — decisao de rede, nao de desenho.
  */
-const gunHeatOf = (entity: Entity, state: SurvivalState): { heat: number; overheated: boolean } => {
+const gunStateOf = (
+  entity: Entity,
+  state: SurvivalState,
+): { heat: number; overheated: boolean; modules: readonly ModuleId[] } => {
   const slot = entity.slot;
   const extra = slot === undefined ? undefined : state.playerExtras?.[slot];
-  if (!extra) return { heat: 0, overheated: false };
+  if (!extra) return { heat: 0, overheated: false, modules: [] };
   return {
     heat: Math.max(0, Math.min(1, extra.heat / HEAT_MAX)),
     overheated: state.tick < extra.overheatedUntil,
+    // `moduleHasCapacity` e nao `activeModules` cru: um modulo gasto continua na
+    // lista ate expirar, e uma peca que nao faz mais nada nao pode continuar
+    // parafusada na arma. Quem mede e a MESMA funcao que decide se o efeito
+    // acontece, entao o metal some no tick em que o efeito some.
+    modules: extra.activeModules
+      .map((module) => module.id)
+      .filter((id) => moduleHasCapacity(extra, id, state.tick)),
   };
 };
 
@@ -150,7 +177,7 @@ const layeredPlayerAnimation = (
   upperElapsedMs: number,
   nowMs: number,
   facing: FacingResolver,
-  gun: { heat: number; overheated: boolean }
+  gun: { heat: number; overheated: boolean; modules: readonly ModuleId[] }
 ): LayeredPlayerAnimation => {
   const releaseMs = action
     ? Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000)
@@ -199,6 +226,7 @@ const layeredPlayerAnimation = (
     recoil: action ? recoilAtElapsed(upperElapsedMs, releaseMs) : 0,
     heat: gun.heat,
     overheated: gun.overheated,
+    modules: gun.modules,
   };
 };
 
@@ -406,7 +434,7 @@ export class EntityPresentation {
           // A composicao ja estabiliza as tres camadas por dentro; o rumo solto
           // que sai aqui e o do TRONCO, e reaproveita a mesma memoria dela.
           const layered = layeredPlayerAnimation(
-            entity, base, action, elapsedMs, nowMs, facing, gunHeatOf(entity, state)
+            entity, base, action, elapsedMs, nowMs, facing, gunStateOf(entity, state)
           );
           return {
             anim: layered,
@@ -463,7 +491,7 @@ export class EntityPresentation {
     // urgente para ler do que a temperatura da arma.
     if (entity.archetype === 'prospector' && (base.anim === 'idle' || base.anim === 'walk')) {
       const layered = layeredPlayerAnimation(
-        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunHeatOf(entity, state)
+        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunStateOf(entity, state)
       );
       return {
         anim: layered,
