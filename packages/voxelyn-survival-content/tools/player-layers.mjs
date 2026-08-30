@@ -84,14 +84,31 @@ const poseArgsFor = (anim, frame) => {
 /**
  * As caixas de um MODULO acoplado, neste quadro.
  *
- * `fan` so anda em `attack`: a ventoinha da Minigun e o unico elemento animado
- * dos modulos, e ela gira quando a arma cospe. Em `idle` ela fica parada, que e
- * a verdade — o canhao em repouso nao gira.
+ * OS ACOPLADOS seguem a pose do tronco, quadro a quadro: eles estao parafusados
+ * no Cravador, e o Cravador recua no disparo.
+ *
+ * A MINIGUN NAO. Os quatro quadros dela codificam SO a posicao da ventoinha, e
+ * o corpo fica na pose de repouso. Duas razoes, e as duas vieram de medir o que
+ * o jogo faz de verdade:
+ *
+ *  1. A rotacao nao cabe no relogio da acao. A simulacao passa ~450 ms subindo
+ *     antes de emitir o primeiro `action_start`, e desce sem emitir nenhum:
+ *     amarrar a ventoinha a animacao de `attack` a deixaria PARADA durante as
+ *     duas transicoes que a arma inteira existe para vender.
+ *  2. E o relogio da acao nem e continuo. A rajada agregada republica
+ *     `action_start` com um `startTick` novo a cada quatro ticks, e
+ *     `visualActionElapsed` reancora a cada troca de `startTick` — a animacao
+ *     de quatro quadros a 12 fps reiniciava a cada 200 ms sem nunca chegar ao
+ *     quarto. Um coice assado herdaria essa mesma gagueira.
+ *
+ * Quem escolhe o quadro, entao, e o cliente, a partir de `barrelPhase` — o
+ * angulo que `MinigunViews` ja integra da rotacao autoritativa. O coice nao se
+ * perde: `recoilScreenOffset` desloca a arma inteira e e aplicado fora da
+ * escolha de quadro.
  */
 const moduleBoxes = (id, anim, frame) => {
-  const pose = poseArgsFor(anim, frame);
-  if (id === 'minigun') return minigunGun({ ...pose, fan: anim === 'attack' ? frame : 0 });
-  return MODULE_ATTACHMENTS[id](gunAnchor(pose));
+  if (id === 'minigun') return minigunGun({ fan: frame });
+  return MODULE_ATTACHMENTS[id](gunAnchor(poseArgsFor(anim, frame)));
 };
 
 const renderModule = (dir, anim, frame, id) =>

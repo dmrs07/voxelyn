@@ -231,6 +231,16 @@ export type LayeredPlayerAnimation = {
    * faria a silhueta mentir sobre qual delas dispara.
    */
   modules?: readonly string[];
+  /**
+   * ANGULO acumulado do conjunto de canos, 0..1 — e nao a velocidade.
+   *
+   * Escolhe o quadro da ventoinha da Minigun. Vem de `MinigunViews`, que
+   * integra a rotacao autoritativa, e nao do relogio da animacao: a simulacao
+   * passa ~450 ms subindo antes do primeiro `action_start` e desce sem emitir
+   * nenhum, entao uma ventoinha presa a `attack` ficaria parada exatamente nas
+   * duas transicoes que a arma existe para vender.
+   */
+  barrelPhase?: number;
 };
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
@@ -254,6 +264,26 @@ export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
  * Testada sozinha porque o desenho precisa de canvas e de sete atlas
  * carregados, e a regra nao precisa de nenhum dos dois.
  */
+/**
+ * Posicoes de orbita da ventoinha assadas na camada da Minigun.
+ *
+ * Quatro porque nesta escala rotacao nao se le por movimento angular — se le
+ * por ALTERNANCIA, e quatro passos bastam para a peca contar que gira. O numero
+ * vive aqui e em `prospector-modules.mjs`; um teste do cliente confere que os
+ * dois concordam com a contagem de quadros do atlas.
+ */
+export const MINIGUN_FAN_FRAMES = 4;
+
+/**
+ * O quadro da ventoinha para este angulo de conjunto.
+ *
+ * `barrelPhase` envolve em 0..1 e pode chegar exatamente em 1 num quadro de
+ * borda; o modulo aqui e o que impede o indice de sair da animacao.
+ */
+export const fanFrameFor = (barrelPhase: number): number =>
+  ((Math.floor(barrelPhase * MINIGUN_FAN_FRAMES) % MINIGUN_FAN_FRAMES) + MINIGUN_FAN_FRAMES) %
+  MINIGUN_FAN_FRAMES;
+
 export const weaponComposition = (
   mounted: readonly string[] = []
 ): { weapon: string | null; attachments: readonly string[] } => {
@@ -982,7 +1012,19 @@ export class SpriteBank {
    * segundo download nem um segundo `emissiveMask`.
    */
   private loadSource({ manifest, url }: { manifest: SpriteManifestEntry; url: string }): void {
-    if (this.byId.get(manifest.id)?.ready) return;
+    // UMA ENTRADA NO MAPA E UM PEDIDO EM VOO. A guarda antes olhava so para
+    // `ready`, e isso bastava enquanto o unico chamador era `load()`, que roda
+    // uma vez no boot. Com a camada de modulo o chamador passou a ser o LACO DE
+    // DESENHO — `requestModule` a cada quadro enquanto a peca esta equipada —,
+    // e ali a guarda antiga significava um `Image` novo, uma entrada
+    // sobrescrita e um `emissiveMask` de atlas inteiro por quadro ate a imagem
+    // chegar; com uma URL quebrada, para sempre.
+    //
+    // Quem ARMA uma nova tentativa e `retryFailed`, apagando a entrada. Assim
+    // cada estado tem um dono: existe entrada = ja pedido, nao existe = pode
+    // pedir. Uma tela de erro com um botao decide quando tentar de novo, e nao
+    // sessenta tentativas por segundo que ninguem pediu.
+    if (this.byId.has(manifest.id)) return;
     const image = new Image();
     const entry: Loaded = {
       manifest,
@@ -1058,8 +1100,17 @@ export class SpriteBank {
    * carregado devolve na hora, sem tocar em rede.
    */
   retryFailed(): void {
-    const again = SOURCES.filter((source) => this.byId.get(source.manifest.id)?.failed);
-    for (const { manifest } of again) this.settlements.set(manifest.id, newSettlement());
+    const again = [...SOURCES, ...Object.values(MODULE_SOURCES)].filter(
+      (source) => this.byId.get(source.manifest.id)?.failed
+    );
+    for (const { manifest } of again) {
+      this.settlements.set(manifest.id, newSettlement());
+      // Apagar a entrada e o que ARMA a nova tentativa: `loadSource` recusa um
+      // id que ja esta no mapa, e sem isto o retry viraria um no-op silencioso.
+      // `get()` ja devolvia `null` para uma entrada falhada, entao ninguem ve
+      // diferenca entre "falhou" e "sumiu".
+      this.byId.delete(manifest.id);
+    }
     for (const source of again) this.loadSource(source);
   }
 
@@ -1324,6 +1375,15 @@ export class SpriteBank {
     // ignorasse o coice deslizaria para dentro do peito a cada disparo.
     const drawGun = (): void => {
       const heatTint = gunHeatTint(animation.heat, animation.overheated) ?? tint;
+      // A VENTOINHA anda pelo angulo, o resto pelo relogio da acao. Os quadros
+      // da camada da Minigun codificam so a posicao dela (ver
+      // `player-layers.mjs`), entao o quadro sai de `barrelPhase` — que sobe
+      // no spin-up, satura na rajada e desce no spin-down, tres estados que a
+      // animacao de `attack` nao alcanca.
+      const fanFrame =
+        minigun && animation.barrelPhase !== undefined
+          ? fanFrameFor(animation.barrelPhase)
+          : undefined;
       for (const layer of [weapon, ...attachments]) {
         this.drawLoadedFrame(
           ctx,
@@ -1337,7 +1397,8 @@ export class SpriteBank {
           zoom,
           heatTint,
           light,
-          faces
+          faces,
+          layer === minigun ? fanFrame : undefined
         );
       }
     };
@@ -1368,13 +1429,27 @@ export class SpriteBank {
     zoom: number,
     tint?: Tint,
     light?: Tint,
-    faces?: FaceLighting
+    faces?: FaceLighting,
+    /**
+     * Quadro escolhido por quem chama, em vez de derivado do relogio.
+     *
+     * Existe por uma camada so — a ventoinha da Minigun —, e por uma razao que
+     * nao e conveniencia: a rotacao dela nao e uma animacao com inicio e fim,
+     * e um angulo continuo que a simulacao ja integra. Derivar do tempo
+     * decorrido significaria reinicia-la a cada `action_start`, e a Minigun
+     * republica um a cada quatro ticks.
+     */
+    frameOverride?: number
   ): void {
     const { manifest, image } = loaded;
     const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
     const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
     const direction = manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
-    const frame = frameAtTime(manifest, useAnimation, elapsedMs);
+    const count = manifest.animations[useAnimation].frames;
+    const frame =
+      frameOverride === undefined
+        ? frameAtTime(manifest, useAnimation, elapsedMs)
+        : ((Math.floor(frameOverride) % count) + count) % count;
     const rect = resolveFrame(manifest, useAnimation, direction, frame);
     const dw = manifest.frameWidth * zoom;
     const dh = manifest.frameHeight * zoom;

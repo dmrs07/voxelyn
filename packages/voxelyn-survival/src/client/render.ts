@@ -3152,7 +3152,21 @@ export class SurvivalRenderer {
       if (!ex.joined || !pl.alive) continue;
       const isLocal = pl === player;
       const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
-      const presented = this.presentation.animationFor(pl, state, anim, nowMs, ex.downed);
+      // A ROTACAO reconstruida entra na composicao aqui, e nao dentro da
+      // apresentacao, porque e o render quem ingere `minigun_spin` /
+      // `minigun_burst` e quem integra o angulo por quadro. Ela decide DUAS
+      // coisas que a lista de modulos nao alcanca: que o parceiro remoto esta
+      // com o canhao montado (o `activeModules` dele nao chega neste cliente) e
+      // que o canhao local continua montado durante a desaceleracao, depois de
+      // a bala 300 ja ter tirado o modulo da lista.
+      const presented = this.presentation.animationFor(
+        pl,
+        state,
+        anim,
+        nowMs,
+        ex.downed,
+        this.minigunViews.get(slot),
+      );
       // Superaquecimento: o corpo TREME e o cano solta fumaca preta.
       //
       // O tremor e do corpo inteiro e nao da arma. Quem trava o gatilho e o
