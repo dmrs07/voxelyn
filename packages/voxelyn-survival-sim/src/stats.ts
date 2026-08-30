@@ -143,3 +143,70 @@ export const buildSummary = (state: SurvivalState, deathCause: DamageCause | nul
     targetTicks,
   };
 };
+
+// ---------------------------------------------------------------------------
+// A PONTUACAO DA RUN
+// ---------------------------------------------------------------------------
+// Duas grandezas, nesta ordem: NUCLEOS EXTRAIDOS e TEMPO. Nada mais.
+//
+// Nada mais e o ponto. Minerio, abates, dano, celulas de purga — tudo isso e
+// consequencia de como a run foi jogada, e nenhuma delas e o que a run pede.
+// Enquanto o minerio entrava na ordenacao (como desempate, mas entrava), ele
+// era uma quarta pergunta que o placar fazia e o jogo nao; retirar e o que faz
+// a pontuacao dizer a mesma coisa que o briefing diz.
+//
+// A ordem entre as duas nao e arbitraria. Nucleo primeiro porque ele e o
+// OBJETIVO: uma descida que volta com dois Nucleos cumpriu duas vezes o que a
+// Aurix pediu, e nenhum tempo compra isso. Tempo depois porque, cumprido o
+// objetivo, a unica pergunta que sobra e quanto o Veio cobrou para solta-lo —
+// e e ela que mantem viva a decisao "extrair agora ou descer mais um".
+//
+// Uma pontuacao LEXICOGRAFICA, e nao uma soma ponderada. Uma soma exigiria um
+// cambio entre segundo e Nucleo que ninguem sabe cotar, e o primeiro playtest
+// que mudasse a duracao da run mudaria o cambio junto — o placar inteiro se
+// reordenaria sem ninguem ter jogado nada.
+
+/**
+ * O que decide a posicao de uma run no livro.
+ *
+ * Deliberadamente estrutural: tanto um `RunSummary` quanto uma linha gravada no
+ * ranking satisfazem esta forma, e por isso o servidor ordena com a MESMA
+ * funcao que a simulacao usa — nao com uma reimplementacao que possa discordar.
+ */
+export type RunScore = {
+  /** Nucleos que sairam do Veio. Criterio primario, MAIOR primeiro. */
+  cores: number;
+  /** Duracao da run em ticks. Criterio secundario, MENOR primeiro. */
+  ticks: number;
+};
+
+export const runScore = (summary: RunSummary): RunScore => ({
+  cores: summary.cores,
+  ticks: summary.ticks,
+});
+
+/**
+ * Ordena duas runs pela pontuacao. Negativo = `a` vem antes.
+ *
+ * NAO desempata: empate real devolve 0 e quem chama decide o que fazer com ele
+ * (o ranking mantem quem chegou antes). Desempatar aqui dentro obrigaria esta
+ * funcao a conhecer id, data ou nome — coisas que nao sao pontuacao.
+ */
+export const compareRunScore = (a: RunScore, b: RunScore): number =>
+  b.cores - a.cores || a.ticks - b.ticks;
+
+/**
+ * A CLASSE de uma run: quantos setores ela atravessou.
+ *
+ * O ranking e separado por ela, e a razao e que runs de profundidades
+ * diferentes nao sao a mesma prova. Uma descida de sete setores tem mais
+ * Nucleos disponiveis e leva o dobro do tempo; joga-la contra uma de tres no
+ * mesmo livro nao compara habilidade, compara autorizacao — e autorizacao se
+ * compra, nao se joga.
+ *
+ * A classe e o `sectorCount`, e nao a geracao, de proposito: G-00 e G-01
+ * autorizam a MESMA descida (tres setores, Nucleo no terceiro), e separa-los
+ * criaria dois livros para uma prova so, cada um com metade dos jogadores.
+ * O que define a prova e a descida, e a descida e a contagem de setores.
+ */
+export const runClass = (summary: RunSummary): number => summary.sectorCount;

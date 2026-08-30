@@ -9,9 +9,16 @@
 // O redesign (doc AD-UI-2.0) transformou a lista em LIVRO-CAIXA: colunas de
 // posicao, estrelas, operador e tempo, com keyline dourada nas tres primeiras
 // linhas — distincao de papel timbrado, nao de podio de game show.
+//
+// UM LIVRO POR PROFUNDIDADE. As abas no topo nao sao um filtro de conveniencia:
+// elas sao a estrutura do placar. Descidas de tres e de sete setores nao sao a
+// mesma prova — a segunda tem mais Nucleos disponiveis e leva o dobro do tempo
+// — e uma lista unica compararia autorizacao em vez de habilidade. A coluna de
+// Nucleos existe pelo mesmo motivo: ela e a pontuacao, e um livro que ordena
+// por um numero que nao mostra parece quebrado mesmo quando esta certo.
 
 import { formatDuration, formatSeed } from './run-summary';
-import type { RankEntry } from './run-recorder';
+import type { RankClass, RankEntry } from './run-recorder';
 import { t } from './i18n';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
@@ -27,6 +34,12 @@ export type RankView = {
   entries: RankEntry[];
   /** Seed do placar, quando ele e de uma descida especifica. */
   seed?: number;
+  /** Os livros que existem, do mais raso ao mais fundo. */
+  classes?: RankClass[];
+  /** O livro aberto. Zero quando ainda nao ha resposta do servidor. */
+  sectorCount?: number;
+  /** Trocar de livro. Ausente enquanto carrega: aba que nao responde e pior que aba ausente. */
+  onSelectClass?: (sectorCount: number) => void;
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
   /**
@@ -40,6 +53,39 @@ export type RankView = {
   loading?: boolean;
 };
 
+/**
+ * As abas de profundidade.
+ *
+ * So aparecem com DOIS livros ou mais. Uma aba solitaria nao oferece escolha
+ * nenhuma e ainda assim ocupa a primeira linha da tela dizendo ao jogador que
+ * existe algo a decidir — e no dia do deploy, com um livro so, seria exatamente
+ * isso.
+ */
+const renderClasses = (host: HTMLElement, view: RankView): void => {
+  const classes = view.classes ?? [];
+  if (classes.length < 2) return;
+  const tabs = el('div', 'ax-tabs ax-rank-classes');
+  for (const board of classes) {
+    const active = board.sectorCount === view.sectorCount;
+    const tab = el(
+      'button',
+      `ax-tab${active ? ' is-active' : ''}`,
+      t('rank.class', { sectors: board.sectorCount }),
+    ) as HTMLButtonElement;
+    tab.type = 'button';
+    // `aria-pressed` e nao `aria-selected`: sao botoes num grupo, e nao um
+    // tablist com paineis irmaos — anunciar tablist obrigaria a navegacao por
+    // setas que este grupo nao implementa.
+    tab.setAttribute('aria-pressed', String(active));
+    tab.title = t('rank.class.entries', { entries: board.entries });
+    if (!active && view.onSelectClass) {
+      tab.addEventListener('click', () => view.onSelectClass?.(board.sectorCount));
+    }
+    tabs.appendChild(tab);
+  }
+  host.appendChild(tabs);
+};
+
 export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   host.textContent = '';
 
@@ -50,6 +96,8 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
       view.seed === undefined ? t('rank.best') : t('rank.seed', { seed: formatSeed(view.seed) }),
     ),
   );
+
+  renderClasses(host, view);
 
   if (view.entries.length === 0 && view.loading) {
     // Consultando o livro: varredura CRT, o unico CRT permitido (board 3p).
@@ -64,6 +112,7 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     head.appendChild(el('span', undefined, '#'));
     head.appendChild(el('span', undefined, '★'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
+    head.appendChild(el('span', undefined, t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
     host.appendChild(head);
 
@@ -72,6 +121,7 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
       row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
       row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       row.appendChild(el('span', 'ax-rank-name', entry.name));
+      row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));
       row.appendChild(el('span', 'ax-rank-time', formatDuration(entry.ticks)));
       host.appendChild(row);
     });

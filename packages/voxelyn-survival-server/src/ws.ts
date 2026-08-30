@@ -184,6 +184,26 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         allowedOrigins: opts.allowedOrigins,
         trustedProxyHops: opts.trustedProxyHops,
         budget: verificationBudget,
+        // A ponte entre o ticket e o livro: e por ela que uma descida de sete
+        // setores e re-simulada com sete setores e vai parar no livro de sete.
+        //
+        // `progressionStore` e lido AQUI DENTRO, e nao capturado agora, porque
+        // as duas conexoes de banco correm em paralelo: a do ranking pode ficar
+        // pronta primeiro, e uma captura no momento da criacao congelaria
+        // `null`. Sem progressao (banco fora, ambiente sem ela) devolve null, e
+        // a run cai na descida de fabrica — o comportamento anterior a esta
+        // mudanca, que continua correto para quem nao tem ticket.
+        runConfig: async (runId) => {
+          const ticket = await progressionStore?.getTicket(runId);
+          if (!ticket) return null;
+          // Ticket VENCIDO ainda serve. A validade existe para limitar a janela
+          // de uma liquidacao que PAGA; o livro nao paga nada — ele so precisa
+          // saber sob qual descida aqueles comandos foram gravados, e isso um
+          // ticket de ontem responde tao bem quanto um de agora. Recusar aqui
+          // jogaria fora a submissao honesta de quem perdeu a rede no fim da
+          // run.
+          return { seed: ticket.seed, tuning: ticket.tuning, depth: ticket.depth };
+        },
       });
     }),
     createDeathEchoStore(databaseUrl, log).then((store) => {

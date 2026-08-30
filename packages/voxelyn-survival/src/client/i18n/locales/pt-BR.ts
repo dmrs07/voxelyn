@@ -220,10 +220,13 @@ export const PT_BR = {
   'rank.loading': 'carregando…',
   'rank.entry': '{position}. {stars} {name}',
   'rank.col.operator': 'Operador',
+  'rank.col.cores': 'Núcleos',
   'rank.col.time': 'Tempo',
+  'rank.class': '{sectors} setores',
+  'rank.class.entries': '{entries} expedições homologadas',
   'rank.how': 'COMO ENTRAR',
   'rank.how.text':
-    'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu.',
+    'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu. A posição sai de duas coisas: quantos Núcleos você trouxe e quanto tempo levou. Cada profundidade tem o seu próprio livro — descidas de três setores não competem com as de sete.',
 
   // ---------------------------------------------------------------------
   // Bestiário: designação corporativa e nome de campo

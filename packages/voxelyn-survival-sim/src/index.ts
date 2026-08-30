@@ -87,6 +87,10 @@ export {
   markDiscovery,
   recordKill,
   starsFor,
+  compareRunScore,
+  runClass,
+  runScore,
+  type RunScore,
 } from './stats.js';
 export {
   ARCHETYPES,

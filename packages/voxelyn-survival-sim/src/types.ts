@@ -261,7 +261,9 @@ export type RunStats = {
    * Lascas de minerio arrancadas — a "cota".
    *
    * Opcional por design: ninguem e obrigado a minerar. Quem minera compra
-   * escolha de modulo com isso, e desempata no ranking. Uma cota obrigatoria
+   * escolha de modulo com isso — e SO isso. O minerio nao entra na pontuacao da
+   * run (ver `compareRunScore`) nem sequer como desempate: enquanto entrava, era
+   * uma pergunta que o placar fazia e o briefing nao. Uma cota obrigatoria
    * viraria imposto sobre o tempo, e o tempo ja e cobrado pela terceira estrela.
    */
   oreCollected: number;

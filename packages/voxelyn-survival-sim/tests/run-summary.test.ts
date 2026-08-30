@@ -9,10 +9,13 @@ import {
   damageEntity,
   emptyCommand,
   hashAuthoritativeState,
+  compareRunScore,
+  runClass,
+  runScore,
   starsFor,
   stepRun,
 } from '../src/index.js';
-import type { DamageCause, SurvivalState } from '../src/index.js';
+import type { DamageCause, RunSummary, SurvivalState } from '../src/index.js';
 
 const idle = () => [emptyCommand()];
 
@@ -75,6 +78,53 @@ describe('as tres estrelas', () => {
       expect(stars).toBeLessThanOrEqual(previous);
       previous = stars;
     }
+  });
+});
+
+describe('a pontuacao da run', () => {
+  /**
+   * Duas grandezas, e so elas. O sumario carrega minerio, abates, dano,
+   * descobertas — nenhuma entra: sao consequencia de como a run foi jogada, e
+   * nenhuma e o que a run pede. Este teste falha no dia em que alguem
+   * acrescentar a terceira.
+   */
+  const scored = (over: Partial<RunSummary>): RunSummary =>
+    ({ cores: 1, ticks: 1000, sectorCount: 3, ...over }) as RunSummary;
+
+  it('le so Nucleos e tempo do sumario', () => {
+    expect(runScore(scored({ cores: 2, ticks: 4321 }))).toEqual({ cores: 2, ticks: 4321 });
+  });
+
+  it('mais Nucleos primeiro', () => {
+    expect(compareRunScore(scored({ cores: 2 }), scored({ cores: 1 }))).toBeLessThan(0);
+  });
+
+  it('entre Nucleos iguais, menos tempo primeiro', () => {
+    expect(compareRunScore(scored({ ticks: 500 }), scored({ ticks: 900 }))).toBeLessThan(0);
+  });
+
+  /**
+   * O Nucleo vale mais que qualquer tempo, e de proposito: ele e o OBJETIVO, e
+   * uma descida que volta com dois cumpriu duas vezes o que a Aurix pediu.
+   * Nenhuma pressa compra isso.
+   */
+  it('nenhum tempo compra um Nucleo', () => {
+    const doisLento = scored({ cores: 2, ticks: 999_999 });
+    const umInstantaneo = scored({ cores: 1, ticks: 1 });
+    expect(compareRunScore(doisLento, umInstantaneo)).toBeLessThan(0);
+  });
+
+  // Empate REAL devolve zero: quem chama decide o desempate (o ranking mantem
+  // quem chegou antes). Desempatar aqui obrigaria a pontuacao a conhecer id,
+  // data ou nome — coisas que nao sao pontuacao.
+  it('empate nao inventa desempate', () => {
+    expect(compareRunScore(scored({}), scored({}))).toBe(0);
+  });
+
+  // A classe e a descida, e nao a geracao: G-00 e G-01 autorizam a MESMA
+  // descida, e separa-las criaria dois livros para uma prova so.
+  it('a classe da run e a profundidade que ela atravessou', () => {
+    expect(runClass(scored({ sectorCount: 7 }))).toBe(7);
   });
 });
 

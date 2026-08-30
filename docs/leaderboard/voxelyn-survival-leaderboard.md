@@ -1,5 +1,82 @@
 # Voxelyn Survival — Ranking e 3 estrelas
 
+## 0. A pontuação: Núcleo e tempo
+
+A posição de uma run sai de **duas** grandezas, nesta ordem:
+
+1. **Núcleos extraídos** — mais primeiro;
+2. **Tempo da run** — menos primeiro;
+3. (empate real) quem chegou antes.
+
+Nada mais entra, e *nada mais* é o ponto. Minério, abates, dano, células de purga são
+consequência de **como** a run foi jogada; nenhuma delas é o que a run **pede**. Enquanto
+o minério entrava na ordenação — como desempate, mas entrava —, ele era uma quarta
+pergunta que o placar fazia e o briefing não.
+
+A ordem entre as duas não é arbitrária. **Núcleo primeiro** porque ele é o objetivo: uma
+descida que volta com dois cumpriu duas vezes o que a Aurix pediu, e nenhum tempo compra
+isso. **Tempo depois** porque, cumprido o objetivo, a única pergunta que sobra é quanto o
+Veio cobrou para soltá-lo — e é ela que mantém viva a decisão "extrair agora ou descer
+mais um".
+
+Lexicográfica, e **não** uma soma ponderada. Uma soma exigiria um câmbio entre segundo e
+Núcleo que ninguém sabe cotar, e o primeiro playtest que mudasse a duração da run mudaria
+o câmbio junto — o placar inteiro se reordenaria sem ninguém ter jogado nada.
+
+**As estrelas deixaram de ordenar.** Uma run de dois Núcleos fora do tempo-alvo vale duas
+estrelas e cumpriu o dobro de uma de três estrelas com um Núcleo só; ordenar pela nota
+punia quem desceu mais fundo. As estrelas continuam sendo a *leitura* da run — elas só
+não são mais a *posição* dela.
+
+`compareRunScore` mora na **simulação**, junto de quem constrói o sumário, e o servidor
+delega a ela. A pontuação é regra do jogo, não do banco: duas implementações da mesma
+ordem (TypeScript e o `order by` do Postgres) já são uma a mais do que o seguro, e uma
+terceira, divergente da sim, seria o jeito de a tela de resultado e o livro discordarem
+sobre quem ganhou.
+
+## 0.1. Um livro por profundidade
+
+Descidas de três e de sete setores **não competem entre si**. A de sete tem mais Núcleos
+disponíveis e leva o dobro do tempo: no mesmo livro, ela não compara habilidade, compara
+**autorização** — e autorização se compra, não se joga.
+
+A classe é o **`sectorCount`**, e não a geração. G-00 e G-01 autorizam a *mesma* descida
+(três setores, Núcleo no terceiro); separá-los criaria dois livros para uma prova só, cada
+um com metade dos jogadores. O que define a prova é a descida, e a descida é a contagem de
+setores.
+
+Os livros que o cliente vê são derivados **do que foi gravado**, nunca da tabela de
+gerações: um seletor montado a partir de `SECTORS_BY_GENERATION` ofereceria quatro livros
+vazios no dia do deploy, e um livro vazio que o jogador abre é uma promessa que o placar
+não cumpriu. Com um livro só, o seletor não aparece.
+
+### Como o servidor sabe a profundidade sem perguntar ao cliente
+
+O corpo do POST **não tem** campo de profundidade — pelo mesmo motivo que não tem campo de
+estrelas. O que ele carrega é o **`runId`** do ticket que *este* servidor emitiu; a
+profundidade e o tuning saem de lá:
+
+```
+cliente  →  { seed, log, name, runId }   ← nenhum campo de configuração
+servidor →  ticket[runId] → { seed, tuning, depth }
+         →  re-simula com ESSA configuração
+```
+
+Um `runId` inventado não autoriza nada: cai no caminho de fábrica (três setores, sem
+protocolo), que é o que toda run sem ticket sempre foi — inclusive a run offline e a de um
+servidor sem progressão.
+
+Ticket **vencido ainda serve** aqui. A validade existe para limitar a janela de uma
+liquidação que *paga*; o livro não paga nada — ele só precisa saber sob qual descida
+aqueles comandos foram gravados, e um ticket de ontem responde isso tão bem quanto um de
+agora. Recusar jogaria fora a submissão honesta de quem perdeu a rede no fim da run.
+
+Isto substituiu a política anterior (*"o ranqueado nunca herda profundidade: re-simula
+tudo em três setores"*). Ela mantinha a comparação justa com um livro só, ao preço de
+**recusar como fraude** toda run mais funda que três — o log de sete setores, alimentado a
+uma run de três, não chega ao mesmo fim. O livro por classe faz o mesmo trabalho sem
+cobrar isso.
+
 ## 1. As três estrelas
 
 | Nota | Exigência |
@@ -23,9 +100,13 @@ mudasse. `TARGET_SECTOR_TICKS` é o único número aqui que se espera calibrar p
 **O cliente nunca submete um resultado.** Ele submete a seed e o que pressionou.
 
 ```
-cliente  →  { seed, log, name }        ← nenhum campo de pontuação
-servidor →  re-simula                  ← descobre sozinho o que aconteceu
+cliente  →  { seed, log, name, runId }  ← nenhum campo de pontuação
+servidor →  re-simula                   ← descobre sozinho o que aconteceu
 ```
+
+`runId` é **identidade, não afirmação**: ele nomeia um ticket que este servidor emitiu, e
+é de lá que saem a seed, o tuning e a profundidade (§0.1). Um identificador inventado não
+autoriza nada.
 
 Não existe campo para mentir. Um cliente modificado que quisesse aparecer no topo teria
 de produzir uma sequência de comandos que, alimentada à simulação autoritativa,
@@ -115,11 +196,23 @@ o "já existe?" e o insert.
 
 ## 6. Ordenação
 
-Mais estrelas primeiro; entre nota igual, **menos tempo**; empate mantém quem chegou antes.
+Ver **§0**: Núcleos, tempo, e por fim quem chegou antes — dentro do livro da profundidade.
 
-Ordenar por tempo dentro da nota não introduz critério novo — a terceira estrela já é "a
-segunda com pressa", então isso apenas continua a escada que a nota começou. O desempate
-pelo mais antigo evita que o ranking se reordene sozinho quando ninguém melhorou nada.
+O desempate pelo mais antigo evita que o ranking se reordene sozinho quando ninguém
+melhorou nada.
+
+O índice do Postgres tem de **casar** com `compareEntries`; um que discorde devolve as
+linhas certas na ordem errada. `sector_count` vem primeiro nele porque toda leitura do jogo
+filtra por classe antes de ordenar. Os índices novos ganham **nome novo**:
+`CREATE INDEX IF NOT EXISTS` olha o nome, não as colunas, e reusar o antigo deixaria o
+índice velho intacto em produção, silenciosamente fora de ordem.
+
+A coluna `cores` nasce **nulável** na migração, e não com `default 0`. Um zero direto
+gravaria "nenhum Núcleo" em toda run antiga que extraiu *com* Núcleo, e o histórico
+inteiro cairia para o fim do livro na primeira leitura depois do deploy. O `UPDATE` a
+preenche a partir da fase (`extracted_with_core` era **um** Núcleo, porque um era o máximo
+que existia) e só então ela vira `not null`. `sector_count` pode usar default porque toda
+linha que existia foi mesmo uma descida de três setores — era a única que o jogo tinha.
 
 ## 7. Verificação
 

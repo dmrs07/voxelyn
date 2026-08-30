@@ -493,6 +493,16 @@ isso e continuam garantindo: o modo ranqueado nunca recebe ticket
 (`isRewardEligibleMode`), e `resimulateRun` sem `depth` cai em G-00 de fábrica.
 Progressão permanente não alonga a prova ranqueada.
 
+> **Revisto pelo ranking por classe.** Esta seção descreve a decisão desta spec,
+> não a regra vigente. O placar passou a ter **um livro por profundidade**, e com
+> isso a política de re-simular toda submissão em três setores deixou de ser o
+> que mantinha a comparação justa e passou a ser o que **recusava como fraude**
+> toda run mais funda que três: o log de sete setores, alimentado a uma run de
+> três, não chega ao mesmo fim. Hoje a submissão carrega o `runId` do ticket que
+> autorizou a descida, e a profundidade sai de lá — sem ticket, continua caindo
+> em G-00 de fábrica, exatamente como esta seção descreve. Ver
+> `docs/leaderboard/voxelyn-survival-leaderboard.md` §0.1.
+
 **Co-op** continua em três setores, e a decisão é explícita. Uma sala de co-op
 não tem perfil: o handshake é anônimo e não há ticket, então não existe "a
 geração de quem criou a sala" para consultar, e usar a menor geração dos

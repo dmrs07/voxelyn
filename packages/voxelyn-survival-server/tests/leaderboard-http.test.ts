@@ -241,16 +241,34 @@ describe('POST /leaderboard', () => {
 });
 
 describe('GET /leaderboard', () => {
-  it('devolve as entradas ordenadas', async () => {
+  it('devolve as entradas ordenadas por Nucleo e depois por tempo', async () => {
     const res = await fetch(`${base}/leaderboard?limit=10`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { entries: { stars: number; ticks: number }[] };
+    const body = (await res.json()) as { entries: { cores: number; ticks: number }[] };
     for (let i = 1; i < body.entries.length; i++) {
       const prev = body.entries[i - 1];
       const cur = body.entries[i];
-      expect(prev.stars >= cur.stars).toBe(true);
-      if (prev.stars === cur.stars) expect(prev.ticks <= cur.ticks).toBe(true);
+      expect(prev.cores >= cur.cores).toBe(true);
+      if (prev.cores === cur.cores) expect(prev.ticks <= cur.ticks).toBe(true);
     }
+  });
+
+  /**
+   * A resposta sempre nomeia o livro que respondeu, mesmo quando ninguem pediu
+   * um. Sem isso, o seletor do cliente nao teria como marcar a aba ativa na
+   * primeira abertura — que e justamente quando ele nao pede nada.
+   */
+  it('sempre diz qual livro respondeu, e quais existem', async () => {
+    const res = await fetch(`${base}/leaderboard?limit=10`);
+    const body = (await res.json()) as {
+      sectorCount: number;
+      classes: { sectorCount: number; entries: number }[];
+      entries: { sectorCount: number }[];
+    };
+    expect(Number.isInteger(body.sectorCount)).toBe(true);
+    expect(Array.isArray(body.classes)).toBe(true);
+    // Nenhuma linha de outra profundidade se mistura ao livro respondido.
+    for (const entry of body.entries) expect(entry.sectorCount).toBe(body.sectorCount);
   });
 
   it('recusa seed invalida em vez de devolver tudo', async () => {
@@ -258,10 +276,26 @@ describe('GET /leaderboard', () => {
     expect(res.status).toBe(400);
   });
 
+  it('recusa classe invalida em vez de devolver tudo', async () => {
+    expect((await fetch(`${base}/leaderboard?sectors=abc`)).status).toBe(400);
+    expect((await fetch(`${base}/leaderboard?sectors=0`)).status).toBe(400);
+  });
+
   it('filtra por seed', async () => {
     const res = await fetch(`${base}/leaderboard?seed=4242`);
     const body = (await res.json()) as { entries: { seed: number }[] };
     for (const e of body.entries) expect(e.seed).toBe(4242);
+  });
+
+  // Um livro que nao existe responde vazio e diz quais existem, em vez de 404:
+  // o cliente pediu uma aba legitima que ainda nao tem ninguem, e isso e uma
+  // resposta, nao um erro.
+  it('classe sem nenhuma run devolve lista vazia, nao erro', async () => {
+    const res = await fetch(`${base}/leaderboard?sectors=6`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sectorCount: number; entries: unknown[] };
+    expect(body.sectorCount).toBe(6);
+    expect(body.entries).toEqual([]);
   });
 });
 

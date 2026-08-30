@@ -69,7 +69,7 @@ import {
   isValidRoomCode,
   normalizeRoomCode,
 } from '@voxelyn/survival-protocol';
-import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
+import { RunRecorder, fetchLeaderboard, submitRun, type RankClass } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
@@ -715,7 +715,9 @@ const submitSoloRun = (state: SurvivalState): void => {
   if (submitted || !state.summary || state.summary.phase === 'dead') return;
   submitted = true;
   const url = serverInput.value.trim() || defaultServerUrl();
-  void submitRun(url, recorder, playerName).then((outcome) => {
+  // O ticket desta descida viaja junto. E dele que o servidor tira a
+  // profundidade autorizada — e, portanto, em qual livro esta run compete.
+  void submitRun(url, recorder, playerName, expedition?.runId).then((outcome) => {
     if (!outcome.ok) {
       // Sem banner: o jogador esta lendo a tela de resultado.
       console.info('[leaderboard] nao enviado:', outcome.reason);
@@ -2658,7 +2660,30 @@ document
   .getElementById('btn-options-close')
   ?.addEventListener('click', () => closeOverlay(optionsOverlay));
 
-document.getElementById('btn-rank')?.addEventListener('click', () => {
+/**
+ * Abre um livro do ranking.
+ *
+ * `sectorCount` ausente na PRIMEIRA abertura de proposito: quem escolhe o livro
+ * inicial e o servidor, que sabe quais existem. O cliente poderia palpitar pela
+ * geracao do proprio perfil, e palpitaria errado justamente para quem mais
+ * precisa do placar — o recem-chegado, cujo livro pode ainda nao ter ninguem.
+ *
+ * As abas ja aparecem no estado de carregamento (`classes` da consulta
+ * anterior), e nao so quando a resposta chega: a aba clicada tem de continuar
+ * na tela enquanto a lista dela e buscada, senao trocar de livro faz o seletor
+ * inteiro piscar fora e voltar.
+ */
+let rankClasses: RankClass[] = [];
+/**
+ * A consulta MAIS RECENTE. Duas trocas de aba rapidas correm em paralelo, e sem
+ * este token quem responde por ultimo desenha por ultimo — a lista na tela
+ * poderia ser a da aba que o jogador ja abandonou, sob o rotulo da que ele
+ * acabou de abrir.
+ */
+let rankQuery = 0;
+const openRankBook = (sectorCount?: number): void => {
+  const url = serverInput.value.trim() || defaultServerUrl();
+  const query = ++rankQuery;
   // Abre com estado de carregamento em vez de esperar a rede: um botao que nao
   // responde por dois segundos le como travado, e o solo funciona offline —
   // este painel pode legitimamente nunca carregar.
@@ -2666,18 +2691,30 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
     entries: [],
     emptyReason: t('rank.loading'),
     seed: forcedSeed ?? undefined,
+    classes: rankClasses,
+    sectorCount,
     loading: true,
   });
+  void fetchLeaderboard(url, { seed: forcedSeed ?? undefined, limit: 25, sectorCount }).then(
+    (page) => {
+      if (query !== rankQuery) return; // outra aba foi pedida depois desta
+      if (rankOverlay.classList.contains('hidden')) return; // jogador ja fechou
+      rankClasses = page.classes;
+      renderRankPanel(rankBody, {
+        entries: page.entries,
+        seed: forcedSeed ?? undefined,
+        classes: page.classes,
+        sectorCount: page.sectorCount,
+        onSelectClass: openRankBook,
+        emptyReason: t('rank.empty.offline'),
+      });
+    },
+  );
+};
+
+document.getElementById('btn-rank')?.addEventListener('click', () => {
   openOverlay(rankOverlay);
-  const url = serverInput.value.trim() || defaultServerUrl();
-  void fetchLeaderboard(url, { seed: forcedSeed ?? undefined, limit: 25 }).then((entries) => {
-    if (rankOverlay.classList.contains('hidden')) return; // jogador ja fechou
-    renderRankPanel(rankBody, {
-      entries,
-      seed: forcedSeed ?? undefined,
-      emptyReason: t('rank.empty.offline'),
-    });
-  });
+  openRankBook();
 });
 document
   .getElementById('btn-rank-close')

@@ -125,10 +125,15 @@ export type Resimulation =
  * apertou, e quem decide com qual Prospector — e com qual PROFUNDIDADE —
  * aqueles comandos rodam e o ticket guardado no servidor.
  *
- * Ausentes = G-00 de fabrica, tres setores. E o que mantem o leaderboard e o
- * ranqueado sendo o mesmo jogo para todo mundo: uma submissao de um perfil
- * G-04 e re-simulada com a mesma descida curta de todos os outros, e progressao
- * permanente nao alonga a prova ranqueada.
+ * Ausentes = G-00 de fabrica, tres setores. E o caminho de quem nao tem ticket:
+ * run offline, servidor sem progressao, pool de Ecos. Nao e um teto — e a
+ * descida de fabrica, a mesma que o jogo sempre foi para quem nao comprou
+ * protocolo nenhum.
+ *
+ * O ranking POR CLASSE e o que tirou daqui a antiga politica de re-simular tudo
+ * em tres setores. Ela mantinha um livro so, ao preco de recusar como fraude
+ * toda run mais funda que tres — e agora que cada profundidade tem o proprio
+ * livro, a comparacao justa nao precisa mais de um teto: precisa de um ticket.
  */
 export const resimulateRun = (
   seed: number,
@@ -206,9 +211,27 @@ export const resimulateRun = (
   };
 };
 
-/** Re-simula uma submissao e devolve o resultado AUTORITATIVO. */
-export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => {
-  const run = resimulateRun(seed, logBase64);
+/**
+ * Re-simula uma submissao e devolve o resultado AUTORITATIVO.
+ *
+ * `tuning` e `depth` NAO vem do corpo da requisicao — quem os passa e o
+ * chamador, depois de le-los de um ticket que o proprio servidor emitiu (ver
+ * `createLeaderboardHandler`). Ausentes, a run e re-simulada como G-00 de
+ * fabrica: tres setores, sem protocolo nenhum.
+ *
+ * Foi preciso abrir estes dois parametros porque o ranking passou a ser POR
+ * CLASSE de descida. Enquanto o livro era um so, re-simular tudo em tres
+ * setores era a politica; agora ela RECUSARIA toda run mais funda que tres —
+ * o log de uma descida de sete setores, alimentado a uma run de tres, nao chega
+ * ao mesmo fim, e voltaria ao jogador como fraude.
+ */
+export const verifySoloRun = (
+  seed: number,
+  logBase64: string,
+  tuning?: PlayerTuning,
+  depth?: RunDepthConfig,
+): ReplayResult => {
+  const run = resimulateRun(seed, logBase64, tuning, depth);
   if (!run.ok) return run;
   const summary = run.state.summary;
   if (!summary) return { ok: false, reason: 'run terminou sem sumario' };
