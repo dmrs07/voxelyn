@@ -325,6 +325,95 @@ describe('a barra sob o piso de apresentacao', () => {
   });
 });
 
+describe('tempo com a aba escondida', () => {
+  it('nao conta para o piso da tela de carregamento', () => {
+    // O defeito: entrar em `loading`, trocar de aba por 5 s e voltar fazia o
+    // primeiro quadro ver o piso como ja cumprido e saltar para o menu — a
+    // tela passava inteira escondida. Verificado no navegador com a
+    // visibilidade simulada: depois do conserto, 3210 ms visiveis na volta.
+    const t = BOOT_TIMING_FULL;
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(t) });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, {
+      type: 'preload-settled',
+      nowMs: identityTotalMs(t),
+      criticalFailed: false,
+    });
+
+    // 5 s escondido logo apos entrar na tela.
+    const voltouEm = identityTotalMs(t) + 5000;
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: voltouEm, hiddenMs: 5000 });
+    // Sem o conserto isto ja seria `handoff`.
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm });
+    expect(state.phase).toBe('loading');
+
+    // E o piso ainda e cobrado POR INTEIRO a partir da volta.
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm + t.loadingMinMs - 1 });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm + t.loadingMinMs });
+    expect(state.phase).toBe('handoff');
+  });
+
+  it('nunca empurra o relogio para o futuro', () => {
+    // Um `hiddenMs` maior que o tempo decorrido faria a fase durar para sempre.
+    let state = initialBootState(0, BOOT_TIMING_FULL);
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: 100, hiddenMs: 999_999 });
+    expect(state.phaseStartedMs).toBe(100);
+  });
+
+  it('ignora duracao nula ou negativa', () => {
+    const state = initialBootState(0, BOOT_TIMING_FULL);
+    expect(advanceBoot(state, { type: 'hidden-elapsed', nowMs: 50, hiddenMs: 0 })).toBe(state);
+    expect(advanceBoot(state, { type: 'hidden-elapsed', nowMs: 50, hiddenMs: -10 })).toBe(state);
+  });
+
+  it('vale para a identidade tambem', () => {
+    const t = BOOT_TIMING_FULL;
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: 4000, hiddenMs: 4000 });
+    state = advanceBoot(state, { type: 'tick', nowMs: 4000 + identityTotalMs(t) - 1 });
+    expect(state.phase).toBe('identity');
+  });
+});
+
+describe('movimento reduzido: a barra anda em degraus', () => {
+  it('quantiza o valor em vez de varrer continuamente', () => {
+    const steps = BOOT_TIMING_REDUCED.progressSteps;
+    expect(steps).toBeGreaterThan(0);
+    // Quadros consecutivos dentro do mesmo degrau devolvem o MESMO valor: e
+    // isso que faz a barra saltar em vez de deslizar. Nenhuma regra de CSS
+    // conseguiria isso — o movimento vinha do JavaScript.
+    const floor = BOOT_TIMING_REDUCED.loadingMinMs;
+    const a = displayedProgress(1, 1000, floor, steps);
+    const b = displayedProgress(1, 1016, floor, steps);
+    expect(a).toBe(b);
+
+    const distintos = new Set<number>();
+    for (let ms = 0; ms <= floor; ms += 16) distintos.add(displayedProgress(1, ms, floor, steps));
+    expect(distintos.size).toBeLessThanOrEqual(steps + 1);
+  });
+
+  it('o perfil completo continua continuo', () => {
+    expect(BOOT_TIMING_FULL.progressSteps).toBe(0);
+    const a = displayedProgress(1, 1000, BOOT_TIMING_FULL.loadingMinMs, 0);
+    const b = displayedProgress(1, 1016, BOOT_TIMING_FULL.loadingMinMs, 0);
+    expect(b).toBeGreaterThan(a);
+  });
+
+  it('o degrau arredonda para BAIXO — nunca adianta progresso', () => {
+    for (let ms = 0; ms <= 3200; ms += 37) {
+      const continuo = displayedProgress(1, ms, 3200, 0);
+      const emDegraus = displayedProgress(1, ms, 3200, 12);
+      expect(emDegraus).toBeLessThanOrEqual(continuo + 1e-9);
+    }
+  });
+
+  it('chega a 100% no fim do piso, como o continuo', () => {
+    expect(displayedProgress(1, 3200, 3200, 12)).toBe(1);
+  });
+});
+
 describe('perfis de tempo', () => {
   it('movimento reduzido mantem as telas e a ordem, sem transicao', () => {
     expect(BOOT_TIMING_REDUCED.identityFadeInMs).toBe(0);

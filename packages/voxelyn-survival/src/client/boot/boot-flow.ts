@@ -83,6 +83,20 @@ export type BootTiming = {
   handoffHoldMs: number;
   /** O escurecimento que entrega a tela ao menu. */
   handoffFadeMs: number;
+  /**
+   * Em quantos DEGRAUS a barra anda. `0` = continua.
+   *
+   * Existe para `prefers-reduced-motion`. Antes do piso de apresentacao a
+   * barra so se mexia quando uma tarefa liquidava — meia duzia de saltos
+   * discretos —, e a regra de CSS que tira a `transition` bastava. Com o piso,
+   * o valor passou a ser reescrito a cada quadro, e nenhuma regra de CSS
+   * impede movimento que o JavaScript esta produzindo: quem pediu menos
+   * movimento ganhou uma animacao continua de 3,2 s.
+   *
+   * Quantizar devolve o comportamento antigo sem tirar a informacao: a barra
+   * anda em degraus visiveis, a tela continua contando o que falta.
+   */
+  progressSteps: number;
 };
 
 /** A abertura completa, para quem abre o jogo. */
@@ -93,6 +107,7 @@ export const BOOT_TIMING_FULL: BootTiming = {
   loadingMinMs: 3200,
   handoffHoldMs: 220,
   handoffFadeMs: 420,
+  progressSteps: 0,
 };
 
 /**
@@ -114,6 +129,9 @@ export const BOOT_TIMING_REDUCED: BootTiming = {
   loadingMinMs: 3200,
   handoffHoldMs: 120,
   handoffFadeMs: 0,
+  // Doze degraus ao longo do piso: um a cada ~270 ms. Movimento suficiente
+  // para a barra dizer que anda, longe de uma varredura continua.
+  progressSteps: 12,
 };
 
 /**
@@ -132,6 +150,7 @@ export const BOOT_TIMING_SKIPPED: BootTiming = {
   loadingMinMs: 0,
   handoffHoldMs: 0,
   handoffFadeMs: 0,
+  progressSteps: 0,
 };
 
 /** Duracao total da identidade — o unico trecho puramente de apresentacao. */
@@ -181,11 +200,14 @@ export const displayedProgress = (
   realFraction: number,
   elapsedMs: number,
   floorMs: number,
+  steps = 0,
 ): number => {
   const real = Math.max(0, Math.min(1, realFraction));
-  if (floorMs <= 0) return real;
-  const byClock = Math.max(0, Math.min(1, elapsedMs / floorMs));
-  return Math.min(real, byClock);
+  const value = floorMs <= 0 ? real : Math.min(real, Math.max(0, Math.min(1, elapsedMs / floorMs)));
+  if (steps <= 0) return value;
+  // Para BAIXO, como o arredondamento do percentual: um degrau que adianta
+  // mostraria progresso que ainda nao aconteceu.
+  return Math.floor(value * steps) / steps;
 };
 
 /**
@@ -251,6 +273,23 @@ export type BootEvent =
    * traz a marca de volta.
    */
   | { type: 'identity-hold-until'; nowMs: number; untilMs: number }
+  /**
+   * A aba passou `hiddenMs` escondida — esse tempo NAO conta.
+   *
+   * `requestAnimationFrame` para (ou e estrangulado a ~1 Hz) quando a aba sai
+   * de vista, mas `performance.now()` continua andando. Sem isto, voltar de
+   * outra aba fazia o primeiro quadro ver o piso da tela de carregamento como
+   * ja cumprido e saltar direto para o menu: a tela que o piso existe para
+   * mostrar teria passado inteira com o jogador olhando para outro lugar.
+   *
+   * Verificado no navegador com a visibilidade simulada (o Chromium headless
+   * nao muda `document.hidden` sozinho ao trocar de aba): 5 s escondido, e a
+   * tela ainda recebe os 3,2 s visiveis inteiros depois da volta.
+   *
+   * O relogio da fase corrente e empurrado para a frente, e nao congelado —
+   * o que ja foi visto continua valendo.
+   */
+  | { type: 'hidden-elapsed'; nowMs: number; hiddenMs: number }
   /** O jogador pediu nova tentativa depois de uma falha critica. */
   | { type: 'retry'; nowMs: number };
 
@@ -331,6 +370,14 @@ const step = (state: BootState, event: BootEvent): BootState => {
     // para que exista um caminho unico de transicao (e um so lugar onde os
     // minimos de tela sao cobrados).
     return step({ ...state, preload }, { type: 'tick', nowMs: event.nowMs });
+  }
+
+  if (event.type === 'hidden-elapsed') {
+    if (event.hiddenMs <= 0) return state;
+    // Nunca alem do agora: um relogio empurrado para o futuro faria a fase
+    // durar para sempre.
+    const shifted = Math.min(event.nowMs, state.phaseStartedMs + event.hiddenMs);
+    return { ...state, phaseStartedMs: shifted };
   }
 
   if (event.type === 'identity-hold-until') {
