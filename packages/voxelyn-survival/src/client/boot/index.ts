@@ -38,6 +38,7 @@
 import {
   advanceBoot,
   bootTiming,
+  displayedProgress,
   handoffTotalMs,
   identityOpacity,
   initialBootState,
@@ -190,6 +191,47 @@ export const runBootSequence = async ({
   }
   let delivered = false;
   let armed = false;
+  // O progresso REAL do preload, guardado para o laco de quadros poder
+  // redesenhar a barra: com um piso de tela, o que a barra mostra depende
+  // tambem do tempo, e nao so das tarefas que liquidaram.
+  let realFraction = 0;
+  let pendingId: string | undefined;
+
+  const paintProgress = (nowMs: number): void => {
+    const elapsed = state.phase === 'loading' ? nowMs - state.phaseStartedMs : 0;
+    screen.setProgress(
+      displayedProgress(
+        realFraction,
+        elapsed,
+        state.timing.loadingMinMs,
+        state.timing.progressSteps,
+      ),
+      pendingId,
+    );
+  };
+
+  // O TEMPO COM A ABA ESCONDIDA NAO CONTA para a apresentacao.
+  //
+  // `requestAnimationFrame` para (ou e estrangulado) quando a aba sai de vista,
+  // mas `performance.now()` nao: sem isto, voltar de outra aba fazia o primeiro
+  // quadro ver o piso da tela de carregamento como ja cumprido e saltar para o
+  // menu — a tela que o piso existe para mostrar teria passado inteira com o
+  // jogador olhando para outro lado.
+  //
+  // O preload NAO e pausado: ele nao e apresentacao, e continuar carregando
+  // enquanto a aba esta em segundo plano e exatamente o que se quer.
+  let hiddenAt: number | null = null;
+  const onVisibility = (): void => {
+    if (document.hidden) {
+      hiddenAt = performance.now();
+      return;
+    }
+    if (hiddenAt === null) return;
+    const nowMs = performance.now();
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs, hiddenMs: nowMs - hiddenAt });
+    hiddenAt = null;
+  };
+  document.addEventListener('visibilitychange', onVisibility);
 
   const paint = (phase: BootPhase): void => {
     screen.showPhase(phase);
@@ -206,10 +248,15 @@ export const runBootSequence = async ({
     // nunca chega a ser observado. Exigir exatamente `handoff` aqui deixaria
     // justamente esses perfis sem entrega — o menu ficaria oculto para sempre.
     if (phase !== 'handoff' && phase !== 'menu') return;
+    // Chegar ao handoff significa que as DUAS comportas cairam — o trabalho
+    // acabou e o piso da tela foi cumprido. Entao a barra crava 100%, e o
+    // ultimo quadro visivel dela nao fica num 99% de arredondamento.
+    screen.setProgress(1);
     // A ENTREGA. Sob o escurecimento da abertura, nunca por cima da barra
     // ainda visivel: `dismiss` inicia o fade e o menu e revelado agora, por
     // baixo dele, de modo que o jogador so ve a troca ja terminada.
     delivered = true;
+    document.removeEventListener('visibilitychange', onVisibility);
     screen.dismiss(handoffTotalMs(timing));
     onReady();
   };
@@ -223,9 +270,11 @@ export const runBootSequence = async ({
    * baixa nem um byte a mais do que precisa.
    */
   const preload = async (): Promise<void> => {
-    const report = await runBootTasks(tasks, (fraction, pendingId) =>
-      screen.setProgress(fraction, pendingId),
-    );
+    const report = await runBootTasks(tasks, (fraction, pending) => {
+      realFraction = fraction;
+      pendingId = pending;
+      paintProgress(performance.now());
+    });
     if (report.outcomes.some((outcome) => outcome.id === 'keyart' && outcome.ok)) {
       screen.revealKeyart();
     }
@@ -249,7 +298,9 @@ export const runBootSequence = async ({
       if (state.phase !== 'failed' || retrying) return;
       retrying = true;
       state = advanceBoot(state, { type: 'retry', nowMs: performance.now() });
-      screen.setProgress(0);
+      realFraction = 0;
+      pendingId = undefined;
+      paintProgress(performance.now());
       paint(state.phase);
       void preload().finally(() => {
         retrying = false;
@@ -261,6 +312,18 @@ export const runBootSequence = async ({
     // junto com a pintura, em vez de correr as fases contra uma tela que
     // ninguem esta vendo.
     const tick = (): void => {
+      // COM A ABA ESCONDIDA, a apresentacao nao anda. Empurrar o relogio na
+      // volta (`hidden-elapsed`) nao basta sozinho: `requestAnimationFrame` e
+      // ESTRANGULADO em segundo plano, nao necessariamente parado, e os poucos
+      // quadros que ainda disparam avancariam as fases com ninguem olhando — o
+      // jogador voltaria para um terminal que nunca viu ser entregue.
+      //
+      // O preload segue normalmente: ele nao e apresentacao. Quem para aqui e
+      // so o relogio das telas.
+      if (typeof document !== 'undefined' && document.hidden) {
+        requestAnimationFrame(tick);
+        return;
+      }
       const before = state.phase;
       const nowMs = performance.now();
       state = advanceBoot(state, { type: 'tick', nowMs });
@@ -274,6 +337,10 @@ export const runBootSequence = async ({
         screen.setIdentityOpacity(0);
       }
       if (state.phase !== before) paint(state.phase);
+      // A barra e redesenhada TODO quadro enquanto a tela esta no ar: com um
+      // piso de apresentacao ela avanca com o relogio tambem, e nao so quando
+      // uma tarefa liquida.
+      if (state.phase === 'loading') paintProgress(nowMs);
       if (state.phase === 'menu') return resolve();
       requestAnimationFrame(tick);
     };

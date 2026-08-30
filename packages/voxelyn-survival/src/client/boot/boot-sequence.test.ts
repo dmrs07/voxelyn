@@ -114,17 +114,24 @@ describe('abertura ligada de ponta a ponta', () => {
     expect(currentStage()).toBe('boot-identity');
     expect(menu().classList.contains('hidden')).toBe(true);
 
-    // Passado o tempo da marca, a tela de carregamento entra.
+    // Passado o tempo da marca, a tela de carregamento entra. O trabalho ja
+    // acabou, mas a barra sobe com o PISO: ela mostra o menor entre o que foi
+    // feito e o tempo decorrido, e por isso comeca em zero em vez de cravar
+    // 100% e ficar parada.
     now = identityTotalMs(BOOT_TIMING_FULL);
     await advanceFrames(2);
     expect(currentStage()).toBe('boot-loading');
-    expect(document.getElementById('boot-percent')?.textContent).toBe('100%');
-    expect(document.getElementById('boot-meter')?.getAttribute('aria-valuenow')).toBe('100');
+    expect(document.getElementById('boot-percent')?.textContent).toBe('0%');
+
+    now += BOOT_TIMING_FULL.loadingMinMs / 2;
+    await advanceFrames(2);
+    expect(document.getElementById('boot-percent')?.textContent).toBe('50%');
     expect(onReady).not.toHaveBeenCalled();
 
-    // Cumprido o piso da tela, vem a entrega.
-    now += BOOT_TIMING_FULL.loadingMinMs;
+    // Cumprido o piso da tela, a barra chega a 100% e vem a entrega.
+    now = identityTotalMs(BOOT_TIMING_FULL) + BOOT_TIMING_FULL.loadingMinMs;
     await advanceFrames(2);
+    expect(document.getElementById('boot-meter')?.getAttribute('aria-valuenow')).toBe('100');
     expect(onReady).toHaveBeenCalledTimes(1);
     expect(menu().classList.contains('hidden')).toBe(false);
     expect(phase()).toBe('done');
@@ -161,7 +168,9 @@ describe('abertura ligada de ponta a ponta', () => {
         { ...art.task, weight: 1 },
       ],
       onReady: () => {},
-      env: { withoutIdentity: false },
+      // Sem piso: aqui o que esta sob teste e a barra contra o TRABALHO, e um
+      // piso de apresentacao mascararia justamente isso.
+      env: { withoutIdentity: false, skip: true },
     });
 
     expect(document.getElementById('boot-percent')?.textContent).toBe('0%');

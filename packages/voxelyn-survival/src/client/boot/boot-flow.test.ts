@@ -5,7 +5,9 @@ import {
   BOOT_TIMING_REDUCED,
   BOOT_TIMING_SKIPPED,
   IDENTITY_MAX_MS,
+  LOADING_FAILURE_MIN_MS,
   advanceBoot,
+  displayedProgress,
   bootTiming,
   handoffTotalMs,
   identityOpacity,
@@ -219,6 +221,22 @@ describe('falha critica', () => {
     expect(phases).not.toContain('menu');
   });
 
+  it('a tela de erro NAO espera o piso de apresentacao', () => {
+    // O piso existe para a tela de carregamento ser vista. A de erro precisa
+    // chegar — segurar uma ma noticia por tres segundos nao compra nada.
+    let state = initialBootState(0, BOOT_TIMING_FULL);
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(BOOT_TIMING_FULL) });
+    const enteredAt = state.phaseStartedMs;
+    state = advanceBoot(state, {
+      type: 'preload-settled',
+      nowMs: enteredAt + LOADING_FAILURE_MIN_MS,
+      criticalFailed: true,
+    });
+    expect(state.phase).toBe('failed');
+    // E muito antes do piso de sucesso.
+    expect(LOADING_FAILURE_MIN_MS).toBeLessThan(BOOT_TIMING_FULL.loadingMinMs);
+  });
+
   it('a nova tentativa volta ao carregamento — nunca a identidade', () => {
     let state: BootState = initialBootState(0, BOOT_TIMING_FULL);
     state = advanceBoot(state, { type: 'tick', nowMs: 2000 });
@@ -229,11 +247,18 @@ describe('falha critica', () => {
     expect(state.phase).toBe('loading');
     expect(state.preload).toBe('running');
 
-    // Agora dando certo: segue para o menu pelo caminho normal.
+    // Agora dando certo: segue para o menu pelo caminho normal — cumprindo o
+    // piso da tela de carregamento, que vale para a nova tentativa igual.
     state = advanceBoot(state, { type: 'preload-settled', nowMs: 3100, criticalFailed: false });
-    state = advanceBoot(state, { type: 'tick', nowMs: 3400 });
+    const handoffAt = 3000 + BOOT_TIMING_FULL.loadingMinMs;
+    state = advanceBoot(state, { type: 'tick', nowMs: handoffAt - 1 });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, { type: 'tick', nowMs: handoffAt });
     expect(state.phase).toBe('handoff');
-    state = advanceBoot(state, { type: 'tick', nowMs: 3400 + handoffTotalMs(BOOT_TIMING_FULL) });
+    state = advanceBoot(state, {
+      type: 'tick',
+      nowMs: handoffAt + handoffTotalMs(BOOT_TIMING_FULL),
+    });
     expect(state.phase).toBe('menu');
   });
 
@@ -248,6 +273,144 @@ describe('falha critica', () => {
     state = advanceBoot(state, { type: 'tick', nowMs: 1 });
     expect(state.phase).toBe('menu');
     expect(advanceBoot(state, { type: 'tick', nowMs: 99_999 })).toBe(state);
+  });
+});
+
+describe('a barra sob o piso de apresentacao', () => {
+  it('mostra o MENOR entre o trabalho feito e o tempo decorrido', () => {
+    // Rede lenta: quem manda e o trabalho.
+    expect(displayedProgress(0.2, 3200, 3200)).toBeCloseTo(0.2);
+    // Tudo em cache: quem manda e o piso.
+    expect(displayedProgress(1, 800, 3200)).toBeCloseTo(0.25);
+    expect(displayedProgress(1, 1600, 3200)).toBeCloseTo(0.5);
+    expect(displayedProgress(1, 3200, 3200)).toBe(1);
+  });
+
+  it('nunca mostra mais do que ja aconteceu', () => {
+    for (let ms = 0; ms <= 4000; ms += 100) {
+      for (const real of [0, 0.3, 0.75, 1]) {
+        const shown = displayedProgress(real, ms, 3200);
+        expect(shown).toBeLessThanOrEqual(real + 1e-9);
+        expect(shown).toBeLessThanOrEqual(ms / 3200 + 1e-9);
+      }
+    }
+  });
+
+  it('e monotonica no tempo — a barra nunca anda para tras', () => {
+    let previous = -1;
+    for (let ms = 0; ms <= 4000; ms += 50) {
+      const shown = displayedProgress(1, ms, 3200);
+      expect(shown).toBeGreaterThanOrEqual(previous);
+      previous = shown;
+    }
+  });
+
+  it('sem piso (modo de desenvolvimento) devolve o progresso real intacto', () => {
+    expect(displayedProgress(0.42, 0, 0)).toBeCloseTo(0.42);
+    expect(displayedProgress(1, 0, 0)).toBe(1);
+  });
+
+  it('sanea entrada fora da faixa', () => {
+    expect(displayedProgress(2, 9999, 3200)).toBe(1);
+    expect(displayedProgress(-1, 9999, 3200)).toBe(0);
+    expect(displayedProgress(1, -50, 3200)).toBe(0);
+  });
+
+  it('o piso e o pedido: entre 3 e 4 segundos', () => {
+    // A tela existe para ser VISTA. Com tudo em cache o preload liquida em
+    // ~200 ms, e sem piso ela passava rapido demais para registrar.
+    expect(BOOT_TIMING_FULL.loadingMinMs).toBeGreaterThanOrEqual(3000);
+    expect(BOOT_TIMING_FULL.loadingMinMs).toBeLessThanOrEqual(4000);
+    expect(BOOT_TIMING_REDUCED.loadingMinMs).toBe(BOOT_TIMING_FULL.loadingMinMs);
+  });
+});
+
+describe('tempo com a aba escondida', () => {
+  it('nao conta para o piso da tela de carregamento', () => {
+    // O defeito: entrar em `loading`, trocar de aba por 5 s e voltar fazia o
+    // primeiro quadro ver o piso como ja cumprido e saltar para o menu — a
+    // tela passava inteira escondida. Verificado no navegador com a
+    // visibilidade simulada: depois do conserto, 3210 ms visiveis na volta.
+    const t = BOOT_TIMING_FULL;
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(t) });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, {
+      type: 'preload-settled',
+      nowMs: identityTotalMs(t),
+      criticalFailed: false,
+    });
+
+    // 5 s escondido logo apos entrar na tela.
+    const voltouEm = identityTotalMs(t) + 5000;
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: voltouEm, hiddenMs: 5000 });
+    // Sem o conserto isto ja seria `handoff`.
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm });
+    expect(state.phase).toBe('loading');
+
+    // E o piso ainda e cobrado POR INTEIRO a partir da volta.
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm + t.loadingMinMs - 1 });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, { type: 'tick', nowMs: voltouEm + t.loadingMinMs });
+    expect(state.phase).toBe('handoff');
+  });
+
+  it('nunca empurra o relogio para o futuro', () => {
+    // Um `hiddenMs` maior que o tempo decorrido faria a fase durar para sempre.
+    let state = initialBootState(0, BOOT_TIMING_FULL);
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: 100, hiddenMs: 999_999 });
+    expect(state.phaseStartedMs).toBe(100);
+  });
+
+  it('ignora duracao nula ou negativa', () => {
+    const state = initialBootState(0, BOOT_TIMING_FULL);
+    expect(advanceBoot(state, { type: 'hidden-elapsed', nowMs: 50, hiddenMs: 0 })).toBe(state);
+    expect(advanceBoot(state, { type: 'hidden-elapsed', nowMs: 50, hiddenMs: -10 })).toBe(state);
+  });
+
+  it('vale para a identidade tambem', () => {
+    const t = BOOT_TIMING_FULL;
+    let state = initialBootState(0, t);
+    state = advanceBoot(state, { type: 'hidden-elapsed', nowMs: 4000, hiddenMs: 4000 });
+    state = advanceBoot(state, { type: 'tick', nowMs: 4000 + identityTotalMs(t) - 1 });
+    expect(state.phase).toBe('identity');
+  });
+});
+
+describe('movimento reduzido: a barra anda em degraus', () => {
+  it('quantiza o valor em vez de varrer continuamente', () => {
+    const steps = BOOT_TIMING_REDUCED.progressSteps;
+    expect(steps).toBeGreaterThan(0);
+    // Quadros consecutivos dentro do mesmo degrau devolvem o MESMO valor: e
+    // isso que faz a barra saltar em vez de deslizar. Nenhuma regra de CSS
+    // conseguiria isso — o movimento vinha do JavaScript.
+    const floor = BOOT_TIMING_REDUCED.loadingMinMs;
+    const a = displayedProgress(1, 1000, floor, steps);
+    const b = displayedProgress(1, 1016, floor, steps);
+    expect(a).toBe(b);
+
+    const distintos = new Set<number>();
+    for (let ms = 0; ms <= floor; ms += 16) distintos.add(displayedProgress(1, ms, floor, steps));
+    expect(distintos.size).toBeLessThanOrEqual(steps + 1);
+  });
+
+  it('o perfil completo continua continuo', () => {
+    expect(BOOT_TIMING_FULL.progressSteps).toBe(0);
+    const a = displayedProgress(1, 1000, BOOT_TIMING_FULL.loadingMinMs, 0);
+    const b = displayedProgress(1, 1016, BOOT_TIMING_FULL.loadingMinMs, 0);
+    expect(b).toBeGreaterThan(a);
+  });
+
+  it('o degrau arredonda para BAIXO — nunca adianta progresso', () => {
+    for (let ms = 0; ms <= 3200; ms += 37) {
+      const continuo = displayedProgress(1, ms, 3200, 0);
+      const emDegraus = displayedProgress(1, ms, 3200, 12);
+      expect(emDegraus).toBeLessThanOrEqual(continuo + 1e-9);
+    }
+  });
+
+  it('chega a 100% no fim do piso, como o continuo', () => {
+    expect(displayedProgress(1, 3200, 3200, 12)).toBe(1);
   });
 });
 
