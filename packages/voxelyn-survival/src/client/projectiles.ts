@@ -11,7 +11,13 @@
 // legivel — e um rastro curto que mostra para onde ele vai.
 
 import { PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
-import { COMBAT_PLANE_TILES, heightToScreenPx, projectileHeightTiles } from './combat-plane';
+import {
+  COMBAT_PLANE_TILES,
+  heightToScreenPx,
+  muzzleForProjectile,
+  muzzleLateralTiles,
+  projectileHeightTiles,
+} from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawGroundShadow, drawVoxel } from './voxel-draw';
 
@@ -22,6 +28,17 @@ export type ProjectileLike = {
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
   kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone' | 'flechette';
+  /**
+   * Velocidade, quando o chamador a tem.
+   *
+   * Serve a UM quadro: o primeiro. O rumo do projetil e normalmente deduzido do
+   * deslocamento entre dois quadros observados, e no quadro de estreia nao ha
+   * dois — sem isto o tiro nasceria no eixo do corpo e pularia para a boca no
+   * quadro seguinte. O snapshot online nao carrega velocidade (nem precisa: um
+   * quadro a 60 Hz), entao o campo e opcional e o co-op cai no rumo deduzido.
+   */
+  vx?: number;
+  vy?: number;
   modules?: {
     explosive?: { armAfterDistance: number };
     piercing?: true;
@@ -404,7 +421,16 @@ const drawSiphonSerpent = (
 const drawFlechette = (
   ctx: CanvasRenderingContext2D,
   project: (x: number, y: number) => [number, number],
-  projectile: ProjectileLike,
+  /**
+   * A origem de DESENHO, e nao `projectile.x/y`.
+   *
+   * Perto da arma as duas nao coincidem: o corpo sai da boca e a posicao
+   * autoritativa fica no eixo do bot. Recebendo a origem, o traco acompanha o
+   * corpo em vez de comecar atras dele durante o primeiro tile — que e onde a
+   * cauda esta mais visivel, porque a bala ainda esta perto da camera do olho.
+   */
+  ox: number,
+  oy: number,
   heading: { dx: number; dy: number } | null,
   sx: number,
   /** Ja com o `lift` aplicado: e a posicao FINAL do corpo na tela. */
@@ -414,7 +440,7 @@ const drawFlechette = (
   size: number,
 ): void => {
   if (heading) {
-    const [tx, ty] = project(projectile.x - heading.dx * 0.55, projectile.y - heading.dy * 0.55);
+    const [tx, ty] = project(ox - heading.dx * 0.55, oy - heading.dy * 0.55);
     // O ponto de tras recebe o MESMO `lift` do corpo: a bala nao muda de
     // altura em meio tile, e um traco que subisse na tela leria como uma
     // trajetoria curva que ela nao tem.
@@ -523,7 +549,18 @@ export class ProjectileView {
         previous.y = p.y;
         previous.seenAt = nowMs;
       } else {
-        this.tracks.set(p.id, { x: p.x, y: p.y, dx: 0, dy: 0, seenAt: nowMs, travelled: 0 });
+        // Semeia o rumo pela VELOCIDADE quando ela existe: e o unico jeito de
+        // o quadro de estreia — justamente aquele em que o tiro esta na boca —
+        // saber para que lado a arma aponta.
+        const speed = Math.hypot(p.vx ?? 0, p.vy ?? 0);
+        this.tracks.set(p.id, {
+          x: p.x,
+          y: p.y,
+          dx: speed > 1e-4 ? (p.vx ?? 0) / speed : 0,
+          dy: speed > 1e-4 ? (p.vy ?? 0) / speed : 0,
+          seenAt: nowMs,
+          travelled: 0,
+        });
       }
     }
     // Projeteis que sumiram (acertaram algo, expiraram) nao podem deixar
@@ -531,6 +568,35 @@ export class ProjectileView {
     // direcao do antigo, com o rastro apontando para tras.
     const live = new Set(projectiles.map((p) => p.id));
     for (const id of this.tracks.keys()) if (!live.has(id)) this.tracks.delete(id);
+  }
+
+  /**
+   * A posicao de MUNDO em que este projetil e DESENHADO.
+   *
+   * Nao e `projectile.x/y`: perto da arma o desenho sai da boca, e a boca esta
+   * um terco de tile a direita do eixo do corpo (ver `muzzleLateralTiles`). O
+   * desvio converge para zero em pouco mais de um tile, entao longe da arma
+   * esta funcao devolve a posicao autoritativa sem mudar nada.
+   *
+   * PUBLICA porque o corpo do projetil nao e a unica coisa desenhada nele: o
+   * rastro, a serpente do sifao, a sombra e o halo saem todos daqui. Cada um
+   * que reprojetasse `projectile.x/y` por conta propria ficaria para tras
+   * enquanto o corpo sai da boca — o efeito descolaria da bala nos primeiros
+   * quadros, que sao justamente os que o jogador esta olhando.
+   *
+   * A direita da trajetoria, em mundo, e `(-dy, dx)`: no modelo o eixo do corpo
+   * e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no outro. A
+   * arma nao troca de lado porque o bot sempre vira o corpo para onde mira.
+   */
+  worldOrigin(projectile: ProjectileLike): [number, number] {
+    const track = this.tracks.get(projectile.id);
+    if (!track) return [projectile.x, projectile.y];
+    const lateral = muzzleLateralTiles(
+      track.travelled,
+      muzzleForProjectile(projectile.kind, projectile.hostile)
+    );
+    if (lateral === 0) return [projectile.x, projectile.y];
+    return [projectile.x - track.dy * lateral, projectile.y + track.dx * lateral];
   }
 
   /**
@@ -544,7 +610,24 @@ export class ProjectileView {
     zoom: number,
     tileH: number
   ): void {
-    const [sx, sy] = project(projectile.x, projectile.y);
+    const track = this.tracks.get(projectile.id);
+    const muzzle = muzzleForProjectile(projectile.kind, projectile.hostile);
+
+    // A ORIGEM DO DESENHO E A BOCA DA ARMA, e nao o centro do bot.
+    //
+    // A simulacao nasce o projetil no eixo do corpo, porque e ali que a
+    // colisao dele comeca; a arma esta um terco de tile a DIREITA disso, e o
+    // jogador via o tiro sair do peito. O deslocamento converge para zero em
+    // pouco mais de um tile — o mesmo contrato da altura, pelo mesmo motivo:
+    // um deslocamento permanente faria o tiro desenhado passar ao lado do que
+    // ele de fato acerta.
+    //
+    // A direita da trajetoria, em mundo, e `(-dy, dx)`: no modelo o eixo do
+    // corpo e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no
+    // outro. A arma nao troca de lado porque o bot sempre vira o corpo para
+    // onde mira.
+    const [ox, oy] = this.worldOrigin(projectile);
+    const [sx, sy] = project(ox, oy);
     const rock = projectile.kind === 'rock';
     const disc = projectile.kind === 'return_disc';
     // O missil e um corpo, nao uma faisca: ele precisa ler como algo que voce
@@ -572,7 +655,6 @@ export class ProjectileView {
       VOXEL_PX *
       zoom *
       (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : flechette ? 0.6 : 1);
-    const track = this.tracks.get(projectile.id);
 
     // ALTURA. Tudo o que nao e hostil saiu da arma do Prospector — estilhaco,
     // disco e drone —, e por isso PARTE da altura do cano; o estilhaco e o disco
@@ -585,7 +667,7 @@ export class ProjectileView {
     // quadro em que o tiro aparece, que e o quadro em que ele saiu da arma.
     const heightTiles = seeker
       ? DRONE_CRUISE_HEIGHT
-      : projectileHeightTiles(track?.travelled ?? 0, !projectile.hostile);
+      : projectileHeightTiles(track?.travelled ?? 0, muzzle);
     const lift = heightToScreenPx(heightTiles, tileH, zoom);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
@@ -614,7 +696,7 @@ export class ProjectileView {
     if (rock) {
       if (track && (track.dx !== 0 || track.dy !== 0)) {
         for (let i = 2; i >= 1; i--) {
-          const [px, py] = project(projectile.x - track.dx * i * 0.22, projectile.y - track.dy * i * 0.22);
+          const [px, py] = project(ox - track.dx * i * 0.22, oy - track.dy * i * 0.22);
           ctx.globalAlpha = 0.5 - i * 0.15;
           drawVoxel(ctx, px, py - lift + i * zoom, size * 0.22, ramp);
         }
@@ -649,8 +731,8 @@ export class ProjectileView {
       if (track && (track.dx !== 0 || track.dy !== 0)) {
         for (let i = 2; i >= 1; i--) {
           const [px, py] = project(
-            projectile.x - track.dx * i * 0.3,
-            projectile.y - track.dy * i * 0.3,
+            ox - track.dx * i * 0.3,
+            oy - track.dy * i * 0.3,
           );
           ctx.globalAlpha = 0.32 - i * 0.11;
           drawVoxel(ctx, px, py - lift, size * 0.4, ramp);
@@ -720,7 +802,7 @@ export class ProjectileView {
     const heading = track && (track.dx !== 0 || track.dy !== 0) ? track : null;
 
     if (projectile.kind === 'flechette') {
-      drawFlechette(ctx, project, projectile, heading, sx, sy - lift, lift, size);
+      drawFlechette(ctx, project, ox, oy, heading, sx, sy - lift, lift, size);
       return;
     }
 
@@ -730,8 +812,8 @@ export class ProjectileView {
       if (heading) {
         for (let i = 3; i >= 1; i--) {
           const [tx, ty] = project(
-            projectile.x - heading.dx * i * 0.26,
-            projectile.y - heading.dy * i * 0.26
+            ox - heading.dx * i * 0.26,
+            oy - heading.dy * i * 0.26
           );
           ctx.globalAlpha = 0.45 - i * 0.11;
           ctx.fillStyle = HOSTILE_RAMP[1];
@@ -757,8 +839,8 @@ export class ProjectileView {
       drawSiphonSerpent(
         ctx,
         project,
-        projectile.x,
-        projectile.y,
+        ox,
+        oy,
         heading,
         lift,
         size,
@@ -770,7 +852,7 @@ export class ProjectileView {
     if (heading) {
       for (let i = TRAIL_LENGTH; i >= 1; i--) {
         const back = i * 0.3;
-        const [tx, ty] = project(projectile.x - heading.dx * back, projectile.y - heading.dy * back);
+        const [tx, ty] = project(ox - heading.dx * back, oy - heading.dy * back);
         ctx.globalAlpha = 0.5 - i * 0.1;
         drawVoxel(ctx, tx, ty - lift, size * (1 - i * 0.18), ramp);
       }
@@ -800,7 +882,7 @@ export class ProjectileView {
     // voxels deslocados ao longo do voo dao ao projetil uma forma alongada com
     // orientacao propria: da para ver PARA ONDE ele aponta, nao so onde esta.
     if (heading) {
-      const [bx, by] = project(projectile.x - heading.dx * 0.16, projectile.y - heading.dy * 0.16);
+      const [bx, by] = project(ox - heading.dx * 0.16, oy - heading.dy * 0.16);
       drawVoxel(ctx, bx, by - lift, size * 0.8, ramp);
     }
     drawVoxel(ctx, sx, sy - lift, size, ramp);

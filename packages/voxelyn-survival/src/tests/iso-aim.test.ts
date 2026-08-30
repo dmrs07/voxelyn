@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
+import { PROSPECTOR_MUZZLES, PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
 import {
   COMBAT_PLANE_TILES,
   MUZZLE_SETTLE_TILES,
+  muzzleForProjectile,
+  muzzleLateralTiles,
   heightToScreenPx,
   projectileHeightTiles,
 } from '../client/combat-plane';
@@ -107,18 +109,20 @@ describe('mira isometrica: o cursor no tronco do alvo', () => {
   });
 });
 
+const BOLT = PROSPECTOR_MUZZLES.bolt;
+
 describe('altura de voo do projetil', () => {
   it('nasce na boca do cano e assenta no plano de combate', () => {
-    expect(projectileHeightTiles(0, true)).toBeCloseTo(PROSPECTOR_MUZZLE_HEIGHT_TILES, 6);
-    expect(projectileHeightTiles(MUZZLE_SETTLE_TILES, true)).toBeCloseTo(COMBAT_PLANE_TILES, 6);
+    expect(projectileHeightTiles(0, BOLT)).toBeCloseTo(PROSPECTOR_MUZZLE_HEIGHT_TILES, 6);
+    expect(projectileHeightTiles(MUZZLE_SETTLE_TILES, BOLT)).toBeCloseTo(COMBAT_PLANE_TILES, 6);
     // Depois de assentar ela nao volta a subir, por mais longe que o tiro va.
-    expect(projectileHeightTiles(50, true)).toBeCloseTo(COMBAT_PLANE_TILES, 6);
+    expect(projectileHeightTiles(50, BOLT)).toBeCloseTo(COMBAT_PLANE_TILES, 6);
   });
 
   it('so desce — nunca sobe de volta no meio do voo', () => {
     let previous = Number.POSITIVE_INFINITY;
     for (let d = 0; d <= MUZZLE_SETTLE_TILES; d += MUZZLE_SETTLE_TILES / 20) {
-      const height = projectileHeightTiles(d, true);
+      const height = projectileHeightTiles(d, BOLT);
       expect(height).toBeLessThanOrEqual(previous + 1e-9);
       previous = height;
     }
@@ -131,11 +135,61 @@ describe('altura de voo do projetil', () => {
    */
   it('o que e hostil fica no plano do comeco ao fim', () => {
     for (const travelled of [0, 0.3, 1, 5, 20]) {
-      expect(projectileHeightTiles(travelled, false)).toBe(COMBAT_PLANE_TILES);
+      expect(projectileHeightTiles(travelled, null)).toBe(COMBAT_PLANE_TILES);
     }
   });
 
   it('distancia negativa (relogio torto) nao levanta o tiro acima do cano', () => {
-    expect(projectileHeightTiles(-5, true)).toBeCloseTo(PROSPECTOR_MUZZLE_HEIGHT_TILES, 6);
+    expect(projectileHeightTiles(-5, BOLT)).toBeCloseTo(PROSPECTOR_MUZZLE_HEIGHT_TILES, 6);
+  });
+});
+
+/**
+ * O EIXO QUE FALTAVA: a arma esta no ombro direito, nao no eixo do corpo.
+ *
+ * A simulacao nasce o projetil no centro do bot porque e ali que a colisao
+ * dele comeca. Sem esta correcao o jogador via o tiro sair do peito, um terco
+ * de tile ao lado da boca que visivelmente o cuspia — e o defeito era pior na
+ * Minigun, onde ele aparece dezesseis vezes por segundo.
+ */
+describe('deslocamento lateral ate a boca', () => {
+  it('nasce na boca e converge para a trajetoria autoritativa', () => {
+    expect(muzzleLateralTiles(0, BOLT)).toBeCloseTo(BOLT.lateral, 6);
+    expect(muzzleLateralTiles(MUZZLE_SETTLE_TILES, BOLT)).toBeCloseTo(0, 6);
+    // Convergir NAO e opcional: a colisao acontece na posicao autoritativa, e
+    // um deslocamento permanente faria o tiro desenhado passar ao lado do que
+    // ele de fato acerta.
+    expect(muzzleLateralTiles(50, BOLT)).toBeCloseTo(0, 6);
+  });
+
+  it('so encolhe — nunca reabre no meio do voo', () => {
+    let previous = Number.POSITIVE_INFINITY;
+    for (let d = 0; d <= MUZZLE_SETTLE_TILES; d += MUZZLE_SETTLE_TILES / 20) {
+      const lateral = muzzleLateralTiles(d, BOLT);
+      expect(lateral).toBeLessThanOrEqual(previous + 1e-9);
+      previous = lateral;
+    }
+  });
+
+  it('o que sai do chao nao tem boca, e nao anda de lado', () => {
+    for (const travelled of [0, 0.5, 3]) {
+      expect(muzzleLateralTiles(travelled, null)).toBe(0);
+    }
+  });
+
+  it('cada arma obedece a PROPRIA boca', () => {
+    // O `kind` e o discriminador porque ele ja carrega a arma: `flechette` so
+    // existe saindo da Minigun. Um numero unico poria a bala dela nascendo
+    // atras dos proprios canos.
+    expect(muzzleForProjectile('flechette', false)).toBe(PROSPECTOR_MUZZLES.minigun);
+    expect(muzzleForProjectile('bolt', false)).toBe(PROSPECTOR_MUZZLES.bolt);
+    expect(muzzleForProjectile('return_disc', false)).toBe(PROSPECTOR_MUZZLES.bolt);
+    expect(PROSPECTOR_MUZZLES.minigun.height).not.toBe(PROSPECTOR_MUZZLES.bolt.height);
+  });
+
+  it('o que e hostil nao tem boca, venha de que tipo vier', () => {
+    for (const kind of ['spit', 'rock', 'bolt']) {
+      expect(muzzleForProjectile(kind, true)).toBeNull();
+    }
   });
 });

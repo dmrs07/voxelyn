@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { layerDepthDispute } from '../tools/voxel.mjs';
 import { ATTACK_FLASH, LAYER_POSE_FRAMES, poseFor } from '../tools/player-layers.mjs';
 import { VOXELS_PER_TILE, prospectorParts } from '../tools/prospector.mjs';
+import { minigunGun } from '../tools/prospector-modules.mjs';
 import {
   PLAYER_GUN_BEHIND_DIRS,
+  PROSPECTOR_MUZZLES,
   gunBehindUpper,
   PROSPECTOR_MUZZLE_FLASH_FRAME,
   PROSPECTOR_MUZZLE_HEIGHT_TILES,
@@ -92,11 +94,45 @@ describe('boca do cano do Prospector', () => {
     expect(muzzle).toHaveLength(1);
   });
 
-  it('publica a altura da boca em tiles, medida nos voxels', () => {
-    expect(PROSPECTOR_MUZZLE_HEIGHT_TILES).toBe(muzzle[0].z / VOXELS_PER_TILE);
+  /**
+   * As TRES medidas, e nao so a altura.
+   *
+   * O ponto de referencia e o CENTRO do voxel, e nao o canto: o tiro sai do
+   * meio do cano. A versao anterior publicava `box.z` cru — a borda de baixo —,
+   * meio voxel abaixo de onde a boca de fato esta.
+   */
+  const offsetOf = (box) => ({
+    forward: -(box.y + box.d / 2) / VOXELS_PER_TILE,
+    lateral: (box.x + box.w / 2) / VOXELS_PER_TILE,
+    height: (box.z + box.h / 2) / VOXELS_PER_TILE,
+  });
+
+  it('publica as tres medidas da boca, tiradas dos voxels', () => {
+    expect(PROSPECTOR_MUZZLES.bolt).toEqual(offsetOf(muzzle[0]));
+    expect(PROSPECTOR_MUZZLE_HEIGHT_TILES).toBe(PROSPECTOR_MUZZLES.bolt.height);
     // Bem acima do meio tile em que o projetil voava: a diferenca entre sair da
     // arma e sair da barriga.
     expect(PROSPECTOR_MUZZLE_HEIGHT_TILES).toBeGreaterThan(1);
+  });
+
+  it('a boca esta ao LADO do eixo do corpo, que e o defeito que ela corrige', () => {
+    // A arma e montada no ombro direito. Um deslocamento lateral de zero seria
+    // o tiro nascendo no centro do bot — que era o comportamento anterior, e
+    // dele a boca dista um terco de tile.
+    expect(PROSPECTOR_MUZZLES.bolt.lateral).toBeGreaterThan(0.25);
+    expect(PROSPECTOR_MUZZLES.minigun.lateral).toBeGreaterThan(0.25);
+  });
+
+  it('a Minigun tem boca PROPRIA, a frente e acima da do Cravador', () => {
+    const mgCold = minigunGun({ flash: false });
+    const mgLit = minigunGun({ flash: true });
+    const mgMuzzle = mgCold.filter((box, i) => box.mat !== mgLit[i].mat);
+    expect(mgMuzzle).toHaveLength(1);
+    expect(PROSPECTOR_MUZZLES.minigun).toEqual(offsetOf(mgMuzzle[0]));
+    // Um numero unico para as duas armas poria o tiro da Minigun nascendo
+    // ATRAS dos proprios canos — e dezesseis vezes por segundo.
+    expect(PROSPECTOR_MUZZLES.minigun.forward).toBeGreaterThan(PROSPECTOR_MUZZLES.bolt.forward);
+    expect(PROSPECTOR_MUZZLES.minigun.height).toBeGreaterThan(PROSPECTOR_MUZZLES.bolt.height);
   });
 
   it('publica o quadro do clarao, e ele e unico na animacao', () => {
