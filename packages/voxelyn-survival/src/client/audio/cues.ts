@@ -254,6 +254,43 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'overheat':
       return [{ voice: 'overheat', x: ev.x, y: ev.y, scale: 1 }];
 
+    // CANHAO ROTATIVO. O motor CONTINUO nao passa por aqui — ele e um leito
+    // (`minigun-bus.ts`), como o fogo e o gas. O que passa sao as bordas: o
+    // arranque, a parada, e a saraivada agregada.
+    case 'minigun_spin':
+      // So as duas transicoes que o ouvido precisa: comecou a girar, parou de
+      // girar. `firing` nao soa — quem anuncia que a arma cuspiu e a propria
+      // rajada, um instante depois — e `overheated` tambem nao, porque o
+      // evento `overheat` ja toca o alarme no mesmo tick e dois sons para a
+      // mesma coisa seriam o dobro do aviso pela metade da clareza.
+      if (ev.phase === 'spinning_up') {
+        return [{ voice: 'minigunSpinStart', x: ev.x, y: ev.y, scale: 1 }];
+      }
+      if (ev.phase === 'spinning_down') {
+        return [{ voice: 'minigunSpinStop', x: ev.x, y: ev.y, scale: 1 }];
+      }
+      return [];
+
+    case 'minigun_burst':
+      // UMA voz por janela de quatro ticks, e nao uma por bala. A escala sobe
+      // com a densidade da janela e satura cedo: a diferenca entre tres e
+      // quatro balas em 200 ms nao e audivel, e deixar a escala crescer sem
+      // teto so faria a arma comer o barramento na rotacao maxima.
+      //
+      // A CAPSULA vem junto, e nao como evento proprio: o latao cai por causa
+      // da bala, e a simulacao nunca soube que capsula existe. Prioridade 1,
+      // entao ela e a primeira coisa a sumir quando o orcamento aperta —
+      // exatamente como o design pede.
+      return [
+        {
+          voice: 'minigunBurst',
+          x: ev.x,
+          y: ev.y,
+          scale: Math.min(1.15, 0.72 + ev.rounds * 0.11),
+        },
+        { voice: 'minigunCasing', x: ev.x, y: ev.y, scale: Math.min(1, 0.6 + ev.rounds * 0.1) },
+      ];
+
     case 'pickup_core':
       return [{ voice: 'pickupCore', x: ev.x, y: ev.y, scale: 1 }];
 

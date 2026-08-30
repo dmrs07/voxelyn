@@ -129,7 +129,23 @@
 // mecanica estar quebrada) e `leyline_circuit` (o desfecho da cascata). A
 // metade que doi: cliente antigo contra servidor novo veria a cascata morrer
 // no meio sem motivo e nunca saberia que o setor tinha um circuito.
-export const PROTOCOL_VERSION = 25;
+// 26: a MINIGUN entra no wire. `ViewerState` ganha `minigun` (rotacao,
+// acumulador e fase autoritativos do canhao rotativo) e nascem dois eventos:
+// `minigun_spin`, publicado so na TRANSICAO de fase, e `minigun_burst`, a
+// contagem AGREGADA de balas de uma janela de quatro ticks. `ProjectileKind`
+// ganha `flechette`.
+// As duas metades doem. Um cliente antigo contra servidor novo recebe um
+// `kind` que nao conhece e desenha o estilhaco generico: dezesseis por segundo
+// viram uma mancha unica onde deveria haver tracantes, e a unica leitura que a
+// arma tem — para onde vai o muro de balas — some. Um cliente novo contra
+// servidor antigo le `minigun` ausente e desenha canos parados durante o
+// spin-up inteiro, que e justamente a meia-segundo de antecipacao pela qual a
+// arma existe.
+// O que deliberadamente NAO entrou: um evento por bala. A cadencia e de
+// dezesseis por segundo por jogador, e a apresentacao precisa da densidade,
+// nao da sequencia — o projetil em si continua viajando no snapshot como
+// todos os outros, entao nada do que machuca depende de evento nenhum.
+export const PROTOCOL_VERSION = 26;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -552,7 +568,15 @@ export const PROTOCOL_VERSION = 25;
 // derivacao so LE o mundo (a impressao digital da geracao continua
 // 1082481898). Sobe porque um replay pre-41 re-simulado sob a regra nova
 // veria a cascata parar num curto que antes nao existia.
-export const SIMULATION_VERSION = 41;
+// 42: MINIGUN. Um modulo novo (`minigun`, tier 3, 300 cargas) entra no
+// `MODULE_DEFINITIONS` e portanto no POOL de escolha dos cofres de classe III:
+// duas simulacoes em versoes diferentes ofereceriam cartuchos diferentes do
+// mesmo cofre da mesma seed. E o `PlayerExtra` ganha `minigun` — rotacao,
+// acumulador de cadencia e fase —, tres campos que entram no hash autoritativo
+// porque sao eles que decidem em que tick a proxima bala sai. Um peer que
+// discordasse da rotacao cruzaria o limiar operacional um tick antes ou depois
+// do outro, e a divergencia apareceria como dano que so existe de um lado.
+export const SIMULATION_VERSION = 42;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

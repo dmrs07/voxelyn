@@ -35,6 +35,13 @@ import {
   GAS_DAMAGE_PER_TICK,
   SPORE_DAMAGE_PER_TICK,
   HEAT_PER_SHOT,
+  MINIGUN_BURST_EVENT_TICKS,
+  MINIGUN_DAMAGE,
+  MINIGUN_HEAT_PER_SHOT,
+  MINIGUN_MAX_SHOTS_PER_TICK,
+  MINIGUN_PROJECTILE_RADIUS,
+  MINIGUN_PROJECTILE_SPEED,
+  MINIGUN_PROJECTILE_TTL_SECONDS,
   MAX_PLAYERS,
   MAX_PROJECTILES,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
@@ -145,12 +152,25 @@ import {
 import { sectorBiome, sectorProfile } from './strata.js';
 import {
   activeModule,
+  activeWeaponModule,
   consumeModuleCharge,
   expireTimedModules,
   grantOrRechargeModule,
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
+import {
+  emptyMinigunState,
+  minigunDrainAccumulator,
+  minigunJitter,
+  minigunNextSpin,
+  minigunPhaseFor,
+  minigunPrimedAccumulator,
+  minigunRateMilli,
+  minigunSpread,
+  resetMinigun,
+  rotateUnit,
+} from './minigun.js';
 import {
   DISCOVERY_CARGO_LOST,
   DISCOVERY_DISCHARGE_POOL,
@@ -265,6 +285,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   purgeCells: tuning.startingPurgeCells,
   activeModules: [],
   pendingModuleChoice: null,
+  minigun: emptyMinigunState(),
   hasCore: false,
   carriedCoreMask: 0,
   dodgeDir: { x: 1, y: 0 },
@@ -285,6 +306,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
 export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): void => {
   extra.activeModules = [];
   extra.pendingModuleChoice = null;
+  resetMinigun(extra.minigun);
   extra.purgeCells = tuning.startingPurgeCells;
   extra.hasCore = false;
   extra.carriedCoreMask = 0;
@@ -1283,6 +1305,190 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   events.push({ t: 'well_offers', sector: state.sector, abilities: offers });
 };
 
+/**
+ * A barra de calor estourou? Entao trava o gatilho, cobra vida e avisa.
+ *
+ * Extraida do bloco do bolt porque agora ha DOIS gatilhos que aquecem o mesmo
+ * cano — o tiro comum e a Minigun — e a regra de superaquecimento e uma so por
+ * decisao de design: "a arma so volta a funcionar depois de cair abaixo do
+ * limiar de recuperacao que o sistema de calor ja usa". Duas copias da conta
+ * seriam duas regras, e a segunda envelheceria calada.
+ */
+const settleOverheat = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const extra = state.playerExtras[slot];
+  const player = state.players[slot];
+  const tuning = state.config.tuning;
+  if (extra.heat < tuning.heatMax) return;
+  extra.overheatedUntil = state.tick + tuning.overheatLockTicks;
+  extra.heat = tuning.heatMax * 0.55;
+  damageEntity(state, player, tuning.overheatSelfDamage, events, { kind: 'overheat' });
+  markDiscovery(state.stats, DISCOVERY_SELF_HARM);
+  events.push({ t: 'overheat', x: player.x, y: player.y });
+};
+
+/**
+ * Uma bala da Minigun. Devolve `false` quando nao havia como dispara-la.
+ *
+ * A ordem interna e a unica que nao duplica dano nem municao: a carga sai
+ * PRIMEIRO (e `consumeModuleCharge` e quem recusa a 301a e publica o
+ * `module_expired` uma vez so), e o projetil so nasce depois. Invertido, um
+ * `MAX_PROJECTILES` cheio comeria a carga sem por bala no mundo.
+ *
+ * O projetil sai SEM `modules`, e isso e a matriz de compatibilidade
+ * acontecendo: perfura, condutivo, explosivo, sifao e ricochete continuam
+ * instalados e com as cargas intactas, mas nao viajam na bala. Ver
+ * `modules.ts`.
+ */
+const fireMinigunRound = (
+  state: SurvivalState,
+  slot: number,
+  index: number,
+  events: SemanticEvent[],
+): boolean => {
+  if (state.projectiles.length >= MAX_PROJECTILES) return false;
+  const extra = state.playerExtras[slot];
+  const player = state.players[slot];
+  const tuning = state.config.tuning;
+  if (!consumeModuleCharge(extra, 'minigun', slot, events, true)) return false;
+
+  // DISPERSAO: cresce com o calor e e deterministica por (tick, slot, indice).
+  const spread = minigunSpread(extra.heat / Math.max(1, tuning.heatMax));
+  const angle = spread * minigunJitter(state.tick, slot, index);
+  const dir = rotateUnit(extra.aim.x, extra.aim.y, angle);
+
+  state.projectiles.push({
+    kind: 'flechette',
+    id: state.nextEntityId++,
+    owner: player.id,
+    x: player.x + dir.x * 0.4,
+    y: player.y + dir.y * 0.4,
+    vx: dir.x * MINIGUN_PROJECTILE_SPEED * tuning.projectileSpeedScale,
+    vy: dir.y * MINIGUN_PROJECTILE_SPEED * tuning.projectileSpeedScale,
+    damage: playerDamage(tuning, MINIGUN_DAMAGE),
+    radius: MINIGUN_PROJECTILE_RADIUS,
+    modules: undefined,
+    distanceTravelled: 0,
+    hostile: false,
+    leavesBiofluid: false,
+    ttl: Math.ceil(TICK_HZ * MINIGUN_PROJECTILE_TTL_SECONDS),
+  });
+
+  extra.heat += MINIGUN_HEAT_PER_SHOT;
+  extra.minigun.pendingRounds++;
+  state.stats.shotsFired += 1;
+  return true;
+};
+
+/**
+ * UM TICK do canhao rotativo. Devolve `true` quando ele esta com o gatilho.
+ *
+ * A ordem e deliberada e vale a pena ler de cima a baixo:
+ *
+ *  1. `wantsSpin` e a intencao COMPLETA — gatilho apertado, modulo com
+ *     municao, sem travamento de calor. Superaquecido, o jogador pode apertar
+ *     o quanto quiser: os canos descem.
+ *  2. A rotacao anda um passo. Ela anda SEMPRE, inclusive com o modulo ja
+ *     gasto, porque a desaceleracao e o fim da fantasia da arma — a bala 300
+ *     sai e os canos continuam girando ate parar.
+ *  3. A fase e derivada da rotacao (funcao total, ver `minigun.ts`), e a
+ *     transicao — e so ela — vira evento.
+ *  4. O acumulador entrega os tiros do tick. Nunca "um por quadro".
+ *  5. A rajada e publicada AGREGADA a cada `MINIGUN_BURST_EVENT_TICKS`.
+ *
+ * O `true` de retorno bloqueia o bolt no mesmo tick, e ele vale enquanto ha
+ * MUNICAO — nao enquanto ha rotacao: a desaceleracao depois da ultima bala nao
+ * pode segurar o tiro comum, que ja voltou a ser a arma do jogador.
+ */
+const stepMinigun = (
+  state: SurvivalState,
+  slot: number,
+  triggerHeld: boolean,
+  events: SemanticEvent[],
+): boolean => {
+  const extra = state.playerExtras[slot];
+  const player = state.players[slot];
+  const mg = extra.minigun;
+  const equipped = activeWeaponModule(extra, state.tick) === 'minigun';
+
+  // Sem arma e sem rotacao residual nao ha nada a fazer — o caminho quente de
+  // toda run que nunca viu uma Minigun sai daqui.
+  if (!equipped && mg.spin === 0 && mg.phase === 'idle' && mg.pendingRounds === 0) return false;
+
+  const overheated = state.tick < extra.overheatedUntil;
+  const wantsSpin = equipped && triggerHeld && !overheated;
+  const previousPhase = mg.phase;
+
+  mg.spin = minigunNextSpin(mg.spin, wantsSpin);
+  mg.phase = minigunPhaseFor(mg.spin, wantsSpin, overheated);
+
+  if (mg.phase === 'firing') {
+    const rate = minigunRateMilli(mg.spin);
+    // Entrando na rajada: semeia o acumulador para a primeira bala sair NESTE
+    // tick, e nao um tick depois de a rotacao ja ter cruzado o limiar.
+    if (previousPhase !== 'firing') mg.fireAccum = minigunPrimedAccumulator(rate);
+    const drained = minigunDrainAccumulator(mg.fireAccum, rate, MINIGUN_MAX_SHOTS_PER_TICK);
+    mg.fireAccum = drained.accum;
+    for (let i = 0; i < drained.shots; i++) {
+      if (!fireMinigunRound(state, slot, i, events)) break;
+    }
+    settleOverheat(state, slot, events);
+    // O travamento pode ter acontecido DENTRO do laco acima: a fase tem de
+    // dizer a verdade no mesmo tick, senao o cliente desenha canos girando
+    // enquanto a simulacao ja travou o gatilho.
+    if (state.tick < extra.overheatedUntil) mg.phase = 'overheated';
+  } else {
+    // Fora da rajada o acumulador zera. Guardar fracao entre rajadas daria uma
+    // bala "gratis" no reaperto — e o que barateia a retomada e a ROTACAO que
+    // sobrou, nunca municao adiantada.
+    mg.fireAccum = 0;
+  }
+
+  if (mg.phase !== previousPhase) {
+    events.push({
+      t: 'minigun_spin',
+      slot,
+      x: player.x,
+      y: player.y,
+      phase: mg.phase,
+      spin: mg.spin,
+    });
+  }
+
+  // A RAJADA AGREGADA. Cinco por segundo, e so quando houve bala: uma janela
+  // silenciosa nao publica nada.
+  if (mg.pendingRounds > 0 && state.tick % MINIGUN_BURST_EVENT_TICKS === 0) {
+    events.push({
+      t: 'minigun_burst',
+      slot,
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      rounds: mg.pendingRounds,
+      spin: mg.spin,
+    });
+    // O tronco tambem so gira uma vez por janela. `player_shot` continua sendo
+    // a acao — o atlas do Prospector nao ganhou pose nova — e o `endTick`
+    // cobre com folga a janela seguinte, entao a pose fica CONTINUA durante a
+    // rajada em vez de piscar cinco vezes por segundo.
+    events.push({
+      t: 'action_start',
+      entity: player.id,
+      action: 'player_shot',
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      startTick: state.tick,
+      releaseTick: state.tick,
+      endTick: state.tick + MINIGUN_BURST_EVENT_TICKS + 3,
+    });
+    mg.pendingRounds = 0;
+  }
+
+  return equipped;
+};
+
 const stepPlayer = (
   state: SurvivalState,
   slot: number,
@@ -1301,6 +1507,8 @@ const stepPlayer = (
   // explicando por que.
   if (!extra.joined || !player.alive || extra.downed) {
     settleBreathChannel(state, slot, events);
+    // Cair com o gatilho apertado nao deixa os canos girando para sempre.
+    if (extra.joined) stepMinigun(state, slot, false, events);
     return;
   }
 
@@ -1315,6 +1523,10 @@ const stepPlayer = (
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
     settleBreathChannel(state, slot, events);
     extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
+    // A pedra do Britador para o gatilho, e os canos DESACELERAM enquanto o
+    // Prospector esta atordoado — com a fase e o evento saindo normalmente,
+    // para o som do motor descer junto em vez de congelar no ar.
+    stepMinigun(state, slot, false, events);
     return;
   }
 
@@ -1479,6 +1691,12 @@ const stepPlayer = (
     emitFlameBreath(state, slot, events);
   }
 
+  // CANHAO ROTATIVO. Vem antes do gatilho comum e devolve `true` quando ele
+  // esta com a arma: a Minigun nao MODIFICA o tiro, ela OCUPA o gatilho (ver
+  // a matriz de compatibilidade em `modules.ts`). O passo tambem roda com a
+  // arma ja gasta, para os canos DESACELERAREM em vez de parar no ar.
+  const minigunHoldsTrigger = stepMinigun(state, slot, Boolean(cmd.fire) && !channeling, events);
+
   // disparo principal. `!channeling` e o bloqueio AUTORITATIVO do bolt durante
   // o sopro: a tentativa barrada nao arma modulo, nao gera calor e nao toca em
   // `nextShotAt` — nada e consumido, e nada fica enfileirado para depois. O
@@ -1486,6 +1704,7 @@ const stepPlayer = (
   if (
     cmd.fire &&
     !channeling &&
+    !minigunHoldsTrigger &&
     state.tick >= extra.nextShotAt &&
     state.tick >= extra.overheatedUntil &&
     state.projectiles.length < MAX_PROJECTILES
@@ -1571,13 +1790,7 @@ const stepPlayer = (
       owner: player.id,
     });
     state.stats.shotsFired += 1;
-    if (extra.heat >= tuning.heatMax) {
-      extra.overheatedUntil = state.tick + tuning.overheatLockTicks;
-      extra.heat = tuning.heatMax * 0.55;
-      damageEntity(state, player, tuning.overheatSelfDamage, events, { kind: 'overheat' });
-      markDiscovery(state.stats, DISCOVERY_SELF_HARM);
-      events.push({ t: 'overheat', x: player.x, y: player.y });
-    }
+    settleOverheat(state, slot, events);
   }
 
   // Celula de Purga: cartucho interno de cura e descontaminacao.
@@ -2958,6 +3171,17 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(e.resonance.current);
     mix(e.resonance.blast);
     mix(e.resonance.kinetic);
+    // O CANHAO ROTATIVO entra no hash inteiro: rotacao, acumulador e fase.
+    //
+    // Os tres decidem QUANDO a proxima bala sai. Duas simulacoes que discordem
+    // da rotacao divergem no tick em que uma cruza o limiar operacional e a
+    // outra ainda nao — e a divergencia aparece como "o parceiro atirou e eu
+    // nao", que e a forma mais confusa possivel de dessincronia. Sao inteiros
+    // por construcao (ver `minigun.ts`), entao nao ha arredondamento a fazer.
+    mix(e.minigun.spin);
+    mix(e.minigun.fireAccum);
+    mixString(e.minigun.phase);
+    mix(e.minigun.pendingRounds);
     mix(e.activeModules.length);
     for (const module of e.activeModules) {
       mixString(module.id);

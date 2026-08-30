@@ -130,8 +130,16 @@ const drawHardwareSheet = (nowMs: number): void => {
   const vh = window.innerHeight;
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, vw, vh);
-  const ids: ModuleId[] = ['piercing', 'conductive', 'explosive', 'siphon', 'ricochet', 'return_disc'];
-  const cols = 3;
+  const ids: ModuleId[] = [
+    'piercing',
+    'conductive',
+    'explosive',
+    'siphon',
+    'ricochet',
+    'return_disc',
+    'minigun',
+  ];
+  const cols = 4;
   const cellW = vw / cols;
   const cellH = vh / 2;
   ids.forEach((id, i) => {

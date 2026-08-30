@@ -71,6 +71,7 @@ suítes (`cues.test.ts`, `mixer.test.ts`, `ambience.test.ts`) rodam sem `AudioCo
 | `ambience-bus.ts` | Osciladores e loops persistentes dos leitos |
 | `music.ts` | Temas por estrato, timeline por tick, notas por compasso (puro) |
 | `music-bus.ts` | Drone/pad persistentes + scheduler lookahead do riff |
+| `minigun-bus.ts` | O motor contínuo do canhão rotativo (§4.5) |
 | `index.ts` | `AudioDirector`: ciclo de vida, unlock, volume, mudo |
 
 ## 3. As três decisões do mixer
@@ -116,6 +117,60 @@ por segundo, dentro de qualquer nuvem. Desde que o evento `hit` carrega o flag `
 flag, e não a causa do dano, de propósito: a varredura do Coração da Fornalha também fere
 com fogo e **é** pancada — ataque de chefe sai como impacto pleno, com ducking e tudo.
 Quem informa "estou no perigo" é o leito contínuo; a voz só pontua o custo.
+
+## 4.5 O canhão rotativo, ou: dezesseis balas por segundo contra dezesseis vozes
+
+A Minigun dispara 16 vezes por segundo. O mixer tem 16 vozes. Se essas duas frases se
+encontrarem sem uma política no meio, uma rajada come o barramento inteiro, todo telegrafo
+de inimigo desaparece durante ela, e o jogo passa a matar por algo que não deu para ouvir —
+o único invariante de combate que este projeto não quebra.
+
+A política tem três partes, e nenhuma delas é "abaixar o volume".
+
+**1. Não existe uma voz por bala.** Não há `minigunShot` no catálogo, e a ausência é a
+decisão. O que sai da simulação não é um evento por projétil: é `minigun_burst`, uma
+contagem **agregada** de uma janela de quatro ticks (200 ms). Cinco eventos por segundo,
+não dezesseis. A receita de `minigunBurst` agenda **três transientes dentro da mesma voz**,
+espaçados por 45 ms — o Web Audio agenda no futuro sem custo por evento, então o preço de
+uma saraivada é o preço de um som. O deslocamento de altura entre os três é determinístico
+e pequeno: três estalos idênticos o ouvido detecta como amostra repetida, e é exatamente
+isso que faz uma minigun soar de brinquedo.
+
+**2. O motor é um leito, não um evento.** `minigun-bus.ts` segue a mesma decisão do
+`AmbienceBus`: os nós nascem uma vez, no unlock, e o que muda é a altura e o ganho. Um
+oscilador por quadro para simular rotação contínua sairia granulado no ritmo do quadro em
+vez do ritmo do motor, e custaria sessenta nós por segundo para dizer uma coisa só. O
+timbre é dente de serra grave (a armadura girando) + uma quinta desafinada (o conjunto de
+peças) + ruído de banda estreita cuja frequência central sobe com o RPM (o atrito). A
+altura segue `playerExtra.minigun.spin`, que é **estado autoritativo** — um contador do
+cliente divergiria do gatilho na primeira reconexão, e o motor aceleraria depois de a arma
+já estar cuspindo. Perto do travamento o motor desafina para baixo e ganha atrito: é a
+única antecipação sonora que o superaquecimento tem.
+
+O leito cobre o jogador **local**. O parceiro remoto chega pelas vozes espaciais
+`minigunSpinStart` / `minigunSpinStop` e pelo próprio `minigunBurst`, que carrega a posição
+no evento. Um segundo leito contínuo por slot remoto seria um par de osciladores
+permanentes para uma arma que ele pode nunca pegar — e o paneamento de um leito que
+persegue um corpo em movimento é justamente o que soa artificial.
+
+**3. A rajada nunca chega a prioridade de telegrafo.** `minigunBurst` é prioridade 6, a
+mesma do tiro comum. A arma mais forte do jogo não compete com o aviso que impede uma morte
+injusta. E as cápsulas (`minigunCasing`, prioridade 1, ao lado de `corrode` e `chip`) são a
+primeira coisa a sumir quando o orçamento aperta — é textura, e o design pede que ela suma.
+A trava de 130 ms transforma a chuva inteira em até sete toques por segundo, agregados: um
+som por cápsula seria a mesma armadilha do som por bala, um andar abaixo.
+
+| Voz | Prioridade | Trava | O que é |
+| --- | --- | --- | --- |
+| `minigunSpinStart` | 6 | 200 ms | O motor pegando no tranco. Sobe. |
+| `minigunSpinStop` | 4 | 200 ms | O motor perdendo rotação. Desce. |
+| `minigunBurst` | 6 | 150 ms | A saraivada de uma janela inteira, em uma voz |
+| `minigunCasing` | 1 | 130 ms | O latão no chão. Some primeiro. |
+
+`minigun_spin` só soa nas transições para `spinning_up` e `spinning_down`. `firing` fica
+mudo porque quem anuncia que a arma cuspiu é a própria rajada, um instante depois;
+`overheated` fica mudo porque o evento `overheat` já toca o alarme no mesmo tick, e dois
+sons para a mesma coisa são o dobro do aviso pela metade da clareza.
 
 ## 5. Ambiência
 
@@ -221,7 +276,7 @@ que não conta como gesto.
 ## 7. Verificação
 
 ```
-pnpm test           # testes de áudio: cues, mixer, ambiência, música
+pnpm test           # testes de áudio: cues, mixer, ambiência, música, minigun
 pnpm build && pnpm check:audio
 ```
 

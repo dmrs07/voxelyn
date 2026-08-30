@@ -21,7 +21,7 @@ export type ProjectileLike = {
   y: number;
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
-  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone';
+  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone' | 'flechette';
   modules?: {
     explosive?: { armAfterDistance: number };
     piercing?: true;
@@ -74,6 +74,15 @@ const ROCK_SPARK = '#7ab8ff';
  */
 const DISC_RAMP: FaceRamp = ['#ffd166', '#6e4a33', '#1d2430'];
 const ARMED_RAMP: FaceRamp = ['#ffd166', '#ff7a3d', '#7a2f2f'];
+/**
+ * FLECHETTE: o tracante da Minigun.
+ *
+ * A mesma familia de cor do estilhaco comum (e o mesmo Prospector atirando),
+ * so que ESTOURADA para o branco no topo. E o unico jeito de um corpo de dois
+ * pixels continuar legivel: com a rampa normal, dezesseis balas por segundo
+ * viram uma poeira cinza-esverdeada sobre o chao da caverna.
+ */
+const FLECHETTE_RAMP: FaceRamp = ['#ffffff', '#a8ffe4', '#2f6b4f'];
 
 /**
  * Raio de colisao de um projetil pequeno, em tiles — o mesmo fallback que a
@@ -379,6 +388,53 @@ const drawSiphonSerpent = (
  * A fase vem da DISTANCIA percorrida, nao do relogio: a gota balanca porque
  * voa, e para de balancar quando o mundo pausa.
  */
+/**
+ * A FLECHETTE: um risco, e nao um cubo.
+ *
+ * O corpo tem dois pixels e nada de forma facetada sobreviveria nesse
+ * tamanho. O que carrega a leitura e o TRACO — um segmento fino atras do
+ * corpo, ao longo do voo — e ele resolve o problema real desta arma: com
+ * dezesseis balas no ar ao mesmo tempo, o jogador nao precisa ver cada uma,
+ * precisa ver PARA ONDE o muro de balas esta indo. Rastro continuo entrega
+ * isso; corpo isolado, nao.
+ *
+ * O traco e desenhado no espaco da TELA a partir da posicao projetada do
+ * ponto atras, para nao inventar uma inclinacao que a projecao 2:1 nao tem.
+ */
+const drawFlechette = (
+  ctx: CanvasRenderingContext2D,
+  project: (x: number, y: number) => [number, number],
+  projectile: ProjectileLike,
+  heading: { dx: number; dy: number } | null,
+  sx: number,
+  /** Ja com o `lift` aplicado: e a posicao FINAL do corpo na tela. */
+  sy: number,
+  /** O mesmo `lift` do corpo, para a cauda ficar na altura dele. */
+  lift: number,
+  size: number,
+): void => {
+  if (heading) {
+    const [tx, ty] = project(projectile.x - heading.dx * 0.55, projectile.y - heading.dy * 0.55);
+    // O ponto de tras recebe o MESMO `lift` do corpo: a bala nao muda de
+    // altura em meio tile, e um traco que subisse na tela leria como uma
+    // trajetoria curva que ela nao tem.
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = FLECHETTE_RAMP[1];
+    ctx.lineWidth = Math.max(1, size * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - lift);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // O corpo: um quadrado branco de um a dois pixels. Quadrado e nao voxel —
+  // as tres faces de um cubo neste calibre sao o mesmo pixel tres vezes.
+  const body = Math.max(1, Math.round(size * 0.9));
+  ctx.fillStyle = FLECHETTE_RAMP[0];
+  ctx.fillRect(Math.round(sx - body / 2), Math.round(sy - body / 2), body, body);
+};
+
 const drawSpitGlob = (
   ctx: CanvasRenderingContext2D,
   sx: number,
@@ -497,16 +553,25 @@ export class ProjectileView {
     const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
     // O ARMADO vence o sifao de proposito: risco fala mais alto que cura, e o
     // aviso laranja do explosivo nao pode ser pintado de verde por cima.
+    const flechette = projectile.kind === 'flechette';
     const ramp = rock ? ROCK_RAMP
       : disc ? DISC_RAMP
       : seeker ? SEEKER_RAMP
+      : flechette ? FLECHETTE_RAMP
       : armed ? ARMED_RAMP
       : projectile.hostile ? HOSTILE_RAMP
       : projectile.modules?.siphon ? SIPHON_RAMP
       : PLAYER_RAMP;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
-    const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : 1);
+    // A flechette e MENOR que o bolt de proposito — 60% do corpo. O calibre e
+    // metade da leitura da arma: uma bala do tamanho do estilhaco comum
+    // faria dezesseis tiros por segundo parecerem dezesseis tiros comuns, e a
+    // troca "muito dano por tiro" -> "muito tiro" sumiria da tela.
+    const size =
+      VOXEL_PX *
+      zoom *
+      (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : flechette ? 0.6 : 1);
     const track = this.tracks.get(projectile.id);
 
     // ALTURA. Tudo o que nao e hostil saiu da arma do Prospector — estilhaco,
@@ -537,7 +602,7 @@ export class ProjectileView {
       ctx,
       sx,
       sy,
-      (rock ? 7 : seeker ? 5 : disc ? 6 : 3) * zoom * (0.6 + 0.4 * altitude),
+      (rock ? 7 : seeker ? 5 : disc ? 6 : flechette ? 1.6 : 3) * zoom * (0.6 + 0.4 * altitude),
       0.45 / altitude,
     );
 
@@ -653,6 +718,11 @@ export class ProjectileView {
     // formas: e ele que conta de onde o tiro veio, e no ricochete e a unica
     // coisa que ainda conta isso depois do rebote.
     const heading = track && (track.dx !== 0 || track.dy !== 0) ? track : null;
+
+    if (projectile.kind === 'flechette') {
+      drawFlechette(ctx, project, projectile, heading, sx, sy - lift, lift, size);
+      return;
+    }
 
     if (projectile.kind === 'spit') {
       // Rastro de RESPINGOS redondos, nao de voxels facetados: gotinhas que a

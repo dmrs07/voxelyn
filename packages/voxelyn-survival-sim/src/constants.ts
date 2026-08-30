@@ -2013,3 +2013,132 @@ export const MAGNETARCH_CRUSH_DAMAGE = 16;
 export const MAGNETARCH_TETHER_RANGE = 9;
 export const MAGNETARCH_TETHER_DAMAGE = 14;
 export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;
+
+// ---------------------------------------------------------------------------
+// MINIGUN — o canhao rotativo da Aurix
+// ---------------------------------------------------------------------------
+//
+// A Minigun e um MODULO-ARMA: enquanto ela tem municao, ela SUBSTITUI o
+// disparo principal do Prospector. Nao e um modificador do bolt como perfura
+// ou ricochete, e por isso ela nao divide o tiro com ninguem (ver a matriz de
+// compatibilidade em `modules.ts`).
+//
+// A regra de conversao que rege TODOS os numeros abaixo: a simulacao roda a
+// TICK_HZ e nada aqui pode depender de quadro. Rotacao e cadencia sao
+// INTEIROS em milesimos justamente por isso — somar 0,05 por tick durante mil
+// ticks acumula erro de float, e duas maquinas de co-op que discordem do
+// terceiro decimal da rotacao divergem no tick em que uma delas cruza o
+// limiar operacional e a outra nao.
+
+/** Municao de uma aquisicao completa. O numero e a identidade do modulo. */
+export const MINIGUN_AMMO = 300;
+
+/** Rotacao maxima, em milesimos. Toda a maquina de estados mede spin nesta escala. */
+export const MINIGUN_SPIN_MAX = 1000;
+
+/**
+ * Quanto a rotacao sobe por tick com o gatilho apertado.
+ *
+ * 72 x 14 ticks = 1008 -> saturado em 1000: o spin-up completo leva 14 ticks,
+ * 0,7 s a 20 Hz, dentro da janela de 0,6-0,8 s que o design pede. E o unico
+ * numero que o jogador sente ANTES de qualquer projetil existir.
+ */
+export const MINIGUN_SPIN_UP_PER_TICK = 72;
+
+/**
+ * Quanto a rotacao cai por tick com o gatilho solto.
+ *
+ * 100 por tick = 10 ticks (0,5 s) do topo ate zero. MAIS RAPIDO que a subida
+ * de proposito: se a descida fosse lenta, soltar o gatilho nao custaria nada e
+ * o compromisso — que e a fantasia inteira da arma — sairia do jogo. Ainda
+ * assim ela e gradual, e e dai que sai a retomada barata: reapertar a dois
+ * ticks da soltura devolve o disparo quase de imediato.
+ */
+export const MINIGUN_SPIN_DOWN_PER_TICK = 100;
+
+/**
+ * Rotacao a partir da qual o primeiro projetil sai.
+ *
+ * 600/1000 = 9 ticks de subida (0,45 s) ate o primeiro tiro, e mais 5 ate a
+ * cadencia maxima. O jogador ouve e ve a arma trabalhando por quase meio
+ * segundo antes de ela cuspir qualquer coisa: e esse atraso que paga a
+ * cadencia absurda que vem depois.
+ */
+export const MINIGUN_SPIN_FIRE_AT = 600;
+
+/**
+ * Cadencia no limiar e no topo, em MILESIMOS DE TIRO POR TICK.
+ *
+ * 400 = 0,4 tiro/tick = 8 tiros/s no instante em que ela comeca a cuspir.
+ * 800 = 0,8 tiro/tick = 16 tiros/s com os canos no maximo.
+ *
+ * A conversao passa por um ACUMULADOR inteiro (`fireAccum`), nunca por "um
+ * projetil por quadro": num aparelho a 30 quadros por segundo a simulacao
+ * continua rodando os mesmos 20 ticks, e o acumulador entrega exatamente os
+ * mesmos 16 tiros por segundo — nem municao perdida, nem DPS perdido.
+ */
+export const MINIGUN_RATE_MIN_MILLI = 400;
+export const MINIGUN_RATE_MAX_MILLI = 800;
+
+/** Um tiro inteiro, na escala do acumulador. */
+export const MINIGUN_SHOT_MILLI = 1000;
+
+/** Teto de tiros por tick. So existe para uma cadencia futura acima de 20/s nao travar o laco. */
+export const MINIGUN_MAX_SHOTS_PER_TICK = 4;
+
+/**
+ * Dano por projetil.
+ *
+ * Menos da metade do bolt (14). O calculo que justifica: 16 tiros/s x 6 = 96
+ * de DPS enquanto a rajada dura, contra os 56 do tiro comum. Descontadas as
+ * pausas de calor, o sustentado fica em ~65 contra ~44 — "claramente alto",
+ * sem que um unico projetil isolado valha nada.
+ */
+export const MINIGUN_DAMAGE = 6;
+
+/** Velocidade do projetil. Bem acima do bolt (13): ele e pequeno e precisa chegar. */
+export const MINIGUN_PROJECTILE_SPEED = 22;
+
+/** Vida do projetil, em segundos de voo. Curta: e uma arma de sala, nao de corredor longo. */
+export const MINIGUN_PROJECTILE_TTL_SECONDS = 0.9;
+
+/** Raio de colisao do projetil. Menor que o padrao (0.2): a bala e pequena de verdade. */
+export const MINIGUN_PROJECTILE_RADIUS = 0.13;
+
+/**
+ * Calor por tiro.
+ *
+ * 2,6 x 16 tiros/s = 41,6 por segundo contra os 23 que o `heatDecayPerTick`
+ * padrao dissipa: saldo de ~18,6/s, e a barra estoura em ~4,6 s de rajada
+ * cheia. Sao ~74 projeteis por rajada, ou seja QUATRO travamentos para gastar
+ * as 300 balas. O numero existe para isso: sem ele o cartucho inteiro sairia
+ * numa unica sustentada de 19 segundos, e o superaquecimento — que e o freio
+ * que o jogo ja tem — nao teria nada a dizer sobre a arma mais forte dele.
+ */
+export const MINIGUN_HEAT_PER_SHOT = 2.6;
+
+/**
+ * Dispersao, em radianos de meia-abertura.
+ *
+ * Base ~1,7 graus (quase precisa) crescendo ate ~6,3 graus com a barra de
+ * calor cheia. A saturacao e o que faz "segurar o gatilho para sempre" nao ser
+ * a resposta certa a todo problema: de perto nao muda nada, e a 10 tiles a
+ * diferenca entre a arma fria e a arma prestes a travar e mais de um tile.
+ *
+ * O desvio de cada tiro e DETERMINISTICO (derivado de tick/slot/indice), nunca
+ * `Math.random()`: replay e co-op precisam ver a mesma bala no mesmo lugar.
+ */
+export const MINIGUN_SPREAD_BASE = 0.03;
+export const MINIGUN_SPREAD_MAX = 0.11;
+
+/**
+ * De quantos em quantos ticks a simulacao publica um `minigun_burst`.
+ *
+ * QUATRO, ou seja cinco eventos por segundo, cada um dizendo quantas balas
+ * sairam na janela. Um evento por bala seriam dezesseis por segundo por
+ * jogador so para dizer "saiu mais uma" — e a apresentacao (rajada sonora,
+ * clarao, capsulas) nao precisa disso: ela precisa da DENSIDADE, que e
+ * exatamente o que o campo `rounds` carrega. O projetil em si continua
+ * viajando no snapshot, como todos os outros.
+ */
+export const MINIGUN_BURST_EVENT_TICKS = 4;

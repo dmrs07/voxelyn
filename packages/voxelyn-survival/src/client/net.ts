@@ -639,6 +639,21 @@ export class NetClient {
       } : null;
       ex.hasCore = this.viewer.hasCore;
       ex.downed = this.viewer.downed;
+      // CANHAO ROTATIVO: rotacao e fase autoritativas do servidor.
+      //
+      // Copiado campo a campo no objeto que ja existe, e nao substituido pela
+      // referencia recebida: o `playerExtra` e lido pelo renderer no mesmo
+      // quadro, e trocar o objeto por baixo dele deixaria qualquer leitor que
+      // guardou a referencia anterior olhando para um canhao congelado.
+      //
+      // Servidor anterior ao protocolo 26 nao manda o campo; o cliente entao
+      // mantem o que ja tinha em vez de zerar a rotacao a cada snapshot.
+      if (this.viewer.minigun) {
+        ex.minigun.spin = this.viewer.minigun.spin;
+        ex.minigun.fireAccum = this.viewer.minigun.fireAccum;
+        ex.minigun.phase = this.viewer.minigun.phase;
+        ex.minigun.pendingRounds = this.viewer.minigun.pendingRounds;
+      }
       // A MIRA vem do proprio aparelho, nao do eco do servidor.
       //
       // Tudo mais neste bloco e estado que so o servidor conhece — calor, cargas,

@@ -121,6 +121,10 @@ const cloneExtra = (pe: PlayerExtra): PlayerExtra => ({
   aim: { x: pe.aim.x, y: pe.aim.y },
   dodgeDir: { x: pe.dodgeDir.x, y: pe.dodgeDir.y },
   activeModules: pe.activeModules.slice(),
+  // O canhao rotativo e mutado NO LUGAR a cada tick (rotacao, acumulador,
+  // fase): sem a copia, o retrato do tick passado apontaria para a rotacao do
+  // tick atual e a interpolacao entregaria canos que nunca aceleram.
+  minigun: { ...pe.minigun },
   resonance: { ...pe.resonance },
 });
 

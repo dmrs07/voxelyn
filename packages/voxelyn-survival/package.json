@@ -12,6 +12,7 @@
     "test": "vitest run",
     "build:offline-check": "vite build && node scripts/check-precache.mjs",
     "check:audio": "node scripts/check-audio.mjs",
+    "check:minigun": "node scripts/check-minigun.mjs",
     "soundtrack:prepare": "node scripts/prepare-soundtrack.mjs"
   },
   "dependencies": {

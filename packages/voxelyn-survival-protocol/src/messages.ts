@@ -4,6 +4,7 @@ import type {
   EnemyArchetype,
   EntityActionKind,
   EntityActionPhase,
+  MinigunState,
   PendingModuleChoice,
   PlayerCommand,
   ProjectileKind,
@@ -126,6 +127,19 @@ export type ViewerState = {
   purgeCells: number;
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
+  /**
+   * O canhao rotativo deste viewer: rotacao, acumulador e fase.
+   *
+   * Viaja porque a HUD, o cano do Prospector e o motor sonoro do jogador LOCAL
+   * leem a fase e a rotacao autoritativas — no solo direto do estado, online
+   * daqui. Sem o campo, o cliente online teria de adivinhar a rotacao a partir
+   * dos eventos de transicao e desenharia canos parados durante um spin-up de
+   * meio segundo, exatamente na parte da arma que existe para ser antecipada.
+   *
+   * Opcional por TOLERANCIA a fixture e a estado montado a mao em teste; a
+   * interoperabilidade real e protegida pelo exact-match do PROTOCOL_VERSION.
+   */
+  minigun?: MinigunState;
   hasCore: boolean;
   /** Quantos Nucleos ESTE jogador carrega. 0..2 hoje. */
   coreCount: number;

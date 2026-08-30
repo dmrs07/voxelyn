@@ -242,12 +242,62 @@ fundo claro/escuro alternável; zoom inteiro 1×–8×; escala real do jogo; ove
 anchor e footprint; seletor de direção; velocidade configurável; comparação lado a lado entre
 versões de um mesmo id.
 
+## 13.5 Cartuchos de módulo: entrada, uso e saída
+
+Os sete cartuchos Aurix (`module-hardware.ts`) são pixel art **procedural**, não atlas:
+chassi comum (corpo de aço, conector traseiro de três aletas, placa de identificação âmbar)
+mais **um** componente funcional dominante, tudo numa prancheta de 32×26 unidades ancorada
+em pixels inteiros. A regra de silhueta do §5 vale entre eles como vale entre criaturas: se
+dois cartuchos se confundem a 100% de zoom, um volta para redesign.
+
+O caso da **Minigun** documenta como a regra se aplica, porque ela nasceu perto de dois
+vizinhos. Contra o **perfurante** — que também é um tubo comprido apontado para a direita —
+o que separa é a **multiplicidade**: quatro canos empilhados com folga entre eles, não um
+corpo único com anéis. Contra o **disco de retorno** — que também tem uma peça redonda
+dominante — o que separa é a **posição**: o tambor fica atrás e embaixo, alimentando, em vez
+de no berço à frente, pronto para sair.
+
+A rotação entra por parâmetro (`spin`), nunca por relógio interno: o mesmo desenho serve ao
+cartucho **parado** na bancada do terminal e ao cartucho **encaixado** no bot, cuja rotação é
+estado autoritativo da simulação. Um relógio próprio faria a vitrine girar sozinha.
+
+Três momentos usam a MESMA arte, e é isso que faz o cartucho ser um objeto e não três
+ícones:
+
+| Momento | Onde | Como aparece |
+| --- | --- | --- |
+| Escolha | Terminal de recuperação | Aceso (`lit` acompanha o boot do CRT) |
+| Incorporação | Voo em arco até o Prospector | Aceso, encolhendo, com rastro discreto |
+| Ejeção | Objeto de cena no chão | Apagado (`lit` parcial); a Minigun ainda quente |
+
+A incorporação e a ejeção são **apresentação pura** (`module-props.ts`): a concessão do
+módulo acontece na simulação, no tick do comando, e o evento que dispara a animação é um
+relato do que já aconteceu. Nada nelas atrasa, condiciona ou confirma nada — origem que não
+resolve vira um clarão curto sobre o próprio bot, e a seleção nunca depende da animação.
+
+No Prospector, a arma é uma **sobreposição procedural** sobre o sprite (`minigun-mount.ts`),
+e não quadros novos no atlas: oito rumos × quatro posições de cano seriam trinta e dois
+quadros por animação para uma peça que dura vinte segundos de run. A regra que faz isso
+funcionar em poucos pixels: **rotação não se lê por movimento angular, e sim por
+alternância** — quatro canos que trocam de comprimento em fase leem como um conjunto
+girando; um desenho girado de verdade num raio de três pixels lê como tremor.
+
+O clarão de boca é pequeno e frequente, nunca uma flor de fogo: dezesseis por segundo com o
+clarão do tiro comum cobririam o inimigo que o jogador está mirando, e a arma passaria a
+esconder o próprio alvo. Fumaça só perto do travamento, pela mesma razão.
+
 ## 14. Renderização e atmosfera (sistemas, não assets)
 
 - Iluminação localizada: escuridão base + raio de luz do jogador + luzes emissivas pontuais.
 - Fog of war reaproveitando o sistema atual, mais escuro (não-cinza).
 - Hit flash branco 2 frames; screen shake ≤ 4 px e ≤ 180 ms.
 - Partículas com orçamento (baseline atual `MAX_PARTICLES=160` é o teto mobile).
+- **Cápsulas e props de módulo têm teto próprio e pool de reuso** (`casings.ts`,
+  `module-props.ts`): 48 cápsulas por jogador, 8 cartuchos ejetados, 4 voos de incorporação.
+  O anel de cápsulas é alocado uma vez e recicla a mais velha — trezentas balas por cartucho
+  custam zero alocação em regime. O jogo dispara logicamente mais balas do que desenha
+  latão quando a carga aperta, e está certo assim: a impressão de abundância vem da
+  **amostragem**, não de uma relação 1:1 que o alvo móvel não sustentaria.
 - Materiais reativos sempre com marcador visual próprio (brilho/bolhas/faísca) — a paleta de
   perigo (§6) é o canal de comunicação.
 - Nada disso pode reduzir a legibilidade de: projéteis, inimigos, líquidos perigosos, saída,

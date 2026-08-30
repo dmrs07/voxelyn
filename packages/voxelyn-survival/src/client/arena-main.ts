@@ -47,6 +47,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   siphon: 'Sifão',
   ricochet: 'Ricochete',
   return_disc: 'Disco de Retorno',
+  minigun: 'Minigun',
 };
 const MODULE_ORDER: readonly ModuleId[] = [
   'piercing',
@@ -55,6 +56,7 @@ const MODULE_ORDER: readonly ModuleId[] = [
   'siphon',
   'ricochet',
   'return_disc',
+  'minigun',
 ];
 
 const setupEl = document.getElementById('setup') as HTMLDivElement;

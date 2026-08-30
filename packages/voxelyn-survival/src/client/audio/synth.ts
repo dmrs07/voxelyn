@@ -233,6 +233,122 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     tone(ctx, out, t0 + 0.14, { type: 'sawtooth', from: 495, to: 495, peak: 0.34, decay: 0.16 });
   },
 
+  // --- canhao rotativo ----------------------------------------------------
+  //
+  // O TIMBRE do motor e industrial e nao eletronico: dente de serra grave
+  // (a armadura girando) somado a uma banda de ruido media (o atrito do
+  // conjunto). Um oscilador puro soaria como sintetizador; o ruido sozinho
+  // soaria como vento. A massa metalica esta na SOMA.
+  //
+  // O arranque SOBE, a parada DESCE, e as duas usam a mesma varredura ao
+  // contrario — e o vocabulario mais simples que existe para "ligando" e
+  // "desligando", e o banco inteiro ja o usa (ver `bishopHeal`).
+  minigunSpinStart: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 52,
+      to: 165,
+      peak: 0.36,
+      decay: 0.5,
+      attack: 0.03,
+    });
+    // A segunda parcial, uma quinta acima e desafinada: e ela que da ao motor
+    // o batimento de um conjunto de pecas, em vez de uma nota so.
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 78,
+      to: 246,
+      peak: 0.1,
+      decay: 0.5,
+      attack: 0.05,
+      detune: 14,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.16,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 420,
+      to: 1500,
+      q: 1.3,
+      attack: 0.06,
+    });
+  },
+  minigunSpinStop: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 150,
+      to: 44,
+      peak: 0.3,
+      decay: 0.6,
+      attack: 0.02,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.12,
+      decay: 0.55,
+      type: 'bandpass',
+      from: 1300,
+      to: 320,
+      q: 1.2,
+      attack: 0.04,
+    });
+  },
+  /**
+   * A SARAIVADA de uma janela inteira, numa voz so.
+   *
+   * Este e o ponto do arquivo em que a arma deixa de ser cara. Uma bala =
+   * uma voz seriam dezesseis `AudioNode` novos por segundo por jogador, e o
+   * teto de dezesseis vozes do mixer nao sobreviveria a nenhum combate. Aqui
+   * TRES transientes sao AGENDADOS dentro da mesma voz, espacados por 45 ms
+   * — o Web Audio agenda no futuro sem custo por evento, entao o preco de
+   * uma saraivada e o preco de um som.
+   *
+   * O deslocamento de altura por transiente e deterministico (`i * 60`) e
+   * pequeno. E o que separa "metralhadora" de "metralhadora de brinquedo":
+   * tres estalos identicos seguidos o ouvido detecta como amostra repetida;
+   * tres com o topo caindo lê como mecanismo.
+   */
+  minigunBurst: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 3; i++) {
+      const at = t0 + i * 0.045;
+      tone(ctx, out, at, {
+        type: 'square',
+        from: 640 - i * 60,
+        to: 190,
+        peak: 0.24,
+        decay: 0.042,
+      });
+      burst(ctx, out, at, noise, {
+        peak: 0.14,
+        decay: 0.035,
+        type: 'highpass',
+        from: 2400 + i * 220,
+      });
+    }
+    // O CORPO da rajada, por baixo dos estalos: um sopro grave curto que da
+    // peso ao conjunto. Sem ele a saraivada e aguda e leve, que e exatamente
+    // o oposto do que a arma promete.
+    burst(ctx, out, t0, noise, {
+      peak: 0.2,
+      decay: 0.13,
+      type: 'lowpass',
+      from: 900,
+      to: 240,
+      attack: 0.006,
+    });
+  },
+  /**
+   * O LATAO no chao: dois cliques metalicos agudos e curtissimos.
+   *
+   * Dois, e nao um, porque a irregularidade E o som: uma capsula sozinha soa
+   * como um clique de UI. E dois, e nao seis, porque o resto da chuva ja e
+   * contado pela trava de 130 ms da voz — o que se ouve e um crepitar de
+   * latao, nunca a contagem das capsulas.
+   */
+  minigunCasing: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'triangle', from: 2600, to: 1900, peak: 0.2, decay: 0.032 });
+    tone(ctx, out, t0 + 0.037, { type: 'triangle', from: 3100, to: 2300, peak: 0.14, decay: 0.028 });
+  },
+
   // --- impactos -----------------------------------------------------------
   hitEnemy: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, {

@@ -50,6 +50,17 @@ export type ModuleHardwareOptions = {
   lit?: number;
   /** Relogio para a pulsacao morna do modulo volatil. */
   nowMs?: number;
+  /**
+   * Fase de rotacao 0..1 do canhao rotativo. Ignorada pelos demais cartuchos.
+   *
+   * Entra por parametro e nao por relogio interno porque o mesmo desenho
+   * serve ao cartucho PARADO na bancada do terminal e ao cartucho encaixado
+   * no bot, cuja rotacao e estado autoritativo da simulacao. Um relogio
+   * proprio faria a vitrine girar sozinha e a arma girar fora de fase.
+   */
+  spin?: number;
+  /** Calor 0..1: acende os pontos quentes do canhao rotativo. */
+  heat?: number;
 };
 
 /** Unidades do grid de desenho. Todo cartucho vive numa prancheta 32×26. */
@@ -273,6 +284,97 @@ const drawReturnDisc = (d: Draw): void => {
 };
 
 /**
+ * MINIGUN: conjunto de canos rotativos + tambor alimentador.
+ *
+ * A silhueta tem de ser separavel de duas coisas que ja existem na bancada, e
+ * as duas ficaram do lado errado da conta na primeira tentativa. Contra o
+ * PERFURANTE — que tambem e um tubo comprido apontado para a direita — o que
+ * separa e a MULTIPLICIDADE: aqui sao quatro canos empilhados com folga entre
+ * eles, e nao um corpo unico com aneis. Contra o DISCO DE RETORNO — que
+ * tambem tem uma peca redonda dominante — o que separa e a POSICAO: o tambor
+ * fica atras e embaixo, alimentando, em vez de no berco na frente, pronto
+ * para sair.
+ *
+ * `spin` gira o pente de canos. Ele nao vem de um relogio interno: quem
+ * desenha passa a fase, porque a MESMA arte serve ao cartucho parado do
+ * terminal (spin 0) e ao cartucho encaixado no bot, cuja rotacao e estado
+ * autoritativo. Um relogio proprio aqui faria a bancada girar sozinha.
+ *
+ * `heat` acende os pontos quentes em ambar/laranja — o unico canal do desenho
+ * que muda com o estado da arma, e o que faz "esta quase travando" ser
+ * visivel no proprio cartucho da HUD e do terminal.
+ */
+const drawMinigun = (d: Draw, spin: number, heat: number): void => {
+  // Bloco de culatra: onde os canos montam. Osso, como as pecas estruturais
+  // dos outros cartuchos.
+  rect(d, 8, 3, 5, 9, HW.bone);
+  rect(d, 9, 4, 3, 7, HW.steelDark);
+
+  // O PENTE DE CANOS. Quatro tubos empilhados, com a altura de cada um
+  // modulada pela fase: os de cima "vem para a frente" e os de baixo recuam,
+  // que e como um conjunto rotativo se le numa projecao chapada.
+  //
+  // A fase e discretizada em quatro passos de proposito — pixel art nao tem
+  // subpixel, e uma interpolacao continua so produziria tremor de meio pixel
+  // no lugar de rotacao.
+  const step = ((Math.floor(spin * 4) % 4) + 4) % 4;
+  for (let i = 0; i < 4; i++) {
+    const phase = (i + step) % 4;
+    const y = 3 + i * 2;
+    // Comprimento alternado: o cano que esta "na frente" mostra mais corpo.
+    const long = phase === 0 || phase === 1;
+    const length = long ? 18 : 15;
+    rect(d, 13, y, length, 2, phase === 0 ? HW.steelLight : HW.steel);
+    // Boca: so os dois canos da frente mostram a abertura clara.
+    if (long) rect(d, 13 + length, y, 1, 2, HW.bone);
+  }
+  // Cinta de contencao atravessando o pente: e ela que diz "isto e UM
+  // conjunto", e nao quatro tubos soltos.
+  rect(d, 20, 2, 2, 10, HW.steelDark);
+  rect(d, 20, 2, 2, 1, HW.rust);
+
+  // TAMBOR ALIMENTADOR atras e embaixo, com a fita de municao subindo para a
+  // culatra. E a peca que conta as 300 balas sem escrever numero nenhum.
+  const { ctx } = d;
+  const dx = Math.round(d.x0 + 10 * d.u);
+  const dy = Math.round(d.y0 + 16 * d.u);
+  const radius = 4.2 * d.u;
+  ctx.fillStyle = HW.steelDark;
+  ctx.beginPath();
+  ctx.arc(dx, dy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = HW.rust;
+  ctx.beginPath();
+  ctx.arc(dx, dy, radius * 0.62, 0, Math.PI * 2);
+  ctx.fill();
+  // Cartuchos no tambor: pontos ambar em volta do eixo, girando com o pente.
+  ctx.fillStyle = accent(d, HW.amber);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + spin * Math.PI * 2;
+    ctx.fillRect(
+      Math.round(dx + Math.cos(a) * radius * 0.78 - d.u / 2),
+      Math.round(dy + Math.sin(a) * radius * 0.78 - d.u / 2),
+      Math.max(1, d.u),
+      Math.max(1, d.u),
+    );
+  }
+  // Fita de alimentacao: do tambor ate a culatra, em degraus.
+  for (let i = 0; i < 3; i++) rect(d, 11 + i, 12 - i * 2, 2, 2, HW.bone);
+
+  // PONTOS QUENTES. Laranja crescente na raiz dos canos e na culatra — o
+  // unico canal do cartucho que responde ao estado da arma.
+  if (heat > 0.01) {
+    const glow = mixColor(HW.rust, HW.fire, Math.min(1, heat));
+    ctx.globalAlpha = 0.35 + 0.65 * Math.min(1, heat);
+    rect(d, 13, 3, 2, 8, glow);
+    rect(d, 9, 5, 1, 5, glow);
+    ctx.globalAlpha = 1;
+  }
+
+  drawStatusLed(d, HW.amber);
+};
+
+/**
  * Desenha o cartucho de um modulo centrado em (cx, cy), com `size` de largura.
  * Retorna a altura ocupada em pixels (para quem empilha texto embaixo).
  */
@@ -307,7 +409,9 @@ export const drawModuleHardware = (
     drawExplosive(d, heartbeat);
   } else if (id === 'siphon') drawSiphon(d);
   else if (id === 'ricochet') drawRicochet(d);
-  else drawReturnDisc(d);
+  else if (id === 'minigun') {
+    drawMinigun(d, options.spin ?? 0, Math.max(0, Math.min(1, options.heat ?? 0)) * lit);
+  } else drawReturnDisc(d);
   ctx.restore();
   return height;
 };

@@ -128,8 +128,58 @@ export type EnemyArchetype =
   | 'furnace_heart'
   | 'frost_queen'
   | 'magnetarch';
-export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
-export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
+export type ModuleId =
+  | 'piercing'
+  | 'conductive'
+  | 'explosive'
+  | 'siphon'
+  | 'ricochet'
+  | 'return_disc'
+  /**
+   * MINIGUN: o canhao rotativo. Unico modulo que nao MODIFICA o tiro — ele
+   * TROCA o tiro. Ver `modules.ts` para a matriz de compatibilidade e
+   * `constants.ts`, secao "MINIGUN", para os numeros.
+   */
+  | 'minigun';
+/**
+ * `weapon` marca o modulo que OCUPA o disparo principal em vez de modifica-lo.
+ *
+ * Existe porque a diferenca e de categoria e nao de grau: dois modulos com a
+ * marca disputam o mesmo gatilho, e quem decide qual vence precisa de um
+ * predicado, nao de uma lista de ids espalhada por tres arquivos.
+ */
+export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe' | 'weapon';
+
+/**
+ * As cinco fases do canhao rotativo. Estado nomeado, e nao tres booleanos.
+ *
+ * A diferenca importa: com booleanos soltos ("girando", "atirando",
+ * "travado") existem combinacoes que a arma nao tem — girando e travado ao
+ * mesmo tempo, atirando sem girar — e todo leitor precisa saber de cor quais
+ * sao impossiveis. Aqui o conjunto de estados E o contrato, e o cliente pinta
+ * cada um deles sem inferir nada.
+ */
+export type MinigunPhase = 'idle' | 'spinning_up' | 'firing' | 'spinning_down' | 'overheated';
+
+/**
+ * O estado autoritativo do canhao rotativo de um slot.
+ *
+ * Vive no `PlayerExtra` e nao no `ActiveModule` porque ele sobrevive ao
+ * modulo: quando a bala 300 sai, o cartucho e ejetado, mas os canos ainda
+ * estao girando e precisam DESACELERAR na tela e no ouvido. Um estado que
+ * morresse junto com o modulo cortaria a rotacao no meio.
+ *
+ * Ambos os campos sao INTEIROS em milesimos. Ver `constants.ts`.
+ */
+export type MinigunState = {
+  /** Rotacao atual, 0..MINIGUN_SPIN_MAX. */
+  spin: number;
+  /** Fracao de tiro acumulada, 0..999. E o que torna a cadencia independente de quadro. */
+  fireAccum: number;
+  phase: MinigunPhase;
+  /** Quantos tiros sairam na janela do `minigun_burst` ainda nao publicada. */
+  pendingRounds: number;
+};
 export type ModuleLifetime =
   | { kind: 'charges'; remaining: number; maximum: number }
   | { kind: 'timer'; acquiredAtTick: number; expiresAtTick: number };
@@ -783,6 +833,17 @@ export type PlayerExtra = {
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
   /**
+   * O canhao rotativo deste slot. Existe SEMPRE, mesmo sem o modulo instalado
+   * — em `idle`, com rotacao zero.
+   *
+   * Alocar sob demanda pareceria mais economico e seria pior: o estado entra
+   * no hash autoritativo, e um campo que ora existe ora nao obrigaria o hash a
+   * ramificar (e um `undefined` do lado do servidor a valer o mesmo que um
+   * `spin: 0` do lado do cliente, o que e exatamente o tipo de acordo tacito
+   * que diverge). Quatro numeros por slot custam nada.
+   */
+  minigun: MinigunState;
+  /**
    * Carrega ao menos um Nucleo? DERIVADO de `carriedCoreMask`, mantido em par
    * com ele nos quatro pontos que escrevem a carga.
    *
@@ -841,6 +902,17 @@ export type ProjectileKind =
   | 'return_disc'
   | 'seeker'
   | 'cart'
+  /**
+   * FLECHETTE: a bala da Minigun.
+   *
+   * Tipo proprio e nao um `bolt` menor porque o cliente decide FORMA pelo
+   * `kind`: um bolt em escala reduzida ainda desenharia o estilhaco de dois
+   * voxels com rastro de energia, e dezesseis deles por segundo viram uma
+   * mancha. A flechette e um tracante fino — corpo minusculo, risco longo —,
+   * que e o que mantem a leitura de "para onde esta indo aquele muro de
+   * balas" num calibre que quase nao ocupa pixel.
+   */
+  | 'flechette'
   /**
    * CICLONE DE FOGO: a instabilidade do Coracao da Fornalha andando pela sala.
    *
@@ -1186,6 +1258,34 @@ export type SemanticEvent =
   | { t: 'module_selected'; slot: number; module: ModuleId; sourceSiteId: number; recharged: boolean }
   | { t: 'module_charge_consumed'; slot: number; module: ModuleId; remaining: number; maximum: number }
   | { t: 'module_expired'; slot: number; module: ModuleId }
+  /**
+   * O canhao rotativo MUDOU DE FASE. Emitido so na transicao, nunca por tick.
+   *
+   * Carrega a rotacao do instante da virada para o cliente poder continuar a
+   * rampa por conta propria com as MESMAS constantes: entre duas transicoes a
+   * apresentacao integra sozinha, e nada precisa trafegar. E o que faz o
+   * parceiro remoto parecer estar usando a arma sem um campo por tick.
+   */
+  | { t: 'minigun_spin'; slot: number; x: number; y: number; phase: MinigunPhase; spin: number }
+  /**
+   * QUANTAS balas sairam na ultima janela de `MINIGUN_BURST_EVENT_TICKS`.
+   *
+   * Cinco por segundo, agregados, em vez de dezesseis "saiu mais uma". A
+   * apresentacao inteira da rajada — a textura sonora, o clarao curto, as
+   * capsulas ejetadas — se alimenta da DENSIDADE, e densidade e o que este
+   * campo diz. O projetil individual continua viajando no snapshot, entao
+   * nada do que machuca depende deste evento.
+   */
+  | {
+      t: 'minigun_burst';
+      slot: number;
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      rounds: number;
+      spin: number;
+    }
   | { t: 'overheat'; x: number; y: number }
   /**
    * O chefe do setor acordou. Chamava-se `guardian_awake`: o Guardiao era o

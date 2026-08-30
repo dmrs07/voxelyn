@@ -66,6 +66,21 @@ const MODULES: Record<ModuleId, ModuleStatic> = {
     proc: 'module.return_disc.proc',
     risk: 'safe',
   },
+  /**
+   * MINIGUN e `safe` mesmo sendo a coisa mais forte da bancada.
+   *
+   * `risk` neste arquivo significa UMA coisa: o modulo pode matar o proprio
+   * Prospector? Explosivo pode. A Minigun nao — o que ela cobra e calor, e
+   * calor ja e o vermelho do HUD. Marca-la de volatil so porque ela e
+   * poderosa apagaria a unica leitura que o selo tem: hoje, um selo laranja
+   * num card significa exatamente "isto pode te matar".
+   */
+  minigun: {
+    label: 'module.minigun.label',
+    description: 'module.minigun.description',
+    proc: 'module.minigun.proc',
+    risk: 'safe',
+  },
 };
 
 /**

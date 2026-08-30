@@ -704,6 +704,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'module.return_disc.description':
     'Deals damage on the way out and returns chasing the Prospector.',
   'module.return_disc.proc': 'RETURNS',
+  'module.minigun.label': 'ROTARY CANNON',
+  'module.minigun.description':
+    'The barrels take a moment to wind up. After that, it dumps weak rounds until the barrel jams.',
+  'module.minigun.proc': 'ROUNDS',
+  'hud.minigun.spinup': 'SPINNING',
+  'hud.minigun.overheated': 'BARREL JAMMED',
   'module.lifetime.charges': '{count} {proc}',
   'module.lifetime.duration': '{seconds}s',
 
