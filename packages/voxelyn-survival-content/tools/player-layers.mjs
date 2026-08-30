@@ -1,4 +1,5 @@
 import { renderVoxels } from './voxel.mjs';
+import { ATTACHMENT_IDS, MODULE_ATTACHMENTS, minigunGun } from './prospector-modules.mjs';
 import {
   ANCHOR_X,
   ANCHOR_Y,
@@ -8,6 +9,7 @@ import {
   RENDER_ANCHOR_Y,
   WALK_FRAMES,
   WALK_SWING,
+  gunAnchor,
   prospectorParts,
   walkFps,
 } from './prospector.mjs';
@@ -59,6 +61,66 @@ export const poseFor = (anim, frame) => {
   return prospectorParts({ bob: idleBob[frame % idleBob.length] });
 };
 
+/**
+ * Os argumentos de POSE de um quadro, que `poseFor` consome mas nao devolve.
+ *
+ * Os modulos precisam deles crus: eles nao sao partes do `prospectorParts`, e
+ * mesmo assim tem de acompanhar coice, respiracao e agachamento voxel a voxel.
+ * Reconstruir a pose aqui (em vez de deixar cada modulo adivinhar) e o que
+ * garante que a peca acoplada nunca descole do cano — a mesma razao pela qual
+ * `gunAnchor` existe um nivel abaixo.
+ */
+const poseArgsFor = (anim, frame) => {
+  if (anim === 'walk') return { swing: WALK_SWING[frame % WALK_FRAMES] };
+  if (anim === 'attack') {
+    return {
+      kick: attackKick[frame % attackKick.length],
+      flash: attackFlash[frame % attackFlash.length],
+    };
+  }
+  return { bob: idleBob[frame % idleBob.length] };
+};
+
+/**
+ * As caixas de um MODULO acoplado, neste quadro.
+ *
+ * OS ACOPLADOS seguem a pose do tronco, quadro a quadro: eles estao parafusados
+ * no Cravador, e o Cravador recua no disparo.
+ *
+ * A MINIGUN NAO. Os quatro quadros dela codificam SO a posicao da ventoinha, e
+ * o corpo fica na pose de repouso. Duas razoes, e as duas vieram de medir o que
+ * o jogo faz de verdade:
+ *
+ *  1. A rotacao nao cabe no relogio da acao. A simulacao passa ~450 ms subindo
+ *     antes de emitir o primeiro `action_start`, e desce sem emitir nenhum:
+ *     amarrar a ventoinha a animacao de `attack` a deixaria PARADA durante as
+ *     duas transicoes que a arma inteira existe para vender.
+ *  2. E o relogio da acao nem e continuo. A rajada agregada republica
+ *     `action_start` com um `startTick` novo a cada quatro ticks, e
+ *     `visualActionElapsed` reancora a cada troca de `startTick` — a animacao
+ *     de quatro quadros a 12 fps reiniciava a cada 200 ms sem nunca chegar ao
+ *     quarto. Um coice assado herdaria essa mesma gagueira.
+ *
+ * Quem escolhe o quadro, entao, e o cliente, a partir de `barrelPhase` — o
+ * angulo que `MinigunViews` ja integra da rotacao autoritativa. O coice nao se
+ * perde: `recoilScreenOffset` desloca a arma inteira e e aplicado fora da
+ * escolha de quadro.
+ */
+const moduleBoxes = (id, anim, frame) => {
+  if (id === 'minigun') return minigunGun({ fan: frame });
+  return MODULE_ATTACHMENTS[id](gunAnchor(poseArgsFor(anim, frame)));
+};
+
+const renderModule = (dir, anim, frame, id) =>
+  renderVoxels(
+    moduleBoxes(id, anim, frame),
+    DIR_INDEX[dir],
+    FRAME_WIDTH,
+    FRAME_HEIGHT,
+    RENDER_ANCHOR_X,
+    RENDER_ANCHOR_Y
+  );
+
 const renderPart = (dir, anim, frame, part) =>
   renderVoxels(
     poseFor(anim, frame)[part],
@@ -69,11 +131,17 @@ const renderPart = (dir, anim, frame, part) =>
     RENDER_ANCHOR_Y
   );
 
+/** Todo modulo que tem camada propria: os seis acoplados mais a Minigun. */
+export const ALL_MODULE_IDS = [...ATTACHMENT_IDS, 'minigun'];
+
+/** O id de atlas de um modulo. Uma funcao so, lida pelo gerador e pelo cliente. */
+export const moduleLayerId = (id) => `layer-module-${id.replace(/_/g, '-')}`;
+
 /**
- * Referência comum de enquadramento usada pelos três atlas. O gerador inclui
+ * Referência comum de enquadramento usada pelos atlas. O gerador inclui
  * estes frames ao calcular a união visual e aplica exatamente o mesmo dx/dy às
- * pernas, ao tronco e à arma, preservando cintura, anchor e escala entre as
- * camadas.
+ * pernas, ao tronco, à arma e aos módulos, preservando cintura, anchor e escala
+ * entre as camadas.
  */
 const fitReference = () => {
   const frames = [];
@@ -86,8 +154,21 @@ const fitReference = () => {
     for (const [anim, count] of animations) {
       for (let frame = 0; frame < count; frame++) {
         const pose = poseFor(anim, frame);
+        // Os MODULOS entram na referencia junto com o corpo, e isso e o que
+        // mantem as camadas alinhadas. `fitSpriteToMargin` centraliza o
+        // conteudo da uniao: se a lanca do perfurante ou os canos da Minigun
+        // ficassem de fora, a camada do modulo receberia um dx diferente do
+        // corpo e a peca nasceria deslocada do cano — em pixels, e so em
+        // algumas direcoes.
+        //
+        // Incluir tudo aqui custa nada em bytes (a referencia e descartada) e
+        // troca um desalinhamento silencioso por um enquadramento comum. Ha
+        // teste conferindo que a ancora declarada nao se mexeu com isso.
+        const withModules = [
+          ...ALL_MODULE_IDS.flatMap((id) => moduleBoxes(id, anim, frame)),
+        ];
         frames.push(renderVoxels(
-          [...pose.lower, ...pose.upper, ...pose.gun],
+          [...pose.lower, ...pose.upper, ...pose.gun, ...withModules],
           DIR_INDEX[dir],
           FRAME_WIDTH,
           FRAME_HEIGHT,
@@ -150,3 +231,29 @@ export const PLAYER_LAYER_SPECS = [
     'shard driver weapon layer for the Aurix PX prospector bot, tinted by barrel heat at runtime'
   ),
 ];
+
+/**
+ * As camadas de MODULO: uma por peca, com os mesmos quadros da arma.
+ *
+ * `idle` e `attack` e nao `walk`, exatamente como a camada da arma: o modulo
+ * acompanha o TRONCO, e e o tronco que decide se o bot esta atirando. Qualquer
+ * divergencia de contagem faria a peca descolar do cano no disparo — o mesmo
+ * motivo pelo qual a arma ja copia esses numeros do tronco.
+ *
+ * A Minigun entra na mesma lista porque ela e desenhada do mesmo jeito, mas ela
+ * NAO e um acoplamento: o cliente troca a camada `gun` por ela em vez de somar
+ * as duas. Ver `prospector-modules.mjs`.
+ */
+export const MODULE_LAYER_SPECS = ALL_MODULE_IDS.map((id) =>
+  baseLayer(
+    moduleLayerId(id),
+    {
+      idle: { frames: idleBob.length, fps: 6, loop: true },
+      attack: { frames: attackKick.length, fps: 12, loop: false },
+    },
+    (dir, anim, frame) => renderModule(dir, anim, frame, id),
+    id === 'minigun'
+      ? 'rotary cannon weapon layer replacing the shard driver on the Aurix PX prospector bot'
+      : `${id.replace(/_/g, ' ')} module hardware bolted onto the shard driver of the Aurix PX prospector bot`
+  )
+);

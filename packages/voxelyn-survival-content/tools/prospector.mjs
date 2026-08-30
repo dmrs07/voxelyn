@@ -113,6 +113,27 @@ export const walkFps = (tilesPerSecond) =>
   (WALK_FRAMES * tilesPerSecond) / WALK_CYCLE_TILES;
 
 /**
+ * ONDE A ARMA ESTA MONTADA, nesta pose. Origem unica do hardpoint direito.
+ *
+ * Existe porque a arma deixou de ser a unica coisa presa ali. Os modulos se
+ * acoplam A ELA (`prospector-modules.mjs`), e um acessorio que calculasse a
+ * propria altura a partir de uma copia do `chest` descolaria do cano no
+ * primeiro quadro de coice — que e exatamente o modo de falha que o cabecalho
+ * deste arquivo descreve entre o sheet e as camadas, um nivel acima.
+ *
+ * Devolve o canto de origem do RECEPTOR (o bloco palido). Tudo o mais — cano,
+ * trilho, camara e os seis pontos de acoplagem — e offset a partir daqui, e
+ * por isso `bob`, `kick`, `lean` e `crouch` entram numa conta so.
+ *
+ * O eixo: `-y` e a FRENTE (a boca do cano esta em `y - 3`), `+x` e o lado
+ * direito do bot e `+z` sobe. Vale para os acessorios tanto quanto para a arma.
+ */
+export const gunAnchor = ({ bob = 0, kick = 0, lean = 0, crouch = 0 } = {}) => {
+  const up = bob - Math.max(0, Math.min(4, crouch));
+  return { x: 2, y: -1 + kick + lean, z: 6 + up + 2 + 2 };
+};
+
+/**
  * Uma perna digitigrada. `swing` desloca pe e canela no eixo do corpo; a coxa
  * fica presa ao quadril, que e o que faz o conjunto ler como perna girando em
  * torno da bacia em vez de escorregar inteira para o lado.
@@ -307,14 +328,16 @@ export const prospectorParts = ({
   // receptor palido atravessado contra o chassi escuro, camara de energia de UM
   // voxel e a boca do cano apontada para a frente. No disparo ela recua no eixo
   // do corpo em vez de girar — o giro seria invisivel neste tamanho.
-  const gunY = -1 + kick;
-  gun.push(box(2, gunY - 2 + lean, chest + 2, 2, 3, 1, 'bone'));
+  // A arma sai do ancoramento compartilhado, e nao de uma conta local: e o
+  // mesmo ponto que os modulos acoplados leem.
+  const a = gunAnchor({ bob, kick, lean, crouch });
+  gun.push(box(a.x, a.y - 2, a.z, 2, 3, 1, 'bone'));
   // Trilho superior escuro de meio-passo sobre o receptor palido: da a arma uma
   // linha de mira e quebra o bloco unico em corpo + trilho, sem engordar a
   // silhueta — o meio-passo sobe no vao entre a arma e a cabeca.
-  gun.push(box(2, gunY - 2 + lean, chest + 3, 2, 3, 0.5, 'rockDeep'));
-  gun.push(box(2, gunY - 1 + lean, chest + 3, 1, 1, 1, 'biolum'));
-  gun.push(box(2, gunY - 3 + lean, chest + 2, 1, 1, 1, flash ? 'loot' : 'rust'));
+  gun.push(box(a.x, a.y - 2, a.z + 1, 2, 3, 0.5, 'rockDeep'));
+  gun.push(box(a.x, a.y - 1, a.z + 1, 1, 1, 1, 'biolum'));
+  gun.push(box(a.x, a.y - 3, a.z, 1, 1, 1, flash ? 'loot' : 'rust'));
 
   return { lower, upper, gun };
 };

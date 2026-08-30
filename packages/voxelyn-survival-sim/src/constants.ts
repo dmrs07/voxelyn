@@ -2089,12 +2089,32 @@ export const MINIGUN_MAX_SHOTS_PER_TICK = 4;
 /**
  * Dano por projetil.
  *
- * Menos da metade do bolt (14). O calculo que justifica: 16 tiros/s x 6 = 96
- * de DPS enquanto a rajada dura, contra os 56 do tiro comum. Descontadas as
- * pausas de calor, o sustentado fica em ~65 contra ~44 — "claramente alto",
+ * Pouco mais de um TERCO do bolt (14). O calculo que justifica: 16 tiros/s x 5
+ * = 80 de DPS enquanto a rajada dura, contra os 56 do tiro comum. Descontadas
+ * as pausas de calor, o sustentado fica em ~55 contra ~44 — "claramente alto",
  * sem que um unico projetil isolado valha nada.
+ *
+ * POR QUE 5 E NAO 6, que era o valor de estreia. O que descompensava a arma
+ * nao era o DPS — ele e plano, 1,5x o do bolt contra chefe e contra inimigo
+ * fraco igualmente. Era a GRANULARIDADE DE OVERKILL contra vida baixa, e o
+ * bomber de 18 HP e o caso limite: 18 sao exatamente tres balas de 6 (zero
+ * desperdicado) contra dois tiros de 14 (dez desperdicados, 36%). Numa fila de
+ * bombers isso virava 4,0 mortes por segundo contra 1,7 do bolt — 2,35x, o
+ * dobro da vantagem que a mesma arma tem contra um bruiser.
+ *
+ * Cinco quebra exatamente esse encaixe: 18 HP passam a custar quatro balas
+ * (20 de dano, 10% desperdicado) e a fila de bombers cai para 1,76x. Nenhuma
+ * linha da tabela desce abaixo de 1,0x — o modulo continua valendo o cofre de
+ * classe III, que e a linha que um nerf nao pode cruzar: um tier 3 que mata
+ * mais devagar que a arma padrao nao foi enfraquecido, foi removido.
+ *
+ * As alavancas RECUSADAS, e por que: cadencia e calor achatam a razao para
+ * ~1,0x em TODAS as linhas, inclusive contra chefe, o que apaga a fantasia da
+ * arma sem tocar na granularidade que era o problema; e o spin-up quase nao
+ * mede (2,35x -> 2,26x com um terco a menos), porque ele custa o PRIMEIRO
+ * alvo e some no resto da fila.
  */
-export const MINIGUN_DAMAGE = 6;
+export const MINIGUN_DAMAGE = 5;
 
 /** Velocidade do projetil. Bem acima do bolt (13): ele e pequeno e precisa chegar. */
 export const MINIGUN_PROJECTILE_SPEED = 22;

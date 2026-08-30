@@ -1,4 +1,14 @@
-import { DEVOURER_STUCK, HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import {
+  DEVOURER_STUCK,
+  HEAT_MAX,
+  TICK_HZ,
+  moduleHasCapacity,
+  type Entity,
+  type EntityActionKind,
+  type ModuleId,
+  type SemanticEvent,
+  type SurvivalState,
+} from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
@@ -122,14 +132,39 @@ export const recoilAtElapsed = (elapsedMs: number, releaseMs: number, durationMs
  * O parceiro remoto nao transmite calor no snapshot: `heat` fica em 0 e a arma
  * dele sai fria. E o silencio certo — inventar calor para o outro seria desenhar
  * um estado que ninguem mediu.
+ *
+ * O MESMO vale para os modulos montados, e pelo mesmo motivo: `activeModules`
+ * vive em `playerExtras`, que este cliente so tem do proprio jogador. O
+ * `EntitySnapshot` do parceiro carrega posicao, vida e acao, e nada mais. No
+ * solo (e para o jogador local em qualquer modo) a lista e completa; para o
+ * parceiro remoto ela sai vazia e a arma dele aparece limpa. Preencher isso
+ * exigiria campo novo no protocolo — decisao de rede, nao de desenho.
  */
-const gunHeatOf = (entity: Entity, state: SurvivalState): { heat: number; overheated: boolean } => {
+/** O que o cliente sabe do canhao rotativo deste Prospector, por reconstrucao. */
+export type MinigunGunView = {
+  /** 0..1. Acima de zero, os canos estao girando — logo, a arma esta montada. */
+  spin: number;
+  /** Angulo acumulado do conjunto, 0..1. E ele que escolhe o quadro da ventoinha. */
+  barrelPhase: number;
+};
+
+const gunStateOf = (
+  entity: Entity,
+  state: SurvivalState,
+): { heat: number; overheated: boolean; modules: readonly ModuleId[] } => {
   const slot = entity.slot;
   const extra = slot === undefined ? undefined : state.playerExtras?.[slot];
-  if (!extra) return { heat: 0, overheated: false };
+  if (!extra) return { heat: 0, overheated: false, modules: [] };
   return {
     heat: Math.max(0, Math.min(1, extra.heat / HEAT_MAX)),
     overheated: state.tick < extra.overheatedUntil,
+    // `moduleHasCapacity` e nao `activeModules` cru: um modulo gasto continua na
+    // lista ate expirar, e uma peca que nao faz mais nada nao pode continuar
+    // parafusada na arma. Quem mede e a MESMA funcao que decide se o efeito
+    // acontece, entao o metal some no tick em que o efeito some.
+    modules: extra.activeModules
+      .map((module) => module.id)
+      .filter((id) => moduleHasCapacity(extra, id, state.tick)),
   };
 };
 
@@ -150,7 +185,8 @@ const layeredPlayerAnimation = (
   upperElapsedMs: number,
   nowMs: number,
   facing: FacingResolver,
-  gun: { heat: number; overheated: boolean }
+  gun: { heat: number; overheated: boolean; modules: readonly ModuleId[] },
+  gunView: MinigunGunView | undefined
 ): LayeredPlayerAnimation => {
   const releaseMs = action
     ? Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000)
@@ -199,8 +235,50 @@ const layeredPlayerAnimation = (
     recoil: action ? recoilAtElapsed(upperElapsedMs, releaseMs) : 0,
     heat: gun.heat,
     overheated: gun.overheated,
+    // A ROTACAO tem prioridade sobre a lista de modulos para decidir se o
+    // canhao esta montado, e nao o contrario. Ver `MinigunGunView`: a lista
+    // esta vazia para o parceiro remoto e perde a Minigun no tick exato da
+    // bala 300, com os canos ainda em desaceleracao. A rotacao cobre os dois.
+    modules: mountedModules(gun.modules, gunView),
+    barrelPhase: gunView?.barrelPhase ?? 0,
   };
 };
+
+/**
+ * Rotacao acima da qual o canhao ainda esta MONTADO no bot.
+ *
+ * Nao e zero por causa do float da integracao local: `advanceSpin` chega a
+ * zero por saturacao, mas um quadro longo pode deixar residuo. E o mesmo
+ * limiar que a sobreposicao procedural usava antes de ser aposentada.
+ */
+export const MINIGUN_MOUNTED_SPIN = 0.001;
+
+/**
+ * Que modulos estao MONTADOS no bot, somando a rotacao a lista autoritativa.
+ *
+ * A lista sozinha nao basta, e os dois furos dela sao especificos:
+ *
+ *  - O PARCEIRO REMOTO nao tem `activeModules` neste cliente (`playerExtras` e
+ *    so do viewer), mas `MinigunViews` reconstroi a rotacao dele a partir de
+ *    `minigun_spin` e `minigun_burst`. Sem esta soma, o Prospector do parceiro
+ *    voltaria a aparecer com o tiro comum cuspindo dezesseis balas por segundo
+ *    — o defeito que a sobreposicao procedural existia para resolver, e que a
+ *    aposentadoria dela reabriu.
+ *  - LOCALMENTE, `moduleHasCapacity` devolve falso no tick em que a bala 300 e
+ *    consumida, e os canos ainda levam dez ticks para parar. Sem esta soma a
+ *    arma trocaria de volta no meio da desaceleracao, que e justamente quando o
+ *    jogador esta olhando para ela.
+ *
+ * A rotacao nunca REMOVE um modulo da lista: ela so acrescenta o canhao que a
+ * lista nao sabe que existe.
+ */
+export const mountedModules = (
+  modules: readonly ModuleId[],
+  gunView?: MinigunGunView
+): readonly ModuleId[] =>
+  gunView && gunView.spin > MINIGUN_MOUNTED_SPIN && !modules.includes('minigun')
+    ? [...modules, 'minigun']
+    : modules;
 
 /** Client-side visual state that never feeds back into the authoritative simulation. */
 export class EntityPresentation {
@@ -308,7 +386,18 @@ export class EntityPresentation {
     state: SurvivalState,
     base: EntityAnimState,
     nowMs: number,
-    downed = false
+    downed = false,
+    /**
+     * A rotacao do canhao RECONSTRUIDA pelo cliente, quando ha uma.
+     *
+     * Vem de `MinigunViews` (que vive no render, porque e ele quem ingere os
+     * eventos e integra por quadro) e nao de `playerExtras`, e a diferenca e o
+     * que faz o canhao existir em dois casos que a lista de modulos nao cobre:
+     * o parceiro remoto, cujo `activeModules` este cliente nao tem, e a
+     * desaceleracao depois da bala 300, quando o modulo ja saiu da lista e os
+     * canos ainda estao girando.
+     */
+    gunView?: MinigunGunView
   ): PresentedAnimation {
     // Resolvido no ponto de SAIDA, nunca antes: cada camada so pode ser gravada
     // uma vez por quadro, com o vetor que de fato vai ser desenhado. Resolver o
@@ -406,7 +495,7 @@ export class EntityPresentation {
           // A composicao ja estabiliza as tres camadas por dentro; o rumo solto
           // que sai aqui e o do TRONCO, e reaproveita a mesma memoria dela.
           const layered = layeredPlayerAnimation(
-            entity, base, action, elapsedMs, nowMs, facing, gunHeatOf(entity, state)
+            entity, base, action, elapsedMs, nowMs, facing, gunStateOf(entity, state), gunView
           );
           return {
             anim: layered,
@@ -463,7 +552,7 @@ export class EntityPresentation {
     // urgente para ler do que a temperatura da arma.
     if (entity.archetype === 'prospector' && (base.anim === 'idle' || base.anim === 'walk')) {
       const layered = layeredPlayerAnimation(
-        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunHeatOf(entity, state)
+        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunStateOf(entity, state), gunView
       );
       return {
         anim: layered,

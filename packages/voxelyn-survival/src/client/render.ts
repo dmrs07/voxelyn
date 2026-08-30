@@ -136,7 +136,6 @@ import {
   type SafeInsets,
 } from './module-layout';
 import { CasingField } from './casings';
-import { drawMinigunMount } from './minigun-mount';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
@@ -941,15 +940,17 @@ const drawModuleGlyph = (
     ctx.stroke();
     ctx.fillRect(cx + 2 * u, cy, 3 * u, u);
   } else if (id === 'minigun') {
-    // Tres canos empilhados apontando para a direita, com o tambor atras.
-    // MULTIPLICIDADE e a leitura, no glifo como no cartucho: um tubo unico
-    // seria o perfurante em 22 pixels.
-    for (let i = 0; i < 3; i++) {
-      ctx.fillRect(cx - u, cy + (i - 1) * 2 * u - u / 2, (i === 1 ? 6 : 5) * u, u);
-    }
-    ctx.beginPath();
-    ctx.arc(cx - 2.5 * u, cy, 2.4 * u, 0, Math.PI * 2);
-    ctx.stroke();
+    // Caixa de municao a esquerda + toco de cano a direita, a mesma leitura do
+    // cartucho: a MUNICAO e a peca, e o cano e um toco.
+    //
+    // Vinte e dois pixels nao comportam as aletas do motor nem a ventoinha, e
+    // tentar reproduzi-las daria ruido. O que sobrevive nesta escala e a
+    // PROPORCAO — um bloco alto contra um toco baixo —, e ela e o que separa o
+    // glifo do perfurante (tubo unico e comprido) e do disco (circulo).
+    ctx.strokeRect(cx - 4.5 * u, cy - 4 * u, 5 * u, 8 * u);
+    for (let i = 0; i < 3; i++) ctx.fillRect(cx - 3.5 * u, cy - 2.5 * u + i * 2 * u, 3 * u, u);
+    ctx.fillRect(cx + 0.5 * u, cy - 1.5 * u, 4 * u, 3 * u);
+    ctx.fillRect(cx + 4.5 * u, cy - 0.5 * u, u, u);
   } else {
     ctx.beginPath();
     ctx.arc(cx, cy, 4 * u, 0, Math.PI * 2);
@@ -3151,7 +3152,21 @@ export class SurvivalRenderer {
       if (!ex.joined || !pl.alive) continue;
       const isLocal = pl === player;
       const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
-      const presented = this.presentation.animationFor(pl, state, anim, nowMs, ex.downed);
+      // A ROTACAO reconstruida entra na composicao aqui, e nao dentro da
+      // apresentacao, porque e o render quem ingere `minigun_spin` /
+      // `minigun_burst` e quem integra o angulo por quadro. Ela decide DUAS
+      // coisas que a lista de modulos nao alcanca: que o parceiro remoto esta
+      // com o canhao montado (o `activeModules` dele nao chega neste cliente) e
+      // que o canhao local continua montado durante a desaceleracao, depois de
+      // a bala 300 ja ter tirado o modulo da lista.
+      const presented = this.presentation.animationFor(
+        pl,
+        state,
+        anim,
+        nowMs,
+        ex.downed,
+        this.minigunViews.get(slot),
+      );
       // Superaquecimento: o corpo TREME e o cano solta fumaca preta.
       //
       // O tremor e do corpo inteiro e nao da arma. Quem trava o gatilho e o
@@ -3253,41 +3268,27 @@ export class SurvivalRenderer {
                   allyTint: !isLocal,
                 });
               }
-              // O CANHAO ROTATIVO por cima da arma. Sobreposicao procedural e
-              // nao quadro de atlas: oito rumos x quatro posicoes de cano
-              // seriam trinta e dois quadros por animacao para uma peca que
-              // dura vinte segundos — e um quadro pre-renderizado nunca
-              // poderia responder a rotacao real. Ver `minigun-mount.ts`.
+              // O CANHAO ROTATIVO nao e mais desenhado aqui.
               //
-              // A condicao e a ROTACAO, e nao a posse do modulo: o parceiro
-              // remoto nao tem `activeModules` neste cliente, e os canos
-              // continuam desacelerando por um instante depois da bala 300.
-              const gunView = this.minigunViews.get(slot);
-              if (gunView.spin > 0.001) {
-                drawMinigunMount(
-                  ctx,
-                  psx,
-                  psy,
-                  presented.facingX,
-                  presented.facingY,
-                  z,
-                  {
-                    // ANGULO, nao velocidade: a velocidade satura em 1 na
-                    // rajada inteira e congelaria os canos justamente no
-                    // trecho em que eles giram mais rapido.
-                    phase: gunView.barrelPhase,
-                    // O calor so e conhecido do jogador local; no parceiro o
-                    // cano fica frio em vez de inventar um estado que este
-                    // cliente nao recebe.
-                    heat: isLocal ? Math.min(1, ex.heat / HEAT_MAX) : 0,
-                    flash: this.minigunViews.firingFlash(slot, nowMs),
-                    overheated: gunView.phase === 'overheated',
-                  },
-                );
-                // VAPOR so perto do travamento, nunca durante a rajada: fumaca
-                // continua taparia o proprio alvo, e o que ela tem a dizer e
-                // "esta prestes a travar", nao "esta atirando".
-                if (isLocal && (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82)) {
+              // Ele era uma sobreposicao procedural (`minigun-mount.ts`), com o
+              // argumento de que quadros por rumo x posicao de cano sairiam
+              // caros demais. A conta estava errada — a camada inteira pesa 15
+              // kB — e o custo real era outro: desenho de runtime nao participa
+              // do rasterizador, entao a arma nao tinha mapa de faces, nem
+              // oclusao de ambiente, nem a luz por face que o resto do bot
+              // recebe. Ficava CHAPADA ao lado de um chassi facetado.
+              //
+              // Agora ela e `layer-module-minigun`, montada por `sprites.ts` no
+              // lugar da camada da arma. A rotacao vem dos quatro quadros de
+              // `attack`, que a rajada mantem continuos (o `action_start` da
+              // Minigun cobre a janela seguinte de proposito).
+              //
+              // O VAPOR fica, porque ele nunca foi da arma: e o aviso de que o
+              // gatilho esta prestes a travar, e sai perto do travamento e nunca
+              // durante a rajada — fumaca continua taparia o proprio alvo.
+              if (isLocal && this.minigunViews.get(slot).spin > 0.001) {
+                const gunView = this.minigunViews.get(slot);
+                if (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82) {
                   this.particles.emitOverheatSmoke(
                     slot,
                     pl.x,

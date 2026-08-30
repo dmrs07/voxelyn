@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOLT_COOLDOWN_TICKS,
+  BOLT_DAMAGE,
   MINIGUN_AMMO,
+  MINIGUN_DAMAGE,
   MINIGUN_BURST_EVENT_TICKS,
   MINIGUN_HEAT_PER_SHOT,
   MINIGUN_RATE_MAX_MILLI,
@@ -22,6 +25,7 @@ import {
   minigunRateMilli,
   minigunSpread,
 } from '../src/minigun';
+import { ARCHETYPES } from '../src/entities';
 import {
   MODULE_DEFINITIONS,
   activeWeaponModule,
@@ -514,5 +518,62 @@ describe('minigun — determinismo e transicoes', () => {
     expect(hashAuthoritativeState(a)).toBe(hashAuthoritativeState(b));
     b.playerExtra.minigun.spin += 1;
     expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
+  });
+});
+
+// A GRANULARIDADE, que e a conta de balanceamento que o dano por bala carrega.
+//
+// O DPS da arma e plano: ela vale ~1,5x o tiro comum contra um chefe de 900 e
+// contra um bomber de 18 igualmente. O que NAO e plano e o desperdicio. Uma
+// arma de dano alto joga fora a sobra em cada alvo fraco; uma de dano baixo
+// nao joga. Quando `MINIGUN_DAMAGE` divide EXATAMENTE a vida do inimigo mais
+// fraco do jogo, a vantagem contra ele dobra em relacao a que ela tem contra
+// todo o resto — e foi isso que aconteceu com o valor de estreia (6, e
+// 18 = 3 x 6, zero desperdicado, 2,7x o tiro comum numa fila de bombers).
+//
+// Este bloco nao trava o numero 5; ele trava a PROPRIEDADE que faz o numero
+// prestar. Qualquer mexida futura em dano ou cadencia passa por aqui.
+describe('granularidade contra a vida real dos inimigos', () => {
+  const BOLT_PERIOD = BOLT_COOLDOWN_TICKS / TICK_HZ;
+  const MINIGUN_PERIOD = 1 / ((MINIGUN_RATE_MAX_MILLI / MINIGUN_SHOT_MILLI) * TICK_HZ);
+
+  /**
+   * Tempo para derrubar um alvo de `hp` numa FILA — gatilho ja preso, sem
+   * reaquisicao. E a medida em que a granularidade aparece: a alternativa
+   * (tempo ate a morte de um alvo isolado) e dominada pelo spin-up e esconde
+   * exatamente o efeito que interessa.
+   *
+   * O calor fica de fora de proposito. Ele encurta os DOIS lados na mesma
+   * proporcao — e o que se quer aqui e a razao, nao o valor absoluto.
+   */
+  const boltTime = (hp: number): number => Math.ceil(hp / BOLT_DAMAGE) * BOLT_PERIOD;
+  const minigunTime = (hp: number): number => Math.ceil(hp / MINIGUN_DAMAGE) * MINIGUN_PERIOD;
+
+  const archetypes = Object.entries(ARCHETYPES).filter(([, def]) => def.hp > 0);
+
+  it('a arma vale a pena contra TODO inimigo do jogo', () => {
+    // O piso de um tier 3: um modulo que mata mais devagar que a arma padrao
+    // nao foi enfraquecido, foi removido — o jogador aprende a nao pega-lo.
+    for (const [name, def] of archetypes) {
+      const ratio = boltTime(def.hp) / minigunTime(def.hp);
+      expect(ratio, `${name} (${def.hp} HP) ficou abaixo do tiro comum`).toBeGreaterThan(1);
+    }
+  });
+
+  it('nenhum inimigo fraco encaixa redondo demais no dano por bala', () => {
+    // O TETO, e o unico numero deste arquivo que veio de medicao e nao de
+    // deducao: com dano 6 a fila de bombers dava 2,67x aqui (2,35x medido com
+    // calor), contra ~1,5x de todo o resto do bestiario. 2,1 e folgado o
+    // bastante para nao brigar com ajuste fino e apertado o bastante para
+    // reprovar um encaixe exato na vida do inimigo mais fraco.
+    for (const [name, def] of archetypes) {
+      const ratio = boltTime(def.hp) / minigunTime(def.hp);
+      expect(ratio, `${name} (${def.hp} HP) recebe vantagem desproporcional`).toBeLessThan(2.1);
+    }
+  });
+
+  it('sobra dano no alvo mais fraco — o encaixe exato e o defeito', () => {
+    const weakest = Math.min(...archetypes.map(([, def]) => def.hp));
+    expect(weakest % MINIGUN_DAMAGE).not.toBe(0);
   });
 });

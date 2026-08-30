@@ -177,7 +177,35 @@ export const PLAYER_GUN_BEHIND_DIRS: readonly string[] = ['dl', 'ur', 'ul'];
 export const gunBehindUpper = (facingX: number, facingY: number): boolean =>
   PLAYER_GUN_BEHIND_DIRS.includes(dirFromFacing(facingX, facingY));
 
+/**
+ * As camadas de MODULO, uma por peca acoplavel a arma.
+ *
+ * Sao atlas de camada como os tres do corpo: mesmo quadro, mesma ancora, mesmas
+ * animacoes da arma. O cliente empilha os que o jogador tem instalados sobre o
+ * Cravador — ou troca a arma inteira pela Minigun, que e a unica com a tag
+ * `weapon` e por isso a unica que SUBSTITUI em vez de somar.
+ *
+ * A lista e literal em vez de derivada de `ModuleId` porque este pacote nao
+ * depende da simulacao (ele so precisa de `@voxelyn/core`, e inverter isso
+ * acoplaria o pipeline de arte ao balanceamento). Quem cobre a divergencia e um
+ * teste do CLIENTE, que conhece os dois lados e exige um atlas por modulo.
+ */
+export const MODULE_LAYER_SPRITE_IDS = [
+  'layer-module-piercing',
+  'layer-module-explosive',
+  'layer-module-conductive',
+  'layer-module-return-disc',
+  'layer-module-ricochet',
+  'layer-module-siphon',
+  'layer-module-minigun',
+] as const;
+
+/** O atlas de camada de um modulo, a partir do `ModuleId` da simulacao. */
+export const moduleLayerSpriteId = (moduleId: string): string =>
+  `layer-module-${moduleId.replace(/_/g, '-')}`;
+
 export const FIRST_PACK_IDS = [
+  ...MODULE_LAYER_SPRITE_IDS,
   ...CHARACTER_SPRITE_IDS,
   ...PLAYER_LAYER_SPRITE_IDS,
   'fx-projectile-bolt',

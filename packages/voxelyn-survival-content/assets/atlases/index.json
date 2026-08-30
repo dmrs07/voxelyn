@@ -32,6 +32,13 @@
     "fx-fire-cyclone",
     "layer-player-prospector-lower",
     "layer-player-prospector-upper",
-    "layer-player-prospector-gun"
+    "layer-player-prospector-gun",
+    "layer-module-piercing",
+    "layer-module-explosive",
+    "layer-module-conductive",
+    "layer-module-return-disc",
+    "layer-module-ricochet",
+    "layer-module-siphon",
+    "layer-module-minigun"
   ]
 }
