@@ -421,7 +421,16 @@ const drawSiphonSerpent = (
 const drawFlechette = (
   ctx: CanvasRenderingContext2D,
   project: (x: number, y: number) => [number, number],
-  projectile: ProjectileLike,
+  /**
+   * A origem de DESENHO, e nao `projectile.x/y`.
+   *
+   * Perto da arma as duas nao coincidem: o corpo sai da boca e a posicao
+   * autoritativa fica no eixo do bot. Recebendo a origem, o traco acompanha o
+   * corpo em vez de comecar atras dele durante o primeiro tile — que e onde a
+   * cauda esta mais visivel, porque a bala ainda esta perto da camera do olho.
+   */
+  ox: number,
+  oy: number,
   heading: { dx: number; dy: number } | null,
   sx: number,
   /** Ja com o `lift` aplicado: e a posicao FINAL do corpo na tela. */
@@ -431,7 +440,7 @@ const drawFlechette = (
   size: number,
 ): void => {
   if (heading) {
-    const [tx, ty] = project(projectile.x - heading.dx * 0.55, projectile.y - heading.dy * 0.55);
+    const [tx, ty] = project(ox - heading.dx * 0.55, oy - heading.dy * 0.55);
     // O ponto de tras recebe o MESMO `lift` do corpo: a bala nao muda de
     // altura em meio tile, e um traco que subisse na tela leria como uma
     // trajetoria curva que ela nao tem.
@@ -562,6 +571,35 @@ export class ProjectileView {
   }
 
   /**
+   * A posicao de MUNDO em que este projetil e DESENHADO.
+   *
+   * Nao e `projectile.x/y`: perto da arma o desenho sai da boca, e a boca esta
+   * um terco de tile a direita do eixo do corpo (ver `muzzleLateralTiles`). O
+   * desvio converge para zero em pouco mais de um tile, entao longe da arma
+   * esta funcao devolve a posicao autoritativa sem mudar nada.
+   *
+   * PUBLICA porque o corpo do projetil nao e a unica coisa desenhada nele: o
+   * rastro, a serpente do sifao, a sombra e o halo saem todos daqui. Cada um
+   * que reprojetasse `projectile.x/y` por conta propria ficaria para tras
+   * enquanto o corpo sai da boca — o efeito descolaria da bala nos primeiros
+   * quadros, que sao justamente os que o jogador esta olhando.
+   *
+   * A direita da trajetoria, em mundo, e `(-dy, dx)`: no modelo o eixo do corpo
+   * e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no outro. A
+   * arma nao troca de lado porque o bot sempre vira o corpo para onde mira.
+   */
+  worldOrigin(projectile: ProjectileLike): [number, number] {
+    const track = this.tracks.get(projectile.id);
+    if (!track) return [projectile.x, projectile.y];
+    const lateral = muzzleLateralTiles(
+      track.travelled,
+      muzzleForProjectile(projectile.kind, projectile.hostile)
+    );
+    if (lateral === 0) return [projectile.x, projectile.y];
+    return [projectile.x - track.dy * lateral, projectile.y + track.dx * lateral];
+  }
+
+  /**
    * Desenha um projetil. `project` converte tile em pixel de tela; `tileH` e a
    * altura do losango, usada para converter altura de voo em pixels.
    */
@@ -588,11 +626,8 @@ export class ProjectileView {
     // corpo e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no
     // outro. A arma nao troca de lado porque o bot sempre vira o corpo para
     // onde mira.
-    const lateral = track ? muzzleLateralTiles(track.travelled, muzzle) : 0;
-    const [sx, sy] = project(
-      projectile.x + (track ? -track.dy : 0) * lateral,
-      projectile.y + (track ? track.dx : 0) * lateral
-    );
+    const [ox, oy] = this.worldOrigin(projectile);
+    const [sx, sy] = project(ox, oy);
     const rock = projectile.kind === 'rock';
     const disc = projectile.kind === 'return_disc';
     // O missil e um corpo, nao uma faisca: ele precisa ler como algo que voce
@@ -661,7 +696,7 @@ export class ProjectileView {
     if (rock) {
       if (track && (track.dx !== 0 || track.dy !== 0)) {
         for (let i = 2; i >= 1; i--) {
-          const [px, py] = project(projectile.x - track.dx * i * 0.22, projectile.y - track.dy * i * 0.22);
+          const [px, py] = project(ox - track.dx * i * 0.22, oy - track.dy * i * 0.22);
           ctx.globalAlpha = 0.5 - i * 0.15;
           drawVoxel(ctx, px, py - lift + i * zoom, size * 0.22, ramp);
         }
@@ -696,8 +731,8 @@ export class ProjectileView {
       if (track && (track.dx !== 0 || track.dy !== 0)) {
         for (let i = 2; i >= 1; i--) {
           const [px, py] = project(
-            projectile.x - track.dx * i * 0.3,
-            projectile.y - track.dy * i * 0.3,
+            ox - track.dx * i * 0.3,
+            oy - track.dy * i * 0.3,
           );
           ctx.globalAlpha = 0.32 - i * 0.11;
           drawVoxel(ctx, px, py - lift, size * 0.4, ramp);
@@ -767,7 +802,7 @@ export class ProjectileView {
     const heading = track && (track.dx !== 0 || track.dy !== 0) ? track : null;
 
     if (projectile.kind === 'flechette') {
-      drawFlechette(ctx, project, projectile, heading, sx, sy - lift, lift, size);
+      drawFlechette(ctx, project, ox, oy, heading, sx, sy - lift, lift, size);
       return;
     }
 
@@ -777,8 +812,8 @@ export class ProjectileView {
       if (heading) {
         for (let i = 3; i >= 1; i--) {
           const [tx, ty] = project(
-            projectile.x - heading.dx * i * 0.26,
-            projectile.y - heading.dy * i * 0.26
+            ox - heading.dx * i * 0.26,
+            oy - heading.dy * i * 0.26
           );
           ctx.globalAlpha = 0.45 - i * 0.11;
           ctx.fillStyle = HOSTILE_RAMP[1];
@@ -804,8 +839,8 @@ export class ProjectileView {
       drawSiphonSerpent(
         ctx,
         project,
-        projectile.x,
-        projectile.y,
+        ox,
+        oy,
         heading,
         lift,
         size,
@@ -817,7 +852,7 @@ export class ProjectileView {
     if (heading) {
       for (let i = TRAIL_LENGTH; i >= 1; i--) {
         const back = i * 0.3;
-        const [tx, ty] = project(projectile.x - heading.dx * back, projectile.y - heading.dy * back);
+        const [tx, ty] = project(ox - heading.dx * back, oy - heading.dy * back);
         ctx.globalAlpha = 0.5 - i * 0.1;
         drawVoxel(ctx, tx, ty - lift, size * (1 - i * 0.18), ramp);
       }
@@ -847,7 +882,7 @@ export class ProjectileView {
     // voxels deslocados ao longo do voo dao ao projetil uma forma alongada com
     // orientacao propria: da para ver PARA ONDE ele aponta, nao so onde esta.
     if (heading) {
-      const [bx, by] = project(projectile.x - heading.dx * 0.16, projectile.y - heading.dy * 0.16);
+      const [bx, by] = project(ox - heading.dx * 0.16, oy - heading.dy * 0.16);
       drawVoxel(ctx, bx, by - lift, size * 0.8, ramp);
     }
     drawVoxel(ctx, sx, sy - lift, size, ramp);

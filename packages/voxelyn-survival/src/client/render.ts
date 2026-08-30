@@ -3498,7 +3498,11 @@ export class SurvivalRenderer {
           if (this.quality.bloom) {
             const spec = projectileLightSpec(view);
             if (spec) {
-              const [hx, hy] = toScreen(view.x, view.y);
+              // A MESMA origem do corpo, e nao `view.x/y`: perto da arma o
+              // projetil e desenhado saindo da boca, e um halo preso a posicao
+              // autoritativa ficaria para tras da propria bala durante o
+              // primeiro tile — o brilho descolado do que brilha.
+              const [hx, hy] = toScreen(...this.projectileView.worldOrigin(view));
               drawEmissiveHalo(
                 ctx,
                 spec.hex,
