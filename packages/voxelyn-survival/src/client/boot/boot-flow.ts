@@ -63,12 +63,20 @@ export type BootTiming = {
   /** Saida da marca, ate o preto. */
   identityFadeOutMs: number;
   /**
-   * Piso da tela de carregamento.
+   * Piso da tela de carregamento — quanto tempo ela fica no ar no MINIMO.
    *
-   * NAO e uma espera inventada: e o anti-flash. Com tudo em cache o preload
-   * liquida em dezenas de ms, e sem piso a tela apareceria e sumiria dentro de
-   * um quadro — o olho registra isso como um defeito de renderizacao, nao como
-   * uma tela. Algumas centenas de ms bastam para virar intencao.
+   * Comecou como anti-flash (algumas centenas de ms, so para a tela nao
+   * aparecer e sumir dentro de um quadro) e virou tempo de APRESENTACAO, por
+   * decisao de produto: com tudo em cache o preload liquida em ~200 ms, e a
+   * tela que existe para o jogo ter cara de jogo passava rapido demais para
+   * ser vista.
+   *
+   * E uma espera declarada, e nao disfarcada — a diferenca esta na barra. Ela
+   * nunca mostra mais do que o menor entre o trabalho concluido e o tempo
+   * decorrido do piso (ver `displayedProgress`), entao ela continua sendo o
+   * progresso REAL rumo ao menu: quando a rede e lenta quem manda e o
+   * trabalho, quando tudo esta em cache quem manda e o piso. O que ela nunca
+   * faz e cravar 100% e ficar parada, que e como uma tela travada se parece.
    */
   loadingMinMs: number;
   /** O respiro em 100% antes de escurecer. */
@@ -82,7 +90,7 @@ export const BOOT_TIMING_FULL: BootTiming = {
   identityFadeInMs: 380,
   identityHoldMs: 1100,
   identityFadeOutMs: 380,
-  loadingMinMs: 260,
+  loadingMinMs: 3200,
   handoffHoldMs: 220,
   handoffFadeMs: 420,
 };
@@ -100,7 +108,10 @@ export const BOOT_TIMING_REDUCED: BootTiming = {
   identityFadeInMs: 0,
   identityHoldMs: 900,
   identityFadeOutMs: 0,
-  loadingMinMs: 260,
+  // O mesmo piso do perfil completo: `prefers-reduced-motion` pede menos
+  // MOVIMENTO, nao menos informacao — cortar a tela aqui esconderia justamente
+  // o feedback de que o jogo esta trabalhando.
+  loadingMinMs: 3200,
   handoffHoldMs: 120,
   handoffFadeMs: 0,
 };
@@ -153,6 +164,28 @@ export const identityOpacity = (timing: BootTiming, elapsedMs: number): number =
   if (elapsedMs < leavingAt) return 1;
   if (fadeOut <= 0) return elapsedMs >= identityTotalMs(timing) ? 0 : 1;
   return Math.max(0, 1 - (elapsedMs - leavingAt) / fadeOut);
+};
+
+/**
+ * O que a barra DESENHA: o menor entre o trabalho concluido e o piso da tela.
+ *
+ * As duas coisas seguram o menu, entao as duas contam — e o menor dos dois e,
+ * literalmente, o quanto falta para o jogador entrar. Numa rede lenta quem
+ * manda e o trabalho (a barra e o preload); com tudo em cache quem manda e o
+ * piso (a barra e o relogio da apresentacao). Em nenhum dos casos ela mostra
+ * mais do que ja aconteceu.
+ *
+ * Piso zero (o atalho de desenvolvimento) devolve o progresso real intacto.
+ */
+export const displayedProgress = (
+  realFraction: number,
+  elapsedMs: number,
+  floorMs: number,
+): number => {
+  const real = Math.max(0, Math.min(1, realFraction));
+  if (floorMs <= 0) return real;
+  const byClock = Math.max(0, Math.min(1, elapsedMs / floorMs));
+  return Math.min(real, byClock);
 };
 
 /**
@@ -232,6 +265,17 @@ export type BootEvent =
  * cedo, quem termina a fase e o proprio som.
  */
 export const IDENTITY_MAX_MS = 5200;
+
+/**
+ * Piso da tela de carregamento quando o desfecho e FALHA, ms.
+ *
+ * O anti-flash original, e nada mais: uma tela que aparece e some no mesmo
+ * quadro parece defeito, mas segurar a mensagem de erro pelo tempo de
+ * APRESENTACAO seria fazer o jogador esperar por uma ma noticia. Nunca maior
+ * que o piso de sucesso — no modo de desenvolvimento, onde ele e zero, este
+ * tambem e.
+ */
+export const LOADING_FAILURE_MIN_MS = 260;
 
 export const initialBootState = (
   nowMs: number,
@@ -318,8 +362,17 @@ const step = (state: BootState, event: BootEvent): BootState => {
         : state;
     case 'loading': {
       if (state.preload === 'running') return state;
+      // A FALHA nao espera o piso de apresentacao. O piso existe para a tela de
+      // carregamento ser vista; a tela de erro nao precisa disso — ela precisa
+      // chegar. Fazer o jogador esperar tres segundos por uma mensagem de que
+      // deu errado seria a unica espera desta abertura que nao compra nada.
+      // Sobra so o anti-flash, que e o piso original.
+      if (state.preload === 'critical-failed') {
+        const failureMin = Math.min(LOADING_FAILURE_MIN_MS, state.timing.loadingMinMs);
+        return elapsed >= failureMin ? enter(state, 'failed', event.nowMs) : state;
+      }
       if (elapsed < state.timing.loadingMinMs) return state;
-      return enter(state, state.preload === 'critical-failed' ? 'failed' : 'handoff', event.nowMs);
+      return enter(state, 'handoff', event.nowMs);
     }
     case 'handoff':
       return elapsed >= handoffTotalMs(state.timing) ? enter(state, 'menu', event.nowMs) : state;

@@ -5,7 +5,9 @@ import {
   BOOT_TIMING_REDUCED,
   BOOT_TIMING_SKIPPED,
   IDENTITY_MAX_MS,
+  LOADING_FAILURE_MIN_MS,
   advanceBoot,
+  displayedProgress,
   bootTiming,
   handoffTotalMs,
   identityOpacity,
@@ -219,6 +221,22 @@ describe('falha critica', () => {
     expect(phases).not.toContain('menu');
   });
 
+  it('a tela de erro NAO espera o piso de apresentacao', () => {
+    // O piso existe para a tela de carregamento ser vista. A de erro precisa
+    // chegar — segurar uma ma noticia por tres segundos nao compra nada.
+    let state = initialBootState(0, BOOT_TIMING_FULL);
+    state = advanceBoot(state, { type: 'tick', nowMs: identityTotalMs(BOOT_TIMING_FULL) });
+    const enteredAt = state.phaseStartedMs;
+    state = advanceBoot(state, {
+      type: 'preload-settled',
+      nowMs: enteredAt + LOADING_FAILURE_MIN_MS,
+      criticalFailed: true,
+    });
+    expect(state.phase).toBe('failed');
+    // E muito antes do piso de sucesso.
+    expect(LOADING_FAILURE_MIN_MS).toBeLessThan(BOOT_TIMING_FULL.loadingMinMs);
+  });
+
   it('a nova tentativa volta ao carregamento — nunca a identidade', () => {
     let state: BootState = initialBootState(0, BOOT_TIMING_FULL);
     state = advanceBoot(state, { type: 'tick', nowMs: 2000 });
@@ -229,11 +247,18 @@ describe('falha critica', () => {
     expect(state.phase).toBe('loading');
     expect(state.preload).toBe('running');
 
-    // Agora dando certo: segue para o menu pelo caminho normal.
+    // Agora dando certo: segue para o menu pelo caminho normal — cumprindo o
+    // piso da tela de carregamento, que vale para a nova tentativa igual.
     state = advanceBoot(state, { type: 'preload-settled', nowMs: 3100, criticalFailed: false });
-    state = advanceBoot(state, { type: 'tick', nowMs: 3400 });
+    const handoffAt = 3000 + BOOT_TIMING_FULL.loadingMinMs;
+    state = advanceBoot(state, { type: 'tick', nowMs: handoffAt - 1 });
+    expect(state.phase).toBe('loading');
+    state = advanceBoot(state, { type: 'tick', nowMs: handoffAt });
     expect(state.phase).toBe('handoff');
-    state = advanceBoot(state, { type: 'tick', nowMs: 3400 + handoffTotalMs(BOOT_TIMING_FULL) });
+    state = advanceBoot(state, {
+      type: 'tick',
+      nowMs: handoffAt + handoffTotalMs(BOOT_TIMING_FULL),
+    });
     expect(state.phase).toBe('menu');
   });
 
@@ -248,6 +273,55 @@ describe('falha critica', () => {
     state = advanceBoot(state, { type: 'tick', nowMs: 1 });
     expect(state.phase).toBe('menu');
     expect(advanceBoot(state, { type: 'tick', nowMs: 99_999 })).toBe(state);
+  });
+});
+
+describe('a barra sob o piso de apresentacao', () => {
+  it('mostra o MENOR entre o trabalho feito e o tempo decorrido', () => {
+    // Rede lenta: quem manda e o trabalho.
+    expect(displayedProgress(0.2, 3200, 3200)).toBeCloseTo(0.2);
+    // Tudo em cache: quem manda e o piso.
+    expect(displayedProgress(1, 800, 3200)).toBeCloseTo(0.25);
+    expect(displayedProgress(1, 1600, 3200)).toBeCloseTo(0.5);
+    expect(displayedProgress(1, 3200, 3200)).toBe(1);
+  });
+
+  it('nunca mostra mais do que ja aconteceu', () => {
+    for (let ms = 0; ms <= 4000; ms += 100) {
+      for (const real of [0, 0.3, 0.75, 1]) {
+        const shown = displayedProgress(real, ms, 3200);
+        expect(shown).toBeLessThanOrEqual(real + 1e-9);
+        expect(shown).toBeLessThanOrEqual(ms / 3200 + 1e-9);
+      }
+    }
+  });
+
+  it('e monotonica no tempo — a barra nunca anda para tras', () => {
+    let previous = -1;
+    for (let ms = 0; ms <= 4000; ms += 50) {
+      const shown = displayedProgress(1, ms, 3200);
+      expect(shown).toBeGreaterThanOrEqual(previous);
+      previous = shown;
+    }
+  });
+
+  it('sem piso (modo de desenvolvimento) devolve o progresso real intacto', () => {
+    expect(displayedProgress(0.42, 0, 0)).toBeCloseTo(0.42);
+    expect(displayedProgress(1, 0, 0)).toBe(1);
+  });
+
+  it('sanea entrada fora da faixa', () => {
+    expect(displayedProgress(2, 9999, 3200)).toBe(1);
+    expect(displayedProgress(-1, 9999, 3200)).toBe(0);
+    expect(displayedProgress(1, -50, 3200)).toBe(0);
+  });
+
+  it('o piso e o pedido: entre 3 e 4 segundos', () => {
+    // A tela existe para ser VISTA. Com tudo em cache o preload liquida em
+    // ~200 ms, e sem piso ela passava rapido demais para registrar.
+    expect(BOOT_TIMING_FULL.loadingMinMs).toBeGreaterThanOrEqual(3000);
+    expect(BOOT_TIMING_FULL.loadingMinMs).toBeLessThanOrEqual(4000);
+    expect(BOOT_TIMING_REDUCED.loadingMinMs).toBe(BOOT_TIMING_FULL.loadingMinMs);
   });
 });
 
