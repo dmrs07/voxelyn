@@ -38,19 +38,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Espelhos de src/client/audio/soundtrack.ts e music.ts. Duplicados aqui
 // porque este script roda em Node puro, sem transpilar TS; se mudar la, mude
-// aqui (o teste de contrato do trim pega divergencia grosseira).
-const MUSIC_CEILING = 0.13;
+// aqui. `soundtrack.test.ts` le ESTE arquivo e cobra a igualdade — a copia
+// existe, mas nao pode divergir em silencio.
+const MUSIC_CEILING = 0.366;
 const TRIM_MIN = 0.25;
 const TRIM_MAX = 2.0;
 
 /**
  * Alvo do leito musical DENTRO do jogo, em LUFS, com o slider no maximo.
  *
- * De onde vem: o leito procedural (drone+baixo+pad sob o teto de 0.13) senta
- * por volta de -30 LUFS, e o contrato da mixagem e a musica ser chao sob os
- * SFX. -30 mantem a trilha composta no mesmo degrau percebido que o backup.
+ * De onde vem: o leito procedural e a trilha composta vivem sob o MESMO teto
+ * (MUSIC_CEILING), entao os dois sobem e descem juntos e o alvo so precisa
+ * manter a trilha composta no mesmo degrau percebido que o backup.
+ *
+ * Era -30 enquanto o teto era 0,13. O teto subiu para 0,366 (+9 dB) porque
+ * -30 LUFS era baixo demais para a trilha ser ouvida como musica, e a protecao
+ * dos SFX passou a vir do ducking em vez da margem estatica. Este numero anda
+ * junto do teto: se um mudar sem o outro, o trim calculado aqui CANCELA a
+ * mudanca — a formula divide por MUSIC_CEILING.
  */
-const TARGET_INGAME_LUFS = -30;
+const TARGET_INGAME_LUFS = -21;
 
 const FFMPEG = process.env.FFMPEG ?? 'ffmpeg';
 const FFPROBE = process.env.FFPROBE ?? 'ffprobe';

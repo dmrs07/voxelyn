@@ -25,14 +25,51 @@ import { TICK_HZ } from '@voxelyn/survival-sim';
 import type { OccupationId, StratumId } from '@voxelyn/survival-sim';
 
 /**
+ * Menor ganho de telegrafo do jogo (`telegraphRanged` em voices.ts).
+ *
+ * E a referencia do contrato "SFX > musica": a musica tem que ficar abaixo
+ * disto no momento em que um telegrafo fala. Vive aqui, e nao como numero solto
+ * em comentario e teste, porque e a fronteira que a mixagem inteira respeita.
+ */
+export const SMALLEST_TELEGRAPH_GAIN = 0.45;
+
+/**
  * Teto do barramento de musica, em ganho absoluto sob o master.
  *
- * 0,13 fica abaixo do menor telegrafo (0,45) com folga de sobra: a musica e
- * chao, nunca disputa o canal de informacao. O slider de musica MULTIPLICA
- * este teto (1.0 no slider = 0.13 de ganho), nunca o substitui — implementar o
- * slider como ganho unitario destruiria a mixagem inteira.
+ * O slider de musica MULTIPLICA este teto (1.0 no slider = 0.366 de ganho),
+ * nunca o substitui — implementar o slider como ganho unitario destruiria a
+ * mixagem inteira.
+ *
+ * COMO O CONTRATO E MANTIDO. Ate aqui o teto era 0,13, escolhido para deixar a
+ * musica 6 dB abaixo do menor telegrafo EM REPOUSO. Isso punha a trilha em
+ * -30 LUFS no jogo com o slider no maximo — baixo demais para ser ouvida como
+ * musica, que era a reclamacao. O teto subiu 9 dB, para -21 LUFS, e a protecao
+ * dos SFX passou a vir do ducking em vez da margem estatica:
+ *
+ *   em repouso     0,366 x 1,74 (trim) = 0,637  — acima do telegrafo, de proposito
+ *   sob telegrafo  0,637 x 0,35 (duck) = 0,223  — exatamente onde a musica ficava antes
+ *
+ * A troca e essa, e vale a pena declarar sem rodeio: perdeu-se margem no
+ * silencio, que ninguem estava usando, e manteve-se margem no unico instante em
+ * que ela existe para valer. Nos 40 ms em que um telegrafo soa, a mixagem e
+ * bit a bit a mesma de antes; entre um telegrafo e outro, a musica finalmente
+ * soa como musica.
  */
-export const MUSIC_CEILING = 0.13;
+export const MUSIC_CEILING = 0.366;
+
+/**
+ * Quanto a musica cede sob uma voz de prioridade >= MUSIC_DUCK_PRIORITY.
+ *
+ * 0,35 (-9,1 dB) nao e gosto: e o fator que poe a musica ducada de volta em
+ * ~0,223 de ganho, o mesmo ponto em que ela tocava em repouso antes do teto
+ * subir. Mudou o teto, recalcule este numero junto — sao um par, e o teste
+ * `mixagem declarada` cobra a relacao entre eles.
+ *
+ * Vive aqui, no modulo puro, porque os DOIS barramentos (procedural e trilha
+ * composta) precisam do mesmo valor para "a musica ceder o canal igual". Antes
+ * era uma copia privada em cada bus, sincronizada so por um comentario.
+ */
+export const MUSIC_DUCK_FACTOR = 0.35;
 
 /**
  * Fracao do ganho do barramento que cabe a cada camada. Relativas ao teto, nao

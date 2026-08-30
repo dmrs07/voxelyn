@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { MUSIC_CEILING } from './music';
+import { MUSIC_CEILING, MUSIC_DUCK_FACTOR, SMALLEST_TELEGRAPH_GAIN } from './music';
 import {
   COMPOSED_TRIM,
   COMPOSED_TRIM_MAX,
@@ -32,14 +35,42 @@ describe('contrato da trilha composta', () => {
     // procedurais tocam perto de full scale, o master do compositor senta em
     // -17 LUFS — o trim calibrado por loudness (script de preparacao) pode
     // legitimamente passar da soma de LAYER_GAINS. O contrato REAL e com os
-    // SFX: no slider maximo, o ganho da trilha fica abaixo do menor telegrafo
-    // (0.45) — musica e chao, nunca canal de informacao. A folga percebida e
-    // bem maior do que a de ganho: o conteudo do master esta ~17 dB abaixo do
-    // proprio full scale, o telegrafo sintetizado nao.
-    const composed = composedBaseGain(1);
-    expect(composed).toBeLessThan(0.45);
+    // SFX, e ele e cobrado SOB O DUCK: com o slider no maximo, a trilha ducada
+    // fica abaixo do menor telegrafo. Em repouso ela passa desse ganho de
+    // proposito — e o que a tirou de -30 para -21 LUFS.
+    //
+    // A folga percebida continua sendo bem maior do que a de ganho: o conteudo
+    // do master esta ~17 dB abaixo do proprio full scale, o telegrafo
+    // sintetizado nao.
+    expect(composedBaseGain(1) * MUSIC_DUCK_FACTOR).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
     // E nunca ultrapassa o pior caso declarado do proprio contrato.
-    expect(composed).toBeLessThanOrEqual(MUSIC_CEILING * COMPOSED_TRIM_MAX + 1e-9);
+    expect(composedBaseGain(1)).toBeLessThanOrEqual(MUSIC_CEILING * COMPOSED_TRIM_MAX + 1e-9);
+  });
+
+  it('o script de calibragem nao divergiu do jogo', () => {
+    // prepare-soundtrack.mjs roda em Node puro e por isso REPETE o teto do jogo
+    // num literal proprio. Uma copia que ninguem confere e uma armadilha: com o
+    // teto novo e o alvo velho o script cospe trim 4,91 — fora da faixa sa, e
+    // so daria as caras quando alguem fosse trocar o master.
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(here, '../../../scripts/prepare-soundtrack.mjs'), 'utf8');
+    const num = (nome: string): number => {
+      const m = new RegExp(`const ${nome} = (-?[\\d.]+);`).exec(src);
+      if (!m) throw new Error(`${nome} nao encontrado em prepare-soundtrack.mjs`);
+      return Number(m[1]);
+    };
+
+    expect(num('MUSIC_CEILING')).toBe(MUSIC_CEILING);
+    expect(num('TRIM_MIN')).toBe(COMPOSED_TRIM_MIN);
+    expect(num('TRIM_MAX')).toBe(COMPOSED_TRIM_MAX);
+
+    // E o alvo tem que REPRODUZIR os trims versionados a partir do LUFS medido
+    // de cada master (os numeros que estao documentados junto de cada trim).
+    const alvo = num('TARGET_INGAME_LUFS');
+    const trimPara = (lufsDoArquivo: number): number =>
+      10 ** ((alvo - lufsDoArquivo) / 20) / MUSIC_CEILING;
+    expect(trimPara(-17.1)).toBeCloseTo(COMPOSED_TRIM, 2);
+    expect(trimPara(-15.0)).toBeCloseTo(MENU_TRIM, 2);
   });
 
   it('composedBaseGain satura o slider em [0,1]', () => {
@@ -68,7 +99,7 @@ describe('resolucao de fonte (fallback para o backup procedural)', () => {
     expect(MENU_SOUNDTRACK_URL).not.toBe(SOUNDTRACK_URL);
     expect(MENU_TRIM).toBeGreaterThanOrEqual(COMPOSED_TRIM_MIN);
     expect(MENU_TRIM).toBeLessThanOrEqual(COMPOSED_TRIM_MAX);
-    expect(menuBaseGain(1)).toBeLessThan(0.45);
+    expect(menuBaseGain(1) * MUSIC_DUCK_FACTOR).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
     expect(menuBaseGain(-1)).toBe(0);
     expect(menuBaseGain(0.5)).toBeCloseTo(menuBaseGain(1) / 2, 10);
   });

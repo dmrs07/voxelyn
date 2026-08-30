@@ -3,7 +3,9 @@ import type { OccupationId, StratumId } from '@voxelyn/survival-sim';
 import {
   LAYER_GAINS,
   MUSIC_CEILING,
+  MUSIC_DUCK_FACTOR,
   MUSIC_THEMES,
+  SMALLEST_TELEGRAPH_GAIN,
   OCCUPATION_VARIATIONS,
   barDurationSec,
   barIndexForTick,
@@ -81,10 +83,31 @@ describe('temas por estrato', () => {
 });
 
 describe('mixagem declarada', () => {
-  // A promessa central: SFX > musica. O teto do barramento fica abaixo do
-  // menor telegrafo (0.45) e nenhuma camada passa do proprio barramento.
-  it('o teto da musica fica abaixo de qualquer telegrafo', () => {
-    expect(MUSIC_CEILING).toBeLessThanOrEqual(0.16);
+  // A promessa central continua sendo SFX > musica — mas ela e cobrada onde
+  // importa, e nao no silencio. Em repouso a musica agora PASSA do menor
+  // telegrafo de proposito (foi assim que ela saiu de -30 para -21 LUFS); o que
+  // nao pode acontecer e ela disputar o canal enquanto um telegrafo fala.
+  //
+  // Um teto solto (o antigo `<= 0.16`) nao dizia nada disso: era um numero que
+  // passava a impressao de proteger sem nomear do que protegia.
+  it('sob um telegrafo, a musica cede o canal', () => {
+    const worstCase = Object.values(LAYER_GAINS).reduce((a, b) => a + b, 0);
+    const ducked = MUSIC_CEILING * worstCase * MUSIC_DUCK_FACTOR;
+    expect(ducked).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
+  });
+
+  it('o teto e o duck sao um par: mexeu num, recalcule o outro', () => {
+    // O duck existe para devolver a musica ao ponto em que ela tocava em
+    // repouso antes de o teto subir 9 dB (0,13 x 1,74 = 0,2262 de ganho). Se
+    // este par sair de sincronia, ou a musica some sob o duck ou ela deixa de
+    // ceder o canal — e nos dois casos alguem precisa olhar, nao descobrir no
+    // ouvido de um jogador.
+    const NIVEL_HISTORICO = 0.13 * 1.74;
+    const duckedComposed = MUSIC_CEILING * 1.74 * MUSIC_DUCK_FACTOR;
+    expect(duckedComposed).toBeCloseTo(NIVEL_HISTORICO, 2);
+  });
+
+  it('nenhuma camada passa do proprio barramento', () => {
     for (const gain of Object.values(LAYER_GAINS)) {
       expect(gain).toBeGreaterThan(0);
       expect(gain).toBeLessThanOrEqual(1);

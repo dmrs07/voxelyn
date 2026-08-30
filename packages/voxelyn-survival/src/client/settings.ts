@@ -85,6 +85,10 @@ export type AudioSettings = {
    * Volume da MUSICA, 0..1. Multiplica o teto interno do barramento de musica
    * (MUSIC_CEILING), nunca vira ganho WebAudio unitario: 1.0 no slider e o
    * teto projetado da mixagem, nao "musica no maximo do alto-falante".
+   *
+   * Esse teto poe a trilha em -21 LUFS no jogo. Ate a virada de mixagem ele
+   * punha em -30, que era audivel como "a musica sumiu" mesmo com o slider
+   * no fim do curso.
    */
   musicVolume: number;
   /**

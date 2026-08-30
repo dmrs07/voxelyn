@@ -22,7 +22,11 @@ Este diretório recebe os dois slots do pipeline de trilha:
   graves coexistem por design. O caminho de áudio não soma para mono, não
   pana, não filtra (ver `src/client/audio/soundtrack-bus.ts`).
 - **SFX > música, sempre**: mesmo teto (`MUSIC_CEILING`) e mesmo ducking da
-  música procedural.
+  música procedural. O teto põe a trilha em **−21 LUFS** no jogo com o slider no
+  máximo; sob um telegrafo o ducking a devolve a −30 LUFS. Em repouso ela passa
+  do menor telegrafo de propósito — a proteção mora no duck, não na margem
+  estática. O trim é calibrado por `prepare-soundtrack.mjs`, que mira o mesmo
+  −21; teto e alvo do script andam juntos.
 - **Loop sem emenda**: `AudioBufferSourceNode` com `loop=true` (gapless com
   precisão de amostra).
 
