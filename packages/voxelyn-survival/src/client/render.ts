@@ -3272,7 +3272,10 @@ export class SurvivalRenderer {
                   presented.facingY,
                   z,
                   {
-                    spin: gunView.spin,
+                    // ANGULO, nao velocidade: a velocidade satura em 1 na
+                    // rajada inteira e congelaria os canos justamente no
+                    // trecho em que eles giram mais rapido.
+                    phase: gunView.barrelPhase,
                     // O calor so e conhecido do jogador local; no parceiro o
                     // cano fica frio em vez de inventar um estado que este
                     // cliente nao recebe.
@@ -4958,7 +4961,7 @@ export class SurvivalRenderer {
         safeLeft + 12,
         moduleY,
         safeLeft + panelW,
-        extra.minigun.spin / MINIGUN_SPIN_MAX,
+        this.minigunViews.get(this.localPlayerId - 1).barrelPhase,
       );
     }
 
@@ -5178,11 +5181,11 @@ export class SurvivalRenderer {
     y: number,
     viewportWidth: number,
     /**
-     * Fase de rotacao 0..1 do canhao, quando ha um. O icone da Minigun GIRA
-     * com ela: e a leitura mais barata possivel de "os canos ja estao no
+     * ANGULO acumulado do canhao, 0..1, quando ha um. O icone da Minigun GIRA
+     * com ele: e a leitura mais barata possivel de "os canos ja estao no
      * ponto", e ela chega ao olho sem custar uma linha de HUD.
      */
-    minigunSpin = 0,
+    minigunPhase = 0,
   ): void {
     const ctx = this.ctx;
     const availableWidth = Math.max(0, viewportWidth - 12 - x);
@@ -5200,14 +5203,16 @@ export class SurvivalRenderer {
       ctx.strokeStyle = PAL.player;
       ctx.lineWidth = pulse ? 2.5 : 1.5;
       ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      if (module.id === 'minigun' && minigunSpin > 0 && !prefersReducedMotion()) {
-        // Gira em torno do proprio centro. O angulo sai da rotacao
-        // AUTORITATIVA, e nao de `nowMs`: um relogio proprio faria o icone
-        // girar durante o travamento por superaquecimento, que e exatamente o
+      if (module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion()) {
+        // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
+        // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
+        // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
+        // angulo deixaria o icone parado no pico —, e um relogio proprio
+        // faria o icone girar durante o travamento, que e exatamente o
         // instante em que ele tem de estar parando.
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(minigunSpin * Math.PI * 2);
+        ctx.rotate(minigunPhase * Math.PI * 2);
         drawModuleGlyph(ctx, module.id, 0, 0, size * 0.47, PAL.biolum);
         ctx.restore();
       } else {

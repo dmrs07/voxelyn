@@ -27,8 +27,22 @@ import {
 } from '@voxelyn/survival-sim';
 
 export type MinigunView = {
-  /** 0..1. */
+  /**
+   * VELOCIDADE de rotacao, 0..1. NAO e um angulo.
+   *
+   * A distincao vale um comentario porque confundi-las e um bug silencioso: a
+   * velocidade SATURA em 1 durante a rajada inteira, entao qualquer desenho
+   * que a use como fase congela exatamente quando os canos estao mais
+   * rapidos. Quem quer angulo usa `barrelPhase`.
+   */
   spin: number;
+  /**
+   * ANGULO acumulado do conjunto de canos, 0..1 (uma volta).
+   *
+   * Integrado a partir da velocidade: `barrelPhase += spin * VOLTAS_POR_SEGUNDO * dt`.
+   * E o unico campo que a apresentacao deve usar para girar qualquer coisa.
+   */
+  barrelPhase: number;
   phase: MinigunPhase;
   /** Quando a ultima rajada chegou, em ms do relogio do cliente. */
   lastBurstMs: number;
@@ -36,7 +50,35 @@ export type MinigunView = {
   lastBurstRounds: number;
 };
 
-const EMPTY: MinigunView = { spin: 0, phase: 'idle', lastBurstMs: 0, lastBurstRounds: 0 };
+const EMPTY: MinigunView = {
+  spin: 0,
+  barrelPhase: 0,
+  phase: 'idle',
+  lastBurstMs: 0,
+  lastBurstRounds: 0,
+};
+
+/**
+ * Voltas por segundo do conjunto de canos na rotacao maxima.
+ *
+ * Seis e o numero em que a alternancia de quatro passos entrega 24 trocas por
+ * segundo: rapido o bastante para ler como maquina, devagar o bastante para
+ * nao virar cintilacao a 30 quadros por segundo. Nao tem relacao com a
+ * cadencia de tiro — o conjunto real de uma minigun gira muito mais rapido do
+ * que ela dispara, e copiar a cadencia aqui so faria os canos piscarem no
+ * ritmo das balas.
+ */
+export const BARREL_TURNS_PER_SECOND = 6;
+
+/** O angulo do conjunto depois de `dtMs` girando nesta velocidade. */
+export const advanceBarrelPhase = (phase: number, spin: number, dtMs: number): number => {
+  const seconds = Math.max(0, Math.min(250, dtMs)) / 1000;
+  const next = phase + Math.max(0, Math.min(1, spin)) * BARREL_TURNS_PER_SECOND * seconds;
+  // Envolve em vez de crescer sem teto: um acumulador que sobe por toda a run
+  // perde precisao de float e, pior, faz `Math.floor(phase * 8)` saltar
+  // passos quando os incrementos ficam menores que o epsilon do valor.
+  return next - Math.floor(next);
+};
 
 /** A rotacao sobe nesta fase? Vale para a integracao local entre transicoes. */
 export const spinRises = (phase: MinigunPhase): boolean =>
@@ -94,6 +136,15 @@ export class MinigunViews {
     // A rajada tambem reancora: ela carrega a rotacao do tick em que foi
     // publicada, e cinco reancoragens por segundo custam nada.
     view.spin = Math.max(0, Math.min(1, spin / MINIGUN_SPIN_MAX));
+    // E ela PROVA a fase: sairam balas, logo a arma esta disparando.
+    //
+    // Sem esta linha, um cliente que entra (ou reconecta) com o parceiro ja
+    // atirando nunca ve a transicao `minigun_spin` — o `full_resync` nao
+    // carrega eventos e o snapshot do parceiro nao carrega `minigun`. A view
+    // nasceria da primeira rajada em `idle`, e `step()` desaceleraria a
+    // rotacao entre uma rajada e a seguinte: os canos do parceiro cairiam e
+    // saltariam cinco vezes por segundo, para sempre.
+    view.phase = 'firing';
   }
 
   /**
@@ -109,9 +160,13 @@ export class MinigunViews {
     view.spin = Math.max(0, Math.min(1, spin / MINIGUN_SPIN_MAX));
   }
 
-  /** Integra a rampa dos slots que so tem transicoes. */
+  /** Integra a rampa e o angulo dos canos. Chamar uma vez por quadro. */
   step(dtMs: number): void {
     for (const view of this.bySlot.values()) {
+      // O ANGULO anda com a velocidade que valeu DURANTE o quadro, e por isso
+      // e integrado antes da rampa: usar a velocidade ja atualizada adiantaria
+      // meio quadro de giro no primeiro tick de cada aceleracao.
+      view.barrelPhase = advanceBarrelPhase(view.barrelPhase, view.spin, dtMs);
       view.spin = advanceSpin(view.spin, view.phase, dtMs);
     }
   }
@@ -128,7 +183,7 @@ export class MinigunViews {
   private ensure(slot: number): MinigunView {
     let view = this.bySlot.get(slot);
     if (!view) {
-      view = { spin: 0, phase: 'idle', lastBurstMs: 0, lastBurstRounds: 0 };
+      view = { spin: 0, barrelPhase: 0, phase: 'idle', lastBurstMs: 0, lastBurstRounds: 0 };
       this.bySlot.set(slot, view);
     }
     return view;

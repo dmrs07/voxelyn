@@ -39,8 +39,15 @@ export const screenAim = (ax: number, ay: number): { x: number; y: number } => {
 };
 
 export type MinigunMountOptions = {
-  /** 0..1, a rotacao autoritativa. */
-  spin: number;
+  /**
+   * ANGULO do conjunto, 0..1 (uma volta) — e nao a velocidade de rotacao.
+   *
+   * A diferenca e a razao de este campo existir. A velocidade satura em 1
+   * durante a rajada inteira; usa-la como angulo congelaria os canos
+   * exatamente no trecho em que eles giram mais rapido. Quem integra o angulo
+   * a partir da velocidade autoritativa e `minigun-view.ts`.
+   */
+  phase: number;
   /** 0..1, a fracao de calor: pinta o metal e acende os pontos quentes. */
   heat: number;
   /** 0..1, quanto resta do clarao de boca da ultima rajada. */
@@ -67,7 +74,7 @@ export const drawMinigunMount = (
   opts: MinigunMountOptions,
 ): void => {
   const dir = screenAim(aimX, aimY);
-  const spin = Math.max(0, Math.min(1, opts.spin));
+  const phase = opts.phase - Math.floor(opts.phase);
   const heat = Math.max(0, Math.min(1, opts.heat));
   const flash = Math.max(0, Math.min(1, opts.flash));
 
@@ -83,14 +90,14 @@ export const drawMinigunMount = (
 
   ctx.save();
 
-  // O CONJUNTO. Quatro canos alternando comprimento em fase com a rotacao.
+  // O CONJUNTO. Quatro canos alternando comprimento em fase com o ANGULO.
   // Oito passos, e nao continuo: pixel art nao tem subpixel, e interpolar
   // produziria tremor de meio pixel no lugar de giro.
-  const step = Math.floor(spin * 8) % 4;
+  const step = Math.floor(phase * 8) % 4;
   const unit = Math.max(1, Math.round(zoom));
   for (let i = 0; i < 4; i++) {
-    const phase = (i + step) % 4;
-    const front = phase === 0 || phase === 1;
+    const slot = (i + step) % 4;
+    const front = slot === 0 || slot === 1;
     const offset = (i - 1.5) * 1.1 * zoom;
     const bx = cx + px * offset;
     const by = cy + py * offset;
