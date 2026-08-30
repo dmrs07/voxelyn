@@ -18,6 +18,7 @@ import type { OccupationId, StratumId } from '@voxelyn/survival-sim';
 import {
   LAYER_GAINS,
   MUSIC_CEILING,
+  MUSIC_DUCK_FACTOR,
   MUSIC_THEMES,
   OCCUPATION_VARIATIONS,
   barDurationSec,
@@ -52,8 +53,7 @@ const CROSSFADE_FLOOR = 0.2;
 /** Quando (apos o inicio da troca) o retune acontece, no vale da curva. */
 const RETUNE_AT_SEC = 1.2;
 
-/** Ducking: fator, ataque e recuperacao. */
-const DUCK_FACTOR = 0.5;
+/** Ducking: ataque e recuperacao. O fator vem de music.ts (os dois buses compartilham). */
 const DUCK_ATTACK_TAU = 0.015; // ~40 ms
 const DUCK_RELEASE_TAU = 0.25; // ~0.8 s
 const DUCK_HOLD_SEC = 0.12;
@@ -284,7 +284,7 @@ export class MusicBus {
     if (!this.duckGain || this.silenced) return;
     const t = this.ctx.currentTime;
     cancelAndHold(this.duckGain.gain, t);
-    this.duckGain.gain.setTargetAtTime(DUCK_FACTOR, t, DUCK_ATTACK_TAU);
+    this.duckGain.gain.setTargetAtTime(MUSIC_DUCK_FACTOR, t, DUCK_ATTACK_TAU);
     this.duckGain.gain.setTargetAtTime(1, t + DUCK_HOLD_SEC, DUCK_RELEASE_TAU);
   }
 

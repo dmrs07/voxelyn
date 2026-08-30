@@ -244,10 +244,14 @@ As quatro decisões estruturais:
    `AudioContext.currentTime` só agenda a reprodução local. Dois clientes de co-op — um
    com unlock tardio, um recém-resyncado — tocam o mesmo compasso por construção. Não há
    `Math.random()` em `music.ts`: variação sai de hash de (compasso, índice).
-2. **Teto de mixagem.** O barramento inteiro vive sob `MUSIC_CEILING = 0.13`, abaixo do
-   menor telegrafo. O slider "Música" **multiplica** o teto (1.0 = 0.13), nunca vira ganho
+2. **Teto de mixagem.** O barramento inteiro vive sob `MUSIC_CEILING = 0.366`, que põe a
+   trilha em −21 LUFS no jogo. Em repouso isso passa do menor telegrafo de propósito; quem
+   mantém o contrato *SFX > música* é o ducking (`MUSIC_DUCK_FACTOR = 0.35`), que sob um
+   telegrafo devolve a música a −30 LUFS — exatamente o nível em que ela tocava o tempo
+   todo antes desta virada. Trocou-se margem no silêncio, que ninguém usava, por margem no
+   instante em que ela importa. O slider "Música" **multiplica** o teto, nunca vira ganho
    unitário. Ducking: vozes de prioridade ≥ 9 (e `hitPlayer`, exceção explícita) abaixam a
-   música para 0,5× por ~0,8 s, com `cancelAndHoldAtTime` para rajadas não empilharem.
+   música para 0,35× por ~0,8 s, com `cancelAndHoldAtTime` para rajadas não empilharem.
 3. **Scheduler com contrato.** Lookahead de 0,4 s; ao voltar de suspensão ou stall o
    cursor **pula** para o próximo compasso válido (`MAX_CATCHUP_BARS = 1`) — nota perdida
    é perdida, nunca reposta em rajada.

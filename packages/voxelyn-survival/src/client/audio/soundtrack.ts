@@ -40,7 +40,8 @@ export const SOUNDTRACK_URL = 'audio/voxelyn-survival-theme.flac';
 
 /**
  * Ajuste de ganho da trilha composta DENTRO do teto da musica, aplicado antes
- * do bus (efetivo = MUSIC_CEILING * COMPOSED_TRIM * slider).
+ * do bus (efetivo = MUSIC_CEILING * COMPOSED_TRIM * slider; sob um telegrafo,
+ * MUSIC_DUCK_FACTOR entra por cima disso).
  *
  * Por que existe: os temas procedurais nascem calibrados contra os SFX (LAYER_GAINS
  * soma ~1 sobre osciladores puros); um master de estudio chega proximo de
@@ -49,8 +50,12 @@ export const SOUNDTRACK_URL = 'audio/voxelyn-survival-theme.flac';
  * e imprime o valor calibrado para colar aqui junto do asset.
  *
  * Calibrado para "TEMA DE EXPLORACAO 3.0" (Clevo): -17.1 LUFS integrado,
- * true peak +0.1 dBTP -> 1.74 poe o leito em -30 LUFS no jogo com o slider
+ * true peak +0.1 dBTP -> 1.74 poe o leito em -21 LUFS no jogo com o slider
  * no maximo. Trocou o master, rode o script de novo.
+ *
+ * O valor nao mudou quando o teto subiu 9 dB: o trim normaliza as DUAS faixas
+ * entre si, e quem fixa o nivel absoluto e MUSIC_CEILING. A calibragem do
+ * compositor continua exatamente onde ele a deixou.
  */
 export const COMPOSED_TRIM = 1.74;
 
@@ -116,7 +121,7 @@ export const MENU_SOUNDTRACK_URL = 'audio/voxelyn-survival-menu.flac';
  * Trim da trilha de menu, mesmo papel do COMPOSED_TRIM.
  *
  * Calibrado para o tema de abertura (Clevo): -15,0 LUFS integrado, true peak
- * +0,2 dBTP -> 1.37 poe o leito em -30 LUFS com o slider no maximo. Trocou o
+ * +0,2 dBTP -> 1.37 poe o leito em -21 LUFS com o slider no maximo. Trocou o
  * master, rode `prepare-soundtrack.mjs --slot menu` de novo.
  */
 export const MENU_TRIM = 1.37;

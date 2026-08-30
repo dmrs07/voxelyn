@@ -18,10 +18,12 @@
 // reiniciar o loop a cada resync seria audivel e pior. O relogio do proprio
 // AudioContext basta.
 
+import { MUSIC_DUCK_FACTOR } from './music';
 import { COMPOSED_FADE_DOWN_TAU, COMPOSED_FADE_UP_TAU, composedBaseGain } from './soundtrack';
 
-/** Ducking: mesmos valores do music-bus, para a musica ceder o canal igual. */
-const DUCK_FACTOR = 0.5;
+/** Ducking: mesmos valores do music-bus, para a musica ceder o canal igual.
+ *  O fator e importado de music.ts — antes era uma copia sincronizada so por
+ *  este comentario, e um contrato que depende de ninguem esquecer nao e contrato. */
 const DUCK_ATTACK_TAU = 0.015;
 const DUCK_RELEASE_TAU = 0.25;
 const DUCK_HOLD_SEC = 0.12;
@@ -130,7 +132,7 @@ export class SoundtrackBus {
     if (!this.duckGain || this.silenced) return;
     const t = this.ctx.currentTime;
     cancelAndHold(this.duckGain.gain, t);
-    this.duckGain.gain.setTargetAtTime(DUCK_FACTOR, t, DUCK_ATTACK_TAU);
+    this.duckGain.gain.setTargetAtTime(MUSIC_DUCK_FACTOR, t, DUCK_ATTACK_TAU);
     this.duckGain.gain.setTargetAtTime(1, t + DUCK_HOLD_SEC, DUCK_RELEASE_TAU);
   }
 
