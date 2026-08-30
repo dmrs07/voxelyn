@@ -1,0 +1,73 @@
+{
+  "id": "layer-module-conductive",
+  "version": 7,
+  "atlas": "layer-module-conductive.png",
+  "normalAtlas": "layer-module-conductive.normal.png",
+  "normalScale": 2,
+  "frameWidth": 88,
+  "frameHeight": 112,
+  "columns": 32,
+  "anchorX": 44,
+  "anchorY": 108,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.68,
+    "h": 1
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#7ab8ff",
+    "#7b8ba3"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4
+    },
+    "dl": {
+      "idle": 8,
+      "attack": 12
+    },
+    "ur": {
+      "idle": 16,
+      "attack": 20
+    },
+    "ul": {
+      "idle": 24,
+      "attack": 28
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "conductive module hardware bolted onto the shard driver of the Aurix PX prospector bot",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

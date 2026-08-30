@@ -16,7 +16,7 @@ import {
 } from './terrain.mjs';
 import { SURFACE_KINDS, buildSurfaceFrames, surfaceBounds } from './surfaces.mjs';
 import { PROP_KINDS, buildPropFrames, propBounds } from './props.mjs';
-import { PLAYER_LAYER_SPECS } from './player-layers.mjs';
+import { MODULE_LAYER_SPECS, PLAYER_LAYER_SPECS } from './player-layers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, '../assets/atlases');
@@ -352,7 +352,7 @@ const buildSurfaces = () => {
   return { id: 'surface-tiles', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
 };
 
-const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS].map(buildEntity);
+const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS, ...MODULE_LAYER_SPECS].map(buildEntity);
 // O terreno fica FORA do index de sprites: nao tem animacao, direcao nem
 // frameMap, e o validador de sprites tentaria le-lo como personagem.
 const terrainResult = buildTerrain();
