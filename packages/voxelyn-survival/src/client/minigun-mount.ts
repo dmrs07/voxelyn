@@ -1,17 +1,21 @@
-// O CANHAO MONTADO NO BOT: os canos girando por cima do sprite da arma.
+// O CANHAO MONTADO NO BOT: a arma por cima do sprite, no ombro do Prospector.
 //
 // Por que uma sobreposicao procedural em vez de quadros novos no atlas: o
-// atlas do Prospector tem oito rumos por animacao, e uma arma com quatro
-// posicoes de cano seriam trinta e dois quadros por animacao — para uma peca
-// que existe por vinte segundos de run. A sobreposicao custa uma dezena de
-// retangulos por quadro e responde a rotacao REAL, que e o que o quadro
-// pre-renderizado nunca poderia fazer.
+// atlas do Prospector tem oito rumos por animacao, e uma arma com posicoes de
+// cano seriam dezenas de quadros por animacao — para uma peca que existe por
+// vinte segundos de run. A sobreposicao custa uma dezena de retangulos por
+// quadro e responde a rotacao REAL, que e o que o quadro pre-renderizado nunca
+// poderia fazer.
 //
-// A regra que faz isto funcionar num punhado de pixels: em pouquissimo espaco,
-// rotacao nao se le por movimento angular — ela se le por ALTERNANCIA. Quatro
-// canos empilhados que trocam de comprimento em fase leem como um conjunto
-// girando; um desenho girado de verdade num raio de tres pixels le como
-// tremor. O mesmo criterio do cartucho em `module-hardware.ts`.
+// A SILHUETA segue o cartucho (`module-hardware.ts`): caixa de municao atras,
+// cano curto e GROSSO na frente. Duas pecas, e nao um pente de canos finos —
+// e a mesma decisao de la, pela mesma razao: a arma se define por municao, e
+// nesta escala um feixe de tubos finos vira um borrao cinza de tres pixels.
+//
+// A regra que faz a rotacao funcionar num punhado de pixels: em pouquissimo
+// espaco, rotacao nao se le por movimento angular — ela se le por
+// ALTERNANCIA. Aqui quem alterna e a ventoinha da culatra, tres pixels em
+// orbita, que e o mesmo elemento que gira no cartucho.
 
 /** Paleta local: os mesmos aco/osso/ambar/fogo da art bible. */
 const M = {
@@ -87,47 +91,54 @@ export const drawMinigunMount = (
   // Perpendicular na tela: e por ela que os canos empilham.
   const px = -dir.y;
   const py = dir.x;
+  const unit = Math.max(1, Math.round(zoom));
 
   ctx.save();
 
-  // O CONJUNTO. Quatro canos alternando comprimento em fase com o ANGULO.
-  // Oito passos, e nao continuo: pixel art nao tem subpixel, e interpolar
-  // produziria tremor de meio pixel no lugar de giro.
-  const step = Math.floor(phase * 8) % 4;
-  const unit = Math.max(1, Math.round(zoom));
-  for (let i = 0; i < 4; i++) {
-    const slot = (i + step) % 4;
-    const front = slot === 0 || slot === 1;
-    const offset = (i - 1.5) * 1.1 * zoom;
-    const bx = cx + px * offset;
-    const by = cy + py * offset;
-    const length = (front ? 7 : 5) * zoom;
-    ctx.strokeStyle = front ? M.steelLight : M.steel;
-    ctx.lineWidth = unit;
+  // A CAIXA DE MUNICAO, atras do ombro: um bloco compacto com dois pixels de
+  // latao. E ela que da massa a silhueta e diz de longe qual arma o Prospector
+  // esta carregando — inclusive a do parceiro remoto, do outro lado da sala.
+  const boxX = cx - dir.x * 3.4 * zoom;
+  const boxY = cy - dir.y * 3.4 * zoom;
+  const box = Math.max(2, Math.round(3.4 * zoom));
+  ctx.fillStyle = M.steel;
+  ctx.fillRect(Math.round(boxX - box / 2), Math.round(boxY - box / 2), box, box);
+  ctx.fillStyle = M.steelLight;
+  ctx.fillRect(Math.round(boxX - box / 2), Math.round(boxY - box / 2), box, Math.max(1, unit));
+  ctx.fillStyle = M.amber;
+  ctx.fillRect(Math.round(boxX - box / 4), Math.round(boxY), Math.max(1, unit), Math.max(1, unit));
+
+  // O CANO: duas linhas grossas, e nao quatro finas. Calibre, nao contagem.
+  for (const side of [-0.6, 0.6]) {
+    const bx = cx + px * side * zoom;
+    const by = cy + py * side * zoom;
+    ctx.strokeStyle = M.steelLight;
+    ctx.lineWidth = Math.max(1, unit * 1.3);
     ctx.beginPath();
     ctx.moveTo(bx, by);
-    ctx.lineTo(bx + dir.x * length, by + dir.y * length);
+    ctx.lineTo(bx + dir.x * 6.5 * zoom, by + dir.y * 6.5 * zoom);
     ctx.stroke();
-    // A boca clara dos canos da frente: e ela que faz a alternancia LER como
-    // rotacao em vez de como cintilacao aleatoria.
-    if (front) {
-      ctx.fillStyle = M.bone;
-      ctx.fillRect(
-        Math.round(bx + dir.x * length - unit / 2),
-        Math.round(by + dir.y * length - unit / 2),
-        unit,
-        unit,
-      );
-    }
+    ctx.fillStyle = M.bone;
+    ctx.fillRect(
+      Math.round(bx + dir.x * 6.5 * zoom - unit / 2),
+      Math.round(by + dir.y * 6.5 * zoom - unit / 2),
+      unit,
+      unit,
+    );
   }
 
-  // A cinta que segura o conjunto: sem ela sao quatro riscos soltos.
-  ctx.strokeStyle = M.steelDark;
-  ctx.lineWidth = Math.max(1, unit * 1.4);
-  ctx.beginPath();
-  ctx.moveTo(cx + px * 2.4 * zoom + dir.x * 3 * zoom, cy + py * 2.4 * zoom + dir.y * 3 * zoom);
-  ctx.lineTo(cx - px * 2.4 * zoom + dir.x * 3 * zoom, cy - py * 2.4 * zoom + dir.y * 3 * zoom);
-  ctx.stroke();
+  // A VENTOINHA da culatra: tres pixels em orbita, na MESMA fase do cartucho.
+  // E o unico elemento que se move, e por isso o unico que precisa girar.
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + phase * Math.PI * 2;
+    ctx.fillStyle = i === 0 ? M.amber : M.steelLight;
+    ctx.fillRect(
+      Math.round(cx + Math.cos(a) * 1.7 * zoom - unit / 2),
+      Math.round(cy + Math.sin(a) * 1.7 * zoom - unit / 2),
+      unit,
+      unit,
+    );
+  }
 
   // CALOR NO METAL. Cresce com a barra que o HUD ja desenha, e satura em
   // branco no travamento — o mesmo vocabulario do `gunHeatTint` do sprite,

@@ -941,15 +941,17 @@ const drawModuleGlyph = (
     ctx.stroke();
     ctx.fillRect(cx + 2 * u, cy, 3 * u, u);
   } else if (id === 'minigun') {
-    // Tres canos empilhados apontando para a direita, com o tambor atras.
-    // MULTIPLICIDADE e a leitura, no glifo como no cartucho: um tubo unico
-    // seria o perfurante em 22 pixels.
-    for (let i = 0; i < 3; i++) {
-      ctx.fillRect(cx - u, cy + (i - 1) * 2 * u - u / 2, (i === 1 ? 6 : 5) * u, u);
-    }
-    ctx.beginPath();
-    ctx.arc(cx - 2.5 * u, cy, 2.4 * u, 0, Math.PI * 2);
-    ctx.stroke();
+    // Caixa de municao a esquerda + toco de cano a direita, a mesma leitura do
+    // cartucho: a MUNICAO e a peca, e o cano e um toco.
+    //
+    // Vinte e dois pixels nao comportam as aletas do motor nem a ventoinha, e
+    // tentar reproduzi-las daria ruido. O que sobrevive nesta escala e a
+    // PROPORCAO — um bloco alto contra um toco baixo —, e ela e o que separa o
+    // glifo do perfurante (tubo unico e comprido) e do disco (circulo).
+    ctx.strokeRect(cx - 4.5 * u, cy - 4 * u, 5 * u, 8 * u);
+    for (let i = 0; i < 3; i++) ctx.fillRect(cx - 3.5 * u, cy - 2.5 * u + i * 2 * u, 3 * u, u);
+    ctx.fillRect(cx + 0.5 * u, cy - 1.5 * u, 4 * u, 3 * u);
+    ctx.fillRect(cx + 4.5 * u, cy - 0.5 * u, u, u);
   } else {
     ctx.beginPath();
     ctx.arc(cx, cy, 4 * u, 0, Math.PI * 2);

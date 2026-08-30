@@ -250,12 +250,26 @@ mais **um** componente funcional dominante, tudo numa prancheta de 32×26 unidad
 em pixels inteiros. A regra de silhueta do §5 vale entre eles como vale entre criaturas: se
 dois cartuchos se confundem a 100% de zoom, um volta para redesign.
 
-O caso da **Minigun** documenta como a regra se aplica, porque ela nasceu perto de dois
-vizinhos. Contra o **perfurante** — que também é um tubo comprido apontado para a direita —
-o que separa é a **multiplicidade**: quatro canos empilhados com folga entre eles, não um
-corpo único com anéis. Contra o **disco de retorno** — que também tem uma peça redonda
-dominante — o que separa é a **posição**: o tambor fica atrás e embaixo, alimentando, em vez
-de no berço à frente, pronto para sair.
+O caso da **Minigun** documenta como a regra se aplica, e ela precisou de duas tentativas.
+
+A primeira punha um **pente de quatro canos** no lugar de destaque, e falhava no teste pelo
+motivo mais direto possível: contra o **perfurante**, que também é um tubo comprido apontado
+para a direita, o cartucho não tinha nada de diferente a dizer. Pior, os canos eram
+`steel`/`steelLight` sobre o tampo `steelLight` do chassi e sumiam — o que o olho pegava era
+o bloco de culatra em osso, um **retângulo vertical claro**, exatamente a forma errada para
+um conjunto rotativo horizontal. A peça dominante tinha acabado sendo a errada por acidente.
+
+A versão atual troca o componente dominante em vez de ajustar o desenho: a peça é a
+**munição**. Caixa com fita rolando no terço esquerdo, carcaça de motor com aletas no meio,
+e o cano reduzido a um **toco grosso**. Isso resolve as duas confusões de uma vez — não é um
+tubo (separa do perfurante) e não tem peça redonda dominante (separa do disco) — e de quebra
+acerta a fantasia: a arma não se define por girar, se define por trezentas balas. A carcaça
+com aletas é a segunda leitura, e é ela que explica o spin-up antes de o jogador senti-lo.
+
+Uma nota de paleta que custou uma iteração: a variante intermediária usava **ciano** na
+ventoinha e no LED. Ciano nesta bancada já significa perfurante, ricochete e disco de
+retorno — usá-lo num quarto cartucho mancharia o código de cor dos quatro de uma vez. O
+acento da Minigun é o **âmbar do latão**, que é literalmente do que ela é feita.
 
 A rotação entra por parâmetro (`spin`), nunca por relógio interno: o mesmo desenho serve ao
 cartucho **parado** na bancada do terminal e ao cartucho **encaixado** no bot, cuja rotação é
@@ -276,11 +290,20 @@ relato do que já aconteceu. Nada nelas atrasa, condiciona ou confirma nada — 
 resolve vira um clarão curto sobre o próprio bot, e a seleção nunca depende da animação.
 
 No Prospector, a arma é uma **sobreposição procedural** sobre o sprite (`minigun-mount.ts`),
-e não quadros novos no atlas: oito rumos × quatro posições de cano seriam trinta e dois
-quadros por animação para uma peça que dura vinte segundos de run. A regra que faz isso
-funcionar em poucos pixels: **rotação não se lê por movimento angular, e sim por
-alternância** — quatro canos que trocam de comprimento em fase leem como um conjunto
-girando; um desenho girado de verdade num raio de três pixels lê como tremor.
+e não quadros novos no atlas: oito rumos × as posições de cano seriam dezenas de quadros por
+animação para uma peça que dura vinte segundos de run. A silhueta segue a do cartucho —
+caixa de munição atrás, toco grosso na frente, **duas** linhas de cano e não quatro finas,
+porque nesta escala um feixe de tubos finos vira um borrão cinza de três pixels.
+
+A regra que faz a rotação funcionar em poucos pixels: **rotação não se lê por movimento
+angular, e sim por alternância** — aqui quem alterna é a ventoinha da culatra, três pixels em
+órbita, o mesmo elemento que gira no cartucho. Um desenho girado de verdade num raio de três
+pixels lê como tremor.
+
+E o que gira é um **ângulo acumulado**, nunca a velocidade de rotação. A velocidade satura em
+1 durante toda a rajada; usá-la como fase congela os canos exatamente no trecho em que eles
+giram mais rápido. `minigun-view.ts` integra o ângulo a partir da velocidade autoritativa, e
+é ele que a apresentação consome.
 
 O clarão de boca é pequeno e frequente, nunca uma flor de fogo: dezesseis por segundo com o
 clarão do tiro comum cobririam o inimigo que o jogador está mirando, e a arma passaria a
