@@ -36,6 +36,7 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
     discoveries: 0,
   },
   cores: 0,
+  coresAvailable: 1,
   sectorCount: 3,
   stars: 0,
   targetTicks: 9600,

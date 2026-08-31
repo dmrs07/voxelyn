@@ -22,7 +22,7 @@ import {
   type SurvivalState,
 } from './types.js';
 import { TICK_HZ } from './constants.js';
-import { countCoresTaken, runSectorCount } from './depth.js';
+import { coresAvailable, countCoresTaken, runSectorCount } from './depth.js';
 
 /**
  * Tempo, em ticks, abaixo do qual a terceira estrela e concedida.
@@ -93,25 +93,62 @@ export const markDiscovery = (stats: RunStats, bit: number): void => {
 };
 
 /**
+ * O que a nota le. Objeto e nao cinco posicionais: quatro numeros seguidos
+ * (`ticks`, `targetTicks`, `cores`, `coresAvailable`) trocados de lugar
+ * compilariam calados, e dois deles sao pares que se parecem.
+ */
+export type StarInput = {
+  phase: RunPhase;
+  ticks: number;
+  targetTicks: number;
+  /** Nucleos que sairam do Veio com o time. */
+  cores: number;
+  /** Nucleos que ESTA run tinha para dar. */
+  coresAvailable: number;
+};
+
+/**
  * As tres estrelas.
  *
  * A escada e de INTENCAO, nao de dificuldade bruta:
  *
- *   1  sobreviveu           — voce saiu vivo do Veio
- *   2  saiu com o nucleo    — voce foi ate o fundo e voltou
- *   3  com o nucleo, no tempo — voce foi ate o fundo, voltou, e nao se demorou
+ *   1  sobreviveu              — voce saiu vivo do Veio
+ *   2  trouxe Nucleo           — voce cumpriu parte do contrato
+ *   3  trouxe TODOS, no tempo  — voce cumpriu o contrato inteiro sem se demorar
  *
  * Morrer nao da estrela nenhuma, e extrair de maos vazias da uma: as duas coisas
  * sao resultados, mas so uma delas e uma run cumprida.
  *
- * A terceira nao adiciona um objetivo novo — ela cobra o mesmo objetivo com
- * pressa. E o que mantem a decisao "extrair agora ou arriscar" viva depois que o
- * jogador ja aprendeu o mapa: com tempo infinito, pegar tudo e sempre certo.
+ * A terceira nao adiciona um objetivo novo — ela cobra o MESMO objetivo,
+ * inteiro e com pressa.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE A CONTAGEM ENTRA, E NAO SO A FASE
+ * ---------------------------------------------------------------------------
+ * Enquanto a nota lia so `phase === 'extracted_with_core'`, uma run de G-04
+ * (Nucleos nos setores 3 e 7) que recolhia o INTERMEDIARIO e subia na hora
+ * ganhava tres estrelas por metade do contrato — e ganhava FACIL, porque o
+ * tempo-alvo e derivado dos sete setores enquanto a run so precisou de tres.
+ * A saida antecipada ficava sendo a jogada otima e ainda por cima a mais bem
+ * avaliada, que e o contrario do que a escada existe para dizer.
+ *
+ * A regra corrigida devolve a decisao ao lugar certo: sair cedo com um Nucleo
+ * continua valendo — e continua valendo DUAS estrelas —, mas o terceiro degrau
+ * agora custa o que ele sempre dizia custar. Descer ate o fundo, recolher tudo
+ * e voltar dentro do tempo.
+ *
+ * Em G-00, G-01 e G-02 nada muda: ha UM Nucleo disponivel, entao "todos" e
+ * "aquele", e a regra nova devolve exatamente a nota antiga.
+ *
+ * A contagem vem de `cores` e nao da fase de proposito. E o mesmo numero que
+ * ordena o ranking (ver `compareRunScore`), e faze-los lerem a mesma grandeza e
+ * o que impede a tela de resultado e o livro de discordarem sobre a mesma run.
  */
-export const starsFor = (phase: RunPhase, ticks: number, targetTicks: number): 0 | 1 | 2 | 3 => {
-  if (phase === 'extracted_with_core') return ticks <= targetTicks ? 3 : 2;
-  if (phase === 'extracted') return 1;
-  return 0;
+export const starsFor = (run: StarInput): 0 | 1 | 2 | 3 => {
+  if (run.phase !== 'extracted' && run.phase !== 'extracted_with_core') return 0;
+  if (run.cores <= 0) return 1;
+  const trouxeTudo = run.cores >= run.coresAvailable;
+  return trouxeTudo && run.ticks <= run.targetTicks ? 3 : 2;
 };
 
 /** Congela o resultado. Chamado uma vez, no tick em que a run termina. */
@@ -122,6 +159,7 @@ export const buildSummary = (state: SurvivalState, deathCause: DamageCause | nul
     stats.discoveries |= DISCOVERY_CORE_TAKEN;
   }
   const targetTicks = targetExtractionTicks(runSectorCount(state));
+  const coresMax = coresAvailable(state);
   return {
     seed: state.config.seed,
     phase: state.phase,
@@ -138,8 +176,21 @@ export const buildSummary = (state: SurvivalState, deathCause: DamageCause | nul
     // resumo acrescenta e o formato que a LIQUIDACAO consome — o servidor
     // credita a partir daqui, re-simulando, e nunca a partir do cliente.
     cores,
+    /**
+     * Quantos esta run tinha para dar. Viaja no resumo em vez de ser
+     * re-derivado da geracao por quem le: a run congelou a propria
+     * profundidade, e uma tela que consultasse o perfil de hoje diria "1 de 2"
+     * sobre uma descida que so tinha um.
+     */
+    coresAvailable: coresMax,
     sectorCount: runSectorCount(state),
-    stars: starsFor(state.phase, state.tick, targetTicks),
+    stars: starsFor({
+      phase: state.phase,
+      ticks: state.tick,
+      targetTicks,
+      cores,
+      coresAvailable: coresMax,
+    }),
     targetTicks,
   };
 };

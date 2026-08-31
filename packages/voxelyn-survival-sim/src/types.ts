@@ -444,6 +444,14 @@ export type RunSummary = {
    * que a re-simulacao produziu, nunca o que o cliente afirmou.
    */
   cores: number;
+  /**
+   * Nucleos que esta run TINHA para dar — o denominador da terceira estrela.
+   *
+   * Congelado junto do resto porque a run congelou a propria profundidade: uma
+   * descida de G-01 vale "1 de 1" para sempre, mesmo lida por um perfil que
+   * hoje esta em G-04 e enxergaria dois.
+   */
+  coresAvailable: number;
   /** A profundidade que esta run atravessou. Contexto para a tela de fim. */
   sectorCount: number;
   stars: 0 | 1 | 2 | 3;

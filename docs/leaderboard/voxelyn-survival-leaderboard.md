@@ -82,14 +82,33 @@ cobrar isso.
 | Nota | Exigência |
 | --- | --- |
 | ★☆☆ | extraiu vivo |
-| ★★☆ | extraiu **com o núcleo** |
-| ★★★ | com o núcleo, **abaixo do tempo-alvo** (12 min = 4 min × 3 setores) |
+| ★★☆ | trouxe **algum** núcleo |
+| ★★★ | trouxe **todos** os núcleos da descida, **abaixo do tempo-alvo** (4 min × setores) |
 
 A escada é de **intenção**, não de dificuldade bruta. Morrer não dá estrela — não é
 um resultado parcial de extrair, é outro resultado. E a terceira estrela não adiciona
-um objetivo novo: **cobra o mesmo objetivo com pressa**. É o que mantém viva a decisão
-"extrair agora ou arriscar" depois que o jogador já aprendeu o mapa — com tempo
+um objetivo novo: **cobra o mesmo objetivo, inteiro e com pressa**. É o que mantém viva a
+decisão "extrair agora ou arriscar" depois que o jogador já aprendeu o mapa — com tempo
 infinito, pegar tudo é sempre certo.
+
+### Por que a contagem entra, e não só a fase
+
+Enquanto a nota lia apenas `phase === 'extracted_with_core'`, uma run de G-04 (núcleos nos
+setores **3 e 7**) que recolhia o **intermediário** e subia na hora ganhava **três estrelas
+por metade do contrato** — e ganhava fácil, porque o tempo-alvo é derivado dos sete setores
+enquanto a run só precisou de três. A saída antecipada era simultaneamente a jogada ótima
+e a mais bem avaliada, que é o contrário do que a escada existe para dizer.
+
+A regra corrigida devolve a decisão ao lugar certo: sair cedo com um núcleo **continua
+valendo**, e continua valendo **duas** estrelas — mas o terceiro degrau agora custa o que
+sempre disse custar. Em G-00, G-01 e G-02 nada muda: há **um** núcleo disponível, então
+"todos" é "aquele", e a regra nova devolve exatamente a nota antiga.
+
+A contagem sai de `cores`, o **mesmo número que ordena o ranking** (§0). Fazê-los lerem a
+mesma grandeza é o que impede a tela de resultado e o livro de discordarem sobre a mesma
+run — e produz a propriedade que sustenta a tela do ranking: **dentro de um livro, as
+estrelas nunca sobem ao descer na lista**. Antes disso era falso, e uma ★★★ aparecia
+abaixo de uma ★★☆; não era só feio, era o sintoma de a escada premiar meia entrega.
 
 O tempo-alvo é derivado de `SECTOR_COUNT`, não um número solto: a run passou de um mapa
 para três, e um alvo fixo passaria a significar outra coisa se o número de setores

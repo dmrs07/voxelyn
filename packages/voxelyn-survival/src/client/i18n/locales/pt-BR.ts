@@ -461,7 +461,9 @@ export const PT_BR = {
     'REGISTRO CORPORATIVO: 1 unidade inativa destruída — sem valor de recuperação.',
   'summary.reputation.other':
     'REGISTRO CORPORATIVO: {count} unidades inativas destruídas — sem valor de recuperação.',
-  'summary.nextStar.three': '★★★ exige o núcleo em {target} — você passou {over}.',
+  'summary.nextStar.three': '★★★ exige todos os núcleos em {target} — você passou {over}.',
+  'summary.nextStar.three.cores':
+    '★★★ exige os {total} núcleos da descida — você subiu com {missing} ainda no Veio.',
   'summary.nextStar.two': '★★ exige sair com o núcleo do Guardião.',
   'summary.nextStar.one': '★ exige alcançar a extração vivo.',
   'summary.seed': 'seed {seed}',

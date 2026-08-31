@@ -445,7 +445,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.reputation.one': 'CORPORATE RECORD: 1 inactive unit destroyed — no recovery value.',
   'summary.reputation.other':
     'CORPORATE RECORD: {count} inactive units destroyed — no recovery value.',
-  'summary.nextStar.three': '★★★ requires the core in {target} — you went {over} over.',
+  'summary.nextStar.three': '★★★ requires every core in {target} — you went {over} over.',
+  'summary.nextStar.three.cores':
+    '★★★ requires all {total} cores of the descent — you surfaced with {missing} still in the Vein.',
   'summary.nextStar.two': "★★ requires leaving with the Guardian's core.",
   'summary.nextStar.one': '★ requires reaching extraction alive.',
   'summary.seed': 'seed {seed}',

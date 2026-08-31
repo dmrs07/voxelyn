@@ -87,6 +87,7 @@ export {
   markDiscovery,
   recordKill,
   starsFor,
+  type StarInput,
   compareRunScore,
   runClass,
   runScore,
