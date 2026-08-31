@@ -967,10 +967,38 @@ export class PostgresProgressionStore implements ProgressionStore {
  * o log e mais grave e diz por que: sem banco, o saldo do jogador nao sobrevive
  * a um restart, e isso precisa aparecer no boot em vez de virar suporte.
  */
+/**
+ * Devolve `null` quando havia banco e ele NAO respondeu — e esse null e a
+ * correcao de um defeito que ja custou perfil em producao.
+ *
+ * Antes, uma falha aqui caia para o store de MEMORIA, e o servidor subia
+ * inteiro servindo progressao a partir de um mapa vazio. Do lado de quem joga
+ * isso nao parece indisponibilidade: parece que a arvore de protocolos foi
+ * ZERADA. E pior que parecer — o cliente recebe `unauthenticated`, abre um
+ * perfil novo, e passa a acumular numa linha que o proximo reinicio tambem
+ * apaga. A base intacta continua no Postgres, e ninguem a le.
+ *
+ * O detalhe que torna isso traicoeiro: o `catch` engole QUALQUER erro de
+ * `connect`, e `connect` roda o SCHEMA inteiro. Uma tabela alterada a mao, um
+ * `alter table` que passou a falhar, uma permissao removida — tudo vira
+ * "progressao zerada para todo mundo", com uma linha de log que ninguem le
+ * porque o servico subiu verde.
+ *
+ * O contrato agora e explicito: sem `DATABASE_URL` a memoria e a resposta certa
+ * (`pnpm dev`, testes, e nada a preservar); COM ele, ou o Postgres responde ou a
+ * progressao fica INDISPONIVEL — as rotas devolvem 503 e o cliente cai na
+ * simulacao local, que e o caminho de retry que ele ja tem.
+ *
+ * Indisponivel e melhor que zerado, e a diferenca nao e de grau: 503 e
+ * reversivel quando o banco volta; um perfil em branco que o jogador comeca a
+ * preencher nao e. O resto do jogo — co-op, ranking, ecos — continua de pe, que
+ * e a regra da casa: indisponibilidade de banco nao vira indisponibilidade de
+ * jogo.
+ */
 export const createProgressionStore = async (
   databaseUrl: string | undefined,
   log: (line: Record<string, unknown>) => void,
-): Promise<ProgressionStore> => {
+): Promise<ProgressionStore | null> => {
   if (!databaseUrl) {
     log({ ev: 'progression_memory', reason: 'DATABASE_URL ausente; saldo nao persiste' });
     return new MemoryProgressionStore();
@@ -981,11 +1009,12 @@ export const createProgressionStore = async (
     return store;
   } catch (err) {
     log({
-      ev: 'progression_fallback',
-      reason: 'saldo nao persiste entre reinicios',
+      ev: 'progression_unavailable',
+      reason:
+        'ha DATABASE_URL e o Postgres nao respondeu; progressao responde 503 em vez de servir perfil em branco',
       error: err instanceof Error ? err.message : String(err),
     });
-    return new MemoryProgressionStore();
+    return null;
   }
 };
 

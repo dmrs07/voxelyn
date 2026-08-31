@@ -267,6 +267,12 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       });
     }),
     createProgressionStore(databaseUrl, log).then((store) => {
+      // `null` = havia banco e ele nao respondeu. NAO instala handler: as rotas
+      // de progressao seguem no 503 que ja existe logo abaixo, e o cliente cai
+      // na simulacao local. Instalar um handler de memoria aqui era o que fazia
+      // a arvore de protocolos aparecer ZERADA para quem joga — ver
+      // `createProgressionStore`.
+      if (!store) return;
       progressionStore = store;
       handleProgression = createProgressionHandler({
         store,

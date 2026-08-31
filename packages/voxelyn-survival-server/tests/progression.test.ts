@@ -9,6 +9,7 @@ import {
   assertProgressionSecretIsStable,
   resolveProgressionSecret,
 } from '../src/progression-auth.js';
+import { createProgressionStore } from '../src/progression-store.js';
 import {
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_GAS_IGNITION,
@@ -1037,5 +1038,43 @@ describe('segredo de sessao: efemero onde e certo, fatal onde destroi', () => {
     expect(lines.map((l) => l.ev)).toContain('progression_secret_ephemeral');
     // Efemero de verdade: duas chamadas nao produzem a mesma assinatura.
     expect(resolveProgressionSecret(undefined, () => {})).not.toBe(secret);
+  });
+});
+
+describe('banco quebrado deixa a progressao INDISPONIVEL, nunca em branco', () => {
+  const capture = () => {
+    const lines: Record<string, unknown>[] = [];
+    return { lines, log: (l: Record<string, unknown>) => lines.push(l) };
+  };
+
+  /**
+   * O defeito que custou um perfil em producao.
+   *
+   * Uma URL de banco que nao responde caia para o store de MEMORIA, e o
+   * servidor subia inteiro servindo progressao de um mapa vazio. Do lado de
+   * quem joga isso nao parece indisponibilidade — parece que a arvore de
+   * protocolos foi zerada. E o cliente entao abre um perfil NOVO e comeca a
+   * acumular nele, enquanto a base intacta segue no Postgres sem ninguem ler.
+   *
+   * `null` e o que faz as rotas caírem no 503 que `ws.ts` ja tinha.
+   */
+  it('com DATABASE_URL que falha, devolve null em vez de um store de memoria', async () => {
+    const { lines, log } = capture();
+    // Host que nao resolve: `connect` falha antes de qualquer schema.
+    const store = await createProgressionStore(
+      'postgres://u:p@nao-existe.invalid:5432/x',
+      log,
+    );
+    expect(store).toBeNull();
+    expect(lines.map((l) => l.ev)).toContain('progression_unavailable');
+  }, 30_000);
+
+  // Sem banco nao ha o que preservar, e a memoria e a resposta certa — e o que
+  // mantem `pnpm dev` e esta suite rodando sem configurar nada.
+  it('sem DATABASE_URL, a memoria continua sendo a resposta certa', async () => {
+    const { lines, log } = capture();
+    const store = await createProgressionStore(undefined, log);
+    expect(store).not.toBeNull();
+    expect(lines.map((l) => l.ev)).toContain('progression_memory');
   });
 });
