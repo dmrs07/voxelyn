@@ -152,6 +152,22 @@ describe('vortice da boca — os graos', () => {
     expect(len(throat), 'o rastro nao esticou na descida').toBeGreaterThan(len(rim) * 1.5);
   });
 
+  it('com MENOS graos, eles continuam espalhados pelo caminho inteiro', () => {
+    // O preset de qualidade reduz a contagem, e a contagem reduzida tem de
+    // entrar em `mawStreak` como `count` — e ela que espalha as fases. Desenhar
+    // um subconjunto dos indices mantendo o total alto amontoaria os
+    // sobreviventes no mesmo trecho da espiral: um pelotao, e nao um fluxo.
+    const few = 29; // o que sobra na qualidade baixa
+    const radii = [];
+    for (let i = 0; i < few; i++) radii.push(radius(head(mawStreak(i, 0.31, reach, few))));
+    const lo = Math.min(...radii);
+    const hi = Math.max(...radii);
+    // Os graos tem de cobrir quase todo o vao entre a garganta e a borda.
+    expect(hi - lo, 'os graos ficaram amontoados num anel so').toBeGreaterThan(
+      (reach - DEVOURER_MAW_BITE_RADIUS) * 0.8
+    );
+  });
+
   it('nascem e morrem transparentes: nada pisca no chao', () => {
     for (let i = 0; i < MAW_STREAKS; i++) {
       const born = mawStreak(i, (i / MAW_STREAKS) * -MAW_FALL_SECONDS, reach);

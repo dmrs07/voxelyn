@@ -2596,8 +2596,23 @@ export class SurvivalRenderer {
         //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
         ctx.strokeStyle = SURFACE_FALLBACK[SURF_SILT];
         ctx.lineWidth = Math.max(1, z * 0.5);
-        for (let i = 0; i < MAW_STREAKS; i++) {
-          const grain = mawStreak(i, seconds, reach);
+        // A CONTAGEM SEGUE O PRESET, pela mesma fracao que o resto dos efeitos
+        // deste cliente usa (`maxFx / PRESETS.high.maxFx`): 145 no alto, 72 no
+        // medio, 29 no baixo.
+        //
+        // Sem isto o vortice era o unico efeito da tela que o governador de
+        // qualidade nao conseguia aliviar — e ele nasceu justamente do quadro
+        // mais caro do encontro, com o chefe, a fauna arrastada e o disco de
+        // terreno mudando ao mesmo tempo. Um efeito que ignora o preset nao e
+        // caro: e imune a solucao.
+        //
+        // `count` vai junto porque e ele que espalha as fases dos graos ao longo
+        // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
+        // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
+        // nao um fluxo.
+        const streaks = Math.max(12, Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)));
+        for (let i = 0; i < streaks; i++) {
+          const grain = mawStreak(i, seconds, reach, streaks);
           if (grain.alpha <= 0.01) continue;
           // Segmento a segmento, com a CABECA mais forte que a cauda.
           //

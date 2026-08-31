@@ -28,7 +28,13 @@ import {
 } from '@voxelyn/survival-sim';
 
 /**
- * Quantos graos o vortice carrega de uma vez.
+ * Quantos graos o vortice carrega de uma vez, NA QUALIDADE ALTA.
+ *
+ * O desenho escala este numero pelo preset ativo (ver `render.ts`), pela mesma
+ * fracao `maxFx / PRESETS.high.maxFx` que o resto dos efeitos do cliente usa.
+ * A contagem tem de entrar em `mawStreak` como `count` junto: e ela que espalha
+ * as fases, e desenhar um subconjunto dos indices com o total antigo amontoaria
+ * os graos sobreviventes todos no mesmo trecho do caminho.
  *
  * Subiu de 44 quando o caminho deixou de ser orbita. Um risco que dava duas
  * voltas cobria meio disco sozinho e poucos bastavam para encher a tela; um
@@ -115,15 +121,22 @@ export type MawStreak = {
 /**
  * Quantos pontos formam o rastro de um grao.
  *
- * Ele e uma POLILINHA e nao um segmento porque o caminho e uma espiral: dois
- * pontos ligados em linha reta cortam a curva pela corda, e com o rastro curto
- * isso mal apareceria — mas o rastro precisa ser longo o bastante para ler como
- * velocidade. A primeira versao usava um segmento so e o resultado, visto na
- * captura, foi um feixe de varetas retas atravessando o disco de lado a lado:
- * o desenho dizia "estilhaco voando" onde a mecanica diz "areia girando para
- * dentro".
+ * Foram cinco enquanto o caminho era uma ORBITA de duas voltas: ali o rastro
+ * cobria quase 45 graus de arco e uma corda unica cortava a curva de lado a
+ * lado — o desenho dizia "estilhaco voando" onde a mecanica diz "areia indo
+ * para dentro".
+ *
+ * Com a espiral de passo constante a varredura inteira caiu para 0,19 volta, e
+ * o rastro (STREAK_SPAN do caminho) passou a cobrir 7,6 graus. Medido: a corda
+ * unica se afasta do arco em 0,017 tile no pior raio — meio pixel de tile. Os
+ * dois pontos do meio deixaram de desenhar qualquer coisa e viraram custo puro.
+ *
+ * Tres e o minimo que ainda entrega a outra coisa que o rastro precisa dar: a
+ * cabeca mais forte que a cauda (ver o desenho em `render.ts`). Com dois pontos
+ * ha um segmento so, e um segmento so tem uma opacidade — e opacidade constante
+ * e uma linha, e linha nao tem ponta.
  */
-const STREAK_POINTS = 5;
+const STREAK_POINTS = 3;
 /**
  * O comprimento do rastro, em fracao do caminho inteiro.
  *
