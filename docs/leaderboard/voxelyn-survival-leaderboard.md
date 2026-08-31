@@ -114,6 +114,23 @@ O tempo-alvo é derivado de `SECTOR_COUNT`, não um número solto: a run passou 
 para três, e um alvo fixo passaria a significar outra coisa se o número de setores
 mudasse. `TARGET_SECTOR_TICKS` é o único número aqui que se espera calibrar por playtest.
 
+### O relógio do ar tem de acompanhar
+
+O mesmo raciocínio vale para a **contaminação**, e lá ele tinha ficado para trás.
+`CONTAMINATION_PER_TICK` foi calibrado quando toda run tinha três setores e doze minutos;
+quando a profundidade virou dado da geração, o relógio ficou onde estava. Medido, com o
+mesmo ritmo de jogo: a run de três setores saturava a **~89%** do caminho — o sprint final,
+que *é* o clima pretendido — e a de sete saturava a **~58%**, com cinco setores de subida
+pela frente e **21 segundos** de vida. Não era uma descida difícil, era uma descida
+impossível, e nada denunciava isso porque cada constante, sozinha, continuava certa.
+
+A taxa agora sai de `contaminationPerTick(sectorCount)`: mesma pressão medida **em fração
+da run**, ar 2,3× mais lento por tick numa descida 2,3× mais longa. Tudo o mais continua —
+acelerar por setor, aliviar no poço (e **só** no poço: a subida é a cobrança), dobrar com o
+Núcleo, saturar perto do fim. Três setores fica bit a bit idêntico, o que permitiu o ajuste
+sem tocar em nenhuma run que já aconteceu; profundidades maiores mudam de resultado, e por
+isso `SIMULATION_VERSION` foi para **43**.
+
 ## 2. A garantia anti-cheat
 
 **O cliente nunca submete um resultado.** Ele submete a seed e o que pressionou.

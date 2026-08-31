@@ -19,7 +19,7 @@ import {
   WELL_OFFER_SPREAD,
   PURGE_CELL_HEAL,
   PURGE_CELL_RADIUS,
-  CONTAMINATION_PER_TICK,
+  contaminationPerTick,
   DISCHARGE_DAMAGE,
   LEYLINE_CHARGE_TICKS,
   LEYLINE_NODE_INTERACT_RADIUS,
@@ -148,6 +148,7 @@ import {
   markCoreTaken,
   runDepth,
   runIsReturning,
+  runSectorCount,
 } from './depth.js';
 import { sectorBiome, sectorProfile } from './strata.js';
 import {
@@ -2791,9 +2792,14 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
   // o que impede o poco de virar botao de reset; o nucleo e a cobranca do
   // caminho de volta.
   const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
+  // A taxa sai da PROFUNDIDADE DA RUN, e nao de uma constante de parede: uma
+  // descida de sete setores dura 2,3x mais que a de tres, e um relogio que nao
+  // soubesse disso mataria toda run funda no meio do caminho de volta. Ver
+  // `contaminationPerTick`.
+  const perTick = contaminationPerTick(runSectorCount(state));
   state.contamination = Math.min(
     1,
-    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coresTakenMask !== 0 ? 2.2 : 1),
+    state.contamination + perTick * sectorScale * (state.coresTakenMask !== 0 ? 2.2 : 1),
   );
   for (let w = 0; w < CONTAMINATION_WAVES.length; w++) {
     const [level, count] = CONTAMINATION_WAVES[w];

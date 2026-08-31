@@ -576,7 +576,17 @@ export const PROTOCOL_VERSION = 26;
 // porque sao eles que decidem em que tick a proxima bala sai. Um peer que
 // discordasse da rotacao cruzaria o limiar operacional um tick antes ou depois
 // do outro, e a divergencia apareceria como dano que so existe de um lado.
-export const SIMULATION_VERSION = 42;
+// 43: O RELOGIO DA CONTAMINACAO PASSA A SER RELATIVO A RUN. A taxa por tick
+// deixa de ser a constante de parede (~14 min ate 1,0) e vira
+// `contaminationPerTick(sectorCount)`, que a divide pela profundidade que a run
+// declarou. E quebra de determinismo em toda descida com mais de tres setores:
+// a mesma seed e o mesmo log produzem contaminacao diferente, e portanto ondas,
+// saturacao e dano diferentes. Sem o bump, um ticket emitido antes do deploy
+// seria liquidado depois contra outra simulacao e o jogador receberia por uma
+// run que nao foi a dele — silenciosamente, porque nada no caminho compara as
+// duas. Descidas de TRES setores ficam bit a bit identicas (3/3 = 1), o que
+// limita o estrago do bump ao que ele precisa cobrir.
+export const SIMULATION_VERSION = 43;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

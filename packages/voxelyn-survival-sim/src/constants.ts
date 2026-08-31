@@ -1120,7 +1120,42 @@ export const CONTAMINATION_SECTOR_SCALE = 0.45;
 /** Contaminacao herdada ao descer, como fracao do que havia no setor anterior. */
 export const CONTAMINATION_CARRYOVER = 0.6;
 
-export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.0
+/**
+ * O ritmo base do ar, calibrado na descida de TRES setores: ~14 min ate 1,0 no
+ * setor 1, sem Nucleo na carga.
+ *
+ * Numero de referencia, e nao a taxa que a run usa — ver
+ * `contaminationPerTick`.
+ */
+export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14);
+
+/**
+ * O RELOGIO DA RUN E RELATIVO A RUN, e nao ao relogio de parede.
+ *
+ * Este ajuste corrige um descompasso que a expansao da profundidade deixou
+ * passar em silencio. `CONTAMINATION_PER_TICK` foi calibrado quando toda run
+ * tinha tres setores e doze minutos de alvo; quando a run passou a ter ate
+ * sete e vinte e oito, o relogio NAO acompanhou — e um relogio absoluto contra
+ * uma run 2,3x mais longa nao e "mais dificil", e outro jogo.
+ *
+ * O tamanho do erro: com o mesmo ritmo de jogo, a run de tres setores saturava
+ * a ~89% do caminho (o sprint final, que E o clima pretendido) e a de sete
+ * saturava a ~58% — com cinco setores de subida pela frente e vinte e um
+ * segundos de vida. Nao era uma descida dificil; era uma descida impossivel, e
+ * nada no codigo denunciava isso porque cada constante, sozinha, continuava
+ * certa.
+ *
+ * A correcao mantem TUDO o que a contaminacao ja fazia — acelerar por setor,
+ * aliviar no poco, dobrar com o Nucleo, saturar perto do fim — e so amarra a
+ * unidade do relogio a duracao que a propria run declara. Uma descida de sete
+ * setores tem um ar 2,3x mais lento por tick porque ela e 2,3x mais longa; a
+ * PRESSAO, medida em fracao da run, e a mesma.
+ *
+ * Tres setores fica bit a bit identico (3/3 = 1), que e o que permite este
+ * ajuste sem tocar em nenhuma run que ja aconteceu.
+ */
+export const contaminationPerTick = (sectorCount: number): number =>
+  (CONTAMINATION_PER_TICK * DEFAULT_SECTOR_COUNT) / Math.max(1, sectorCount);
 export const VENT_BASE_INTERVAL_TICKS = 160;
 
 // ---------------------------------------------------------------------------
