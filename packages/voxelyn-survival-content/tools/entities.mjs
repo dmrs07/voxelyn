@@ -2167,51 +2167,82 @@ const frostQueenModel = (anim, f) => {
   const b = [];
   const z = drift + glide * 0.3;
 
-  // SAIA: um tronco ESTREITO do chao a cintura, com o alargamento so na barra.
-  // Duas larguras, nao seis — a saia tem de ler como uma peça, e a barra e o
-  // que arrasta. As lascas soltas na borda sao a nevoa; sao elas, e nao mais
-  // degraus, que quebram a base.
-  b.push(box(-1.8, -1.6, z + 4, 3.6, 3.2, 5, 'ice'));
-  b.push(box(-2.6, -2.2, z + 1.6, 5.2, 4.4, 2.4, 'ice'));
-  b.push(box(-3.4, -2.8, z, 6.8, 5.6, 1.6, 'ice'));
-  for (let i = 0; i < 7; i++) {
-    const a = (i * 2 * Math.PI) / 7 + glide * 0.3;
-    b.push(box(Math.cos(a) * 3.6 - 0.45, Math.sin(a) * 3 - 0.45, z + (i % 2) * 0.8, 0.9, 0.9, 1.4 + (i % 3) * 0.6, 'ice'));
+  // VESTES: placas SEPARADAS em volta de um corpo escuro, nunca uma piramide
+  // preenchida. O vazio entre elas e parte do desenho: mesmo em silhueta a
+  // Rainha precisa ter cintura, pernas ausentes e uma cauda arrastada — nao a
+  // leitura de um bloco de gelo esculpido.
+  b.push(box(-0.65, -0.6, z + 2.4, 1.3, 1.2, 7.2, 'rockDeep'));
+  b.push(box(-2.7, -1.25, z + 0.4, 1.55, 2.2, 6.8, 'ice'));
+  b.push(box(1.15, -1.25, z + 1.2, 1.55, 2.2, 6, 'ice'));
+  b.push(box(-1.05, -2.2, z, 2.1, 1.15, 7.5, 'ice'));
+  // A placa traseira e uma cauda: baixa, deslocada e atrasada pelo movimento.
+  // Ela ancora o deslizamento sem fechar a silhueta sob o torso.
+  b.push(box(-1.1, 0.9 + glide * 0.2, z + 0.2, 2.2, 3.2, 1.15, 'ice'));
+  b.push(box(-0.65, 3.45 + glide * 0.25, z, 1.3, 1.65, 0.8, 'ice'));
+  // Poucas lascas soltas prolongam a barra e vendem nevoa congelada. Elas
+  // orbitam devagar, mas deixam grandes intervalos transparentes entre si.
+  for (let i = 0; i < 5; i++) {
+    const a = (i * 2 * Math.PI) / 5 + glide * 0.22;
+    const r = i === 0 ? 3.6 : 3.15;
+    b.push(box(
+      Math.cos(a) * r - 0.35,
+      Math.sin(a) * 2.8 - 0.35,
+      z + (i % 2) * 0.55,
+      0.7,
+      0.7,
+      0.9 + (i % 3) * 0.55,
+      'ice'
+    ));
   }
 
   // CINTURA e TRONCO: a parte mais estreita do corpo inteiro, e e ela que faz a
   // figura ler como figura. O corpo por baixo e ESCURO, e a fresta entre as duas
   // placas de gelo deixa ver isso — a promessa do contra-jogo.
-  b.push(box(-1.2, -1, z + 9, 2.4, 2, 5.6, 'rockDeep'));
-  b.push(box(-2.2, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
-  b.push(box(0.7, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
+  b.push(box(-1, -0.85, z + 8.5, 2, 1.7, 5.8, 'rockDeep'));
+  // Couraca rachada: duas metades que nunca se encontram no esterno. A fresta
+  // vertical faz o corpo debaixo do gelo continuar visivel durante o combate.
+  b.push(box(-2.05, -1.25, z + 10.2, 1.25, 2.5, 3.9, 'ice'));
+  b.push(box(0.8, -1.25, z + 9.5, 1.25, 2.5, 4.6, 'ice'));
 
   // OMBROS: uma barra atravessada, mais larga que a cintura e mais estreita que
   // a barra da saia. E o terceiro degrau de largura, e sem ele nao ha figura.
-  b.push(box(-3.2, -1.2, z + 14 - flinch * 0.5, 6.4, 2.4, 1.6, 'ice'));
+  // Ombreiras independentes em vez de uma barra solida. O lado do braco-lamina
+  // e maior, quebrando a simetria de estatua que achatava a personalidade.
+  b.push(box(-3.25, -1.2, z + 13.6 - flinch * 0.5, 2.35, 2.4, 1.7, 'ice'));
+  b.push(box(0.9, -1.05, z + 13.9 - flinch * 0.5, 3.05, 2.1, 1.45, 'ice'));
 
   // BRACOS de sincelo: finos, sem mao — terminam em ponta, e saem para os LADOS
   // antes de descer. Sobem na carga, e e nesse gesto que o telegrafo do
   // congelamento acontece.
-  for (const s of [-1, 1]) {
-    const ax = s * 3.4 - 0.5;
-    b.push(box(ax, -0.7, z + 13 - flinch * 0.5, 1.1, 1.6, 1.6, 'ice'));
-    b.push(box(ax, -0.7, z + 9.5 + raise * 1.4, 1.1, 1.4, 3.5 + raise * 0.4, 'ice'));
-  }
+  const leftArmZ = z + 9.1 + raise * 1.35 - flinch * 0.5;
+  const rightArmZ = z + 8.1 + raise * 1.15 - flinch * 0.5;
+  b.push(box(-3.55, -0.75, z + 12.2 - flinch * 0.5, 1.05, 1.5, 2, 'ice'));
+  b.push(box(-3.65, -0.7, leftArmZ, 0.85, 1.35, 3.6 + raise * 0.45, 'ice'));
+  // O braco direito e uma lamina/cetro comprido: uma diagonal escalonada, nao
+  // outro pendulo identico. No ataque ela sobe e atravessa a massa do corpo.
+  b.push(box(3, -0.65, z + 11.8 - flinch * 0.5, 1, 1.35, 2.2, 'ice'));
+  b.push(box(3.25, -0.58, rightArmZ, 0.75, 1.15, 4.8 + raise * 0.65, 'ice'));
+  b.push(box(3.35, -0.5, rightArmZ - 1.25, 0.55, 0.95, 1.4, 'electric'));
 
   // PESCOCO e CABECA: pequenos. A cabeca pequena sobre ombros largos e o que
   // da ESCALA a figura — do tamanho da cintura, ela viraria um boneco.
-  b.push(box(-0.8, -0.8, z + 15.6 - flinch * 0.5, 1.6, 1.6, 1.2, 'rockDeep'));
-  b.push(box(-1.4, -1.4, z + 16.8 - flinch * 0.5, 2.8, 2.8, 2.4, 'ice'));
+  b.push(box(-0.55, -0.55, z + 15.1 - flinch * 0.5, 1.1, 1.1, 1.9, 'rockDeep'));
+  b.push(box(-1.15, -1.05, z + 16.8 - flinch * 0.5, 2.3, 2.1, 2.25, 'rockDeep'));
+  // Um veu de gelo cobre nuca e um lado do rosto, mas deixa a mascara escura
+  // respirar. A assimetria e legivel nas quatro vistas sem mudar o hitbox.
+  b.push(box(-1.55, -0.15, z + 16.45 - flinch * 0.5, 0.75, 2.4, 3, 'ice'));
+  b.push(box(0.8, 0.05, z + 17.15 - flinch * 0.5, 0.6, 1.8, 1.75, 'ice'));
   // O rosto: dois pontos de corrente na fresta escura. Nada mais — e o unico
   // brilho do modelo e ele fica na altura dos olhos de proposito.
-  b.push(box(-1.1, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
-  b.push(box(0.4, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
+  b.push(box(-0.75, -1.25, z + 17.65 - flinch * 0.5, 0.5, 0.5, 0.45, 'electric'));
+  b.push(box(0.35, -1.25, z + 17.65 - flinch * 0.5, 0.5, 0.5, 0.45, 'electric'));
 
   // COROA: cinco lascas desiguais, a do meio mais alta. Crescem com a carga —
   // a silhueta anuncia antes de a cor mudar, como no Coracao.
-  [1.4, 2.4, 4, 2.4, 1.4].forEach((hgt, i) => {
-    b.push(box(-1.5 + i * 0.8, -0.4, z + 19.2 - flinch * 0.5, 0.7, 0.9, hgt + raise * 0.5, 'ice'));
+  [2.1, 3.2, 4.5, 1.4, 2.65].forEach((hgt, i) => {
+    // A quarta ponta e o dente quebrado da coroa. Nenhuma fileira regular: ela
+    // e uma soberana arruinada, nao uma cerca de cristais.
+    b.push(box(-1.5 + i * 0.75, -0.15 + (i % 2) * 0.25, z + 18.4 - flinch * 0.5, 0.55, 0.65, hgt + raise * 0.5, 'ice'));
   });
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
