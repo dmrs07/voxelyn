@@ -2170,7 +2170,7 @@
       .ax-rank-head,
       .ax-rank-row {
         display: grid;
-        grid-template-columns: 34px 54px minmax(0, 1fr) 46px 64px;
+        grid-template-columns: 34px minmax(0, 1fr) 46px 64px 54px;
         gap: 8px;
         align-items: baseline;
         padding: 5px 8px;
@@ -2212,8 +2212,12 @@
         color: var(--ax-gold);
         text-align: right;
       }
+      .ax-rank-head span:nth-child(3),
       .ax-rank-head span:nth-child(4),
       .ax-rank-head span:nth-child(5) {
+        text-align: right;
+      }
+      .ax-rank-row .ax-stars {
         text-align: right;
       }
       .ax-rank-row .ax-rank-time {

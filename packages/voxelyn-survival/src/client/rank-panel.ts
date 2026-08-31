@@ -108,21 +108,33 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     empty.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
     host.appendChild(empty);
   } else {
+    // A ORDEM DAS COLUNAS E A FORMULA DA POSICAO, lida da esquerda para a
+    // direita: posicao, quem, e entao os dois numeros que ordenam — Nucleos e
+    // tempo, nessa ordem. As estrelas ficam por ULTIMO, e a mudanca nao e
+    // estetica.
+    //
+    // Enquanto elas vinham em segundo lugar, ocupavam o slot em que o olho
+    // procura o criterio de ordenacao — e nao sao mais o criterio. Num livro
+    // fundo isso produzia uma lista que PARECE quebrada estando certa: uma
+    // ★★★ de um Nucleo aparece abaixo de duas ★★☆ de dois, e quem le a coluna
+    // de cima para baixo ve as notas fora de ordem antes de ver o porque. No
+    // fim da linha elas voltam a ser o que sao: a leitura da run, nao a
+    // posicao dela.
     const head = el('div', 'ax-rank-head');
     head.appendChild(el('span', undefined, '#'));
-    head.appendChild(el('span', undefined, '★'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
     head.appendChild(el('span', undefined, t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
+    head.appendChild(el('span', undefined, '★'));
     host.appendChild(head);
 
     view.entries.forEach((entry, index) => {
       const row = el('div', `ax-rank-row${index < 3 ? ' is-podium' : ''}`);
       row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
-      row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       row.appendChild(el('span', 'ax-rank-name', entry.name));
       row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));
       row.appendChild(el('span', 'ax-rank-time', formatDuration(entry.ticks)));
+      row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       host.appendChild(row);
     });
   }

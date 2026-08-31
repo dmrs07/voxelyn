@@ -101,6 +101,21 @@ describe('abas de profundidade', () => {
 });
 
 describe('a linha do livro', () => {
+  /**
+   * A ordem das colunas e a formula da posicao, lida da esquerda para a
+   * direita. As estrelas por ULTIMO nao e capricho: no slot anterior (segundo
+   * lugar) elas ocupavam onde o olho procura o criterio de ordenacao, e num
+   * livro fundo a lista PARECIA quebrada estando certa — uma ★★★ de um Nucleo
+   * abaixo de duas ★★☆ de dois.
+   */
+  it('ordena as colunas como a pontuacao ordena as linhas', () => {
+    renderRankPanel(host, { entries: [entry()] });
+    const head = Array.from(host.querySelectorAll('.ax-rank-head span')).map(
+      (s) => s.textContent,
+    );
+    expect(head).toEqual(['#', 'Operador', 'Núcleos', 'Tempo', '★']);
+  });
+
   it('mostra os Nucleos, que sao a pontuacao', () => {
     renderRankPanel(host, { entries: [entry({ cores: 2 })] });
     expect(host.querySelector('.ax-rank-cores')?.textContent).toBe('2');
