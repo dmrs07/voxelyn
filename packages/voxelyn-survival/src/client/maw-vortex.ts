@@ -80,15 +80,33 @@ export const MAW_NO_RETURN_RADIUS = ((): number => {
 })();
 
 export type MawStreak = {
-  /** Deslocamento em tiles a partir do centro da boca. */
-  dx: number;
-  dy: number;
-  /** O mesmo ponto um instante ATRAS: a cauda do risco. */
-  tailDx: number;
-  tailDy: number;
+  /** O RASTRO do grao, do mais antigo ao ponto atual, em tiles a partir do centro. */
+  path: ReadonlyArray<{ dx: number; dy: number }>;
   /** 0 a 1 — nasce e morre nas pontas do caminho, sem piscar. */
   alpha: number;
 };
+
+/**
+ * Quantos pontos formam o rastro de um grao.
+ *
+ * Ele e uma POLILINHA e nao um segmento porque o caminho e uma espiral: dois
+ * pontos ligados em linha reta cortam a curva pela corda, e com o rastro curto
+ * isso mal apareceria — mas o rastro precisa ser longo o bastante para ler como
+ * velocidade. A primeira versao usava um segmento so e o resultado, visto na
+ * captura, foi um feixe de varetas retas atravessando o disco de lado a lado:
+ * o desenho dizia "estilhaco voando" onde a mecanica diz "areia girando para
+ * dentro".
+ */
+const STREAK_POINTS = 5;
+/**
+ * O comprimento do rastro, em fracao do caminho inteiro.
+ *
+ * Medido pelo que ele custa no pior lugar: na borda, onde o raio e maior, este
+ * vao vale cerca de um tile de arco. Mais que isso e o grao vira um risco
+ * dando meia-volta na tela; menos e ele vira um ponto, e ponto nao tem direcao
+ * — e a DIRECAO e a unica coisa que este efeito precisa dizer.
+ */
+const STREAK_SPAN = 0.024;
 
 /**
  * Onde esta o grao `i` no instante `seconds`, para um alcance `reach`.
@@ -109,20 +127,23 @@ export const mawStreak = (
   reach: number,
   count = MAW_STREAKS
 ): MawStreak => {
-  const at = (p: number): { x: number; y: number } => {
+  const at = (p: number): { dx: number; dy: number } => {
     const clamped = Math.max(0, Math.min(1, p));
-    const r = DEVOURER_MAW_BITE_RADIUS + (reach - DEVOURER_MAW_BITE_RADIUS) * Math.pow(1 - clamped, 0.62);
+    const r =
+      DEVOURER_MAW_BITE_RADIUS + (reach - DEVOURER_MAW_BITE_RADIUS) * Math.pow(1 - clamped, 0.62);
     // O angulo de partida usa o angulo aureo para os graos nao se alinharem em
     // raios: `i * 2pi/count` daria um pente girando, que le como roda dentada.
     const theta = i * 2.39996 + clamped * MAW_SWIRL_TURNS * Math.PI * 2;
-    return { x: Math.cos(theta) * r, y: Math.sin(theta) * r };
+    return { dx: Math.cos(theta) * r, dy: Math.sin(theta) * r };
   };
   const raw = seconds / MAW_FALL_SECONDS + i / count;
   const p = raw - Math.floor(raw);
-  const head = at(p);
-  const tail = at(p - 0.06);
+  const path: Array<{ dx: number; dy: number }> = [];
+  for (let k = STREAK_POINTS - 1; k >= 0; k--) {
+    path.push(at(p - (STREAK_SPAN * k) / (STREAK_POINTS - 1)));
+  }
   // Some nas duas pontas: um grao que aparecesse pronto na borda pareceria
   // materia caindo do teto, e um que sumisse a meio caminho negaria o destino.
   const fade = Math.min(1, p / 0.12, (1 - p) / 0.12);
-  return { dx: head.x, dy: head.y, tailDx: tail.x, tailDy: tail.y, alpha: Math.max(0, fade) };
+  return { path, alpha: Math.max(0, fade) };
 };

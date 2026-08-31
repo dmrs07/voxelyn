@@ -2579,12 +2579,16 @@ export class SurvivalRenderer {
         for (let i = 0; i < MAW_STREAKS; i++) {
           const grain = mawStreak(i, seconds, reach);
           if (grain.alpha <= 0.01) continue;
-          const [hx, hy] = toScreen(maw.x + grain.dx, maw.y + grain.dy);
-          const [tx, ty] = toScreen(maw.x + grain.tailDx, maw.y + grain.tailDy);
-          ctx.globalAlpha = grain.alpha * 0.75;
+          ctx.globalAlpha = grain.alpha * 0.8;
           ctx.beginPath();
-          ctx.moveTo(tx, ty);
-          ctx.lineTo(hx, hy);
+          // Polilinha e nao segmento: o caminho e uma espiral, e ligar as duas
+          // pontas em reta corta a curva pela corda — o que se ve entao e uma
+          // vareta atravessando o disco, nao areia girando para dentro.
+          grain.path.forEach((point, k) => {
+            const [sx, sy] = toScreen(maw.x + point.dx, maw.y + point.dy);
+            if (k === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+          });
           ctx.stroke();
         }
         ctx.restore();

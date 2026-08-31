@@ -11,7 +11,9 @@ import {
 } from '@voxelyn/survival-sim';
 import { MAW_FALL_SECONDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawStreak } from './maw-vortex';
 
-const radius = (g: { dx: number; dy: number }): number => Math.hypot(g.dx, g.dy);
+const head = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) => g.path[g.path.length - 1];
+const tail = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) => g.path[0];
+const radius = (p: { dx: number; dy: number }): number => Math.hypot(p.dx, p.dy);
 
 describe('vortice da boca — a linha do sem-volta', () => {
   it('e onde a sucao iguala a caminhada, derivada e nao copiada', () => {
@@ -46,11 +48,25 @@ describe('vortice da boca — os graos', () => {
   it('nunca saem do disco nem entram na garganta', () => {
     for (let i = 0; i < MAW_STREAKS; i++) {
       for (let s = 0; s < 3; s += 0.037) {
-        const g = mawStreak(i, s, reach);
-        expect(radius(g)).toBeLessThanOrEqual(reach + 0.001);
-        expect(radius(g)).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS - 0.001);
+        for (const point of mawStreak(i, s, reach).path) {
+          expect(radius(point)).toBeLessThanOrEqual(reach + 0.001);
+          expect(radius(point)).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS - 0.001);
+        }
       }
     }
+  });
+
+  it('o rastro segue a ESPIRAL, e nao a corda entre as pontas', () => {
+    // O defeito que a primeira captura revelou: com duas pontas ligadas em
+    // reta, o risco cortava o disco de lado a lado e lia como estilhaco. O
+    // rastro tem de ser curto o bastante para o meio dele nao desabar para
+    // dentro da curva.
+    const g = mawStreak(5, 0.5, reach);
+    expect(g.path.length).toBeGreaterThan(2);
+    const first = g.path[0];
+    const last = g.path[g.path.length - 1];
+    const chord = Math.hypot(last.dx - first.dx, last.dy - first.dy);
+    expect(chord, 'o rastro atravessa o disco').toBeLessThan(reach * 0.35);
   });
 
   it('caem PARA DENTRO: a cauda esta sempre mais longe que a cabeca', () => {
@@ -61,10 +77,10 @@ describe('vortice da boca — os graos', () => {
       // O meio da queda, longe das pontas onde o serrilhado do laco reinicia.
       for (let s = 0.2; s < MAW_FALL_SECONDS * 0.8; s += 0.05) {
         const g = mawStreak(i, s, reach);
-        const head = radius(g);
-        const tail = Math.hypot(g.tailDx, g.tailDy);
         if (g.alpha <= 0.01) continue;
-        expect(tail, `grao ${i} subiu em vez de cair`).toBeGreaterThan(head - 0.001);
+        expect(radius(tail(g)), `grao ${i} subiu em vez de cair`).toBeGreaterThan(
+          radius(head(g)) - 0.001
+        );
       }
     }
   });
@@ -85,6 +101,6 @@ describe('vortice da boca — os graos', () => {
   it('encolhem com o alcance: no comeco da janela o vortice e pequeno', () => {
     const early = mawStreak(3, 0.4, DEVOURER_MAW_RADIUS * 0.25);
     const late = mawStreak(3, 0.4, DEVOURER_MAW_RADIUS);
-    expect(radius(early)).toBeLessThan(radius(late));
+    expect(radius(head(early))).toBeLessThan(radius(head(late)));
   });
 });
