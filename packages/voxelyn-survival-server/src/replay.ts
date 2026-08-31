@@ -33,12 +33,14 @@ import {
   TICK_HZ,
   TICK_MS,
   type PlayerCommand,
+  hashPlayerTuning,
   type PlayerTuning,
   type RunDepthConfig,
   type RunSummary,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
 import {
+  SIMULATION_VERSION,
   DEATH_ECHO_TRACE_SAMPLES,
   DEATH_ECHO_TRACE_STEP_MS,
   buildDeathEchoCapsule,
@@ -212,6 +214,31 @@ export const resimulateRun = (
 };
 
 /**
+ * Impressao da CONFIGURACAO sob a qual um log foi verificado.
+ *
+ * Existe porque `seed + bytes` deixou de identificar uma run. Enquanto toda
+ * submissao rodava a descida de fabrica, os dois bastavam; agora os mesmos
+ * bytes, com a mesma seed, produzem resultados diferentes conforme a
+ * profundidade e o tuning que o ticket autorizou — e sao esses resultados que
+ * entram em LIVROS diferentes. Um digest cego a configuracao faria o segundo
+ * deles voltar como "duplicata" e sumir do livro dele.
+ *
+ * A configuracao de FABRICA imprime vazio, de proposito: e o que mantem
+ * identico todo digest ja gravado no banco, e portanto a deduplicacao de todo
+ * reenvio de run que ja aconteceu.
+ */
+const configFingerprint = (tuning?: PlayerTuning, depth?: RunDepthConfig): string => {
+  if (!tuning && !depth) return '';
+  const parts: string[] = [`v${SIMULATION_VERSION}`];
+  if (depth) parts.push(`d${depth.sectorCount}:${[...depth.coreSectors].sort((a, b) => a - b)}`);
+  // O tuning entra pelo HASH que a progressao ja calcula, e nao campo a campo:
+  // uma segunda enumeracao dos atributos divergiria da primeira no dia em que
+  // um atributo novo entrasse so numa delas.
+  if (tuning) parts.push(`t${hashPlayerTuning(tuning)}`);
+  return parts.join('|');
+};
+
+/**
  * Re-simula uma submissao e devolve o resultado AUTORITATIVO.
  *
  * `tuning` e `depth` NAO vem do corpo da requisicao — quem os passa e o
@@ -224,6 +251,10 @@ export const resimulateRun = (
  * setores era a politica; agora ela RECUSARIA toda run mais funda que tres —
  * o log de uma descida de sete setores, alimentado a uma run de tres, nao chega
  * ao mesmo fim, e voltaria ao jogador como fraude.
+ *
+ * O digest devolvido carrega a configuracao junto (ver `configFingerprint`).
+ * `replayDigest` em si NAO muda: ele tambem nomeia as capsulas do pool de Ecos,
+ * e mexer nele renomearia carcacas ja publicadas para trocar de assunto.
  */
 export const verifySoloRun = (
   seed: number,
@@ -235,12 +266,13 @@ export const verifySoloRun = (
   if (!run.ok) return run;
   const summary = run.state.summary;
   if (!summary) return { ok: false, reason: 'run terminou sem sumario' };
+  const fingerprint = configFingerprint(tuning, depth);
   return {
     ok: true,
     summary,
     authHash: hashAuthoritativeState(run.state),
     ticks: run.state.tick,
-    digest: replayDigest(seed, run.canonicalLog),
+    digest: replayDigest(seed, run.canonicalLog) + (fingerprint ? `:${fingerprint}` : ''),
   };
 };
 

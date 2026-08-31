@@ -49,6 +49,46 @@ export type AuthorizedRunConfig = {
   depth?: RunDepthConfig;
 };
 
+/**
+ * O que se sabe sobre o ticket de uma submissao — e as quatro respostas sao
+ * quatro de verdade, nao uma com tres jeitos de falhar.
+ *
+ * A versao anterior deste codigo tinha UMA resposta ausente (`null`) para
+ * significar as tres ultimas juntas, e o efeito era o defeito que este PR
+ * inteiro existe para eliminar: com o banco de progressao fora do ar, ou com o
+ * ticket ja varrido da tabela, a run de sete setores caia CALADA no caminho de
+ * fabrica e era re-simulada com tres. Uma submissao honesta voltava recusada
+ * como fraude — ou, pior, entrava no livro errado com um resultado que nao foi
+ * o dela.
+ *
+ * Separadas, cada uma cobra a resposta HTTP que lhe cabe: so `unauthorized` cai
+ * na descida de fabrica, e ela e a unica em que a fabrica e a verdade.
+ */
+export type RunConfigResolution =
+  /** Ticket lido: e esta a configuracao sob a qual o log tem de rodar. */
+  | { status: 'authorized'; config: AuthorizedRunConfig }
+  /**
+   * Nao ha ticket a resolver, e nunca havera: este servidor nao tem progressao.
+   * A descida de fabrica nao e um palpite aqui — e o que a run foi.
+   */
+  | { status: 'unauthorized' }
+  /**
+   * O ticket nao esta mais la, ou nao serve. Terminal: tentar de novo nao muda.
+   *
+   * Os dois casos que chegam aqui sao reais e nenhum e trapaca. Tickets sao
+   * VARRIDOS da tabela depois da retencao (`sweepExpiredTickets`), entao uma
+   * submissao suficientemente atrasada encontra o proprio ticket ausente; e um
+   * deploy que mude `SIMULATION_VERSION` deixa para tras tickets que descrevem
+   * uma simulacao que nao roda mais. Nos dois a run e inverificavel, e dizer
+   * isso e mais honesto que verificar contra outra configuracao.
+   */
+  | { status: 'incompatible'; reason: string }
+  /**
+   * Nao deu para saber — banco fora, tempo esgotado. Tentar de novo pode
+   * resolver, e por isso a resposta e 503 e nao 422.
+   */
+  | { status: 'unavailable' };
+
 export type LeaderboardHttpOptions = {
   store: LeaderboardStore;
   log: (line: Record<string, unknown>) => void;
@@ -66,11 +106,12 @@ export type LeaderboardHttpOptions = {
    * profundidade sai de la. Nao ha campo para inflar a propria classe, do mesmo
    * jeito que nunca houve campo para inflar as estrelas.
    *
-   * Ausente (ou devolvendo null: ticket vencido, servidor sem progressao, run
-   * offline) cai em G-00 de fabrica — tres setores, sem protocolo —, que
-   * continua sendo o que toda run sem ticket sempre foi.
+   * Ausente por completo, nenhuma submissao tem ticket e todas rodam a descida
+   * de fabrica — e o que mantem este modulo montavel sozinho, sem progressao em
+   * volta. Presente, ele responde com uma das quatro situacoes de
+   * `RunConfigResolution`, e so uma delas autoriza a fabrica.
    */
-  runConfig?: (runId: string) => Promise<AuthorizedRunConfig | null>;
+  runConfig?: (runId: string) => Promise<RunConfigResolution>;
 };
 
 /** Teto do identificador de ticket aceito no corpo. UUID cabe com folga. */
@@ -203,21 +244,39 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
     // uma leitura barata de banco, e reservar antes dela seguraria a vaga de
     // re-simulacao durante uma consulta que pode nem terminar em replay.
     //
-    // Falha de leitura NAO derruba a submissao: ela cai no caminho de fabrica,
-    // do mesmo jeito que uma run sem ticket. O banco de progressao fora do ar
-    // ja custa a recompensa da run; custar tambem a entrada no ranking seria
-    // uma indisponibilidade virando duas.
+    // NENHUMA falha aqui cai na descida de fabrica. Cair nela seria re-simular
+    // o log contra uma configuracao que nao e a da run — e o resultado disso
+    // nao e "um pouco errado", e uma recusa por fraude na cara de quem jogou
+    // limpo, ou uma linha no livro de outra profundidade. A fabrica so vale
+    // quando ela E a verdade: submissao sem ticket, ou servidor sem progressao.
     let authorized: AuthorizedRunConfig | null = null;
     if (runId && opts.runConfig) {
+      let resolution: RunConfigResolution;
       try {
-        authorized = await opts.runConfig(runId);
+        resolution = await opts.runConfig(runId);
       } catch (err) {
+        // Excecao e sempre "nao deu para saber": um resolvedor que quisesse
+        // dizer outra coisa teria devolvido uma das quatro situacoes.
+        resolution = { status: 'unavailable' };
         opts.log({
           ev: 'leaderboard_run_config_failed',
           runId,
           error: err instanceof Error ? err.message : String(err),
         });
       }
+      if (resolution.status === 'unavailable') {
+        // 503 e nao 422: a run e valida, o servidor e que nao conseguiu
+        // conferir. Reenviar daqui a pouco resolve, e a resposta tem de dizer
+        // isso — 422 encerraria a submissao honesta para sempre.
+        json(res, 503, { error: 'nao foi possivel conferir a autorizacao; tente de novo' });
+        return true;
+      }
+      if (resolution.status === 'incompatible') {
+        opts.log({ ev: 'leaderboard_ticket_incompatible', runId, reason: resolution.reason });
+        json(res, 422, { error: resolution.reason });
+        return true;
+      }
+      if (resolution.status === 'authorized') authorized = resolution.config;
     }
     // A seed vem do TICKET quando ha ticket. O corpo so responde por ela na run
     // sem autorizacao (offline, servidor sem progressao) — e ali ela nao decide

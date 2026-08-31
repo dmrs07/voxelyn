@@ -8,6 +8,7 @@ import {
   type RunSummary,
 } from '@voxelyn/survival-sim';
 import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
+import { runDepthForGeneration, type RunDepthConfig } from '@voxelyn/survival-sim';
 import type { SoloRunSubmission } from '@voxelyn/survival-protocol';
 import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from '../src/replay';
 import {
@@ -139,6 +140,59 @@ describe('recusa de entrada hostil', () => {
     for (const junk of ['AAAA', 'AAAAAAAA', toBase64(new Uint8Array([0, 0, 1, 2, 3, 4, 5]))]) {
       expect(() => verifySoloRun(1, junk)).not.toThrow();
     }
+  });
+});
+
+describe('o digest do ranking carrega a configuracao', () => {
+  /**
+   * `seed + bytes` deixou de identificar uma run.
+   *
+   * Enquanto toda submissao rodava a descida de fabrica, os dois bastavam.
+   * Agora os MESMOS bytes, com a MESMA seed, produzem resultados diferentes
+   * conforme a profundidade que o ticket autorizou — e esses resultados entram
+   * em livros diferentes. Um digest cego a configuracao faria o segundo deles
+   * voltar como "duplicata" e sumir do livro dele.
+   */
+  const played = playAndLog(4242, (t) => ({
+    move: { x: Math.sin(t / 40), y: Math.cos(t / 37) },
+    fire: t % 4 === 0,
+  }));
+
+  const digestOf = (depth?: RunDepthConfig): string => {
+    const verdict = verifySoloRun(4242, played.base64, undefined, depth);
+    expect(verdict.ok, verdict.ok ? '' : verdict.reason).toBe(true);
+    return verdict.ok ? verdict.digest : '';
+  };
+
+  it('o mesmo log sob profundidades diferentes nao deduplica', () => {
+    const fabrica = digestOf();
+    const g04 = digestOf(runDepthForGeneration('G-04'));
+    expect(g04).not.toBe(fabrica);
+  });
+
+  // Estavel, senao a deduplicacao pararia de deduplicar: um reenvio do MESMO
+  // log sob o MESMO ticket entraria como linha nova a cada tentativa.
+  //
+  // G-04 e nao G-03 porque a run de fixture nao chega ao fim numa descida de
+  // cinco setores — o bot senoidal sobrevive alem do teto de ticks —, e um log
+  // que nao termina nao tem digest para comparar.
+  it('continua estavel: mesma configuracao, mesmo digest', () => {
+    const a = digestOf(runDepthForGeneration('G-04'));
+    const b = digestOf(runDepthForGeneration('G-04'));
+    expect(a).toBe(b);
+  });
+
+  /**
+   * E o historico fica INTACTO.
+   *
+   * A configuracao de fabrica imprime vazio de proposito: todo digest ja
+   * gravado no banco continua sendo o mesmo, e portanto a deduplicacao de todo
+   * reenvio de run que ja aconteceu continua funcionando. Se este teste falhar,
+   * um reenvio antigo passa a entrar como linha nova.
+   */
+  it('a descida de fabrica mantem o digest que o banco ja tem', () => {
+    const canonical = encodeCommandLog(played.log.slice(0, played.state.tick));
+    expect(digestOf()).toBe(replayDigest(4242, canonical));
   });
 });
 

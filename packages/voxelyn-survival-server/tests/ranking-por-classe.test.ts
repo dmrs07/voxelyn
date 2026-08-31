@@ -61,8 +61,16 @@ const bootHandler = async (tickets: Record<string, RunDepthConfig>) => {
     store,
     log: () => {},
     runConfig: async (runId) => {
+      if (runId === 'ticket:banco-fora') throw new Error('progressao indisponivel');
+      if (runId === 'ticket:versao-velha') {
+        return { status: 'incompatible', reason: 'run jogada em outra versao da simulacao' };
+      }
       const depth = tickets[runId];
-      return depth ? { seed: seedOf(runId), depth } : null;
+      // Ticket ausente e TERMINAL, e nao "cai na fabrica": e o que o resolvedor
+      // de producao devolve quando a varredura ja levou o ticket embora.
+      return depth
+        ? { status: 'authorized', config: { seed: seedOf(runId), depth } }
+        : { status: 'incompatible', reason: 'ticket da run nao encontrado' };
     },
   });
   const server: Server = createServer((req, res) => {
@@ -133,6 +141,8 @@ describe('a run e verificada com a profundidade AUTORIZADA', () => {
     expect(played.state.phase).not.toBe('running');
     const boot = await bootHandler({});
     open = boot.server;
+    // Sem `runId` no corpo o resolvedor nem e consultado: nao ha ticket a
+    // resolver, e a fabrica E a verdade desta run.
     const res = await post(boot.base, { seed: 4242, log: played.base64, name: 'sem ticket' });
     const body = (await res.json()) as { summary: { sectorCount: number } };
     expect(body.summary.sectorCount).toBe(3);
@@ -141,10 +151,8 @@ describe('a run e verificada com a profundidade AUTORIZADA', () => {
   /**
    * Nao ha campo para inflar a propria classe.
    *
-   * Um cliente que anuncie sete setores no corpo nao ganha sete setores: o
-   * corpo nao tem esse campo, e a unica coisa que ele pode mandar — o runId —
-   * so vale se ESTE servidor tiver emitido o ticket. Um identificador
-   * inventado cai no caminho de fabrica.
+   * O corpo nao tem campo de profundidade, e a unica coisa que ele pode mandar
+   * — o runId — so vale se ESTE servidor tiver emitido o ticket.
    */
   it('runId inventado nao autoriza profundidade nenhuma', async () => {
     const played = playRun(4242);
@@ -158,8 +166,60 @@ describe('a run e verificada com a profundidade AUTORIZADA', () => {
       sectorCount: 7,
       depth: { generation: 'G-04', sectorCount: 7, coreSectors: [3, 7] },
     });
-    const body = (await res.json()) as { summary: { sectorCount: number } };
-    expect(body.summary.sectorCount).toBe(3);
+    // Recusa, e nao rebaixamento silencioso para a fabrica. Rebaixar seria
+    // re-simular contra uma configuracao que nao e a da run — e quem paga por
+    // isso nao e o trapaceiro (que nao tinha run nenhuma), e o jogador honesto
+    // cujo ticket a varredura levou embora.
+    expect(res.status).toBe(422);
+    expect((await res.json()) as { error: string }).toEqual({
+      error: 'ticket da run nao encontrado',
+    });
+  });
+
+  /**
+   * Banco de progressao fora do ar: 503, nao 422 e nao fabrica.
+   *
+   * Os tres desfechos sao diferentes e so um esta certo. A fabrica re-simula
+   * contra a configuracao errada; 422 encerra para sempre uma submissao que so
+   * precisava de outra tentativa; 503 diz o que aconteceu — nao deu para
+   * conferir — e deixa o reenvio funcionar.
+   */
+  it('falha ao resolver o ticket devolve 503, e nao a descida de fabrica', async () => {
+    const played = playRun(4242);
+    const boot = await bootHandler({});
+    open = boot.server;
+    const res = await post(boot.base, {
+      seed: 4242,
+      log: played.base64,
+      name: 'honesto',
+      runId: 'ticket:banco-fora',
+    });
+    expect(res.status).toBe(503);
+    // E nada entrou no livro: melhor nenhuma linha do que a linha errada.
+    expect(await boot.store.top({})).toHaveLength(0);
+  });
+
+  /**
+   * Ticket de outra versao da simulacao: recusa explicita.
+   *
+   * A liquidacao ja fazia esta guarda (`version_mismatch`); ao ranking ela
+   * faltava. Um deploy que mude SIMULATION_VERSION deixa para tras tickets que
+   * descrevem uma descida que a simulacao de hoje nao reproduz — re-simular
+   * assim mesmo daria um resultado que nao foi o do jogador.
+   */
+  it('ticket de outra versao da simulacao e recusado, e nao rebaixado', async () => {
+    const played = playRun(4242);
+    const boot = await bootHandler({});
+    open = boot.server;
+    const res = await post(boot.base, {
+      seed: 4242,
+      log: played.base64,
+      name: 'veterano',
+      runId: 'ticket:versao-velha',
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: string }).error).toContain('outra versao');
+    expect(await boot.store.top({})).toHaveLength(0);
   });
 
   // A seed sai do ticket quando ha ticket: o corpo pode mentir sobre ela sem

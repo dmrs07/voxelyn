@@ -62,14 +62,42 @@ servidor →  ticket[runId] → { seed, tuning, depth }
          →  re-simula com ESSA configuração
 ```
 
-Um `runId` inventado não autoriza nada: cai no caminho de fábrica (três setores, sem
-protocolo), que é o que toda run sem ticket sempre foi — inclusive a run offline e a de um
-servidor sem progressão.
+**Nenhuma falha de resolução cai na descida de fábrica.** Cair nela seria re-simular o log
+contra uma configuração que não é a da run, e o resultado disso não é "um pouco errado": é
+uma recusa por fraude na cara de quem jogou limpo, ou uma linha no livro de outra
+profundidade. A fábrica só vale quando ela **é** a verdade. As quatro respostas possíveis
+(`RunConfigResolution`) são quatro de verdade, e não uma com três jeitos de falhar:
 
-Ticket **vencido ainda serve** aqui. A validade existe para limitar a janela de uma
-liquidação que *paga*; o livro não paga nada — ele só precisa saber sob qual descida
-aqueles comandos foram gravados, e um ticket de ontem responde isso tão bem quanto um de
-agora. Recusar jogaria fora a submissão honesta de quem perdeu a rede no fim da run.
+| resolução | quando | resposta |
+| --- | --- | --- |
+| `authorized` | ticket lido e utilizável | re-simula com ela |
+| `unauthorized` | servidor **sem progressão** — não há ticket a resolver, e nunca haverá | descida de fábrica |
+| `incompatible` | ticket ausente (já **varrido** da tabela) ou de outra `SIMULATION_VERSION` | **422**, terminal |
+| `unavailable` | banco fora, tempo esgotado — não deu para saber | **503**, reenviar resolve |
+
+Os dois casos de `incompatible` são reais e nenhum é trapaça. Tickets são deletados depois
+da retenção (`sweepExpiredTickets`), então uma submissão suficientemente atrasada encontra
+o próprio ticket ausente; e um deploy que mude a versão da simulação deixa para trás
+tickets que descrevem uma descida que ela já não reproduz. Nos dois a run é **inverificável**,
+e dizer isso é mais honesto que verificar contra outra configuração — é a mesma guarda que
+a liquidação já fazia (`version_mismatch`) e que faltava aqui.
+
+Ticket **vencido**, esse sim, ainda serve — enquanto existir. A validade existe para
+limitar a janela de uma liquidação que *paga*; o livro não paga nada, e um ticket de ontem
+diz sob qual descida os comandos foram gravados tão bem quanto um de agora.
+
+### O digest carrega a configuração
+
+`seed + bytes` deixou de identificar uma run: os mesmos bytes, com a mesma seed, produzem
+resultados diferentes conforme o ticket — e esses resultados entram em **livros
+diferentes**. Um digest cego à configuração faria o segundo deles voltar como "duplicata" e
+sumir do livro dele. O digest do ranking passa a incluir profundidade, hash de tuning e
+versão da simulação.
+
+A configuração de fábrica imprime **vazio**, de propósito: todo digest já gravado no banco
+continua o mesmo, e a deduplicação de todo reenvio que já aconteceu continua funcionando.
+E `replayDigest` em si não mudou — ele também nomeia as cápsulas do pool de Ecos, e mexer
+nele renomearia carcaças já publicadas para tratar de outro assunto.
 
 Isto substituiu a política anterior (*"o ranqueado nunca herda profundidade: re-simula
 tudo em três setores"*). Ela mantinha a comparação justa com um livro só, ao preço de
