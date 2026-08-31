@@ -2520,6 +2520,20 @@ export class SurvivalRenderer {
       const reach = maw ? mawReach(state.tick, openedAt) : 0;
       if (maw && reach > 0.05) {
         const [mx, my] = toScreen(maw.x, maw.y);
+        // O FATOR DA PROJECAO, e ele nao e cosmetico.
+        //
+        // Um circulo de raio R no mundo vira, nesta isometrica, uma elipse de
+        // semi-eixos `R * TILE_W/2 * raiz(2)` e `R * TILE_H/2 * raiz(2)`: o
+        // extremo horizontal esta em (R/raiz2, -R/raiz2), onde `x - y` vale
+        // `R * raiz(2)` e nao R. Sem a raiz, o anel sai a 71% do raio que ele
+        // anuncia — e ai a areia aparece girando FORA dele, que foi exatamente
+        // como o defeito se manifestou.
+        //
+        // Um anel que promete um raio diferente do raio que agarra e pior que
+        // anel nenhum, porque o jogador confia nele para decidir onde ficar.
+        const ISO = Math.SQRT2;
+        const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
+        const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
         const seconds = nowMs / 1000;
         ctx.save();
 
@@ -2533,11 +2547,17 @@ export class SurvivalRenderer {
         //    janela em que pisar ali e inofensivo — e o jogador esta em cima
         //    dela nesse segundo, porque a queda do arco foi mirada nele.
         if (reach >= DEVOURER_MAW_BITE_RADIUS) {
-          const throatX = DEVOURER_MAW_BITE_RADIUS * TILE_W * 0.5 * z;
-          const throatY = DEVOURER_MAW_BITE_RADIUS * TILE_H * 0.5 * z;
           ctx.fillStyle = 'rgba(14,10,8,0.62)';
           ctx.beginPath();
-          ctx.ellipse(mx, my, throatX, throatY, 0, 0, Math.PI * 2);
+          ctx.ellipse(
+            mx,
+            my,
+            ringX(DEVOURER_MAW_BITE_RADIUS),
+            ringY(DEVOURER_MAW_BITE_RADIUS),
+            0,
+            0,
+            Math.PI * 2
+          );
           ctx.fill();
         }
 
@@ -2546,7 +2566,7 @@ export class SurvivalRenderer {
         ctx.strokeStyle = 'rgba(201,180,140,0.42)';
         ctx.lineWidth = Math.max(1, z * 0.7);
         ctx.beginPath();
-        ctx.ellipse(mx, my, reach * TILE_W * 0.5 * z, reach * TILE_H * 0.5 * z, 0, 0, Math.PI * 2);
+        ctx.ellipse(mx, my, ringX(reach), ringY(reach), 0, 0, Math.PI * 2);
         ctx.stroke();
 
         // 3. A LINHA DO SEM-VOLTA, so depois que a boca cresceu ate ela. E a
@@ -2561,8 +2581,8 @@ export class SurvivalRenderer {
           ctx.ellipse(
             mx,
             my,
-            MAW_NO_RETURN_RADIUS * TILE_W * 0.5 * z,
-            MAW_NO_RETURN_RADIUS * TILE_H * 0.5 * z,
+            ringX(MAW_NO_RETURN_RADIUS),
+            ringY(MAW_NO_RETURN_RADIUS),
             0,
             0,
             Math.PI * 2
@@ -2576,20 +2596,45 @@ export class SurvivalRenderer {
         //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
         ctx.strokeStyle = SURFACE_FALLBACK[SURF_SILT];
         ctx.lineWidth = Math.max(1, z * 0.5);
-        for (let i = 0; i < MAW_STREAKS; i++) {
-          const grain = mawStreak(i, seconds, reach);
+        // A CONTAGEM SEGUE O PRESET, pela mesma fracao que o resto dos efeitos
+        // deste cliente usa (`maxFx / PRESETS.high.maxFx`): 145 no alto, 72 no
+        // medio, 29 no baixo.
+        //
+        // Sem isto o vortice era o unico efeito da tela que o governador de
+        // qualidade nao conseguia aliviar — e ele nasceu justamente do quadro
+        // mais caro do encontro, com o chefe, a fauna arrastada e o disco de
+        // terreno mudando ao mesmo tempo. Um efeito que ignora o preset nao e
+        // caro: e imune a solucao.
+        //
+        // `count` vai junto porque e ele que espalha as fases dos graos ao longo
+        // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
+        // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
+        // nao um fluxo.
+        const streaks = Math.max(12, Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)));
+        for (let i = 0; i < streaks; i++) {
+          const grain = mawStreak(i, seconds, reach, streaks);
           if (grain.alpha <= 0.01) continue;
-          ctx.globalAlpha = grain.alpha * 0.8;
-          ctx.beginPath();
-          // Polilinha e nao segmento: o caminho e uma espiral, e ligar as duas
-          // pontas em reta corta a curva pela corda — o que se ve entao e uma
-          // vareta atravessando o disco, nao areia girando para dentro.
-          grain.path.forEach((point, k) => {
-            const [sx, sy] = toScreen(maw.x + point.dx, maw.y + point.dy);
-            if (k === 0) ctx.moveTo(sx, sy);
-            else ctx.lineTo(sx, sy);
-          });
-          ctx.stroke();
+          // Segmento a segmento, com a CABECA mais forte que a cauda.
+          //
+          // Uma polilinha de alfa unico e uma linha, e uma linha nao tem ponta:
+          // ela diz onde a areia esta e nao para onde ela vai. Com o rastro
+          // apagando para tras, cada grao vira uma seta — e o conjunto delas e o
+          // que anuncia o centro sem desenhar nada apontando para ele.
+          //
+          // A polilinha continua existindo pelo motivo de sempre: o caminho e
+          // uma espiral, e ligar as duas pontas em reta corta a curva pela
+          // corda.
+          for (let k = 1; k < grain.path.length; k++) {
+            const a = grain.path[k - 1];
+            const b = grain.path[k];
+            const [ax, ay] = toScreen(maw.x + a.dx, maw.y + a.dy);
+            const [bx, by] = toScreen(maw.x + b.dx, maw.y + b.dy);
+            ctx.globalAlpha = grain.alpha * (0.16 + 0.74 * (k / (grain.path.length - 1)));
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+          }
         }
         ctx.restore();
       }

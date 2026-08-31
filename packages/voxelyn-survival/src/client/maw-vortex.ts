@@ -27,19 +27,51 @@ import {
   PLAYER_SPEED,
 } from '@voxelyn/survival-sim';
 
-/** Quantos graos o vortice carrega de uma vez. */
-export const MAW_STREAKS = 44;
-/** Quanto tempo um grao leva da borda ate a garganta, em segundos. */
-export const MAW_FALL_SECONDS = 1.15;
 /**
- * Voltas que um grao da em torno do centro no caminho inteiro.
+ * Quantos graos o vortice carrega de uma vez, NA QUALIDADE ALTA.
  *
- * Uma e pouco: le como um risco curvo caindo, e nao como rotacao. Tres e
- * demais no zoom padrao — a espiral fecha tao rapido que o olho perde qual
- * ponta e o comeco. Duas voltas dao a leitura que o efeito existe para dar: o
- * chao inteiro girando para dentro de um lugar so.
+ * O desenho escala este numero pelo preset ativo (ver `render.ts`), pela mesma
+ * fracao `maxFx / PRESETS.high.maxFx` que o resto dos efeitos do cliente usa.
+ * A contagem tem de entrar em `mawStreak` como `count` junto: e ela que espalha
+ * as fases, e desenhar um subconjunto dos indices com o total antigo amontoaria
+ * os graos sobreviventes todos no mesmo trecho do caminho.
+ *
+ * Subiu de 44 quando o caminho deixou de ser orbita. Um risco que dava duas
+ * voltas cobria meio disco sozinho e poucos bastavam para encher a tela; um
+ * risco radial e curto, e o que enche o disco agora e a QUANTIDADE. Setenta e
+ * dois espalhados por area (ver a lei do raio em `mawStreak`) dao fluxo continuo
+ * sem virar um chuveiro solido, que apagaria o chao que a boca esta comendo.
  */
-export const MAW_SWIRL_TURNS = 2;
+export const MAW_STREAKS = 145;
+/** Quanto tempo um grao leva da borda ate a garganta, em segundos. */
+export const MAW_FALL_SECONDS = 0.9;
+/**
+ * O PASSO DA ESPIRAL: o angulo entre o caminho do grao e a reta que aponta para
+ * o centro. Ele e a coisa toda deste efeito.
+ *
+ * A versao anterior fixava VOLTAS (duas) em vez de passo, e o resultado foi o
+ * relato do playtest — "parece que nao suga nada, sao particulas circulando".
+ * Ele estava certo, e da para medir: com duas voltas, o percurso tangencial de
+ * um grao no raio medio passa de 50 tiles contra 6 de percurso radial. Entre 89%
+ * e 96% de cada passo era ORBITA. O desenho dizia "isto gira", e a mecanica diz
+ * "isto engole".
+ *
+ * Fixar o passo em vez das voltas corrige a causa. A 38 graus, cada passo do
+ * grao e 56% radial e 44% tangencial — em TODO raio, porque o passo e constante
+ * por construcao (ver `mawStreak`). O grao continua girando o bastante para o
+ * conjunto ler como vortice e nao como chuva, mas o que ele faz o tempo inteiro
+ * e ir para o centro.
+ *
+ * 38 e nao 45 porque a leitura tem de pender para o lado da succao: a 45 o
+ * movimento e meio a meio e o olho fica em duvida sobre qual dos dois e o
+ * assunto. Abaixo de ~25 a espiral desaparece e sobra chuva radial, que le como
+ * explosao ao contrario.
+ *
+ * A varredura total sai como CONSEQUENCIA, e nao como numero escolhido:
+ * `tan(38 graus) * ln(alcance / garganta)`, cerca de 0,19 volta. Um decimo do
+ * que era.
+ */
+export const MAW_SPIRAL_PITCH_RAD = (38 * Math.PI) / 180;
 
 /**
  * A distancia em que a sucao iguala a caminhada — a LINHA DO SEM-VOLTA.
@@ -89,24 +121,36 @@ export type MawStreak = {
 /**
  * Quantos pontos formam o rastro de um grao.
  *
- * Ele e uma POLILINHA e nao um segmento porque o caminho e uma espiral: dois
- * pontos ligados em linha reta cortam a curva pela corda, e com o rastro curto
- * isso mal apareceria — mas o rastro precisa ser longo o bastante para ler como
- * velocidade. A primeira versao usava um segmento so e o resultado, visto na
- * captura, foi um feixe de varetas retas atravessando o disco de lado a lado:
- * o desenho dizia "estilhaco voando" onde a mecanica diz "areia girando para
- * dentro".
+ * Foram cinco enquanto o caminho era uma ORBITA de duas voltas: ali o rastro
+ * cobria quase 45 graus de arco e uma corda unica cortava a curva de lado a
+ * lado — o desenho dizia "estilhaco voando" onde a mecanica diz "areia indo
+ * para dentro".
+ *
+ * Com a espiral de passo constante a varredura inteira caiu para 0,19 volta, e
+ * o rastro (STREAK_SPAN do caminho) passou a cobrir 7,6 graus. Medido: a corda
+ * unica se afasta do arco em 0,017 tile no pior raio — meio pixel de tile. Os
+ * dois pontos do meio deixaram de desenhar qualquer coisa e viraram custo puro.
+ *
+ * Tres e o minimo que ainda entrega a outra coisa que o rastro precisa dar: a
+ * cabeca mais forte que a cauda (ver o desenho em `render.ts`). Com dois pontos
+ * ha um segmento so, e um segmento so tem uma opacidade — e opacidade constante
+ * e uma linha, e linha nao tem ponta.
  */
-const STREAK_POINTS = 5;
+const STREAK_POINTS = 3;
 /**
  * O comprimento do rastro, em fracao do caminho inteiro.
  *
- * Medido pelo que ele custa no pior lugar: na borda, onde o raio e maior, este
- * vao vale cerca de um tile de arco. Mais que isso e o grao vira um risco
- * dando meia-volta na tela; menos e ele vira um ponto, e ponto nao tem direcao
- * — e a DIRECAO e a unica coisa que este efeito precisa dizer.
+ * Era 0,024, calibrado quando o caminho era uma orbita e um rastro maior dava
+ * meia-volta na tela. Com a espiral de passo constante o rastro ficou RADIAL, e
+ * um rastro radial curto e um ponto — e ponto nao tem direcao, que e a unica
+ * coisa que este efeito precisa dizer.
+ *
+ * A 0,09 ele mede cerca de um terco de tile na borda e um tile e pouco colado
+ * na garganta, porque a velocidade radial cresce para dentro (ver `mawStreak`).
+ * O risco esticando conforme desce e o que vende a ACELERACAO: nao e so que a
+ * areia vai para o centro, e que ela vai cada vez mais rapido.
  */
-const STREAK_SPAN = 0.024;
+const STREAK_SPAN = 0.11;
 
 /**
  * Onde esta o grao `i` no instante `seconds`, para um alcance `reach`.
@@ -116,10 +160,11 @@ const STREAK_SPAN = 0.024;
  * tempo em vez de fazer todos os graos partirem juntos — uma leva unica leria
  * como um anel pulsando, e nao como fluxo.
  *
- * O raio nao cai linear: `(1 - p)^0.62` faz o grao ACELERAR para dentro, que e
- * a mesma coisa que a sucao faz com o corpo do jogador. E a unica parte do
- * desenho que precisa concordar com a fisica, e concorda pela forma e nao pelo
- * numero — a forca exata continua sendo assunto de `mawPull`.
+ * O caminho e uma espiral de passo constante com o raio caindo por conservacao
+ * de fluxo — as duas coisas juntas sao o que faz isto ler como succao em vez de
+ * como orbita. E a unica parte do desenho que precisa concordar com a fisica, e
+ * concorda pela FORMA e nao pelo numero: a forca exata continua sendo assunto de
+ * `mawPull`, na simulacao.
  */
 export const mawStreak = (
   i: number,
@@ -143,12 +188,39 @@ export const mawStreak = (
   // simulacao faz — ela tambem so cobra a mordida quando `reach` alcanca o raio
   // da garganta.
   const inner = Math.min(DEVOURER_MAW_BITE_RADIUS, reach * 0.34);
+  // O RAIO cai com `r^Q` linear no tempo, e o expoente e um compromisso medido.
+  //
+  // Q = 2 e a fisica exata de um sumidouro plano (fluxo conservado: `r * v_r`
+  // constante). Foi a primeira tentativa, e ela distribui os graos
+  // uniformemente por AREA — o que, num disco, poe metade deles no terco
+  // externo do raio. Visto em tela: a borda cheia de riscos e o miolo vazio,
+  // que e a leitura oposta da que o efeito existe para dar. Convergencia so se
+  // le se houver o que ver convergindo perto do centro.
+  //
+  // Q = 1 espalharia por RAIO (densidade perfeitamente uniforme), mas com
+  // velocidade radial constante — e ai o grao nao acelera, e a succao perde a
+  // urgencia.
+  //
+  // 1,35 fica entre os dois e paga os dois: a densidade por unidade de raio
+  // cresce so com `r^0,35` (praticamente plana) e a velocidade radial ainda
+  // sobe 50% da borda ate a garganta. O PASSO da espiral nao depende disto —
+  // ele e propriedade da curva (ver o angulo abaixo), nao da velocidade com que
+  // ela e percorrida —, entao a razao radial/tangencial continua a mesma.
+  const Q = 1.2;
+  const outerQ = Math.pow(reach, Q);
+  const innerQ = Math.pow(inner, Q);
   const at = (p: number): { dx: number; dy: number } => {
     const clamped = Math.max(0, Math.min(1, p));
-    const r = inner + (reach - inner) * Math.pow(1 - clamped, 0.62);
-    // O angulo de partida usa o angulo aureo para os graos nao se alinharem em
+    const r = Math.pow(Math.max(innerQ, outerQ - clamped * (outerQ - innerQ)), 1 / Q);
+    // O ANGULO segue o log do raio, e essa e a definicao de espiral de passo
+    // constante: `theta = tan(passo) * ln(R / r)`. Com ela, a razao entre o que
+    // o grao anda para o lado e o que ele anda para dentro e a MESMA em todo
+    // raio — o vortice tem uma forma so, da borda a garganta, em vez de virar
+    // uma orbita longe e um mergulho perto.
+    //
+    // O termo do indice usa o angulo aureo para os graos nao se alinharem em
     // raios: `i * 2pi/count` daria um pente girando, que le como roda dentada.
-    const theta = i * 2.39996 + clamped * MAW_SWIRL_TURNS * Math.PI * 2;
+    const theta = i * 2.39996 + Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
     return { dx: Math.cos(theta) * r, dy: Math.sin(theta) * r };
   };
   const raw = seconds / MAW_FALL_SECONDS + i / count;
@@ -157,8 +229,16 @@ export const mawStreak = (
   for (let k = STREAK_POINTS - 1; k >= 0; k--) {
     path.push(at(p - (STREAK_SPAN * k) / (STREAK_POINTS - 1)));
   }
-  // Some nas duas pontas: um grao que aparecesse pronto na borda pareceria
-  // materia caindo do teto, e um que sumisse a meio caminho negaria o destino.
-  const fade = Math.min(1, p / 0.12, (1 - p) / 0.12);
+  // ACENDE devagar na borda e APAGA de repente na garganta.
+  //
+  // As duas pontas eram simetricas, e a simetria custava o clima: um grao que
+  // ja vinha desbotando no ultimo quinto do caminho esvaziava justamente a
+  // regiao onde a convergencia acontece, e o vortice ficava com um miolo palido
+  // — o oposto do que a cena diz, que e que tudo termina ali.
+  //
+  // Nascer devagar continua sendo necessario (um grao que aparecesse pronto na
+  // borda pareceria materia caindo do teto). Morrer, nao: ele nao esta sumindo,
+  // esta sendo engolido, e engolido acontece de uma vez.
+  const fade = Math.min(1, p / 0.14, (1 - p) / 0.05);
   return { path, alpha: Math.max(0, fade) };
 };
