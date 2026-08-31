@@ -145,7 +145,22 @@
 // dezesseis por segundo por jogador, e a apresentacao precisa da densidade,
 // nao da sequencia — o projetil em si continua viajando no snapshot como
 // todos os outros, entao nada do que machuca depende de evento nenhum.
-export const PROTOCOL_VERSION = 26;
+// 27: `WorldFlags` ganha `mawOpenedAt` — o tick em que a BOCA do Devorador
+// Branco abriu, ou -1. Um numero so, pela mesma economia do Diluvio: o vortice
+// inteiro (alcance, forca a cada distancia, quanto ainda falta para abrir) e
+// derivado dele mais as constantes que as duas pontas compartilham.
+// As duas metades doem, e de formas diferentes. Cliente ANTIGO contra servidor
+// novo desenha um chefe entalado e inofensivo — a leitura antiga, e ela virou
+// mentira — enquanto o servidor arrasta o corpo do jogador para dentro da
+// garganta: dano sem sinal, o unico invariante de combate que este projeto nao
+// quebra. Cliente NOVO contra servidor antigo le o campo ausente como -1 e
+// nunca desenha vortice nenhum, o que esta certo: naquela simulacao ele nao
+// existe.
+// O que deliberadamente NAO entrou: um campo por tick com o alcance atual. Ele
+// diria o que o cliente sabe calcular, e abriria a chance de o anel desenhado
+// discordar da sucao que ele promete — que e a unica coisa que este efeito nao
+// pode fazer.
+export const PROTOCOL_VERSION = 27;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -586,7 +601,33 @@ export const PROTOCOL_VERSION = 26;
 // run que nao foi a dele — silenciosamente, porque nada no caminho compara as
 // duas. Descidas de TRES setores ficam bit a bit identicas (3/3 = 1), o que
 // limita o estrago do bump ao que ele precisa cobrir.
-export const SIMULATION_VERSION = 43;
+// 44: A JANELA DO DEVORADOR DEIXA DE SER UMA TORRE. O humor do fim da rajada
+// (`DEVOURER_STUCK`, agora `DEVOURER_MAW`) era um alvo imovel e inofensivo:
+// nao andava, nao cobrava contato, nao tinha areia absorvendo tiro. Encostar
+// era de graca e a abertura nao pedia nada de quem a usava alem de municao.
+//
+// Agora a mesma janela e uma BOCA. Ele continua imovel e continua sem couraça —
+// tudo o que a abertura prometia continua de pe —, mas enquanto ela dura ele
+// engole o setor para dentro de si:
+//
+// - SUCAO por tick sobre todo corpo dentro do disco, jogador e fauna, em
+//   sub-passos com colisao (parede segura o arrasto). O alcance CRESCE de zero
+//   ao raio cheio ao longo de 4,5 s; a forca a cada distancia e fixa, e cruza a
+//   velocidade de caminhada a 3,5 tiles do centro — a linha do sem-volta.
+// - A GARGANTA cobra DEVOURER_MAW_BITE_DAMAGE (200, o dobro da vida cheia) de
+//   quem chega ao centro. Vale igual para bicho.
+// - A boca ENGOLE a silica solta do disco: `SURF_SILT` dentro do alcance vira
+//   `SURF_NONE`, tick a tick. Vidro nao e tocado — e o contra-jogo de sempre,
+//   agora com uma terceira alavanca (sobre vidro a sucao cai abaixo da
+//   caminhada em qualquer ponto do disco).
+// - `bossRuntime.mawOpenedAt` entra no estado autoritativo e no HASH: e dele
+//   que saem alcance, forca e refeicao.
+//
+// Muda posicao de todo corpo da camara, dano, superficie e o hash. Duas
+// simulacoes em versoes diferentes divergem no primeiro tick de janela — uma
+// com o jogador parado onde ele estava, a outra com ele meio tile mais perto —
+// e a distancia entre elas so cresce dali em diante.
+export const SIMULATION_VERSION = 44;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -638,7 +679,24 @@ export const SIMULATION_VERSION = 43;
 // fechado e aberto, ANEXADOS ao fim da lista. A classe I mantem os nomes
 // historicos salvageCache/salvageCacheOpened, que tambem servem de fallback
 // para atlas antigo em cache. Puro conteudo visual — tier ja existia na sim.
-export const CONTENT_VERSION = 25;
+// 26: a pose PRESA do Devorador vira a BOCA. O atlas `enemy-white-devourer`
+// sobe para v2 e muda de canvas (104x94 -> 112x110, ancora 50,71 -> 54,75):
+// o corpo erguido saiu e no lugar dele ha uma cratera dentada rente ao chao —
+// cinco abas de mandibula descascadas para fora e deitadas na areia, carne
+// exposta por baixo delas, um anel de dentes curtos e desiguais e um vao escuro
+// que AFUNDA. O humor `downed` passa de 4 quadros a 5 fps para 6 a 11: nao e
+// mais uma respiracao, e um espasmo em que nenhuma peca se move junto com a
+// vizinha.
+//
+// O canvas cresceu porque a boca e mais larga que o corpo do bicho, e a ancora
+// mudou junto porque `fitSpriteToMargin` reenquadra o sheet inteiro pela uniao
+// dos quadros — declarar a ancora velha desenharia o verme dois pixels fora do
+// lugar em TODA animacao, e nao so nesta.
+//
+// Um cliente com o atlas antigo continua desenhando o tronco erguido enquanto a
+// simulacao arrasta corpos para dentro de um buraco que ele nao mostra: a pose
+// e o unico sinal de que a janela virou uma boca, e ela e o telegrafo do golpe.
+export const CONTENT_VERSION = 26;
 
 export type VersionTriple = {
   protocolVersion: number;

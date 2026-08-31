@@ -60,6 +60,10 @@ export const emptyBossRuntime = (): BossRuntime => ({
   leapToX: 0,
   leapToY: 0,
   leapsLeft: 0,
+  // -1 pelo mesmo motivo que `delugeAt`: zero e um tick legitimo, e uma camara
+  // que nascesse com `mawOpenedAt = 0` comecaria com a boca do Devorador ja
+  // aberta e ja puxando — num tick em que ele ainda esta por baixo da areia.
+  mawOpenedAt: -1,
   // -1 e "o Diluvio nunca aconteceu", e tem de ser negativo e nao zero: zero e
   // um tick legitimo, e um encontro que comecasse com `delugeAt = 0` nasceria
   // com o setor ja submerso.

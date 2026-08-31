@@ -108,6 +108,11 @@ export {
   furnaceSweepAt,
   type FurnaceSweep,
 } from './entities.js';
+// O CAMPO DA BOCA do Devorador. Exportado pelo mesmo motivo que o Diluvio e a
+// varredura da Fornalha: o vortice e DERIVADO e nao transmitido — o cliente
+// refaz a mesma conta da simulacao, a partir do unico tick que viaja
+// (`bossRuntime.mawOpenedAt`), e chega no mesmo alcance e na mesma forca.
+export { mawIntensity, mawPull, mawReach } from './maw.js';
 export { hasLineOfSight } from './pathing.js';
 export {
   explodeAt,

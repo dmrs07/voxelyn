@@ -867,19 +867,158 @@ export const DEVOURER_LEAPS_PER_CYCLE = 3;
  */
 export const DEVOURER_HOP_GAP_TICKS = 45;
 /**
- * PRESO: a janela de dano do encontro inteiro.
+ * A BOCA: a janela de dano do encontro inteiro, e o unico momento em que ele
+ * puxa.
  *
- * Ele entala meio enterrado no proprio buraco no fim da rajada — nao anda, nao
- * cobra contato e nao tem areia absorvendo tiro. 7,5 s e longo de proposito: e
- * a unica abertura do ciclo, e ela paga tres arcos esquivados.
+ * Ele abre meio enterrado no proprio buraco no fim da rajada. 7,5 s e longo de
+ * proposito: e a unica abertura do ciclo, e ela paga tres arcos esquivados.
  *
- * O total de exposicao por ciclo fica proximo do que existia antes (~60% contra
- * ~58%), mas concentrado num lugar so. E essa concentracao que transforma "vou
- * chipando dano quando der" em "guardei o superaquecimento para AGORA".
+ * O que ele era antes: um alvo PARADO e inofensivo — nao andava, nao cobrava
+ * contato, nao tinha areia absorvendo tiro. Uma torre. Encostar era de graca, e
+ * por isso a janela nao pedia nada de quem a usava: bastava chegar e segurar o
+ * gatilho ate o relogio virar. A unica decisao era ter guardado o
+ * superaquecimento, e essa decisao acontece antes da janela, nao dentro dela.
+ *
+ * O que ele e agora: a MESMA janela, com sucao. Ele continua imovel e continua
+ * sem couraça — tudo o que a abertura prometia continua de pe —, mas enquanto
+ * ela dura ele engole o setor para dentro de si: areia, bicho e jogador. A
+ * janela deixou de ser um alvo e virou um LUGAR, e ficar nele passou a custar.
+ *
+ * O total de exposicao por ciclo nao muda. O que muda e o que a exposicao pede:
+ * antes pedia municao, agora pede municao E posicao.
  */
-export const DEVOURER_STUCK_TICKS = 150;
+export const DEVOURER_MAW_TICKS = 150;
 /** E quanto tempo passa por baixo antes de tentar sair de novo. */
 export const DEVOURER_BURROW_MIN_TICKS = 70;
+
+// ---------------------------------------------------------------------------
+// A BOCA — o vortice da janela
+// ---------------------------------------------------------------------------
+/**
+ * Ate onde a sucao alcanca, quando ela esta aberta por inteiro.
+ *
+ * 7,5 tiles e MENOS da metade do alcance do bolt do Prospector (18): quem
+ * decidir tratar a janela como tiro ao alvo a distancia continua podendo, e
+ * paga por isso em DPS perdido, nao em vida. A boca nao existe para proibir a
+ * aproximacao — ela existe para cobrar preco por ela, e um raio que engolisse a
+ * camara inteira transformaria "chegar perto" numa decisao que o jogador nao
+ * chega a tomar.
+ */
+export const DEVOURER_MAW_RADIUS = 7.5;
+/**
+ * A GARGANTA: dali para dentro nao ha corpo, ha boca.
+ *
+ * Encostar aqui e o unico jeito de morrer para este chefe sem ter sido acertado
+ * por nada — e por isso o raio e pequeno e o caminho ate ele e longo e
+ * telegrafado. Ninguem chega na garganta por acidente num tick: chega-se depois
+ * de segundos sendo puxado, com a areia inteira apontando para onde.
+ */
+export const DEVOURER_MAW_BITE_RADIUS = 1.6;
+/**
+ * O que a garganta cobra. Nao e um numero de balanceamento, e uma sentenca.
+ *
+ * Duas vezes a vida cheia do Prospector: nenhuma cura, nenhum modulo e nenhuma
+ * reducao ambiental salva quem chega la. E deliberado — a boca precisa ser
+ * uma REGRA e nao um risco calculavel, senao o jogador otimizado descobre que
+ * atravessar a garganta com vida cheia e mais barato que reposicionar, e a
+ * mecanica inteira vira um dano a mais.
+ *
+ * Vale para os inimigos tambem: o que cai la dentro e devorado.
+ */
+export const DEVOURER_MAW_BITE_DAMAGE = 200;
+/**
+ * A sucao NA BORDA, em tiles por segundo. O jogador anda a 4,6.
+ *
+ * 0,7 e de proposito quase nada: cruzar a borda nao pode empurrar ninguem, tem
+ * de AVISAR. O que se sente aqui e o passo ficando pesado numa direcao — o
+ * telegrafo tatil de que o chao virou ladeira, chegando um bom tempo antes de a
+ * ladeira ser intransponivel.
+ */
+export const DEVOURER_MAW_PULL_EDGE = 0.7;
+/**
+ * A sucao COLADA na garganta, em tiles por segundo.
+ *
+ * Bem acima da caminhada (4,6): a um tile e meio da boca, andar para tras nao e
+ * mais uma resposta. A resposta que sobra e a esquiva, que percorre 2,2 tiles em
+ * 0,2 s — e e essa a linha de projeto inteira do golpe. Ver
+ * DEVOURER_MAW_PULL_FALLOFF.
+ */
+export const DEVOURER_MAW_PULL_CORE = 7.6;
+/**
+ * A CURVA entre as duas, e o numero que define o encontro.
+ *
+ * A sucao a uma distancia `d` e
+ *
+ *   EDGE + (CORE - EDGE) * t^FALLOFF,  t = (RADIUS - d) / (RADIUS - BITE)
+ *
+ * e o expoente 1,5 foi escolhido resolvendo para UM ponto: onde a sucao iguala
+ * a velocidade de caminhada. Com estes valores isso cai em 3,5 tiles da boca.
+ *
+ * Essa e a linha do sem-volta, e ela existe para ser aprendida. Fora dela,
+ * andar para longe funciona — devagar, custando o tiro que voce nao deu, mas
+ * funciona. Dentro dela, andar nao basta mais e a esquiva vira obrigatoria: uma
+ * esquiva a 2,5 tiles ganha 2,2 e perde 1,2 para a sucao, e devolve o corpo
+ * quase exatamente sobre a linha — de onde a segunda esquiva sai limpa.
+ *
+ * Uma curva linear poria essa linha a meia distancia e faria metade do disco
+ * ser proibida; um expoente alto a colaria na garganta e a sucao viraria um
+ * teleporte com aviso. 1,5 poe a decisao onde ela e uma decisao: a maior parte
+ * do disco e negociavel, e o preco de negociar mal e conhecido.
+ */
+export const DEVOURER_MAW_PULL_FALLOFF = 1.5;
+/**
+ * Quanto tempo a boca leva para abrir de todo, em ticks.
+ *
+ * A sucao nao nasce pronta: o ALCANCE cresce de zero ate DEVOURER_MAW_RADIUS ao
+ * longo destes 4,5 s, e so nos ultimos 3 s da janela ela cobre o disco inteiro.
+ *
+ * Isso e o que separa "puxou" de "arrastou": o primeiro segundo da janela e
+ * exatamente o que a janela sempre foi — chegue, encoste, descarregue. O
+ * segundo terco e o aviso. O terco final e a conta. Um vortice que abrisse
+ * inteiro no tick do pouso puxaria o jogador para dentro antes de ele ter
+ * atirado uma vez, e a abertura teria virado uma punicao por aceitar o convite
+ * que ela mesma faz.
+ *
+ * A rampa tambem e o que torna a garganta JUSTA. A queda do arco e mirada no
+ * jogador, entao a janela sempre abre com o corpo dele sobre o centro; a
+ * garganta so passa a cobrar quando o alcance chega ao raio dela, cerca de um
+ * segundo depois. Esse segundo e o tempo de sair de cima do buraco andando.
+ *
+ * A intensidade cresce so no ALCANCE, e nunca na forca: a sucao a 4 tiles e a
+ * mesma no segundo 5 e no segundo 7. O campo tem uma forma so, e o que muda e
+ * ate onde ele chegou — que e o que permite ao jogador aprender a linha do
+ * sem-volta uma vez e confiar nela sempre.
+ */
+export const DEVOURER_MAW_SPOOL_TICKS = 90;
+/**
+ * O VIDRO SEGURA. Fracao da sucao que sobra para quem pisa em vidro.
+ *
+ * 0,45 nao e um alivio: e a resposta. Multiplicada pelo pico (7,6) da 3,4 —
+ * abaixo da caminhada em qualquer ponto do disco, inclusive colado na garganta.
+ * Quem esta de pe sobre vidro SEMPRE consegue sair andando.
+ *
+ * E o mesmo contra-jogo do encontro inteiro, cobrado numa terceira moeda. Calor
+ * sobre silica solta ja negava a emergencia (ele nao sobe por vidro) e ja
+ * esticava o arco (ele nao decola de vidro); agora tambem da chao onde a boca
+ * nao tem o que agarrar. Uma unica materia, tres alavancas, e nenhuma delas
+ * dada de graca — o vidro precisa ter sido feito ANTES, porque durante a janela
+ * a boca come a areia que o produziria.
+ *
+ * Nao e zero porque imunidade apagaria a leitura: sobre vidro o jogador precisa
+ * continuar SENTINDO a boca puxar, senao ele nao aprende que o chao e que
+ * mudou.
+ */
+export const DEVOURER_MAW_GLASS_GRIP = 0.45;
+/**
+ * Tamanho do sub-passo do arrasto, em tiles. Mesmo motivo do eletroima do
+ * Coveiro (UNDERTAKER_PULL_STEP): o arrasto anda em passos pequenos e cada um
+ * consulta a colisao, entao quem tem uma quina entre si e a boca para NELA.
+ *
+ * E a segunda forma de sobreviver a garganta, e a unica que nao gasta esquiva:
+ * cobertura. Um puxao resolvido de uma vez atravessaria a parede e apagaria
+ * essa leitura — junto com a razao de a camara ter geometria.
+ */
+export const DEVOURER_MAW_PULL_STEP = 0.15;
 /**
  * O telegrafo da emergencia: 1,2 s de chao rachando no ponto marcado.
  *

@@ -1,14 +1,14 @@
 {
   "id": "enemy-white-devourer",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-white-devourer.png",
   "normalAtlas": "enemy-white-devourer.normal.png",
   "normalScale": 2,
-  "frameWidth": 104,
-  "frameHeight": 94,
-  "columns": 39,
-  "anchorX": 50,
-  "anchorY": 71,
+  "frameWidth": 112,
+  "frameHeight": 110,
+  "columns": 36,
+  "anchorX": 54,
+  "anchorY": 74,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -73,8 +73,8 @@
       "loop": false
     },
     "downed": {
-      "frames": 4,
-      "fps": 5,
+      "frames": 6,
+      "fps": 11,
       "loop": true
     }
   },
@@ -86,39 +86,39 @@
       "special": 14,
       "hit": 18,
       "downed": 20,
-      "die": 24
+      "die": 26
     },
     "dl": {
-      "idle": 29,
-      "walk": 33,
-      "attack": 39,
-      "special": 43,
-      "hit": 47,
-      "downed": 49,
-      "die": 53
+      "idle": 31,
+      "walk": 35,
+      "attack": 41,
+      "special": 45,
+      "hit": 49,
+      "downed": 51,
+      "die": 57
     },
     "ur": {
-      "idle": 58,
-      "walk": 62,
-      "attack": 68,
-      "special": 72,
-      "hit": 76,
-      "downed": 78,
-      "die": 82
+      "idle": 62,
+      "walk": 66,
+      "attack": 72,
+      "special": 76,
+      "hit": 80,
+      "downed": 82,
+      "die": 88
     },
     "ul": {
-      "idle": 87,
-      "walk": 91,
-      "attack": 97,
-      "special": 101,
-      "hit": 105,
-      "downed": 107,
-      "die": 111
+      "idle": 93,
+      "walk": 97,
+      "attack": 103,
+      "special": 107,
+      "hit": 111,
+      "downed": 113,
+      "die": 119
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward",
+    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor",
     "seedOrRef": "deterministic-code-v2"
   }
 }

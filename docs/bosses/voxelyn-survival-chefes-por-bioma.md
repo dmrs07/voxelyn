@@ -318,6 +318,82 @@ Três regras que sustentam isso:
 propósito — quem lê o rastro e para de correr em linha reta já está jogando contra
 ele.
 
+### A janela deixou de ser uma torre
+
+O ciclo dele termina numa abertura: três arcos mirados em sequência e então ele fica
+**meio enterrado na própria cratera** por 7,5 s, imóvel e sem areia absorvendo tiro.
+Essa parte não mudou, e não pode mudar — é a única janela de dano do encontro.
+
+O que mudou é o que ele **faz** parado. Ele era uma torre: um alvo inofensivo que não
+andava, não cobrava contato e não pedia nada de quem o usava além de munição. A única
+decisão do encontro era ter guardado o superaquecimento, e essa decisão acontece
+*antes* da janela, não dentro dela.
+
+Agora a mesma janela é uma **boca**, e enquanto ela dura ele engole o setor para
+dentro de si: areia, bicho e jogador. A janela deixou de ser um alvo e virou um
+**lugar** — e ficar nele passou a custar.
+
+**A sucção é gradual em dois eixos, e é isso que a separa de uma armadilha.**
+
+- **No tempo.** O alcance cresce de zero até 7,5 tiles ao longo de 4,5 s. O primeiro
+  segundo da janela é exatamente o que a janela sempre foi (chegue, encoste,
+  descarregue); o segundo terço é o aviso; o terço final é a conta. E como a queda do
+  arco é mirada no jogador, a janela **sempre** abre com ele em cima do centro: a
+  garganta só passa a cobrar quando o alcance chega ao raio dela, cerca de um segundo
+  depois. Esse segundo é o tempo de sair de cima do buraco andando.
+- **No espaço.** A força a cada distância é fixa — 0,7 tile/s na borda, 7,6 colado na
+  garganta — e cruza a velocidade de caminhada (4,6) a **3,47 tiles do centro**. Essa
+  é a *linha do sem-volta*, e o jogo a desenha no chão. Fora dela, andar para longe
+  resolve. Dentro dela, andar não basta mais.
+
+Nenhum tick arranca mais que um terço de tile: quem se ignora por completo, parado na
+borda, ainda leva **2,85 s** até a garganta. Esse tempo é o espaço onde a perícia
+cabe.
+
+**As três saídas, e nenhuma é automática:**
+
+| Saída | Como funciona | Quando serve |
+| --- | --- | --- |
+| **Andar** | A sucção é menor que a caminhada fora da linha do sem-volta | Do disco inteiro até 3,47 tiles |
+| **Esquivar** | 2,2 tiles em 0,2 s contra ~1,2 de sucção — devolve o corpo à linha | Dentro dela, gastando o recurso |
+| **Vidro** | Sobre `SURF_GLASS` a sucção cai a 45% e **nunca** vence a caminhada | De qualquer ponto — mas o vidro tem de já existir |
+
+**A garganta é uma regra, não um risco.** Chegar ao centro custa 200 — o dobro da vida
+cheia do Prospector. Nenhuma cura e nenhum módulo salvam quem chega lá, e é deliberado:
+se fosse um número calculável, o jogador otimizado descobriria que atravessar a boca é
+mais barato que reposicionar, e a mecânica viraria um dano a mais. Vale igual para a
+fauna — quem arrasta um bando para dentro do raio resolve dois problemas de uma vez, e
+essa jogada só existe porque a sucção não pergunta de quem é o corpo.
+
+**O vórtice de areia é o desenho do raio.** A boca engole toda a sílica solta que o
+alcance cobre: `SURF_SILT` dentro do disco vira chão limpo, tick a tick. A borda entre
+areia e chão limpo diz — sem HUD e sem número — até onde a sucção chega naquele
+instante, e como o alcance cresce com o tempo, **a borda que avança pelo chão é o
+cronômetro**. Ela toca os pés do jogador no mesmo tick em que a sucção o alcança.
+
+E ela come de verdade: sílica engolida não vitrifica mais. Essa é a pressão que impede
+o contra-jogo de ser adiado de graça — quem guardou o rastro do verme "para depois"
+descobre que depois ele foi comido. O **vidro não é tocado**, pela regra de sempre.
+
+**A pose é a promessa.** Enquanto a boca está aberta, o atlas troca a silhueta:
+uma **cratera dentada rente ao chão** — cinco abas de mandíbula descascadas para fora
+e deitadas na areia, carne exposta por baixo delas, um anel de dentes curtos e
+desiguais e um vão escuro que afunda. Ela já foi um tronco **erguido**, e a projeção é
+que derrubou aquela versão: vista de cima em 2:1, um voxel de altura sobe 4px na tela
+e um de raio sobe 2px, então a arcada alta que devia emoldurar o buraco tapava o
+buraco inteiro. Boca vista de cima lê por **área de abertura**, não por altura.
+
+E ela **espasma**: seis quadros a 11 fps, com cada aba, cada dente e cada fio de
+tecido lendo o quadro pelo seu próprio relógio. A dilatação global não é senoidal — é
+uma tabela que pula (1,00 → 0,80 → 1,18 → 0,90 → 1,24 → 0,86). Senoide daria um
+pulmão, e pulmão é calmo; isto precisa parecer engasgo.
+
+**A mesma matéria, agora com três alavancas.** Calor sobre sílica solta já negava a
+emergência (ele não sobe por vidro) e já esticava o arco (ele não decola de vidro);
+agora também dá chão onde a boca não tem o que agarrar. Uma decisão, três pagamentos —
+e nenhum deles entregue de graça, porque durante a janela a boca come a areia que
+produziria o vidro.
+
 ### A linhagem árida mudou de destino
 
 `arid` era `basalto → sílica → fornalha`, e isso tinha uma consequência que só

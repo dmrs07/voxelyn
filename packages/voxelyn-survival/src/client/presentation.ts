@@ -1,5 +1,5 @@
 import {
-  DEVOURER_STUCK,
+  DEVOURER_MAW,
   HEAT_MAX,
   TICK_HZ,
   moduleHasCapacity,
@@ -424,15 +424,26 @@ export class EntityPresentation {
     }
     this.downedAt.delete(entity.id);
 
-    // O DEVORADOR ENTALADO. Vem antes de tudo o que consulta acao porque preso
-    // ele nao TEM acao — e sem esta linha o `base.anim` cairia em `idle`, que e
-    // o corpo deitado passeando pelo chao. E a unica janela de dano do encontro:
-    // desenha-la com a pose de repouso apagaria o convite que ela e.
+    // O DEVORADOR DE BOCA ABERTA. Vem antes de tudo o que consulta acao porque
+    // nesse humor ele nao TEM acao — e sem esta linha o `base.anim` cairia em
+    // `idle`, que e o corpo deitado passeando pelo chao. E a unica janela de
+    // dano do encontro: desenha-la com a pose de repouso apagaria o convite que
+    // ela e, e o aviso que ela virou.
     //
-    // A pose `downed` do atlas ergue a metade dianteira para fora da cratera. O
-    // slot ja significava exatamente isto — "fora de combate, vulneravel" — e o
-    // Devorador e o unico inimigo que o usa em vida.
-    if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_STUCK) {
+    // A pose `downed` do atlas e a CRATERA DENTADA rente ao chao: abas de
+    // mandibula descascadas para fora, carne exposta, um vao escuro no meio e
+    // um espasmo de seis quadros que nunca move duas pecas juntas. O slot
+    // significava "fora de combate, vulneravel", e continua significando — ele
+    // esta mesmo aberto ao tiro.
+    //
+    // Ela ja ergueu a metade dianteira para fora do buraco, e o que derrubou
+    // aquela versao foi a projecao: vista de cima, altura na beirada de perto
+    // tapa o vao atras dela, e o que sobrava era uma pilha bege. A leitura de
+    // BOCA e area de abertura, e nao altura — e o vortice desenhado no chao em
+    // volta (ver `maw-vortex.ts`) e quem completa a moldura.
+    //
+    // O Devorador continua sendo o unico inimigo que usa este slot em vida.
+    if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_MAW) {
       const start = this.downedAt.get(entity.id) ?? nowMs;
       this.downedAt.set(entity.id, start);
       const aim = bodyFacing();

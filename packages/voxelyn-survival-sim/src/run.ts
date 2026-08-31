@@ -3322,6 +3322,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(Math.round(state.bossRuntime.leapToX * 1000));
   mix(Math.round(state.bossRuntime.leapToY * 1000));
   mix(state.bossRuntime.leapsLeft);
+  // A BOCA. Um numero que decide, a cada tick da janela, quem esta sendo puxado,
+  // com que forca e quanta areia ja foi engolida — e a partir dele, quem chega
+  // na garganta. Duas simulacoes que discordassem de um unico tick de abertura
+  // continuariam parecendo iguais no comeco da janela e divergiriam segundos
+  // depois, com um jogador devorado de um lado e a tres tiles do centro do
+  // outro.
+  mix(state.bossRuntime.mawOpenedAt);
   // O DILUVIO. Tres numeros que valem por uma camada de mundo inteira: eles
   // decidem, celula a celula, o que esta submerso — e submerso decide por onde
   // o chefe nada, onde ele emerge e quanto uma descarga cobra. Fora do hash,

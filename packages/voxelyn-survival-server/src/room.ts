@@ -494,6 +494,8 @@ export class GameRoom {
       delugeAt: this.state.bossRuntime.delugeAt,
       delugeX: round3(this.state.bossRuntime.delugeX),
       delugeY: round3(this.state.bossRuntime.delugeY),
+      // A BOCA em um numero. O cliente refaz o vortice inteiro a partir dele.
+      mawOpenedAt: this.state.bossRuntime.mawOpenedAt,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.

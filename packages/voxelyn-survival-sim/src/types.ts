@@ -675,6 +675,26 @@ export type BossRuntime = {
    */
   leapsLeft: number;
   /**
+   * O tick em que a BOCA do Devorador abriu. -1 = nunca abriu nesta camara.
+   *
+   * Um numero e nao um booleano porque a boca nao esta so aberta ou fechada:
+   * ela CRESCE. O alcance da sucao sai deste instante (ver
+   * DEVOURER_MAW_SPOOL_TICKS), e sao o alcance e o instante juntos que decidem
+   * quem esta sendo puxado e quanta areia ja foi engolida.
+   *
+   * Entra no hash pela mesma razao que `delugeAt`: ele decide dano e posicao de
+   * todo corpo dentro do disco, e duas simulacoes que discordassem de um tick
+   * continuariam parecendo iguais no comeco da janela e divergiriam segundos
+   * depois — com um jogador na garganta de um lado e a tres tiles dela do
+   * outro.
+   *
+   * Viaja em `WorldFlags` pela mesma razao que `delugeAt` viaja: quem reconecta
+   * no meio da janela nunca recebeu a transicao, e sem este numero desenharia
+   * um chefe entalado e inofensivo enquanto o servidor o arrasta para dentro.
+   * Dano sem sinal e o unico invariante de combate que este projeto nao quebra.
+   */
+  mawOpenedAt: number;
+  /**
    * O DILUVIO: o tick em que a lamina comecou a subir, e de onde.
    *
    * `delugeAt < 0` significa "nunca aconteceu". Tres numeros, e nao uma camada
@@ -755,19 +775,27 @@ export const DEVOURER_SURFACED = 1;
  */
 export const DEVOURER_AIRBORNE = 2;
 /**
- * PRESO: meio enterrado no proprio buraco, no fim da rajada de saltos.
+ * A BOCA ABERTA: aberto no proprio buraco, no fim da rajada de saltos.
  *
  * E a janela de dano do encontro inteiro, e por isso e um humor e nao um
- * cooldown invisivel: ele nao anda, nao cobra contato e nao tem areia
- * absorvendo tiro. O cliente troca a silhueta por causa dele — a pose `downed`
- * do atlas ergue a metade dianteira para fora da cratera, que e o unico
- * desenho do bicho com altura.
+ * cooldown invisivel: ele nao anda e nao tem areia absorvendo tiro. O cliente
+ * troca a silhueta por causa dele — a pose `downed` do atlas e uma cratera
+ * dentada rente ao chao, com as placas da frente descascadas para fora, a carne
+ * a mostra e um vao escuro no meio, espasmando em seis quadros.
+ *
+ * Chamava-se `DEVOURER_STUCK`, "entalado", e o nome era honesto sobre o que a
+ * janela era: um alvo imovel e inofensivo, uma TORRE. Ele continua imovel — o
+ * que mudou nao e o corpo, e o que o corpo faz parado. Enquanto a boca esta
+ * aberta ela puxa o setor para dentro de si, e quem chega na garganta e
+ * devorado (ver DEVOURER_MAW_*). O humor precisa dizer isso porque e ele que o
+ * cliente le para desenhar o vortice: submerso, no ar e com a boca aberta sao
+ * tres desenhos sem nada em comum.
  *
  * O nome nao e `SURFACED` de proposito: aquele humor continua existindo e e do
  * LEVIATA, que emerge para perseguir. Os dois ficariam com o mesmo numero e
- * significados opostos — um caçando, o outro entalado.
+ * significados opostos — um caçando, o outro comendo de onde esta.
  */
-export const DEVOURER_STUCK = 3;
+export const DEVOURER_MAW = 3;
 
 /**
  * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.
