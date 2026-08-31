@@ -330,6 +330,10 @@ export type WorldFlags = {
   delugeAt?: number;
   delugeX?: number;
   delugeY?: number;
+  leviathanShockAt?: number;
+  leviathanShockRecoverAt?: number;
+  leviathanShockSeq?: number;
+  protectiveBubbles?: Array<{ x: number; y: number; radius: number }>;
   /**
    * A BOCA do Devorador: o tick em que ela abriu (-1 = fechada).
    *

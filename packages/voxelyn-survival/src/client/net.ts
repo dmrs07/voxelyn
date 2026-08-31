@@ -30,7 +30,6 @@ type FrameEntities = {
   projectiles: ProjectileSnapshot[];
 };
 
-
 /**
  * Cliente de rede sem DOM: transporta intencoes e reconstroi um SurvivalState
  * renderavel a partir da geracao local (mesma seed) + diffs de chunk + snapshots,
@@ -93,7 +92,7 @@ export class NetClient {
       current.config.width,
       current.config.height,
       next.solid,
-      next.surface
+      next.surface,
     );
     next.solid = this.mirror.solid;
     next.surface = this.mirror.surface;
@@ -125,7 +124,7 @@ export class NetClient {
         versions: CURRENT_VERSIONS,
         resumeToken,
         ...(this.roomCode ? { roomCode: this.roomCode } : {}),
-      })
+      }),
     );
   }
 
@@ -179,7 +178,14 @@ export class NetClient {
     if (nowMs - this.lastSendMs < 40) return;
     this.lastSendMs = nowMs;
     this.seq += 1;
-    this.send(encodeMessage({ t: 'cmd', seq: this.seq, clientTick: this.state?.tick ?? 0, commands: [this.command] }));
+    this.send(
+      encodeMessage({
+        t: 'cmd',
+        seq: this.seq,
+        clientTick: this.state?.tick ?? 0,
+        commands: [this.command],
+      }),
+    );
     // bordas transmitidas: zera o acumulador (a mensagem ja foi serializada)
     this.command.dodge = false;
     this.command.ability = false;
@@ -247,7 +253,12 @@ export class NetClient {
             coreSectors: msg.coreSectors,
           },
         });
-        this.mirror = new ClientWorldMirror(msg.worldWidth, msg.worldHeight, this.state.solid, this.state.surface);
+        this.mirror = new ClientWorldMirror(
+          msg.worldWidth,
+          msg.worldHeight,
+          this.state.solid,
+          this.state.surface,
+        );
         // o renderer le as arrays do state; aponta-as para o espelho
         this.state.solid = this.mirror.solid;
         this.state.surface = this.mirror.surface;
@@ -384,6 +395,12 @@ export class NetClient {
     state.bossRuntime.mawOpenedAt = world.mawOpenedAt ?? -1;
     state.bossRuntime.delugeX = world.delugeX ?? 0;
     state.bossRuntime.delugeY = world.delugeY ?? 0;
+    state.bossRuntime.leviathanShockAt = world.leviathanShockAt ?? -1;
+    state.bossRuntime.leviathanShockRecoverAt = world.leviathanShockRecoverAt ?? -1;
+    state.bossRuntime.leviathanShockSeq = world.leviathanShockSeq ?? 0;
+    state.bossRuntime.protectiveBubbles = (world.protectiveBubbles ?? []).map((bubble) => ({
+      ...bubble,
+    }));
     // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao
     // reimplementa a regra de quem guarda o que, ele desenha o que a sala
     // decidiu. `entityId` fica nulo — o espelho nunca precisa dele.
@@ -469,7 +486,12 @@ export class NetClient {
    * O mapa por id nasce aqui porque e forma de LEITURA do mundo — o resto do
    * cliente procura entidade por id —, nao decisao de tempo.
    */
-  private ingestFrame(entities: EntitySnapshot[], projectiles: ProjectileSnapshot[], tick: number, nowMs: number): void {
+  private ingestFrame(
+    entities: EntitySnapshot[],
+    projectiles: ProjectileSnapshot[],
+    tick: number,
+    nowMs: number,
+  ): void {
     const map = new Map<number, EntitySnapshot>();
     for (const e of entities) map.set(e.id, e);
     // Linha do tempo reiniciada (sala nova): a narracao guardada e daquele mundo.
@@ -537,15 +559,17 @@ export class NetClient {
           pl.facing.y = snap.facingY ?? pl.facing.y;
           pl.stunnedUntil = snap.stunnedUntil ?? 0;
           state.playerExtras[slot].downed = snap.downed ?? false;
-          pl.action = snap.action ? {
-            kind: snap.action.kind,
-            phase: snap.action.phase,
-            startedAt: snap.action.startedAt,
-            releaseAt: snap.action.releaseAt,
-            endsAt: snap.action.endsAt,
-            direction: { x: snap.action.dx, y: snap.action.dy },
-            target: snap.action.target,
-          } : undefined;
+          pl.action = snap.action
+            ? {
+                kind: snap.action.kind,
+                phase: snap.action.phase,
+                startedAt: snap.action.startedAt,
+                releaseAt: snap.action.releaseAt,
+                endsAt: snap.action.endsAt,
+                direction: { x: snap.action.dx, y: snap.action.dy },
+                target: snap.action.target,
+              }
+            : undefined;
         }
       } else {
         const def = ARCHETYPES[snap.archetype as EnemyArchetype] ?? ARCHETYPES.stalker;
@@ -572,15 +596,17 @@ export class NetClient {
           rangedReadyAt: 0,
           stunnedUntil: snap.stunnedUntil ?? 0,
           facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },
-          action: snap.action ? {
-            kind: snap.action.kind,
-            phase: snap.action.phase,
-            startedAt: snap.action.startedAt,
-            releaseAt: snap.action.releaseAt,
-            endsAt: snap.action.endsAt,
-            direction: { x: snap.action.dx, y: snap.action.dy },
-            target: snap.action.target,
-          } : undefined,
+          action: snap.action
+            ? {
+                kind: snap.action.kind,
+                phase: snap.action.phase,
+                startedAt: snap.action.startedAt,
+                releaseAt: snap.action.releaseAt,
+                endsAt: snap.action.endsAt,
+                direction: { x: snap.action.dx, y: snap.action.dy },
+                target: snap.action.target,
+              }
+            : undefined,
         });
       }
     }
@@ -590,41 +616,37 @@ export class NetClient {
     // interpolar, eles saltam de snapshot em snapshot enquanto tudo em volta
     // desliza; lidos do quadro seguinte, chegam ao alvo antes das criaturas que
     // vao acertar. Mesma linha do tempo do resto, pelo mesmo motivo.
-    const projectileTargets = interpolated
-      ? new Map(to.projectiles.map((p) => [p.id, p]))
-      : null;
-    state.projectiles = from.projectiles.map(
-      (p): Projectile => {
-        const target = projectileTargets?.get(p.id);
-        return {
-          id: p.id,
-          owner: 0,
-          x: target ? p.x + (target.x - p.x) * alpha : p.x,
-          y: target ? p.y + (target.y - p.y) * alpha : p.y,
-          vx: 0,
-          vy: 0,
-          kind: p.kind,
-          damage: 0,
-          // Reconstroi so o que o DESENHO consulta. Nao e o estado do modulo: as
-          // cargas, o alcance de armar e os rebotes restantes vivem no servidor,
-          // e copia-los pela metade aqui criaria uma segunda fonte de verdade
-          // sobre uma mecanica que o cliente nem simula.
-          modules:
-            p.armed || p.piercing || p.bouncy || p.siphon
-              ? {
-                  ...(p.armed ? { explosive: { armAfterDistance: 0 } } : {}),
-                  ...(p.piercing ? { piercing: true as const } : {}),
-                  ...(p.bouncy ? { ricochet: { remainingBounces: 1 } } : {}),
-                  ...(p.siphon ? { siphon: true as const } : {}),
-                }
-              : undefined,
-          distanceTravelled: p.armed ? 1 : 0,
-          hostile: p.hostile,
-          leavesBiofluid: false,
-          ttl: 1,
-        };
-      }
-    );
+    const projectileTargets = interpolated ? new Map(to.projectiles.map((p) => [p.id, p])) : null;
+    state.projectiles = from.projectiles.map((p): Projectile => {
+      const target = projectileTargets?.get(p.id);
+      return {
+        id: p.id,
+        owner: 0,
+        x: target ? p.x + (target.x - p.x) * alpha : p.x,
+        y: target ? p.y + (target.y - p.y) * alpha : p.y,
+        vx: 0,
+        vy: 0,
+        kind: p.kind,
+        damage: 0,
+        // Reconstroi so o que o DESENHO consulta. Nao e o estado do modulo: as
+        // cargas, o alcance de armar e os rebotes restantes vivem no servidor,
+        // e copia-los pela metade aqui criaria uma segunda fonte de verdade
+        // sobre uma mecanica que o cliente nem simula.
+        modules:
+          p.armed || p.piercing || p.bouncy || p.siphon
+            ? {
+                ...(p.armed ? { explosive: { armAfterDistance: 0 } } : {}),
+                ...(p.piercing ? { piercing: true as const } : {}),
+                ...(p.bouncy ? { ricochet: { remainingBounces: 1 } } : {}),
+                ...(p.siphon ? { siphon: true as const } : {}),
+              }
+            : undefined,
+        distanceTravelled: p.armed ? 1 : 0,
+        hostile: p.hostile,
+        leavesBiofluid: false,
+        ttl: 1,
+      };
+    });
 
     // HUD do jogador local
     if (this.viewer) {
@@ -635,11 +657,16 @@ export class NetClient {
         id: module.id,
         lifetime: { ...module.lifetime },
       }));
-      ex.pendingModuleChoice = this.viewer.pendingModuleChoice ? {
-        sourceSiteId: this.viewer.pendingModuleChoice.sourceSiteId,
-        options: [...this.viewer.pendingModuleChoice.options] as [typeof this.viewer.pendingModuleChoice.options[0], typeof this.viewer.pendingModuleChoice.options[1]],
-        createdAtTick: this.viewer.pendingModuleChoice.createdAtTick,
-      } : null;
+      ex.pendingModuleChoice = this.viewer.pendingModuleChoice
+        ? {
+            sourceSiteId: this.viewer.pendingModuleChoice.sourceSiteId,
+            options: [...this.viewer.pendingModuleChoice.options] as [
+              (typeof this.viewer.pendingModuleChoice.options)[0],
+              (typeof this.viewer.pendingModuleChoice.options)[1],
+            ],
+            createdAtTick: this.viewer.pendingModuleChoice.createdAtTick,
+          }
+        : null;
       ex.hasCore = this.viewer.hasCore;
       ex.downed = this.viewer.downed;
       // CANHAO ROTATIVO: rotacao e fase autoritativas do servidor.

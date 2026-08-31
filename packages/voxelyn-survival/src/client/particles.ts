@@ -32,7 +32,8 @@ export type ParticleKind =
   | 'chitin'
   | 'spore'
   | 'stone'
-  | 'mycelium';
+  | 'mycelium'
+  | 'bubble';
 
 type Particle = {
   x: number; // tile
@@ -102,6 +103,7 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // cima de verde — nao e materia arrancada dele, e materia entrando nele, e
   // por isso e a unica das tres rampas de criatura que nao tem pedra no fundo.
   mycelium: ['#7ab8ff', '#59f2c2', '#2f6b4f'],
+  bubble: ['#e8f7ff', '#9fd8f2', '#4b86a6'],
 };
 
 /**
@@ -162,15 +164,19 @@ export const hitMaterialOf = (archetype: string | undefined): ParticleKind =>
 export const seededUnit = (seed: number): (() => number) => seeded(seed);
 
 const seeded = (seed: number) => {
-  let s = (seed | 0) || 1;
+  let s = seed | 0 || 1;
   return () => {
-    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
     return ((s >>> 0) % 10000) / 10000;
   };
 };
 
 const eventSeed = (x: number, y: number, salt: number): number =>
-  Math.imul(Math.round(x * 16) | 0, 374761393) ^ Math.imul(Math.round(y * 16) | 0, 668265263) ^ salt;
+  Math.imul(Math.round(x * 16) | 0, 374761393) ^
+  Math.imul(Math.round(y * 16) | 0, 668265263) ^
+  salt;
 
 /**
  * Tempo decorrido do frame, em ms, a partir do relogio do render.
@@ -213,10 +219,13 @@ export class VoxelParticles {
   private readonly lastOverheatBucket = new Map<number, number>();
   private lastFurnaceBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
+  private readonly lastBubbleBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
-  get count(): number { return this.items.length; }
+  get count(): number {
+    return this.items.length;
+  }
 
   clear(): void {
     this.items.length = 0;
@@ -224,6 +233,7 @@ export class VoxelParticles {
     this.lastSporeBucket.clear();
     this.lastFungalSmokeBucket.clear();
     this.lastOverheatBucket.clear();
+    this.lastBubbleBucket.clear();
   }
 
   private push(p: Particle): void {
@@ -231,6 +241,44 @@ export class VoxelParticles {
     // esta olhando, e cortar a cauda deixaria a explosao pela metade.
     if (this.items.length >= this.budget) this.items.shift();
     this.items.push(p);
+  }
+
+  /** Emissor leve, limitado por entidade e velocidade; usa o budget global. */
+  emitMovementBubbles(
+    id: number,
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    bodyRadius: number,
+    surfaceZ: number,
+    nowMs: number,
+    heavy = false,
+  ): void {
+    const speed = Math.hypot(vx, vy);
+    if (speed < 0.35 || surfaceZ <= 0.4) return;
+    const interval = heavy ? 90 : 145;
+    const bucket = Math.floor(nowMs / interval);
+    if (this.lastBubbleBucket.get(id) === bucket) return;
+    this.lastBubbleBucket.set(id, bucket);
+    const rnd = seeded(eventSeed(x, y, id ^ bucket));
+    const count = heavy ? Math.min(4, 2 + Math.floor(speed / 3)) : 1;
+    const nx = vx / speed;
+    const ny = vy / speed;
+    for (let i = 0; i < count; i++) {
+      this.push({
+        x: x - nx * bodyRadius + (rnd() - 0.5) * bodyRadius,
+        y: y - ny * bodyRadius + (rnd() - 0.5) * bodyRadius,
+        z: 0.25 + rnd() * Math.min(0.8, surfaceZ * 0.35),
+        vx: -nx * 0.12 + (rnd() - 0.5) * 0.18,
+        vy: -ny * 0.12 + (rnd() - 0.5) * 0.18,
+        vz: 0.8 + rnd() * 0.55,
+        life: Math.min(1500, Math.max(360, surfaceZ * 850)),
+        maxLife: Math.min(1500, Math.max(360, surfaceZ * 850)),
+        kind: 'bubble',
+        visualSeed: id + i,
+      });
+    }
   }
 
   private burst(
@@ -242,14 +290,15 @@ export class VoxelParticles {
     lift: number,
     life: number,
     salt: number,
-    baseZ = 0
+    baseZ = 0,
   ): void {
     const rnd = seeded(eventSeed(x, y, salt));
     for (let i = 0; i < count; i++) {
       const angle = rnd() * Math.PI * 2;
       const mag = speed * (0.35 + rnd() * 0.65);
       this.push({
-        x, y,
+        x,
+        y,
         z: baseZ + 0.12 + rnd() * 0.25,
         vx: Math.cos(angle) * mag,
         vy: Math.sin(angle) * mag,
@@ -283,7 +332,7 @@ export class VoxelParticles {
     radius: number,
     life: number,
     salt: number,
-    baseZ = 0
+    baseZ = 0,
   ): void {
     const rnd = seeded(eventSeed(x, y, salt));
     const speed = radius / (life / 1000);
@@ -295,7 +344,8 @@ export class VoxelParticles {
       // mais mata o jogador que confiou na borda que viu.
       const mag = speed * (0.82 + rnd() * 0.18);
       this.push({
-        x, y,
+        x,
+        y,
         z: baseZ + 0.06 + rnd() * 0.1,
         vx: Math.cos(angle) * mag,
         vy: Math.sin(angle) * mag,
@@ -316,6 +366,21 @@ export class VoxelParticles {
     const n = (base: number) => Math.max(1, Math.round(base * scale));
     for (const ev of events) {
       switch (ev.t) {
+        case 'leviathan_discharge':
+          this.ring(
+            ev.x,
+            ev.y,
+            'spark',
+            Math.max(18, n(36)),
+            Math.min(18, ev.radius),
+            420,
+            71,
+            0.5,
+          );
+          for (const bubble of ev.bubbles) {
+            this.burst(bubble.x, bubble.y, 'bubble', n(12), 1.9, 1.8, 700, 72, 0.5);
+          }
+          break;
         case 'explosion':
           // Quatro camadas com papeis distintos, e nao quatro variacoes da mesma
           // coisa: a frente diz ATE ONDE, a brasa e o entulho dizem QUE forca, e
@@ -466,7 +531,7 @@ export class VoxelParticles {
     arc: number,
     reach: readonly number[],
     seq: number,
-    scale: number
+    scale: number,
   ): void {
     if (reach.length === 0) return;
     const rnd = seeded(eventSeed(x, y, Math.imul(seq + 1, 2654435761)));
@@ -684,7 +749,7 @@ export class VoxelParticles {
     dirX: number,
     dirY: number,
     nowMs: number,
-    scale: number
+    scale: number,
   ): void {
     const bucket = (nowMs / 45) | 0;
     if (this.lastDashJetBucket.get(slot) === bucket) return;
@@ -754,11 +819,22 @@ export class VoxelParticles {
       p.y += p.vy * dt;
       p.z += p.vz * dt;
       // Brasa e entulho caem; gas e fumaca sobem e desaceleram, nunca caem.
-      if (p.kind === 'gas' || p.kind === 'sporeCloud' || p.kind === 'ash' || p.kind === 'mycelium') {
+      if (
+        p.kind === 'gas' ||
+        p.kind === 'sporeCloud' ||
+        p.kind === 'ash' ||
+        p.kind === 'mycelium' ||
+        p.kind === 'bubble'
+      ) {
         p.vz *= gasDrag;
       } else {
         p.vz -= 5.5 * dt;
-        if (p.z < 0) { p.z = 0; p.vz = -p.vz * 0.28; p.vx *= 0.6; p.vy *= 0.6; }
+        if (p.z < 0) {
+          p.z = 0;
+          p.vz = -p.vz * 0.28;
+          p.vx *= 0.6;
+          p.vy *= 0.6;
+        }
       }
       p.vx *= drag;
       p.vy *= drag;
@@ -775,7 +851,7 @@ export class VoxelParticles {
     ctx: CanvasRenderingContext2D,
     project: (x: number, y: number) => [number, number],
     zoom: number,
-    tileH: number
+    tileH: number,
   ): void {
     if (this.items.length === 0) return;
     // Ordem do pintor, igual ao resto da cena: o que esta atras desenha antes.

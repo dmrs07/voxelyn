@@ -79,6 +79,7 @@ export const actionAnimation = (action: EntityActionKind): string => {
     action === 'drill' ||
     action === 'erupt' ||
     action === 'freeze' ||
+    action === 'massive_shock' ||
     // O voo herda a pose do telegrafo: no atlas do Devorador o `special` e o
     // corpo erguido com a boca aberta, que e exatamente a silhueta de quem
     // atravessa o ar. Cair no `attack` traria a pose de bote, com o corpo
@@ -101,7 +102,7 @@ const actionElapsedMs = (action: ActionIntent, tick: number): number =>
 export const locomotionFacing = (
   base: EntityAnimState,
   fallbackX: number,
-  fallbackY: number
+  fallbackY: number,
 ): { x: number; y: number } => {
   const hasMoveFacing = Math.hypot(base.moveFacingX, base.moveFacingY) > 0.001;
   if (base.anim === 'walk' && hasMoveFacing) {
@@ -186,7 +187,7 @@ const layeredPlayerAnimation = (
   nowMs: number,
   facing: FacingResolver,
   gun: { heat: number; overheated: boolean; modules: readonly ModuleId[] },
-  gunView: MinigunGunView | undefined
+  gunView: MinigunGunView | undefined,
 ): LayeredPlayerAnimation => {
   const releaseMs = action
     ? Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000)
@@ -274,7 +275,7 @@ export const MINIGUN_MOUNTED_SPIN = 0.001;
  */
 export const mountedModules = (
   modules: readonly ModuleId[],
-  gunView?: MinigunGunView
+  gunView?: MinigunGunView,
 ): readonly ModuleId[] =>
   gunView && gunView.spin > MINIGUN_MOUNTED_SPIN && !modules.includes('minigun')
     ? [...modules, 'minigun']
@@ -306,7 +307,13 @@ export class EntityPresentation {
    * que hoje pisca, a proxima pose a nascer entraria sem protecao — e o rumo
    * cru continuaria vazando para o desenho quando a entidade trocasse de pose.
    */
-  private facingFor(entity: Entity, layer: number, x: number, y: number, nowMs: number): { x: number; y: number } {
+  private facingFor(
+    entity: Entity,
+    layer: number,
+    x: number,
+    y: number,
+    nowMs: number,
+  ): { x: number; y: number } {
     return this.facingHysteresis.resolve(entity.id * 2 + layer, x, y, nowMs);
   }
 
@@ -324,7 +331,8 @@ export class EntityPresentation {
         // Uma nova ação com outro startTick receberá um relógio novo na primeira
         // renderização, ancorado ao elapsed autoritativo daquele instante.
         const clock = this.actionVisualClocks.get(event.entity);
-        if (clock && clock.startTick !== event.startTick) this.actionVisualClocks.delete(event.entity);
+        if (clock && clock.startTick !== event.startTick)
+          this.actionVisualClocks.delete(event.entity);
       } else if (event.t === 'action_end') {
         // A simulação cancelou a ação antes do endTick prometido (canal de
         // sopro interrompido por stun, queda ou troca no poço). Sem apagar o
@@ -369,7 +377,12 @@ export class EntityPresentation {
     }
   }
 
-  private visualActionElapsed(entityId: number, action: ActionIntent, tick: number, nowMs: number): number {
+  private visualActionElapsed(
+    entityId: number,
+    action: ActionIntent,
+    tick: number,
+    nowMs: number,
+  ): number {
     const authoritativeElapsed = actionElapsedMs(action, tick);
     let clock = this.actionVisualClocks.get(entityId);
     if (!clock || clock.startTick !== action.startTick) {
@@ -397,7 +410,7 @@ export class EntityPresentation {
      * desaceleracao depois da bala 300, quando o modulo ja saiu da lista e os
      * canos ainda estao girando.
      */
-    gunView?: MinigunGunView
+    gunView?: MinigunGunView,
   ): PresentedAnimation {
     // Resolvido no ponto de SAIDA, nunca antes: cada camada so pode ser gravada
     // uma vez por quadro, com o vetor que de fato vai ser desenhado. Resolver o
@@ -411,7 +424,12 @@ export class EntityPresentation {
     if (revive) {
       if (nowMs < revive.endMs) {
         const aim = bodyFacing();
-        return { anim: 'revive', elapsedMs: nowMs - revive.startMs, facingX: aim.x, facingY: aim.y };
+        return {
+          anim: 'revive',
+          elapsedMs: nowMs - revive.startMs,
+          facingX: aim.x,
+          facingY: aim.y,
+        };
       }
       this.reviveUntil.delete(entity.id);
     }
@@ -506,7 +524,14 @@ export class EntityPresentation {
           // A composicao ja estabiliza as tres camadas por dentro; o rumo solto
           // que sai aqui e o do TRONCO, e reaproveita a mesma memoria dela.
           const layered = layeredPlayerAnimation(
-            entity, base, action, elapsedMs, nowMs, facing, gunStateOf(entity, state), gunView
+            entity,
+            base,
+            action,
+            elapsedMs,
+            nowMs,
+            facing,
+            gunStateOf(entity, state),
+            gunView,
           );
           return {
             anim: layered,
@@ -563,7 +588,14 @@ export class EntityPresentation {
     // urgente para ler do que a temperatura da arma.
     if (entity.archetype === 'prospector' && (base.anim === 'idle' || base.anim === 'walk')) {
       const layered = layeredPlayerAnimation(
-        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunStateOf(entity, state), gunView
+        entity,
+        base,
+        null,
+        nowMs - base.animStartMs,
+        nowMs,
+        facing,
+        gunStateOf(entity, state),
+        gunView,
       );
       return {
         anim: layered,

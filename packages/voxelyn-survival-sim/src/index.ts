@@ -125,6 +125,7 @@ export {
   isConductiveCell,
   isDeluged,
   delugeFront,
+  delugeDepth,
   meltIce,
   heatFungalCell,
   breakSolid,

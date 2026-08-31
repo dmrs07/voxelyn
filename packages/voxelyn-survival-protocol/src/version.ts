@@ -160,7 +160,9 @@
 // diria o que o cliente sabe calcular, e abriria a chance de o anel desenhado
 // discordar da sucao que ele promete — que e a unica coisa que este efeito nao
 // pode fazer.
-export const PROTOCOL_VERSION = 27;
+// 28: WorldFlags carrega a carga do Leviata e as duas bolhas protetivas;
+// EntityActionKind/eventos ganham massive_shock/leviathan_discharge.
+export const PROTOCOL_VERSION = 28;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -627,7 +629,8 @@ export const PROTOCOL_VERSION = 27;
 // simulacoes em versoes diferentes divergem no primeiro tick de janela — uma
 // com o jogador parado onde ele estava, a outra com ele meio tile mais perto —
 // e a distancia entre elas so cresce dali em diante.
-export const SIMULATION_VERSION = 44;
+// 45: Diluvio ganha profundidade e descarga massiva evitavel por bolha de ar.
+export const SIMULATION_VERSION = 45;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -710,9 +713,7 @@ export const CURRENT_VERSIONS: VersionTriple = {
   contentVersion: CONTENT_VERSION,
 };
 
-export type VersionCheck =
-  | { ok: true }
-  | { ok: false; reason: string; field: keyof VersionTriple };
+export type VersionCheck = { ok: true } | { ok: false; reason: string; field: keyof VersionTriple };
 
 /** O protocol precisa casar exatamente; sim/content sao avaliados pelo chamador. */
 export const checkProtocolVersion = (incoming: Partial<VersionTriple>): VersionCheck => {

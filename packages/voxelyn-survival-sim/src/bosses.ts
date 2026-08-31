@@ -70,6 +70,10 @@ export const emptyBossRuntime = (): BossRuntime => ({
   delugeAt: -1,
   delugeX: 0,
   delugeY: 0,
+  leviathanShockAt: -1,
+  leviathanShockRecoverAt: -1,
+  leviathanShockSeq: 0,
+  protectiveBubbles: [],
 });
 
 /**
@@ -247,9 +251,7 @@ export const bossForSector = (
 
   const biome = biomeAt(sector);
   const primary = bossForBiome(biome);
-  const source: SectorBossSource = BOSS_OF_OCCUPATION[biome.occupation]
-    ? 'occupation'
-    : 'stratum';
+  const source: SectorBossSource = BOSS_OF_OCCUPATION[biome.occupation] ? 'occupation' : 'stratum';
 
   // ---------------------------------------------------------------------
   // UM CHEFE POR RUN

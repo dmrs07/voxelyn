@@ -213,7 +213,12 @@ export type PendingModuleChoice = {
 export type DamageCause =
   | { kind: 'player_shot' }
   | { kind: 'enemy_contact'; archetype: EnemyArchetype; elite: boolean }
-  | { kind: 'enemy_projectile'; archetype: EnemyArchetype; elite: boolean; projectile: ProjectileKind }
+  | {
+      kind: 'enemy_projectile';
+      archetype: EnemyArchetype;
+      elite: boolean;
+      projectile: ProjectileKind;
+    }
   | { kind: 'fire' }
   | { kind: 'gas' }
   | { kind: 'spores' }
@@ -228,6 +233,7 @@ export type DamageCause =
    */
   | { kind: 'contamination' }
   | { kind: 'discharge'; source: EffectOrigin['source'] }
+  | { kind: 'leviathan_discharge' }
   | { kind: 'explosion'; source: EffectOrigin['source'] }
   | { kind: 'overheat' }
   | { kind: 'bleedout' }
@@ -489,6 +495,8 @@ export type EntityActionKind =
   | 'leap'
   /** Congelamento da Rainha: o lago se refaz e os Espectros saem dele. */
   | 'freeze'
+  /** Carga global do Leviata; as bolhas de ar sao o contra-jogo. */
+  | 'massive_shock'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -711,6 +719,10 @@ export type BossRuntime = {
   delugeAt: number;
   delugeX: number;
   delugeY: number;
+  leviathanShockAt: number;
+  leviathanShockRecoverAt: number;
+  leviathanShockSeq: number;
+  protectiveBubbles: Array<{ x: number; y: number; radius: number }>;
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
@@ -1140,7 +1152,18 @@ export type LeylineCircuit = {
 };
 
 export type SemanticEvent =
-  | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
+  | {
+      t: 'action_start';
+      entity: number;
+      action: EntityActionKind;
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      startTick: number;
+      releaseTick: number;
+      endTick: number;
+    }
   /**
    * Uma acao telegrafada morreu ANTES do `endTick` anunciado. Existe para o
    * sopro canalizado: `action_start` promete uma pose de 2,5 s, e um canal
@@ -1161,8 +1184,31 @@ export type SemanticEvent =
    * mao nao o carregam); a interoperabilidade real e garantida pelo handshake.
    */
   | { t: 'hit'; x: number; y: number; amount: number; target: number; hazard?: true }
-  | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
-  | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }
+  | {
+      t: 'death';
+      x: number;
+      y: number;
+      entity: number;
+      archetype: string;
+      facingX: number;
+      facingY: number;
+      tick: number;
+    }
+  | {
+      t: 'explosion';
+      x: number;
+      y: number;
+      radius: number;
+      source: 'player' | 'enemy' | 'environment';
+      owner?: number;
+    }
+  | {
+      t: 'leviathan_discharge';
+      x: number;
+      y: number;
+      radius: number;
+      bubbles: Array<{ x: number; y: number; radius: number }>;
+    }
   /**
    * Um solido deixou de existir. Carrega QUAL material caiu para o cliente
    * poder desfazer o bloco no material certo; sem isso ele teria de adivinhar
@@ -1268,7 +1314,18 @@ export type SemanticEvent =
    * por ele que o cliente mantem o TRONCO do dono girando junto com o jato —
    * inclusive o do parceiro remoto, cujo `facing` de snapshot segue os pes.
    */
-  | { t: 'flame_cone'; owner: number; x: number; y: number; dx: number; dy: number; range: number; arc: number; seq: number; reach: number[] }
+  | {
+      t: 'flame_cone';
+      owner: number;
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      range: number;
+      arc: number;
+      seq: number;
+      reach: number[];
+    }
   /**
    * Um bolt do jogador morreu contra um solido que nao cedeu. Puramente
    * presentacional — o burst de plasma no ponto de contato. `nx`/`ny` e a normal
@@ -1293,8 +1350,20 @@ export type SemanticEvent =
   | { t: 'salvage_cache_opened'; siteId: number; slot: number; x: number; y: number }
   | { t: 'purge_cell_acquired'; slot: number; amount: number }
   | { t: 'purge_cell_used'; slot: number; x: number; y: number }
-  | { t: 'module_selected'; slot: number; module: ModuleId; sourceSiteId: number; recharged: boolean }
-  | { t: 'module_charge_consumed'; slot: number; module: ModuleId; remaining: number; maximum: number }
+  | {
+      t: 'module_selected';
+      slot: number;
+      module: ModuleId;
+      sourceSiteId: number;
+      recharged: boolean;
+    }
+  | {
+      t: 'module_charge_consumed';
+      slot: number;
+      module: ModuleId;
+      remaining: number;
+      maximum: number;
+    }
   | { t: 'module_expired'; slot: number; module: ModuleId }
   /**
    * O canhao rotativo MUDOU DE FASE. Emitido so na transicao, nunca por tick.
@@ -1430,7 +1499,15 @@ export type SemanticEvent =
    * (true, no release). Sem o campo o cliente desenharia as duas iguais e a
    * unica informacao que importa — "agora queima" — nao chegaria.
    */
-  | { t: 'beam_line'; x: number; y: number; dx: number; dy: number; length: number; powered: boolean }
+  | {
+      t: 'beam_line';
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      length: number;
+      powered: boolean;
+    }
   /**
    * A vida de um modulo do Diamandis, num evento so em vez de tres tipos.
    *
@@ -1450,7 +1527,15 @@ export type SemanticEvent =
       module: number;
       state: 'exposed' | 'detached' | 'dropped' | 'lost';
     }
-  | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
+  | {
+      t: 'player_down';
+      slot: number;
+      x: number;
+      y: number;
+      facingX: number;
+      facingY: number;
+      tick: number;
+    }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean; cores: number }
   /**

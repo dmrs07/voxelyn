@@ -53,6 +53,7 @@ import {
   furnaceSweepAt,
   isDeluged,
   delugeFront,
+  delugeDepth,
   isPipe,
   FURNACE_OVERHEATING,
   WELL_OFFER_REACH,
@@ -1134,7 +1135,10 @@ export type GroundMarker = {
 
 export const pendingGroundMarkers = (state: {
   config: { width: number };
-  bossRuntime: { collapseCells: readonly { idx: number; at: number }[]; blastCells: readonly number[] };
+  bossRuntime: {
+    collapseCells: readonly { idx: number; at: number }[];
+    blastCells: readonly number[];
+  };
   enemies: readonly { alive: boolean; action?: { kind: string; releaseAt: number } }[];
 }): GroundMarker[] => {
   const w = state.config.width;
@@ -1149,7 +1153,8 @@ export const pendingGroundMarkers = (state: {
     });
   }
   if (state.bossRuntime.blastCells.length > 0) {
-    const at = state.enemies.find((e) => e.alive && e.action?.kind === 'demolish')?.action?.releaseAt;
+    const at = state.enemies.find((e) => e.alive && e.action?.kind === 'demolish')?.action
+      ?.releaseAt;
     // Sem relogio nao ha aviso possivel: meia marca (onde, mas nao quando) e
     // pior que nenhuma, porque ela para de comunicar urgencia e continua
     // ocupando o chao.
@@ -1585,8 +1590,20 @@ export class SurvivalRenderer {
               cx += (cell % this.worldWidth) + 0.5;
               cy += Math.floor(cell / this.worldWidth) + 0.5;
             }
-            this.addFlash(cx / ev.cells.length, cy / ev.cells.length, 5.5, 0.95, nowMs, 200, PAL.electric);
+            this.addFlash(
+              cx / ev.cells.length,
+              cy / ev.cells.length,
+              5.5,
+              0.95,
+              nowMs,
+              200,
+              PAL.electric,
+            );
           }
+          break;
+        case 'leviathan_discharge':
+          this.addFlash(ev.x, ev.y, 18, 1.8, nowMs, 430, PAL.electric);
+          this.shake = { power: 9, until: nowMs + 420 };
           break;
         case 'hit':
           // Respingo na materia do alvo. Descritivo: diz o que foi atingido,
@@ -1792,7 +1809,9 @@ export class SurvivalRenderer {
             ev.dx,
             ev.dy,
             ev.rounds,
-            Math.imul(ev.slot + 1, 0x9e3779b9) ^ Math.imul(ev.rounds, 0x85ebca6b) ^ this.casingSalt++,
+            Math.imul(ev.slot + 1, 0x9e3779b9) ^
+              Math.imul(ev.rounds, 0x85ebca6b) ^
+              this.casingSalt++,
             this.quality.maxFx / PRESETS.high.maxFx,
           );
           break;
@@ -2063,7 +2082,14 @@ export class SurvivalRenderer {
             // respirando = rele aberto: um bit, uma diferenca de luz.
             if (routedNodeCells.has(i)) {
               const breathe = (0.5 + 0.25 * Math.sin(nowMs / 600)) * (1 + 0.1 * veinDepth);
-              lights.push({ x: x + 0.5, y: y + 0.5, r: 3.2, power: breathe, hex: PAL.electric, height: 0.7 });
+              lights.push({
+                x: x + 0.5,
+                y: y + 0.5,
+                r: 3.2,
+                power: breathe,
+                hex: PAL.electric,
+                height: 0.7,
+              });
             } else {
               lights.push({
                 x: x + 0.5,
@@ -2276,7 +2302,10 @@ export class SurvivalRenderer {
         // mecanica: a silica solta do Devorador e o aviso de por onde ele anda,
         // e o vidro e a prova de que aquele pedaco esta negado a ele.
         const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
-        if (surfKind === undefined || !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
+        if (
+          surfKind === undefined ||
+          !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)
+        ) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
 
@@ -2328,9 +2357,17 @@ export class SurvivalRenderer {
           // alguem ligou na tela.
           const edge = delugeR - Math.hypot(x + 0.5 - delugeCx, y + 0.5 - delugeCy);
           const crest = edge < 1.6 ? 1 - edge / 1.6 : 0;
-          diamond(sx, sy, `rgba(46,58,77,${(0.28 + b * 0.16).toFixed(3)})`);
+          const depth = delugeDepth(state, i);
+          const surfaceY = sy - depth * TILE_H * z;
+          // Superficie elevada + coluna: a agua agora ocupa ALTURA no mundo,
+          // em vez de ser somente um filtro colado ao piso.
+          ctx.save();
+          ctx.fillStyle = `rgba(34,74,105,${(0.08 + depth * 0.025).toFixed(3)})`;
+          ctx.fillRect(sx - TILE_W * 0.5 * z, surfaceY, TILE_W * z, Math.max(0, sy - surfaceY));
+          diamond(sx, surfaceY, `rgba(92,150,185,${(0.2 + b * 0.12).toFixed(3)})`);
+          ctx.restore();
           if (crest > 0) {
-            diamond(sx, sy, `rgba(150,190,225,${(crest * 0.4).toFixed(3)})`);
+            diamond(sx, surfaceY, `rgba(190,225,245,${(crest * 0.48).toFixed(3)})`);
           }
         }
         const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;
@@ -2438,7 +2475,7 @@ export class SurvivalRenderer {
           // arco de circunferencia na tela apontaria para o chao errado.
           const STEPS = 16;
           for (let s = 0; s <= STEPS; s++) {
-            const a = mid - sweep.arc + ((sweep.arc * 2) * s) / STEPS;
+            const a = mid - sweep.arc + (sweep.arc * 2 * s) / STEPS;
             const [sx, sy] = toScreen(
               sweep.x + Math.cos(a) * sweep.radius,
               sweep.y + Math.sin(a) * sweep.radius,
@@ -2487,7 +2524,8 @@ export class SurvivalRenderer {
         // O anel EXTERNO nao se move: ele diz onde. O interno fecha: ele diz
         // quando. Separar as duas leituras e o que permite decidir a rota sem
         // ficar medindo o relogio.
-        ctx.strokeStyle = mark.kind === 'stalactite' ? 'rgba(255,166,63,0.55)' : 'rgba(217,59,76,0.55)';
+        ctx.strokeStyle =
+          mark.kind === 'stalactite' ? 'rgba(255,166,63,0.55)' : 'rgba(217,59,76,0.55)';
         ctx.lineWidth = Math.max(1, z * 0.6);
         ctx.beginPath();
         ctx.ellipse(msx, msy, rx, ry, 0, 0, Math.PI * 2);
@@ -2515,7 +2553,7 @@ export class SurvivalRenderer {
     {
       const openedAt = state.bossRuntime.mawOpenedAt;
       const maw = state.enemies.find(
-        (e) => e.alive && e.archetype === 'white_devourer' && e.mood === DEVOURER_MAW
+        (e) => e.alive && e.archetype === 'white_devourer' && e.mood === DEVOURER_MAW,
       );
       const reach = maw ? mawReach(state.tick, openedAt) : 0;
       if (maw && reach > 0.05) {
@@ -2556,7 +2594,7 @@ export class SurvivalRenderer {
             ringY(DEVOURER_MAW_BITE_RADIUS),
             0,
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
           ctx.fill();
         }
@@ -2585,7 +2623,7 @@ export class SurvivalRenderer {
             ringY(MAW_NO_RETURN_RADIUS),
             0,
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
           ctx.stroke();
         }
@@ -2610,7 +2648,10 @@ export class SurvivalRenderer {
         // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
         // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
         // nao um fluxo.
-        const streaks = Math.max(12, Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)));
+        const streaks = Math.max(
+          12,
+          Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)),
+        );
         for (let i = 0; i < streaks; i++) {
           const grain = mawStreak(i, seconds, reach, streaks);
           if (grain.alpha <= 0.01) continue;
@@ -2657,7 +2698,12 @@ export class SurvivalRenderer {
             for (const name of objectiveChain) {
               if (
                 this.props.draw(
-                  ctx, name, nowMs, csx, csy, z,
+                  ctx,
+                  name,
+                  nowMs,
+                  csx,
+                  csy,
+                  z,
                   bodyFaceLight(state.corePos.x, state.corePos.y, PROP_RESPONSE),
                 )
               ) {
@@ -2696,18 +2742,19 @@ export class SurvivalRenderer {
       if (esx > -80 && esx < vw + 80 && esy > -100 && esy < vh + 100) {
         // Na subida com o Nucleo a entrada E o portal para o setor de cima:
         // desenhar a plataforma chapada aqui esconderia o unico caminho.
-        const entryChain = entryAtlasChain(
-          objectiveViewOf(state),
-          state.stratum,
-          state.occupation,
-        );
+        const entryChain = entryAtlasChain(objectiveViewOf(state), state.stratum, state.occupation);
         items.push({
           depth: state.entry.x + state.entry.y,
           draw: () => {
             for (const name of entryChain) {
               if (
                 this.props.draw(
-                  ctx, name, nowMs, esx, esy, z,
+                  ctx,
+                  name,
+                  nowMs,
+                  esx,
+                  esy,
+                  z,
                   bodyFaceLight(state.entry.x, state.entry.y, PROP_RESPONSE),
                 )
               ) {
@@ -2879,7 +2926,12 @@ export class SurvivalRenderer {
                   : 'salvageTerminalIdle';
             if (
               this.props.draw(
-                ctx, prop, nowMs, tsx, tsy, z,
+                ctx,
+                prop,
+                nowMs,
+                tsx,
+                tsy,
+                z,
                 bodyFaceLight(site.terminal.x, site.terminal.y, PROP_RESPONSE),
               )
             ) {
@@ -3041,7 +3093,7 @@ export class SurvivalRenderer {
       // Mundo novo, lamina nova: rastros do setor anterior morreriam como
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
-    this.bossModuleMarks.clear();
+      this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -3088,7 +3140,12 @@ export class SurvivalRenderer {
               ctx.globalAlpha *= CEILING_ALPHA;
             }
             const drew = this.props.draw(
-              ctx, atlasName, nowMs, dsx, dsy - lift, z,
+              ctx,
+              atlasName,
+              nowMs,
+              dsx,
+              dsy - lift,
+              z,
               bodyFaceLight(prop.x, prop.y, PROP_RESPONSE),
             );
             if (ceiling) ctx.restore();
@@ -3739,12 +3796,88 @@ export class SurvivalRenderer {
       }
     }
 
+    // Bolhas de locomocao usam velocidade autoritativa, throttle por entidade e
+    // o mesmo budget global dos demais VFX. Parados praticamente nao emitem.
+    for (const entity of [...state.players, ...state.enemies]) {
+      if (!entity.alive) continue;
+      const i = Math.floor(entity.y) * state.config.width + Math.floor(entity.x);
+      const depth = delugeDepth(state, i);
+      if (depth < 0.5) continue;
+      this.particles.emitMovementBubbles(
+        entity.id,
+        entity.x,
+        entity.y,
+        entity.vx,
+        entity.vy,
+        entity.radius,
+        depth,
+        nowMs,
+        entity.archetype === 'sheet_leviathan',
+      );
+    }
+
     items.sort((a, b) => a.depth - b.depth);
     for (const item of items) item.draw();
 
     // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
     // por baixo de particulas, numeros de dano e HUD.
     drawBiomeVeil(ctx, state.stratum, vw, vh);
+
+    // Bolsao de AR: volume real vem do runtime; aqui a elipse isometrica e a
+    // borda dupla o separam inequivocamente das particulas pequenas.
+    for (const bubble of state.bossRuntime.protectiveBubbles) {
+      const [bx, by] = toScreen(bubble.x, bubble.y);
+      const rx = bubble.radius * TILE_W * z;
+      const ry = bubble.radius * TILE_H * z;
+      const pulse = 0.78 + 0.12 * Math.sin(nowMs / 115 + bubble.x);
+      ctx.save();
+      const fill = ctx.createRadialGradient(bx - rx * 0.25, by - ry * 0.5, 1, bx, by, rx);
+      fill.addColorStop(0, 'rgba(232,247,255,0.28)');
+      fill.addColorStop(0.7, 'rgba(110,190,225,0.10)');
+      fill.addColorStop(1, 'rgba(70,135,170,0.03)');
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = `rgba(220,248,255,${pulse.toFixed(3)})`;
+      ctx.lineWidth = Math.max(2, 2.2 * z);
+      ctx.beginPath();
+      ctx.ellipse(bx, by - ry * 0.55, rx, ry * 1.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(125,210,240,0.55)';
+      ctx.lineWidth = Math.max(1, z);
+      ctx.beginPath();
+      ctx.ellipse(bx, by - ry * 0.55, rx * 0.82, ry * 1.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    const chargingLeviathan = state.enemies.find(
+      (enemy) =>
+        enemy.alive &&
+        enemy.archetype === 'sheet_leviathan' &&
+        enemy.action?.kind === 'massive_shock',
+    );
+    if (chargingLeviathan?.action) {
+      const [lx, ly] = toScreen(chargingLeviathan.x, chargingLeviathan.y);
+      const span = Math.max(
+        1,
+        chargingLeviathan.action.releaseAt - chargingLeviathan.action.startedAt,
+      );
+      const charge = Math.max(
+        0,
+        Math.min(1, (state.tick - chargingLeviathan.action.startedAt) / span),
+      );
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = `rgba(150,220,255,${(0.28 + charge * 0.7).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, (1 + charge * 3) * z);
+      const arcs = 2 + Math.floor(charge * 5);
+      for (let i = 0; i < arcs; i++) {
+        const radius = (24 + i * 7 + Math.sin(nowMs / 55 + i) * 4) * z;
+        ctx.beginPath();
+        ctx.arc(lx, ly - 18 * z, radius, i * 0.9 + nowMs / 420, i * 0.9 + nowMs / 420 + 1.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // O TELEGRAFO DO CARRINHO: a linha inteira do tramo pulsa em laranja de
     // perigo durante o aviso. SOBRE o veu e SEM corte de luz: morte anunciada
@@ -4394,7 +4527,11 @@ export class SurvivalRenderer {
    * label diz o que o botao FARA (abrir/fechar o rele), nao o que ha.
    */
   private drawLeylineNodePrompt(
-    key: 'leyline.node.route' | 'leyline.node.unroute' | 'leyline.source.launch' | 'leyline.source.again',
+    key:
+      | 'leyline.node.route'
+      | 'leyline.node.unroute'
+      | 'leyline.source.launch'
+      | 'leyline.source.again',
     sx: number,
     sy: number,
     z: number,
@@ -4722,7 +4859,7 @@ export class SurvivalRenderer {
     this.cargoFlights = alive;
   }
 
-/**
+  /**
    * Resolve as ejecoes pendentes e adianta a fisica dos cartuchos.
    *
    * As duas coisas juntas porque as duas precisam do MESMO quadro: a ejecao
@@ -4747,10 +4884,7 @@ export class SurvivalRenderer {
         // A Minigun sai FUMEGANTE: o calor do cano no instante da ultima bala
         // vira o brilho residual da peca no ar. Os outros modulos saem frios,
         // porque nenhum deles aquece nada.
-        const heat =
-          pending.module === 'minigun'
-            ? Math.min(1, extra.heat / HEAT_MAX)
-            : 0;
+        const heat = pending.module === 'minigun' ? Math.min(1, extra.heat / HEAT_MAX) : 0;
         this.moduleProps.eject(
           pending.module,
           pending.slot,
@@ -4817,7 +4951,7 @@ export class SurvivalRenderer {
     );
   }
 
-    private renderRewardFlight(
+  private renderRewardFlight(
     toScreen: (x: number, y: number) => [number, number],
     nowMs: number,
   ): void {

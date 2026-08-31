@@ -157,6 +157,7 @@ export const carcassVariant = (cause: DamageCause): CarcassVariant => {
     case 'overheat':
       return scorched;
     case 'discharge':
+    case 'leviathan_discharge':
       return arced;
     case 'explosion':
       return ruptured;

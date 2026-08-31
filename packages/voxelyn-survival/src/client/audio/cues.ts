@@ -54,6 +54,7 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   haul: 'telegraphHurl',
   hurl: 'telegraphHurl',
   pulse: 'telegraphPulse',
+  massive_shock: 'telegraphPulse',
   // O inicio do sopro canalizado reusa a voz do pulso: e o mesmo "a habilidade
   // saiu" que o cast de tick unico sempre tocou, e o resto do canal ja soa
   // pelas ignicoes que as emissoes provocam.

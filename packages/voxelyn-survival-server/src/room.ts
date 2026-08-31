@@ -223,7 +223,6 @@ export class GameRoom {
     return slot;
   }
 
-
   detach(clientId: string): void {
     const slot = this.slots.find((s) => s.clientId === clientId);
     if (slot) {
@@ -378,16 +377,18 @@ export class GameRoom {
         facingX: round3(p.facing.x),
         facingY: round3(p.facing.y),
         stunnedUntil: p.stunnedUntil,
-        action: p.action ? {
-          kind: p.action.kind,
-          phase: p.action.phase,
-          startedAt: p.action.startedAt,
-          releaseAt: p.action.releaseAt,
-          endsAt: p.action.endsAt,
-          dx: round3(p.action.direction.x),
-          dy: round3(p.action.direction.y),
-          target: p.action.target,
-        } : undefined,
+        action: p.action
+          ? {
+              kind: p.action.kind,
+              phase: p.action.phase,
+              startedAt: p.action.startedAt,
+              releaseAt: p.action.releaseAt,
+              endsAt: p.action.endsAt,
+              dx: round3(p.action.direction.x),
+              dy: round3(p.action.direction.y),
+              target: p.action.target,
+            }
+          : undefined,
       });
     }
     for (const e of this.state.enemies) {
@@ -406,16 +407,18 @@ export class GameRoom {
         facingY: round3(e.facing.y),
         stunnedUntil: e.stunnedUntil,
         mood: e.mood,
-        action: e.action ? {
-          kind: e.action.kind,
-          phase: e.action.phase,
-          startedAt: e.action.startedAt,
-          releaseAt: e.action.releaseAt,
-          endsAt: e.action.endsAt,
-          dx: round3(e.action.direction.x),
-          dy: round3(e.action.direction.y),
-          target: e.action.target,
-        } : undefined,
+        action: e.action
+          ? {
+              kind: e.action.kind,
+              phase: e.action.phase,
+              startedAt: e.action.startedAt,
+              releaseAt: e.action.releaseAt,
+              endsAt: e.action.endsAt,
+              dx: round3(e.action.direction.x),
+              dy: round3(e.action.direction.y),
+              target: e.action.target,
+            }
+          : undefined,
       });
     }
     return out;
@@ -431,11 +434,16 @@ export class GameRoom {
         id: module.id,
         lifetime: { ...module.lifetime },
       })),
-      pendingModuleChoice: e.pendingModuleChoice ? {
-        sourceSiteId: e.pendingModuleChoice.sourceSiteId,
-        options: [...e.pendingModuleChoice.options] as [typeof e.pendingModuleChoice.options[0], typeof e.pendingModuleChoice.options[1]],
-        createdAtTick: e.pendingModuleChoice.createdAtTick,
-      } : null,
+      pendingModuleChoice: e.pendingModuleChoice
+        ? {
+            sourceSiteId: e.pendingModuleChoice.sourceSiteId,
+            options: [...e.pendingModuleChoice.options] as [
+              (typeof e.pendingModuleChoice.options)[0],
+              (typeof e.pendingModuleChoice.options)[1],
+            ],
+            createdAtTick: e.pendingModuleChoice.createdAtTick,
+          }
+        : null,
       // Copia rasa e nao a referencia: o `ViewerState` vai para o
       // serializador e a simulacao continua mutando este objeto no tick
       // seguinte — mandar a referencia entregaria a rotacao do tick errado
@@ -494,6 +502,14 @@ export class GameRoom {
       delugeAt: this.state.bossRuntime.delugeAt,
       delugeX: round3(this.state.bossRuntime.delugeX),
       delugeY: round3(this.state.bossRuntime.delugeY),
+      leviathanShockAt: this.state.bossRuntime.leviathanShockAt,
+      leviathanShockRecoverAt: this.state.bossRuntime.leviathanShockRecoverAt,
+      leviathanShockSeq: this.state.bossRuntime.leviathanShockSeq,
+      protectiveBubbles: this.state.bossRuntime.protectiveBubbles.map((bubble) => ({
+        x: round3(bubble.x),
+        y: round3(bubble.y),
+        radius: round3(bubble.radius),
+      })),
       // A BOCA em um numero. O cliente refaz o vortice inteiro a partir dele.
       mawOpenedAt: this.state.bossRuntime.mawOpenedAt,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
@@ -551,7 +567,9 @@ export class GameRoom {
         y: round3(p.y),
         hostile: p.hostile,
         kind: p.kind,
-        armed: Boolean(modules?.explosive && p.distanceTravelled >= modules.explosive.armAfterDistance),
+        armed: Boolean(
+          modules?.explosive && p.distanceTravelled >= modules.explosive.armAfterDistance,
+        ),
         piercing: Boolean(modules?.piercing),
         bouncy: (modules?.ricochet?.remainingBounces ?? 0) > 0,
         siphon: Boolean(modules?.siphon),
@@ -563,7 +581,7 @@ export class GameRoom {
     slot: Slot,
     tickChunkDiffs: ChunkDiff[],
     removed: number[],
-    events: SemanticEvent[]
+    events: SemanticEvent[],
   ): ServerSnapshot {
     const snap: ServerSnapshot = {
       t: 'snapshot',
@@ -631,4 +649,3 @@ export class GameRoom {
 }
 
 const round3 = (n: number): number => Math.round(n * 1000) / 1000;
-

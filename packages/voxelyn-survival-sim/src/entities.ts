@@ -67,6 +67,12 @@ import {
   LEVIATHAN_DELUGE_SPEED_SCALE,
   DELUGE_HP_FRACTION,
   DELUGE_WINDUP_TICKS,
+  PROSPECTOR_HEAD_HEIGHT,
+  LEVIATHAN_SHOCK_WINDUP_TICKS,
+  LEVIATHAN_SHOCK_RECOVERY_TICKS,
+  LEVIATHAN_SHOCK_COOLDOWN_TICKS,
+  LEVIATHAN_SHOCK_DAMAGE,
+  LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
   DIVER_BOSS_AGGRO_RANGE,
   LUNG_MATRIX_BREATH_INTERVAL_TICKS,
   LUNG_MATRIX_BURN_DAMAGE,
@@ -258,7 +264,22 @@ import {
   UNDERTAKER_SLAM_RANGE,
   UNDERTAKER_SLAM_WINDUP_TICKS,
 } from './constants.js';
-import { breakSolid, canRip, chargeCells, closeArena, delugeFront, explodeAt, igniteCell, isConductiveCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
+import {
+  breakSolid,
+  canRip,
+  chargeCells,
+  closeArena,
+  delugeDepth,
+  delugeFront,
+  explodeAt,
+  igniteCell,
+  isConductiveCell,
+  isConductiveSurface,
+  meltIce,
+  openArena,
+  ripSolid,
+  setSurface,
+} from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
 import { mawPull, mawReach } from './maw.js';
@@ -327,24 +348,66 @@ export type ArchetypeDef = {
 };
 
 export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
-  stalker: { hp: 26, speed: 5.2, radius: 0.32, contactDamage: 8, contactCooldown: 10, aggroRange: 9 },
+  stalker: {
+    hp: 26,
+    speed: 5.2,
+    radius: 0.32,
+    contactDamage: 8,
+    contactCooldown: 10,
+    aggroRange: 9,
+  },
   // 160 e nao 95: com 95 ele morria em 1,7 s de fogo sustentado, o que dava
   // tempo para exatamente UM arremesso — a mecanica nova mal existia. Aqui vida
   // e o portao de quantas vezes ela acontece, e nao um jeito de alongar uma luta
   // inofensiva (que e por que o guardiao NAO ganha vida).
-  bruiser: { hp: 160, speed: 2.3, radius: 0.46, contactDamage: 18, contactCooldown: 16, aggroRange: 7 },
-  spitter: { hp: 30, speed: 2.8, radius: 0.34, contactDamage: 6, contactCooldown: 14, aggroRange: 9 },
+  bruiser: {
+    hp: 160,
+    speed: 2.3,
+    radius: 0.46,
+    contactDamage: 18,
+    contactCooldown: 16,
+    aggroRange: 7,
+  },
+  spitter: {
+    hp: 30,
+    speed: 2.8,
+    radius: 0.34,
+    contactDamage: 6,
+    contactCooldown: 14,
+    aggroRange: 9,
+  },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
-  guardian: { hp: 420, speed: 2.1, radius: 0.68, contactDamage: 24, contactCooldown: 14, aggroRange: 7 },
+  guardian: {
+    hp: 420,
+    speed: 2.1,
+    radius: 0.68,
+    contactDamage: 24,
+    contactCooldown: 14,
+    aggroRange: 7,
+  },
   // Vida MENOR que a do guardiao de proposito. A dificuldade do bispo nao mora
   // na barra: em cima do fungo ele se cura mais rapido do que se leva dano, e
   // fora dele cai depressa. Somar vida grande a cura seria cobrar as duas coisas
   // pelo mesmo problema e transformar a luta em espera.
-  bishop: { hp: BISHOP_HP, speed: 2.6, radius: 0.6, contactDamage: 20, contactCooldown: 14, aggroRange: 10 },
+  bishop: {
+    hp: BISHOP_HP,
+    speed: 2.6,
+    radius: 0.6,
+    contactDamage: 20,
+    contactCooldown: 14,
+    aggroRange: 10,
+  },
   // Alcance de aggro alto e velocidade alta porque a ameaca dele e CHEGAR: um
   // cavalo que espera o jogador entrar num raio pequeno nunca teria distancia
   // para investir, e a investida e o bicho inteiro.
-  fungal_horse: { hp: HORSE_HP, speed: 4.4, radius: 0.44, contactDamage: 14, contactCooldown: 12, aggroRange: 13 },
+  fungal_horse: {
+    hp: HORSE_HP,
+    speed: 4.4,
+    radius: 0.44,
+    contactDamage: 14,
+    contactCooldown: 12,
+    aggroRange: 13,
+  },
   // Corpo GRANDE (raio 0,46, entre o bruiser e o guardiao) e vida BAIXA.
   //
   // A combinacao e deliberada e diz o que ele e: uma maquina de carga de 2,5 m
@@ -352,32 +415,88 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // DECISAO — quem decidir destrui-lo consegue, sempre, e o custo nunca foi a
   // luta. Subir a vida junto com o tamanho transformaria a decisao num
   // orcamento de municao, que e outra coisa.
-  miner: { hp: MINER_HP, speed: MINER_RAGE_SPEED, radius: 0.46, contactDamage: 6, contactCooldown: 18, aggroRange: MINER_NOTICE_RANGE },
+  miner: {
+    hp: MINER_HP,
+    speed: MINER_RAGE_SPEED,
+    radius: 0.46,
+    contactDamage: 6,
+    contactCooldown: 18,
+    aggroRange: MINER_NOTICE_RANGE,
+  },
   // ------------------------------------------------------------------------
   // Bestiario de assinatura (um por estrato; ver constants.ts).
   // ------------------------------------------------------------------------
   // Lento e parrudo de proposito: a ameaca dele nao e alcancar ninguem, e o
   // ESPACO que os cristais armados negam. Matar e facil; matar DE PERTO, entre
   // cristais carregando, e a decisao.
-  resonant: { hp: 95, speed: 1.6, radius: 0.44, contactDamage: 10, contactCooldown: 16, aggroRange: 10 },
+  resonant: {
+    hp: 95,
+    speed: 1.6,
+    radius: 0.44,
+    contactDamage: 10,
+    contactCooldown: 16,
+    aggroRange: 10,
+  },
   // Rapida NA AGUA (a lentidao da agua nao vale para ela — e o elemento dela).
   // Vida baixa: a defesa e nao estar visivel, nao ser um saco de pancada.
-  mud_lamprey: { hp: 55, speed: 3.6, radius: 0.4, contactDamage: 16, contactCooldown: 14, aggroRange: 11 },
+  mud_lamprey: {
+    hp: 55,
+    speed: 3.6,
+    radius: 0.4,
+    contactDamage: 16,
+    contactCooldown: 14,
+    aggroRange: 11,
+  },
   // Corpo largo, quase parado: ele e um orgao do bioma, nao um cacador. O
   // perigo dele e ONDE o gas passa a estar, nunca a perseguicao.
-  bellows: { hp: 80, speed: 1.7, radius: 0.5, contactDamage: 10, contactCooldown: 16, aggroRange: 9 },
+  bellows: {
+    hp: 80,
+    speed: 1.7,
+    radius: 0.5,
+    contactDamage: 10,
+    contactCooldown: 16,
+    aggroRange: 9,
+  },
   // Vida media com couraça que corta mais da metade do dano: frio, ele demora
   // como um bruiser; quente, morre rapido — e corre atras da troca.
-  scoriac: { hp: 130, speed: 2.4, radius: 0.44, contactDamage: 16, contactCooldown: 14, aggroRange: 8 },
-  frost_wraith: { hp: 48, speed: 3.8, radius: 0.36, contactDamage: 14, contactCooldown: 12, aggroRange: 11 },
+  scoriac: {
+    hp: 130,
+    speed: 2.4,
+    radius: 0.44,
+    contactDamage: 16,
+    contactCooldown: 14,
+    aggroRange: 8,
+  },
+  frost_wraith: {
+    hp: 48,
+    speed: 3.8,
+    radius: 0.36,
+    contactDamage: 14,
+    contactCooldown: 12,
+    aggroRange: 11,
+  },
   // Mesmo chassi do Spore Bomber (vida baixa, corre e estoura): trocar os
   // numeros faria dele outro inimigo, e ele e o MESMO inimigo com outra
   // quimica. O que muda esta na morte — gas no lugar de esporo.
-  sulfur_bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
+  sulfur_bomber: {
+    hp: 18,
+    speed: 3.7,
+    radius: 0.3,
+    contactDamage: 4,
+    contactCooldown: 10,
+    aggroRange: 9,
+  },
   // Lento e pesado: ele nao precisa te alcancar, ele te TRAZ. Vida alta de
   // bruiser porque o encontro tem de durar o bastante para o puxao acontecer
   // pelo menos duas vezes — uma so seria um susto, nao uma regra aprendida.
-  undertaker: { hp: 145, speed: 1.9, radius: 0.5, contactDamage: 12, contactCooldown: 16, aggroRange: UNDERTAKER_PULL_RANGE },
+  undertaker: {
+    hp: 145,
+    speed: 1.9,
+    radius: 0.5,
+    contactDamage: 12,
+    contactCooldown: 16,
+    aggroRange: UNDERTAKER_PULL_RANGE,
+  },
   // DIAMANDIS. Vida de chefe e corpo MODERADO: visualmente ele e dez vezes um
   // Prospector, mas uma hitbox gigante transformaria toda parede em gaiola e
   // todo tiro em acerto garantido. O tamanho dele mora no sprite e no ESTRAGO
@@ -529,7 +648,7 @@ export const moveEntity = (
   state: SurvivalState,
   ent: Entity,
   dx: number,
-  dy: number
+  dy: number,
 ): { blockedX: boolean; blockedY: boolean; blockCell: { x: number; y: number } | null } => {
   let blockCell: { x: number; y: number } | null = null;
   let blockedX = false;
@@ -681,7 +800,7 @@ export const damageEntity = (
    * Distinto da causa: a varredura da Fornalha fere com {kind:'fire'} e NAO e
    * hazard — e pancada de chefe, e o audio a trata como tal.
    */
-  hazard = false
+  hazard = false,
 ): void => {
   if (!ent.alive) return;
   if (ent.kind === 'player') {
@@ -752,7 +871,8 @@ export const damageEntity = (
     else markDiscovery(state.stats, DISCOVERY_FURNACE_COOLED);
   }
   if (ent.archetype === 'frost_queen') {
-    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) amount *= FROST_QUEEN_ICE_ARMOR;
+    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD)
+      amount *= FROST_QUEEN_ICE_ARMOR;
     else markDiscovery(state.stats, DISCOVERY_QUEEN_THAWED);
   }
   if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
@@ -778,7 +898,7 @@ export const damageEntity = (
   if (attributable) {
     state.stats.damageDealtTenths = addDamageTenths(
       state.stats.damageDealtTenths,
-      Math.min(amount, ent.hp)
+      Math.min(amount, ent.hp),
     );
   }
   ent.hp -= amount;
@@ -791,6 +911,11 @@ export const damageEntity = (
   if (ent.hp > 0) return;
   ent.hp = 0;
   ent.alive = false;
+  if (ent.archetype === 'sheet_leviathan') {
+    state.bossRuntime.protectiveBubbles = [];
+    state.bossRuntime.leviathanShockAt = -1;
+    ent.action = undefined;
+  }
   recordKill(state.stats, ent.archetype as EnemyArchetype);
   // O chefe deste setor CAIU — e cai uma vez so na run.
   //
@@ -927,7 +1052,7 @@ export const spawnEnemy = (
   archetype: EnemyArchetype,
   x: number,
   y: number,
-  elite: boolean
+  elite: boolean,
 ): Entity => {
   const def = ARCHETYPES[archetype];
   const enemy: Entity = {
@@ -1058,7 +1183,7 @@ export const interceptDirection = (
   sourceY: number,
   target: Entity,
   projectileSpeed: number,
-  maxLeadSeconds: number
+  maxLeadSeconds: number,
 ): Vec2 => {
   const rx = target.x - sourceX;
   const ry = target.y - sourceY;
@@ -1107,7 +1232,7 @@ const startAction = (
   windupTicks: number,
   recoveryTicks: number,
   events: SemanticEvent[],
-  target?: number
+  target?: number,
 ): void => {
   const releaseAt = state.tick + windupTicks;
   enemy.action = {
@@ -1197,7 +1322,7 @@ const guardianSalvoRelease = (
         enemy.y,
         target,
         GUARDIAN_ROCK_SPEED,
-        GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED
+        GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED,
       )
     : action.direction;
   enemy.facing = { ...aim };
@@ -1356,9 +1481,12 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   const action = enemy.action;
   if (!action || action.phase !== 'windup') return;
   action.phase = 'release';
-  const target = action.target === undefined
-    ? null
-    : state.players.find((p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed) ?? null;
+  const target =
+    action.target === undefined
+      ? null
+      : (state.players.find(
+          (p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed,
+        ) ?? null);
 
   if (action.kind === 'pulse') {
     if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
@@ -1369,10 +1497,17 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   if (action.kind === 'demolish') {
     const w = state.config.width;
     for (const cell of state.bossRuntime.blastCells) {
-      explodeAt(state, (cell % w) + 0.5, Math.floor(cell / w) + 0.5, DIAMANDIS_DEMOLISH_RADIUS, events, {
-        source: 'enemy',
-        owner: enemy.id,
-      });
+      explodeAt(
+        state,
+        (cell % w) + 0.5,
+        Math.floor(cell / w) + 0.5,
+        DIAMANDIS_DEMOLISH_RADIUS,
+        events,
+        {
+          source: 'enemy',
+          owner: enemy.id,
+        },
+      );
     }
     state.bossRuntime.blastCells = [];
     return;
@@ -1380,6 +1515,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   if (action.kind === 'erupt') {
     if (enemy.archetype === 'sheet_leviathan') leviathanBreach(state, enemy, events);
     else devourerErupt(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'massive_shock') {
+    leviathanMassiveDischarge(state, enemy, events);
     return;
   }
   if (action.kind === 'freeze') {
@@ -1427,7 +1566,14 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       leavesBiofluid: true,
       ttl: Math.ceil(((def.aggroRange + 4) / 7) * TICK_HZ),
     });
-    events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: action.direction.x, dy: action.direction.y, owner: enemy.id });
+    events.push({
+      t: 'shot',
+      x: enemy.x,
+      y: enemy.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+      owner: enemy.id,
+    });
   } else if (action.kind === 'contact' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     if (distTo(enemy, target) < enemy.radius + target.radius + 0.45) {
@@ -1444,7 +1590,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
         enemy.y,
         target,
         BRUISER_HURL_SPEED,
-        BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED
+        BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED,
       );
       enemy.facing = { ...action.direction };
     }
@@ -1469,7 +1615,14 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       leavesBiofluid: false,
       ttl: Math.ceil((BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED) * TICK_HZ),
     });
-    events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: action.direction.x, dy: action.direction.y, owner: enemy.id });
+    events.push({
+      t: 'shot',
+      x: enemy.x,
+      y: enemy.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+      owner: enemy.id,
+    });
   } else if (action.kind === 'charge') {
     // O cavalo NAO recebe impulso aqui. A investida dele e conduzida tick a tick
     // por `horseChargeStride`, que precisa da posicao exata de cada passo para
@@ -1530,7 +1683,12 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     const stop = enemy.radius + target.radius + 0.05;
     for (let s = 0; s < steps; s++) {
       if (distTo(enemy, target) <= stop) break; // chegou: nao empurra por dentro
-      const moved = moveEntity(state, target, pull.x * UNDERTAKER_PULL_STEP, pull.y * UNDERTAKER_PULL_STEP);
+      const moved = moveEntity(
+        state,
+        target,
+        pull.x * UNDERTAKER_PULL_STEP,
+        pull.y * UNDERTAKER_PULL_STEP,
+      );
       // Bateu em alguma coisa: o arrasto acabou aqui — e basta UM DOS EIXOS
       // travar. Testar "nao saiu do lugar" (os dois eixos juntos) era um erro
       // silencioso em toda diagonal: com a parede segurando so o X, o passo
@@ -1559,9 +1717,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     // derivar de `contactDamage` faria o golpe pesado valer 14, e um golpe
     // que custa uma posicao inteira nao pode doer como um encostao.
     const heavy =
-      enemy.archetype === 'undertaker'
-        ? UNDERTAKER_SLAM_DAMAGE
-        : def.contactDamage * 1.2;
+      enemy.archetype === 'undertaker' ? UNDERTAKER_SLAM_DAMAGE : def.contactDamage * 1.2;
     const reach = enemy.archetype === 'undertaker' ? UNDERTAKER_SLAM_RANGE : 2.1;
     if (distTo(enemy, target) < reach) {
       damageEntity(state, target, heavy, events, {
@@ -1577,7 +1733,8 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
 const advanceAction = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): boolean => {
   const action = enemy.action;
   if (!action) return false;
-  if (state.tick >= action.releaseAt && action.phase === 'windup') releaseAction(state, enemy, events);
+  if (state.tick >= action.releaseAt && action.phase === 'windup')
+    releaseAction(state, enemy, events);
   if (!enemy.alive) return true;
   if (state.tick >= action.endsAt) {
     enemy.action = undefined;
@@ -1595,7 +1752,10 @@ const advanceAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
  * mesma sala precisam arrancar exatamente o mesmo bloco. Um sorteio aqui
  * divergiria o mundo entre os dois jogadores.
  */
-export const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
+export const findRippable = (
+  state: SurvivalState,
+  ent: Entity,
+): { x: number; y: number } | null => {
   const ex = Math.floor(ent.x);
   const ey = Math.floor(ent.y);
   let best: { x: number; y: number } | null = null;
@@ -1640,7 +1800,7 @@ const guardianSteering = (
   enemy: Entity,
   targetX: number,
   targetY: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): Vec2 => {
   if (hasLineOfSight(state, enemy.x, enemy.y, targetX, targetY)) {
     state.bossRuntime.path = [];
@@ -1682,7 +1842,17 @@ const guardianSteering = (
   // vizinhas PERPENDICULARES ao passo sao o que da largura ao vao.
   if (state.solid[ny * w + nx] !== SOLID_NONE) {
     const alongX = Math.abs(nx - ex) >= Math.abs(ny - ey);
-    for (const [ox, oy] of alongX ? [[0, 0], [0, -1], [0, 1]] : [[0, 0], [-1, 0], [1, 0]]) {
+    for (const [ox, oy] of alongX
+      ? [
+          [0, 0],
+          [0, -1],
+          [0, 1],
+        ]
+      : [
+          [0, 0],
+          [-1, 0],
+          [1, 0],
+        ]) {
       const bx = nx + ox;
       const by = ny + oy;
       if (state.solid[by * w + bx] === SOLID_NONE) continue;
@@ -1726,7 +1896,13 @@ const bishopRegen = (state: SurvivalState, enemy: Entity, events: SemanticEvent[
   // semantico levaria 20 curas por segundo so deste inimigo, e o mixer de audio
   // gastaria o orcamento de vozes inteiro num som que se le igual em 5 Hz.
   if (state.tick % 4 === 0) {
-    events.push({ t: 'heal', x: enemy.x, y: enemy.y, entity: enemy.id, amount: BISHOP_REGEN_PER_TICK * 4 });
+    events.push({
+      t: 'heal',
+      x: enemy.x,
+      y: enemy.y,
+      entity: enemy.id,
+      amount: BISHOP_REGEN_PER_TICK * 4,
+    });
   }
   return true;
 };
@@ -1968,12 +2144,13 @@ const lurkerStep = (
   player: Entity | null,
   dist: number,
   dt: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   const isLamprey = enemy.archetype === 'mud_lamprey';
   const w = state.config.width;
   const inElement = (i: number): boolean =>
-    i >= 0 && i < state.surface.length &&
+    i >= 0 &&
+    i < state.surface.length &&
     (isLamprey ? isConductiveSurface(state.surface[i]) : state.surface[i] === SURF_ICE);
 
   const hidden = inElement(cellUnder(state, enemy));
@@ -2005,7 +2182,7 @@ const lurkerStep = (
       isLamprey ? LAMPREY_LUNGE_WINDUP_TICKS : WRAITH_LUNGE_WINDUP_TICKS,
       8,
       events,
-      player.id
+      player.id,
     );
     return;
   }
@@ -2052,7 +2229,7 @@ const bellowsStep = (
   player: Entity | null,
   dist: number,
   dt: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   const w = state.config.width;
   const h = state.config.height;
@@ -2173,13 +2350,23 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
   }
 
   const victim = nearestTarget(state, enemy.x, enemy.y);
-  if (victim && state.tick >= enemy.contactReadyAt && distTo(enemy, victim) < enemy.radius + victim.radius + 0.35) {
+  if (
+    victim &&
+    state.tick >= enemy.contactReadyAt &&
+    distTo(enemy, victim) < enemy.radius + victim.radius + 0.35
+  ) {
     enemy.contactReadyAt = state.tick + ARCHETYPES.fungal_horse.contactCooldown;
-    damageEntity(state, victim, ARCHETYPES.fungal_horse.contactDamage * (enemy.elite ? 1.4 : 1), events, {
-      kind: 'enemy_contact',
-      archetype: 'fungal_horse',
-      elite: enemy.elite,
-    });
+    damageEntity(
+      state,
+      victim,
+      ARCHETYPES.fungal_horse.contactDamage * (enemy.elite ? 1.4 : 1),
+      events,
+      {
+        kind: 'enemy_contact',
+        archetype: 'fungal_horse',
+        elite: enemy.elite,
+      },
+    );
   }
 
   // O rastro so comeca depois que a investida ANDOU o atraso inteiro.
@@ -2195,7 +2382,8 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
 
   const trailX = Math.floor(enemy.x - action.direction.x * step * HORSE_TRAIL_DELAY_TICKS);
   const trailY = Math.floor(enemy.y - action.direction.y * step * HORSE_TRAIL_DELAY_TICKS);
-  if (trailX < 0 || trailY < 0 || trailX >= state.config.width || trailY >= state.config.height) return;
+  if (trailX < 0 || trailY < 0 || trailX >= state.config.width || trailY >= state.config.height)
+    return;
   const i = trailY * state.config.width + trailX;
   if (state.solid[i] !== SOLID_NONE) return;
   // `igniteCell` primeiro: cada materia tem a propria resposta ao calor (o fungo
@@ -2224,7 +2412,11 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
  * pe. E a mesma regra do Britador, e e o que faz a passagem dele EXPOR veio
  * que estava emparedado — o estrago do chefe vira a mina do jogador.
  */
-const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+const diamandisDrillStride = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
   const action = enemy.action;
   if (!action || action.kind !== 'drill' || action.phase === 'windup') return;
 
@@ -2267,7 +2459,11 @@ const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: Seman
   moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
 
   const victim = nearestTarget(state, enemy.x, enemy.y);
-  if (victim && state.tick >= enemy.contactReadyAt && distTo(enemy, victim) < enemy.radius + victim.radius + 0.4) {
+  if (
+    victim &&
+    state.tick >= enemy.contactReadyAt &&
+    distTo(enemy, victim) < enemy.radius + victim.radius + 0.4
+  ) {
     enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
     damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE, events, {
       kind: 'enemy_contact',
@@ -2483,15 +2679,12 @@ const devourerLaunchSpot = (
   // mesmo ataque de um lado so.
   const done = DEVOURER_LEAPS_PER_CYCLE - state.bossRuntime.leapsLeft;
   const dir = rotated(back, done * DEVOURER_LEAP_TURN);
-  const reach = Math.min(
-    DEVOURER_LEAP_MAX_RANGE,
-    Math.max(DEVOURER_LEAP_MIN_RANGE, span)
-  );
+  const reach = Math.min(DEVOURER_LEAP_MAX_RANGE, Math.max(DEVOURER_LEAP_MIN_RANGE, span));
   return devourerSurfacingSpot(
     state,
     Math.floor(landX + dir.x * reach),
     Math.floor(landY + dir.y * reach),
-    DEVOURER_LAUNCH_SEARCH
+    DEVOURER_LAUNCH_SEARCH,
   );
 };
 
@@ -2582,7 +2775,7 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
 export const devourerMawTick = (
   state: SurvivalState,
   enemy: Entity,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   if (state.tick >= enemy.nextActionAt) {
     // A boca FECHA, e ele volta para baixo com a rajada recomposta.
@@ -2690,7 +2883,7 @@ const devourerMawDrag = (
   state: SurvivalState,
   enemy: Entity,
   victim: Entity,
-  reach: number
+  reach: number,
 ): void => {
   const dist = distTo(enemy, victim);
   if (dist > reach || dist <= 0.0001) return;
@@ -3062,6 +3255,171 @@ const archcantorHasNetwork = (state: SurvivalState, enemy: Entity): boolean => {
  * generica de descarga que ja existe; o preco e o meio ficar mortal para quem
  * o parou.
  */
+type ProtectiveBubble = { x: number; y: number; radius: number };
+
+const bubblePositionValid = (
+  state: SurvivalState,
+  boss: Entity,
+  bubble: ProtectiveBubble,
+  placed: readonly ProtectiveBubble[],
+  reachable: ReadonlySet<number>,
+): boolean => {
+  const w = state.config.width;
+  const h = state.config.height;
+  if (bubble.x < 2 || bubble.y < 2 || bubble.x >= w - 2 || bubble.y >= h - 2) return false;
+  if (Math.hypot(bubble.x - boss.x, bubble.y - boss.y) < boss.radius + bubble.radius + 0.65)
+    return false;
+  if (
+    placed.some(
+      (other) =>
+        Math.hypot(bubble.x - other.x, bubble.y - other.y) < bubble.radius + other.radius + 0.5,
+    )
+  )
+    return false;
+  if (!reachable.has(Math.floor(bubble.y) * w + Math.floor(bubble.x))) return false;
+  for (
+    let y = Math.floor(bubble.y - bubble.radius);
+    y <= Math.floor(bubble.y + bubble.radius);
+    y++
+  ) {
+    for (
+      let x = Math.floor(bubble.x - bubble.radius);
+      x <= Math.floor(bubble.x + bubble.radius);
+      x++
+    ) {
+      if (x < 0 || y < 0 || x >= w || y >= h) return false;
+      if (
+        Math.hypot(x + 0.5 - bubble.x, y + 0.5 - bubble.y) <= bubble.radius &&
+        state.solid[y * w + x] !== SOLID_NONE
+      )
+        return false;
+    }
+  }
+  return (
+    delugeDepth(state, Math.floor(bubble.y) * w + Math.floor(bubble.x)) >= PROSPECTOR_HEAD_HEIGHT
+  );
+};
+
+/**
+ * Dois abrigos deterministas e deliberadamente assimetricos: o primeiro tende
+ * a ficar longe do chefe; o segundo, mais perto dele. A rotacao sai da seed e
+ * da sequencia do golpe, sem Math.random e sem quebrar replay/network.
+ */
+const protectiveBubblePositions = (state: SurvivalState, boss: Entity): ProtectiveBubble[] => {
+  const out: ProtectiveBubble[] = [];
+  const w = state.config.width;
+  const reachable = new Set<number>();
+  const queue: number[] = [];
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    const cell = Math.floor(player.y) * w + Math.floor(player.x);
+    if (!reachable.has(cell)) {
+      reachable.add(cell);
+      queue.push(cell);
+    }
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head];
+    const x = cell % w;
+    const y = Math.floor(cell / w);
+    for (const [dx, dy] of NEIGHBORS4) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= state.config.height - 1) continue;
+      const next = ny * w + nx;
+      if (reachable.has(next) || state.solid[next] !== SOLID_NONE) continue;
+      reachable.add(next);
+      queue.push(next);
+    }
+  }
+  const base =
+    (((state.config.seed ^ (state.bossRuntime.leviathanShockSeq * 0x9e3779b9)) >>> 0) % 6283) /
+    1000;
+  const rings = [6.2, 3.4];
+  for (let slot = 0; slot < 2; slot++) {
+    for (let n = 0; n < 40; n++) {
+      const angle = base + slot * 2.17 + n * 2.399963;
+      const radius = rings[slot] + ((n % 5) - 2) * 0.35;
+      const bubble = {
+        x: Math.floor(boss.x + Math.cos(angle) * radius) + 0.5,
+        y: Math.floor(boss.y + Math.sin(angle) * radius) + 0.5,
+        radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
+      };
+      if (!bubblePositionValid(state, boss, bubble, out, reachable)) continue;
+      out.push(bubble);
+      break;
+    }
+  }
+  // Arenas muito recortadas: busca exaustiva, ainda determinista, garante o par.
+  for (let i = 0; out.length < 2 && i < state.surface.length; i++) {
+    const idx = (i * 97 + state.bossRuntime.leviathanShockSeq * 53) % state.surface.length;
+    const bubble = {
+      x: (idx % w) + 0.5,
+      y: Math.floor(idx / w) + 0.5,
+      radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
+    };
+    if (bubblePositionValid(state, boss, bubble, out, reachable)) out.push(bubble);
+  }
+  return out;
+};
+
+const playerProtectedByBubble = (player: Entity, bubble: ProtectiveBubble): boolean =>
+  Math.hypot(player.x - bubble.x, player.y - bubble.y) + player.radius <= bubble.radius;
+
+const leviathanMassiveDischarge = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  const bubbles = state.bossRuntime.protectiveBubbles.map((bubble) => ({ ...bubble }));
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    if (!bubbles.some((bubble) => playerProtectedByBubble(player, bubble))) {
+      damageEntity(state, player, LEVIATHAN_SHOCK_DAMAGE, events, { kind: 'leviathan_discharge' });
+    }
+  }
+  events.push({
+    t: 'leviathan_discharge',
+    x: enemy.x,
+    y: enemy.y,
+    radius: Math.hypot(state.config.width, state.config.height),
+    bubbles,
+  });
+  state.bossRuntime.protectiveBubbles = [];
+  state.bossRuntime.leviathanShockAt = -1;
+  state.bossRuntime.leviathanShockRecoverAt = state.tick + LEVIATHAN_SHOCK_COOLDOWN_TICKS;
+};
+
+const startLeviathanMassiveShock = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): boolean => {
+  if (
+    state.bossRuntime.leviathanShockAt >= 0 ||
+    state.tick < state.bossRuntime.leviathanShockRecoverAt
+  )
+    return false;
+  state.bossRuntime.leviathanShockSeq++;
+  const bubbles = protectiveBubblePositions(state, enemy);
+  if (bubbles.length !== 2) return false;
+  state.bossRuntime.protectiveBubbles = bubbles;
+  state.bossRuntime.leviathanShockAt = state.tick + LEVIATHAN_SHOCK_WINDUP_TICKS;
+  startAction(
+    state,
+    enemy,
+    'massive_shock',
+    enemy.facing,
+    LEVIATHAN_SHOCK_WINDUP_TICKS,
+    LEVIATHAN_SHOCK_RECOVERY_TICKS,
+    events,
+  );
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 5 });
+  return true;
+};
+
 const leviathanStep = (
   state: SurvivalState,
   enemy: Entity,
@@ -3074,6 +3432,12 @@ const leviathanStep = (
   // uma carta que muda o mapa nao pode ficar esperando a fase certa do ciclo
   // para sair. Cruzou o limiar com o encontro em curso, ela sai.
   if (player && state.bossRuntime.awake) leviathanDeluge(state, enemy, events);
+  if (
+    player &&
+    delugeDepth(state, Math.floor(player.y) * w + Math.floor(player.x)) >= PROSPECTOR_HEAD_HEIGHT
+  ) {
+    if (startLeviathanMassiveShock(state, enemy, events)) return;
+  }
   if (enemy.mood === DEVOURER_SURFACED) {
     if (state.tick >= enemy.nextActionAt) {
       enemy.mood = DEVOURER_BURROWED;
@@ -3084,12 +3448,20 @@ const leviathanStep = (
     const toward = normalized(player.x - enemy.x, player.y - enemy.y);
     enemy.facing = { ...toward };
     const def = ARCHETYPES.sheet_leviathan;
-    if (distTo(enemy, player) < enemy.radius + player.radius + 0.2 && state.tick >= enemy.contactReadyAt) {
+    if (
+      distTo(enemy, player) < enemy.radius + player.radius + 0.2 &&
+      state.tick >= enemy.contactReadyAt
+    ) {
       enemy.contactReadyAt = state.tick + def.contactCooldown;
       startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
       return;
     }
-    moveEntity(state, enemy, toward.x * LEVIATHAN_SURFACE_SPEED * dt, toward.y * LEVIATHAN_SURFACE_SPEED * dt);
+    moveEntity(
+      state,
+      enemy,
+      toward.x * LEVIATHAN_SURFACE_SPEED * dt,
+      toward.y * LEVIATHAN_SURFACE_SPEED * dt,
+    );
     return;
   }
 
@@ -3175,11 +3547,7 @@ const leviathanStep = (
  * `phasesFired` guarda que ela ja saiu: uma fase de uma vez nao volta atras nem
  * se o chefe for curado, e o bit ja viaja no snapshot e ja entra no hash.
  */
-const leviathanDeluge = (
-  state: SurvivalState,
-  enemy: Entity,
-  events: SemanticEvent[],
-): void => {
+const leviathanDeluge = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   if ((state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE) !== 0) return;
   if (enemy.maxHp <= 0 || enemy.hp / enemy.maxHp > DELUGE_HP_FRACTION) return;
   state.bossRuntime.phasesFired |= BOSS_PHASE_DELUGE;
@@ -3492,7 +3860,15 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
     damageEntity(state, player, FURNACE_HEART_WAVE_DAMAGE, events, { kind: 'fire' });
   }
 
-  events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
+  events.push({
+    t: 'beam_line',
+    x: enemy.x,
+    y: enemy.y,
+    dx: dirX,
+    dy: dirY,
+    length: r,
+    powered: true,
+  });
 };
 
 /**
@@ -4041,7 +4417,11 @@ const hasModule = (state: SurvivalState, module: number): boolean =>
  * Soltar nao tira a arma — o modulo continua pendurado e funcionando. O que
  * muda e que agora um Coveiro consegue engatar o eletroima nele.
  */
-const diamandisShedModules = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+const diamandisShedModules = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
   const fraction = enemy.hp / enemy.maxHp;
   for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
     const bit = 1 << m;
@@ -4162,7 +4542,8 @@ const undertakerSalvageStep = (
   dt: number,
   events: SemanticEvent[],
 ): boolean => {
-  const carrying = (enemy.mood ?? 0) > 0 && (state.bossRuntime.modulesLost & (1 << (enemy.mood! - 1))) !== 0;
+  const carrying =
+    (enemy.mood ?? 0) > 0 && (state.bossRuntime.modulesLost & (1 << (enemy.mood! - 1))) !== 0;
   const w = state.config.width;
   const h = state.config.height;
 
@@ -4177,10 +4558,13 @@ const undertakerSalvageStep = (
     const toBottom = h - enemy.y;
     const best = Math.min(toLeft, toRight, toTop, toBottom);
     const dir =
-      best === toLeft ? { x: -1, y: 0 }
-      : best === toRight ? { x: 1, y: 0 }
-      : best === toTop ? { x: 0, y: -1 }
-      : { x: 0, y: 1 };
+      best === toLeft
+        ? { x: -1, y: 0 }
+        : best === toRight
+          ? { x: 1, y: 0 }
+          : best === toTop
+            ? { x: 0, y: -1 }
+            : { x: 0, y: 1 };
     enemy.facing = { ...dir };
     const speed = ARCHETYPES.undertaker.speed * surfaceSpeedMul(state, enemy);
     const moved = moveEntity(state, enemy, dir.x * speed * dt, dir.y * speed * dt);
@@ -4256,7 +4640,16 @@ const undertakerSalvageStep = (
   if (distTo(enemy, boss) <= UNDERTAKER_SALVAGE_REACH) {
     if (state.tick >= enemy.rangedReadyAt) {
       enemy.rangedReadyAt = state.tick + UNDERTAKER_SALVAGE_WINDUP_TICKS + 20;
-      startAction(state, enemy, 'haul', toward, UNDERTAKER_SALVAGE_WINDUP_TICKS, 6, events, boss.id);
+      startAction(
+        state,
+        enemy,
+        'haul',
+        toward,
+        UNDERTAKER_SALVAGE_WINDUP_TICKS,
+        6,
+        events,
+        boss.id,
+      );
     }
     return true;
   }
@@ -4272,7 +4665,11 @@ const undertakerSalvageStep = (
  * existe: nao machuca por pisar, SEGURA o calor da arma. A luta continua
  * sendo sobre posicao, e o mapa e que fica caro.
  */
-const diamandisReactorCollapse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+const diamandisReactorCollapse = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
   const w = state.config.width;
   const r = DIAMANDIS_REACTOR_EMBER_RADIUS;
   const cx = Math.floor(enemy.x);
@@ -4339,6 +4736,27 @@ const driftByVelocity = (
 
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
+  const leviathan = state.enemies.find(
+    (enemy) => enemy.alive && enemy.archetype === 'sheet_leviathan',
+  );
+  const livePlayer = state.players.some((player) => {
+    const extra = state.playerExtras[player.slot ?? 0];
+    return player.alive && extra.joined && !extra.downed;
+  });
+  if (!leviathan || !livePlayer) {
+    state.bossRuntime.protectiveBubbles = [];
+    state.bossRuntime.leviathanShockAt = -1;
+    if (leviathan?.action?.kind === 'massive_shock') {
+      leviathan.action = undefined;
+      events.push({ t: 'action_end', entity: leviathan.id });
+    }
+  } else if (
+    leviathan.action?.kind === 'massive_shock' &&
+    leviathan.action.phase === 'windup' &&
+    state.bossRuntime.protectiveBubbles.length !== 2
+  ) {
+    state.bossRuntime.protectiveBubbles = protectiveBubblePositions(state, leviathan);
+  }
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
     // A cura do bispo roda ANTES do portao de acao, e nao dentro do ramo de IA.
@@ -4438,7 +4856,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           state,
           enemy,
           away.x * MINER_FLEE_SPEED * dt * surfaceSpeedMul(state, enemy),
-          away.y * MINER_FLEE_SPEED * dt * surfaceSpeedMul(state, enemy)
+          away.y * MINER_FLEE_SPEED * dt * surfaceSpeedMul(state, enemy),
         );
         // Encurralado, ele desliza pela parede em vez de travar de frente para
         // ela. Um NPC preso num canto vibrando le como bug, e nao como medo.
@@ -4447,7 +4865,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
             state,
             enemy,
             (fled.blockedX ? -away.y : 0) * MINER_FLEE_SPEED * dt,
-            (fled.blockedY ? -away.x : 0) * MINER_FLEE_SPEED * dt
+            (fled.blockedY ? -away.x : 0) * MINER_FLEE_SPEED * dt,
           );
         }
         continue;
@@ -4466,7 +4884,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         state,
         enemy,
         toward.x * MINER_RAGE_SPEED * dt * surfaceSpeedMul(state, enemy),
-        toward.y * MINER_RAGE_SPEED * dt * surfaceSpeedMul(state, enemy)
+        toward.y * MINER_RAGE_SPEED * dt * surfaceSpeedMul(state, enemy),
       );
       continue;
     }
@@ -4597,7 +5015,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           // fugiu, nao chegou, plantou).
           enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
           enemy.rangedReadyAt = 0;
-          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, BISHOP_NOVA_TRAVEL_TICKS, events, player.id);
+          startAction(
+            state,
+            enemy,
+            'pulse',
+            toward,
+            BISHOP_NOVA_WINDUP_TICKS,
+            BISHOP_NOVA_TRAVEL_TICKS,
+            events,
+            player.id,
+          );
           continue;
         }
         if (refuge) {
@@ -4620,7 +5047,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         dist <= BISHOP_NOVA_RADIUS
       ) {
         enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
-        startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, BISHOP_NOVA_TRAVEL_TICKS, events, player.id);
+        startAction(
+          state,
+          enemy,
+          'pulse',
+          toward,
+          BISHOP_NOVA_WINDUP_TICKS,
+          BISHOP_NOVA_TRAVEL_TICKS,
+          events,
+          player.id,
+        );
         continue;
       }
 
@@ -4638,7 +5074,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
       ) {
         enemy.rangedReadyAt = state.tick + HORSE_CHARGE_COOLDOWN_TICKS;
-        startAction(state, enemy, 'charge', toward, HORSE_CHARGE_WINDUP_TICKS, HORSE_CHARGE_TICKS, events, player.id);
+        startAction(
+          state,
+          enemy,
+          'charge',
+          toward,
+          HORSE_CHARGE_WINDUP_TICKS,
+          HORSE_CHARGE_TICKS,
+          events,
+          player.id,
+        );
         continue;
       }
 
@@ -4664,7 +5109,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
       ) {
         enemy.rangedReadyAt = state.tick + UNDERTAKER_PULL_COOLDOWN_TICKS;
-        startAction(state, enemy, 'haul', toward, UNDERTAKER_PULL_WINDUP_TICKS, 6, events, player.id);
+        startAction(
+          state,
+          enemy,
+          'haul',
+          toward,
+          UNDERTAKER_PULL_WINDUP_TICKS,
+          6,
+          events,
+          player.id,
+        );
         continue;
       }
 
@@ -4726,7 +5180,8 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           dist >= DIAMANDIS_DEMOLISH_MIN_RANGE &&
           dist <= DIAMANDIS_DEMOLISH_RANGE
         ) {
-          enemy.rangedReadyAt = state.tick + Math.round(DIAMANDIS_DEMOLISH_COOLDOWN_TICKS * cadence);
+          enemy.rangedReadyAt =
+            state.tick + Math.round(DIAMANDIS_DEMOLISH_COOLDOWN_TICKS * cadence);
           startAction(
             state,
             enemy,
@@ -4739,7 +5194,13 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           );
           // As marcas nascem AGORA, com a posicao que o alvo tem agora: e o
           // instante do telegrafo que elas congelam, e sair dali e a resposta.
-          markDemolition(state, enemy, player, state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS, events);
+          markDemolition(
+            state,
+            enemy,
+            player,
+            state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+            events,
+          );
           continue;
         }
         // O feixe MORRE no colapso do reator: e o primeiro sistema a cair
@@ -4753,7 +5214,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
         ) {
           enemy.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
-          startAction(state, enemy, 'beam', toward, DIAMANDIS_BEAM_WINDUP_TICKS, 10, events, player.id);
+          startAction(
+            state,
+            enemy,
+            'beam',
+            toward,
+            DIAMANDIS_BEAM_WINDUP_TICKS,
+            10,
+            events,
+            player.id,
+          );
           continue;
         }
       }
@@ -4768,7 +5238,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         archcantorHasNetwork(state, enemy)
       ) {
         enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
-        startAction(state, enemy, 'pulse', toward, ARCHCANTOR_WINDUP_TICKS, ARCHCANTOR_CHAIN_LAYERS * ARCHCANTOR_CHAIN_STEP_TICKS, events, player.id);
+        startAction(
+          state,
+          enemy,
+          'pulse',
+          toward,
+          ARCHCANTOR_WINDUP_TICKS,
+          ARCHCANTOR_CHAIN_LAYERS * ARCHCANTOR_CHAIN_STEP_TICKS,
+          events,
+          player.id,
+        );
         continue;
       }
 
@@ -4779,7 +5258,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         dist <= FROST_QUEEN_FREEZE_RADIUS + 3
       ) {
         enemy.rangedReadyAt = state.tick + FROST_QUEEN_FREEZE_COOLDOWN_TICKS;
-        startAction(state, enemy, 'freeze', toward, FROST_QUEEN_FREEZE_WINDUP_TICKS, 8, events, player.id);
+        startAction(
+          state,
+          enemy,
+          'freeze',
+          toward,
+          FROST_QUEEN_FREEZE_WINDUP_TICKS,
+          8,
+          events,
+          player.id,
+        );
         continue;
       }
 
@@ -4800,7 +5288,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         const ammo = findRippable(state, enemy);
         if (ammo && ripSolid(state, ammo.x, ammo.y, events)) {
           enemy.rangedReadyAt = state.tick + BRUISER_HURL_COOLDOWN_TICKS;
-          startAction(state, enemy, 'hurl', toward, BRUISER_HURL_WINDUP_TICKS, 6, events, player.id);
+          startAction(
+            state,
+            enemy,
+            'hurl',
+            toward,
+            BRUISER_HURL_WINDUP_TICKS,
+            6,
+            events,
+            player.id,
+          );
           continue;
         }
       }
@@ -4997,7 +5494,8 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       (p) =>
         p.alive &&
         !state.playerExtras[p.slot ?? 0].downed &&
-        Math.max(Math.abs(p.x - guardian.x), Math.abs(p.y - guardian.y)) < GUARDIAN_ARENA_RADIUS - 1
+        Math.max(Math.abs(p.x - guardian.x), Math.abs(p.y - guardian.y)) <
+          GUARDIAN_ARENA_RADIUS - 1,
     );
     if (near) {
       const placed = closeArena(
@@ -5006,7 +5504,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         Math.floor(guardian.y),
         GUARDIAN_ARENA_RADIUS,
         GUARDIAN_ARENA_EXITS,
-        events
+        events,
       );
       if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
@@ -5028,7 +5526,7 @@ export const applyExplosionDamage = (
    * aconteca, e sem este campo ela chegaria ao jogador indistinguivel de um
    * bomber que ele nunca viu.
    */
-  source: EffectOrigin['source'] = 'environment'
+  source: EffectOrigin['source'] = 'environment',
 ): void => {
   const joined = state.players.filter((p) => state.playerExtras[p.slot ?? 0].joined);
   for (const ent of [...joined, ...state.enemies]) {
@@ -5041,7 +5539,7 @@ export const applyExplosionDamage = (
         ent,
         EXPLOSION_DAMAGE * Math.max(0.35, 1 - d / (radius + 0.001)) * scale,
         events,
-        { kind: 'explosion', source }
+        { kind: 'explosion', source },
       );
     }
   }
