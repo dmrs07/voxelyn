@@ -1794,7 +1794,20 @@ const stepPlayer = (
     settleOverheat(state, slot, events);
   }
 
-  // Celula de Purga: cartucho interno de cura e descontaminacao.
+  // Celula de Purga: cartucho interno de cura e descontaminacao LOCAL.
+  //
+  // "Local" e a palavra que falta na promessa: ela cura, e limpa gas e esporos
+  // no raio — mas nao encosta em `state.contamination`, a barra global que de
+  // fato encerra a run. E o que faz da contaminacao o unico sistema de pressao
+  // do jogo sem contrajogada nenhuma: ela sobe, acelera por setor, dobra com o
+  // Nucleo, e a unica resposta disponivel e andar mais rapido.
+  //
+  // Nao foi decidido contra — nunca chegou a ser decidido. Poe-la para cortar
+  // uma fracao da barra e uma linha aqui; o trabalho todo e de calibragem, e a
+  // economia de celulas (um cofre por site, tres sites por setor, setor
+  // regenerado na subida) e o que decide se a ideia funciona. Numeros medidos,
+  // faixa a testar e riscos em
+  // docs/audit/2026-08-31-contaminacao-em-aberto.md §1.
   if (cmd.purge && extra.purgeCells > 0) {
     extra.purgeCells--;
     player.hp = Math.min(player.maxHp, player.hp + PURGE_CELL_HEAL);
