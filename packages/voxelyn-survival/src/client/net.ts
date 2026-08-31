@@ -379,6 +379,9 @@ export class NetClient {
     // nunca recebeu o evento que a anunciou, e sem estes tres campos veria um
     // setor seco enquanto o servidor cobra por um setor submerso.
     state.bossRuntime.delugeAt = world.delugeAt ?? -1;
+    // -1 quando o servidor e anterior a boca do Devorador: "nao ha boca
+    // aberta", que e exatamente o que uma simulacao sem ela quer dizer.
+    state.bossRuntime.mawOpenedAt = world.mawOpenedAt ?? -1;
     state.bossRuntime.delugeX = world.delugeX ?? 0;
     state.bossRuntime.delugeY = world.delugeY ?? 0;
     // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao

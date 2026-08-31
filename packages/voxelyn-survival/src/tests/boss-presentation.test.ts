@@ -30,7 +30,7 @@ import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-ti
 import { ARCHETYPE_SPRITE } from '../client/sprites';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import { EntityPresentation } from '../client/presentation';
-import { DEVOURER_AIRBORNE, DEVOURER_BURROWED, DEVOURER_STUCK } from '@voxelyn/survival-sim';
+import { DEVOURER_AIRBORNE, DEVOURER_BURROWED, DEVOURER_MAW } from '@voxelyn/survival-sim';
 import { SURFACE_FALLBACK, SURFACE_KIND_INDEX } from '../client/render';
 import {
   applyBossModuleMark,
@@ -179,7 +179,7 @@ describe('o Devorador entalado troca de silhueta', () => {
 
   it('preso desenha a pose erguida; mergulhado e no ar, nao', () => {
     const p = new EntityPresentation();
-    const stuck = p.animationFor(worm(DEVOURER_STUCK) as never, { tick: 5 } as never, base as never, 1_000);
+    const stuck = p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_000);
     expect(stuck.anim).toBe('downed');
 
     for (const mood of [DEVOURER_BURROWED, DEVOURER_AIRBORNE]) {

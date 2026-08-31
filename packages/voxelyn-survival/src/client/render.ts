@@ -29,6 +29,9 @@ import {
   SURF_RAIL,
   SURF_SILT,
   SURF_RAIL_V,
+  DEVOURER_MAW,
+  DEVOURER_MAW_BITE_RADIUS,
+  mawReach,
   CANARY_DEAD_AT,
   CONTAMINATION_WAVES,
   TICK_HZ,
@@ -74,6 +77,7 @@ import {
   type EntityAnimState,
   PropBank,
 } from './sprites';
+import { MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawStreak } from './maw-vortex';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
 import { ProjectileView, SMALL_PROJECTILE_RADIUS } from './projectiles';
@@ -2495,6 +2499,94 @@ export class SurvivalRenderer {
         ctx.beginPath();
         ctx.ellipse(msx, msy, rx * progress, ry * progress, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // O VORTICE DA BOCA do Devorador. Desenhado no CHAO, junto das outras
+    // marcas de solo e antes de qualquer corpo: ele e terreno acontecendo, nao
+    // um efeito por cima da cena — e o jogador precisa ver os proprios pes
+    // dentro dele.
+    //
+    // Nada aqui e transmitido. O unico numero que viaja e o tick em que a boca
+    // abriu (`bossRuntime.mawOpenedAt`), e o alcance sai dele pela MESMA funcao
+    // que a simulacao usa para decidir quem esta sendo puxado: o anel nao pode
+    // prometer um raio diferente do raio que agarra.
+    {
+      const openedAt = state.bossRuntime.mawOpenedAt;
+      const maw = state.enemies.find(
+        (e) => e.alive && e.archetype === 'white_devourer' && e.mood === DEVOURER_MAW
+      );
+      const reach = maw ? mawReach(state.tick, openedAt) : 0;
+      if (maw && reach > 0.05) {
+        const [mx, my] = toScreen(maw.x, maw.y);
+        const seconds = nowMs / 1000;
+        ctx.save();
+
+        // 1. A GARGANTA: a unica coisa preenchida do desenho, e escura. Ela nao
+        //    pulsa nem gira — e o lugar para onde tudo o mais aponta, e um
+        //    centro que se mexe deixaria de ser um centro.
+        //
+        //    So aparece quando ela EXISTE, pela mesma condicao que a simulacao
+        //    usa para cobrar (`reach >= BITE_RADIUS`). Desenhar a garganta antes
+        //    disso mostraria uma sentenca no chao durante o unico segundo da
+        //    janela em que pisar ali e inofensivo — e o jogador esta em cima
+        //    dela nesse segundo, porque a queda do arco foi mirada nele.
+        if (reach >= DEVOURER_MAW_BITE_RADIUS) {
+          const throatX = DEVOURER_MAW_BITE_RADIUS * TILE_W * 0.5 * z;
+          const throatY = DEVOURER_MAW_BITE_RADIUS * TILE_H * 0.5 * z;
+          ctx.fillStyle = 'rgba(14,10,8,0.62)';
+          ctx.beginPath();
+          ctx.ellipse(mx, my, throatX, throatY, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 2. A BORDA: ate onde a sucao chega NESTE tick. Cresce com a janela,
+        //    entao o anel avancando pelo chao e o cronometro dela.
+        ctx.strokeStyle = 'rgba(201,180,140,0.42)';
+        ctx.lineWidth = Math.max(1, z * 0.7);
+        ctx.beginPath();
+        ctx.ellipse(mx, my, reach * TILE_W * 0.5 * z, reach * TILE_H * 0.5 * z, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 3. A LINHA DO SEM-VOLTA, so depois que a boca cresceu ate ela. E a
+        //    unica informacao do encontro que o jogador nao teria como medir:
+        //    dali para dentro andar para tras deixa de bastar, e a resposta
+        //    passa a ser esquiva, vidro ou uma quina. Vermelha e mais forte que
+        //    a borda porque as duas dizem coisas de gravidade diferente.
+        if (reach > MAW_NO_RETURN_RADIUS) {
+          ctx.strokeStyle = 'rgba(217,59,76,0.5)';
+          ctx.lineWidth = Math.max(1, z * 0.55);
+          ctx.beginPath();
+          ctx.ellipse(
+            mx,
+            my,
+            MAW_NO_RETURN_RADIUS * TILE_W * 0.5 * z,
+            MAW_NO_RETURN_RADIUS * TILE_H * 0.5 * z,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.stroke();
+        }
+
+        // 4. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
+        //    celula e o chao limpo chega pelo diff de chunks; o que falta, e o
+        //    que estes riscos entregam, e o CAMINHO — a materia indo para
+        //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
+        ctx.strokeStyle = SURFACE_FALLBACK[SURF_SILT];
+        ctx.lineWidth = Math.max(1, z * 0.5);
+        for (let i = 0; i < MAW_STREAKS; i++) {
+          const grain = mawStreak(i, seconds, reach);
+          if (grain.alpha <= 0.01) continue;
+          const [hx, hy] = toScreen(maw.x + grain.dx, maw.y + grain.dy);
+          const [tx, ty] = toScreen(maw.x + grain.tailDx, maw.y + grain.tailDy);
+          ctx.globalAlpha = grain.alpha * 0.75;
+          ctx.beginPath();
+          ctx.moveTo(tx, ty);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+        }
         ctx.restore();
       }
     }

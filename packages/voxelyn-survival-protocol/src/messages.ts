@@ -331,6 +331,26 @@ export type WorldFlags = {
   delugeX?: number;
   delugeY?: number;
   /**
+   * A BOCA do Devorador: o tick em que ela abriu (-1 = fechada).
+   *
+   * Um numero so, pela mesma economia do Diluvio: o vortice inteiro — alcance,
+   * forca a cada distancia, quanto ainda falta para ele abrir de todo — e
+   * derivado deste instante mais as constantes que as duas pontas ja
+   * compartilham (ver `maw.ts` na simulacao). Um campo por tick diria o que o
+   * cliente sabe calcular, e abriria a chance de o anel desenhado discordar da
+   * sucao que ele promete.
+   *
+   * Viaja porque quem RECONECTA no meio da janela nunca recebeu a transicao de
+   * humor que a abriu, e desenharia um chefe entalado e inofensivo enquanto o
+   * servidor arrasta o corpo dele para dentro. Dano sem sinal e o unico
+   * invariante de combate que este projeto nao quebra.
+   *
+   * Ausente em servidores anteriores a boca: o cliente trata como -1, que e
+   * "nao ha boca aberta" — a leitura correta para uma simulacao em que ela
+   * ainda nem existia.
+   */
+  mawOpenedAt?: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

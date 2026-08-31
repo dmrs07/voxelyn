@@ -109,7 +109,10 @@ import {
   DEVOURER_HOP_GAP_TICKS,
   DEVOURER_REPEAT_MIN_GAP,
   DEVOURER_LEAPS_PER_CYCLE,
-  DEVOURER_STUCK_TICKS,
+  DEVOURER_MAW_TICKS,
+  DEVOURER_MAW_BITE_DAMAGE,
+  DEVOURER_MAW_BITE_RADIUS,
+  DEVOURER_MAW_PULL_STEP,
   DEVOURER_TRAIL_WIDTH,
   SURF_GLASS,
   SURF_SCORCHED,
@@ -258,6 +261,7 @@ import {
 import { breakSolid, canRip, chargeCells, closeArena, delugeFront, explodeAt, igniteCell, isConductiveCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
+import { mawPull, mawReach } from './maw.js';
 import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
@@ -265,7 +269,7 @@ import {
   BELLOWS_INHALING,
   DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
-  DEVOURER_STUCK,
+  DEVOURER_MAW,
   DEVOURER_SURFACED,
   FURNACE_COOLING,
   FURNACE_OVERHEATING,
@@ -2351,20 +2355,26 @@ const devourerStep = (
     return;
   }
 
-  // PRESO: a janela. Ele nao faz NADA aqui, e a lista do que ele nao faz e a
-  // mecanica inteira — nao anda, nao vira, nao cobra contato e nao tem areia
-  // absorvendo tiro. Encostar nele e de graca, e e por isso que este e o
-  // momento de gastar o superaquecimento.
+  // A BOCA: a janela. Ele continua sem andar, sem virar e sem areia absorvendo
+  // tiro — a abertura e a mesma, e tudo o que ela prometia continua de pe.
   //
-  // Antes existia um estado EXPOSTO em que ele perseguia devagar e machucava
-  // por contato. Ele saiu: perseguir de leve no meio da unica abertura do ciclo
-  // punia justamente a aproximacao que a abertura existe para convidar.
-  if (enemy.mood === DEVOURER_STUCK) {
+  // O que ele NAO faz mais e nada. Antes ele ficava entalado e inerte, uma
+  // torre: a janela nao pedia nada de quem a usava alem de ter municao. Agora
+  // ela e um lugar com sucao, e usar a janela virou uma decisao de posicao.
+  //
+  // Antes disso existiu tambem um estado EXPOSTO em que ele perseguia devagar e
+  // cobrava contato. Ele saiu e nao volta: perseguir puniria a aproximacao que
+  // a abertura existe para convidar. A boca e o contrario disso — ela ATRAI, e
+  // quem decide se chegar perto vale a pena continua sendo o jogador.
+  if (enemy.mood === DEVOURER_MAW) {
     if (state.tick >= enemy.nextActionAt) {
       enemy.mood = DEVOURER_BURROWED;
+      state.bossRuntime.mawOpenedAt = -1;
       state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
       enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+      return;
     }
+    devourerMawStep(state, enemy, events);
     return;
   }
 
@@ -2547,7 +2557,7 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
   enemy.action = undefined;
   devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
   // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
-  // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: ele ENTALA.
+  // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: a BOCA abre.
   //
   // O decremento acontece aqui, no pouso, e nao na decolagem — um arco que o
   // vidro negou nunca chegou a ser um ataque, e cobrar da conta um salto que
@@ -2558,9 +2568,181 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
     enemy.nextActionAt = state.tick + DEVOURER_HOP_GAP_TICKS;
     return;
   }
-  enemy.mood = DEVOURER_STUCK;
-  enemy.nextActionAt = state.tick + DEVOURER_STUCK_TICKS;
+  enemy.mood = DEVOURER_MAW;
+  enemy.nextActionAt = state.tick + DEVOURER_MAW_TICKS;
+  // O instante em que a boca abriu. Dele saem o alcance da sucao, a areia ja
+  // engolida e o desenho do vortice no cliente — as duas pontas integram a
+  // mesma rampa a partir deste unico numero (ver `maw.ts`).
+  state.bossRuntime.mawOpenedAt = state.tick;
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+};
+
+/**
+ * UM TICK DE BOCA ABERTA: engolir areia, arrastar corpos, devorar quem chegou.
+ *
+ * A ordem importa e e esta. A areia primeiro porque ela e o TELEGRAFO: o chao
+ * limpo que sobra desenha o alcance do tick, e desenhar depois de arrastar
+ * mostraria o aviso um tick atrasado em relacao a coisa que ele avisa. A
+ * mordida por ultimo porque ela le a posicao JA arrastada — quem foi puxado
+ * para dentro da garganta neste tick e comido neste tick, e nao no seguinte.
+ *
+ * Ele nao se mexe em nenhum ramo. A boca nao persegue: ela espera, e o mundo e
+ * que anda ate ela.
+ */
+const devourerMawStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const opened = state.bossRuntime.mawOpenedAt;
+  const reach = mawReach(state.tick, opened);
+  if (reach <= 0) return;
+
+  devourerMawIntake(state, enemy, reach);
+
+  // TUDO e puxado, e o "tudo" e literal: jogador e bicho, com a mesma conta.
+  //
+  // Incluir a fauna nao e enfeite tematico — e o que impede a janela de virar
+  // uma armadilha unilateral. O jogador que arrasta um bando para dentro do
+  // raio da boca resolve os dois problemas de uma vez, e essa jogada so existe
+  // porque a sucao nao pergunta de quem e o corpo. Chefes ficam de fora: uma
+  // camara com dois donos e um caso que este jogo nao tem, e o unico efeito de
+  // permitir seria um Devorador se arrastando para dentro de si mesmo.
+  for (const victim of state.players) {
+    if (!victim.alive || !state.playerExtras[victim.slot ?? 0].joined) continue;
+    devourerMawDrag(state, enemy, victim, reach);
+  }
+  for (const victim of state.enemies) {
+    if (!victim.alive || victim === enemy || isBossArchetype(victim.archetype)) continue;
+    devourerMawDrag(state, enemy, victim, reach);
+  }
+
+  // A GARGANTA so cobra depois de EXISTIR. Enquanto o alcance nao chegou ao raio
+  // dela, a boca ainda esta se abrindo e o centro e uma cratera como qualquer
+  // outra — que e o que ele acabou de ser.
+  //
+  // Isto nao e uma folga de bondade, e a correcao de um caso que sem ela seria
+  // fatal e injusto: a queda do arco e mirada NO JOGADOR, entao a janela abre
+  // com o corpo dele em cima do centro. Uma garganta valendo desde o primeiro
+  // tick mataria, sem sinal e sem tempo de resposta, exatamente quem acabou de
+  // levar a cratera — e a unica licao possivel seria "nao esteja onde o chefe
+  // decidiu cair", que nao e uma licao.
+  //
+  // O vao que sobra e o primeiro segundo da janela: tempo de sair de cima do
+  // centro andando, com o anel do vortice crescendo a vista para dizer que ele
+  // vem.
+  if (reach >= DEVOURER_MAW_BITE_RADIUS) devourerMawBite(state, enemy, events);
+};
+
+/**
+ * A AREIA SENDO SUGADA: toda silica solta dentro do alcance vira chao limpo.
+ *
+ * Isto e o desenho do raio, feito com a materia do proprio estrato. A borda
+ * entre areia e chao limpo diz — sem HUD, sem numero e sem uma linha de cliente
+ * — exatamente ate onde a sucao chega neste tick, e como o alcance cresce com o
+ * tempo, a borda que avanca pelo chao E o cronometro: ela toca os pes do
+ * jogador no mesmo tick em que a sucao o alcanca.
+ *
+ * Sem cota por tick, e a ausencia dela e o ponto: quem paga o ritmo e o
+ * ALCANCE. Um segundo relogio por cima so poderia atrasar a borda em relacao a
+ * sucao que ela promete desenhar, que e a unica coisa que este efeito nao pode
+ * fazer.
+ *
+ * E ela come de verdade: silica engolida nao vitrifica mais. Quem guardou o
+ * rastro do verme "para depois" descobre que depois ele foi comido — e essa e a
+ * pressao que impede o contra-jogo de ser adiado de graca. O VIDRO nao e
+ * tocado, pela regra de sempre: o chefe nao desfaz a decisao do jogador.
+ */
+const devourerMawIntake = (state: SurvivalState, enemy: Entity, reach: number): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = Math.ceil(reach);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+      if (Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y) > reach) continue;
+      const i = y * w + x;
+      if (state.surface[i] !== SURF_SILT) continue;
+      setSurface(state, i, SURF_NONE, 0);
+    }
+  }
+};
+
+/**
+ * UM CORPO sendo arrastado por um tick.
+ *
+ * Em sub-passos com colisao, como o eletroima do Coveiro e pelo mesmo motivo:
+ * um puxao resolvido de uma vez atravessaria parede, e quem tem uma quina entre
+ * si e a boca precisa parar NELA. Cobertura e a unica saida da garganta que nao
+ * gasta esquiva, e ela so existe se cada passo do arrasto perguntar ao terreno.
+ *
+ * O chao consultado e o da VITIMA e nao o do caminho: vidro segura os pes de
+ * quem esta em cima dele (DEVOURER_MAW_GLASS_GRIP), e e por isso que vitrificar
+ * antes da janela e a resposta a este golpe.
+ */
+const devourerMawDrag = (
+  state: SurvivalState,
+  enemy: Entity,
+  victim: Entity,
+  reach: number
+): void => {
+  const dist = distTo(enemy, victim);
+  if (dist > reach || dist <= 0.0001) return;
+  const w = state.config.width;
+  const fx = Math.floor(victim.x);
+  const fy = Math.floor(victim.y);
+  const onGlass =
+    fx >= 0 &&
+    fy >= 0 &&
+    fx < w &&
+    fy < state.config.height &&
+    state.surface[fy * w + fx] === SURF_GLASS;
+  const speed = mawPull(dist, state.tick, state.bossRuntime.mawOpenedAt, onGlass);
+  if (speed <= 0) return;
+  const travel = speed / TICK_HZ;
+  const dir = normalized(enemy.x - victim.x, enemy.y - victim.y);
+  const steps = Math.max(1, Math.ceil(travel / DEVOURER_MAW_PULL_STEP));
+  const step = travel / steps;
+  for (let s = 0; s < steps; s++) {
+    const moved = moveEntity(state, victim, dir.x * step, dir.y * step);
+    // Um eixo travado ja encerra o arrasto. Testar os dois juntos deixaria o
+    // corpo raspar na parede contornando obstaculo curto ate a garganta — a
+    // quina deixaria de proteger justamente no caso comum. Mesma correcao que o
+    // eletroima do Coveiro ja levou.
+    if (moved.blockedX || moved.blockedY) break;
+  }
+};
+
+/**
+ * A GARGANTA: dali para dentro nao ha corpo, ha boca.
+ *
+ * Cobrada uma vez por tick e para todo mundo — jogador e bicho —, com a mesma
+ * sentenca. DEVOURER_MAW_BITE_DAMAGE e o dobro da vida cheia do Prospector de
+ * proposito: a boca precisa ser uma REGRA e nao um risco calculavel, senao
+ * atravessar a garganta com vida cheia vira mais barato que reposicionar e o
+ * golpe inteiro degenera num dano a mais.
+ *
+ * Ninguem chega aqui de surpresa. O caminho ate a garganta e segundos de
+ * arrasto, com a areia inteira apontando para onde e a linha do sem-volta
+ * anunciada muito antes — e sobre vidro, ou atras de uma quina, ele nunca se
+ * fecha.
+ */
+const devourerMawBite = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const cause: DamageCause = {
+    kind: 'enemy_contact',
+    archetype: 'white_devourer',
+    elite: enemy.elite,
+  };
+  for (const victim of state.players) {
+    if (!victim.alive || !state.playerExtras[victim.slot ?? 0].joined) continue;
+    if (distTo(enemy, victim) > DEVOURER_MAW_BITE_RADIUS) continue;
+    damageEntity(state, victim, DEVOURER_MAW_BITE_DAMAGE, events, cause);
+  }
+  for (const victim of state.enemies) {
+    if (!victim.alive || victim === enemy || isBossArchetype(victim.archetype)) continue;
+    if (distTo(enemy, victim) > DEVOURER_MAW_BITE_RADIUS) continue;
+    damageEntity(state, victim, DEVOURER_MAW_BITE_DAMAGE, events, cause);
+  }
 };
 
 /**
