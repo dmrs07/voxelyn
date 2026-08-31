@@ -477,6 +477,8 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------
+  'banner.profile.reopened':
+    'Perfil novo neste navegador — o anterior continua no servidor, mas o vínculo local se perdeu.',
   'banner.expedition.offline': 'AURIX INDISPONÍVEL · SIMULAÇÃO LOCAL, NADA SERÁ REGISTRADO',
   'banner.expedition.tooLong': 'EXPEDIÇÃO EXCEDEU O REGISTRO DE 30 MIN · CARGA NÃO HOMOLOGÁVEL',
   'banner.expedition.pending': 'TRANSMISSÃO INTERROMPIDA · A TELEMETRIA SERÁ REENVIADA',

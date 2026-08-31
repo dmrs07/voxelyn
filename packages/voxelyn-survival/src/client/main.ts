@@ -61,7 +61,11 @@ import {
   type MatrixViewState,
   type PanelNotice,
 } from './matrix-panel';
-import type { CodexContext, PublicLoreFragment } from '@voxelyn/survival-protocol';
+import type {
+  CodexContext,
+  PublicLoreFragment,
+  PublicProgressionProfile,
+} from '@voxelyn/survival-protocol';
 import { formatSeed, parseSeed } from './run-summary';
 import { endActionAt, type EndAction, type EndActionRegions } from './run-end-actions';
 import {
@@ -541,6 +545,60 @@ let settlementSent = false;
  * `expedition` e a B liquidava o log dela contra o ticket errado; se a A tivesse
  * falhado, ela zerava `expedition` e a B nao homologava nada.
  */
+/**
+ * Avisa quando o jogo abriu um perfil NOVO por cima de um que tinha progresso.
+ *
+ * Nasceu de um incidente que levou uma hora para diagnosticar e devia ter
+ * levado dez segundos. A arvore de protocolos voltou vazia; o servidor estava
+ * impecavel — Postgres conectado em todo boot, base intacta, nenhum outro
+ * jogador afetado. O que aconteceu foi local: o token da sessao sumiu deste
+ * navegador (storage limpo, PWA reinstalado, ou a ORIGEM do servidor mudou e a
+ * chave passou a ser outra), o servidor respondeu `unauthenticated`, e o
+ * cliente abriu um perfil em branco — em silencio.
+ *
+ * O silencio e o defeito. Perder o vinculo com o perfil e indistinguivel, na
+ * tela, de o servidor ter apagado tudo — e a primeira suspeita vai para o
+ * servidor, que e onde a informacao NAO esta.
+ *
+ * Nao avisa na primeira visita, que e o caso normal e nao tem nada de errado. A
+ * condicao e a conjuncao inteira:
+ *
+ *   1. a sessao teve de ser reaberta (`openedProfile` presente);
+ *   2. havia um perfil em cache neste navegador;
+ *   3. ele era OUTRO (`profileId` diferente — reconectar ao mesmo nao e perda);
+ *   4. e ele tinha progresso a perder.
+ *
+ * O item 4 e o que separa "voce perdeu sua arvore" de "voce tinha um perfil
+ * zerado e ganhou outro zerado". Sem ele o aviso apareceria para quem nao
+ * perdeu nada, e um aviso que cria alarme falso deixa de ser lido.
+ *
+ * O perfil antigo NAO se perdeu do lado do servidor — ele continua no banco,
+ * so ficou sem endereco neste aparelho. Por isso o texto fala em vinculo, e nao
+ * em perda: dizer "seu progresso foi apagado" seria mentira, e a mentira
+ * mandaria o jogador desistir de algo que ainda da para resgatar.
+ */
+const announceProfileReopened = (
+  previous: PublicProgressionProfile | null,
+  opened: PublicProgressionProfile,
+): void => {
+  if (!previous || previous.profileId === opened.profileId) return;
+  const hadProgress =
+    previous.purchasedUpgradeIds.length > 0 ||
+    previous.wallet.ore > 0 ||
+    previous.wallet.cores > 0;
+  if (!hadProgress) return;
+  setBanner(t('banner.profile.reopened'), 'offline');
+  // Sem `setTimeout` para limpar, ao contrario dos outros banners: este e o
+  // unico aviso que o jogador vai receber sobre uma progressao que sumiu, e
+  // faze-lo desaparecer sozinho em quatro segundos e quase nao te-lo dado.
+  // Ele sai quando o proximo banner entrar.
+  console.info(
+    '[progressao] perfil novo neste navegador. O anterior era',
+    previous.profileId,
+    '— ele continua no servidor.',
+  );
+};
+
 const authorizeExpedition = async (
   seed: number,
   descent: number,
@@ -558,6 +616,10 @@ const authorizeExpedition = async (
   // A sessao pode ter nascido AGORA, nesta chamada: o perfil que veio com ela e
   // o unico estado autoritativo que o jogo tem antes de descer.
   if (authorized.openedProfile) {
+    // LIDO ANTES de sobrescrever: `writeCachedProfile` apaga o unico vestigio
+    // do perfil anterior que este navegador tinha.
+    const previous = readCachedProfile()?.profile ?? null;
+    announceProfileReopened(previous, authorized.openedProfile);
     writeCachedProfile(authorized.openedProfile, Date.now());
     renderer.setProspectorGeneration(authorized.openedProfile.generation);
     renderDescentClearance();

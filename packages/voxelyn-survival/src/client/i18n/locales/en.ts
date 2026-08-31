@@ -461,6 +461,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------
+  'banner.profile.reopened':
+    'New profile on this browser — the previous one is still on the server, but the local link is gone.',
   'banner.expedition.offline': 'AURIX UNREACHABLE · LOCAL SIMULATION, NOTHING WILL BE RECORDED',
   'banner.expedition.tooLong': 'EXPEDITION EXCEEDED THE 30 MIN RECORD · CARGO CANNOT BE CLEARED',
   'banner.expedition.pending': 'TRANSMISSION INTERRUPTED · TELEMETRY WILL BE RESENT',
