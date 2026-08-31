@@ -205,10 +205,13 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'rank.loading': 'loading…',
   'rank.entry': '{position}. {stars} {name}',
   'rank.col.operator': 'Operator',
+  'rank.col.cores': 'Cores',
   'rank.col.time': 'Time',
+  'rank.class': '{sectors} sectors',
+  'rank.class.entries': '{entries} homologated expeditions',
   'rank.how': 'HOW TO GET IN',
   'rank.how.text':
-    'Only runs that extracted count. The server re-simulates your match from the keys you pressed — there is no score to submit, only what happened.',
+    'Only runs that extracted count. The server re-simulates your match from the keys you pressed — there is no score to submit, only what happened. Position comes from two things: how many Cores you brought back and how long it took. Each depth keeps its own book — three-sector descents do not compete with seven.',
 
   // ---------------------------------------------------------------------
   // Bestiary: corporate designation and field name
@@ -442,7 +445,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.reputation.one': 'CORPORATE RECORD: 1 inactive unit destroyed — no recovery value.',
   'summary.reputation.other':
     'CORPORATE RECORD: {count} inactive units destroyed — no recovery value.',
-  'summary.nextStar.three': '★★★ requires the core in {target} — you went {over} over.',
+  'summary.nextStar.three': '★★★ requires every core in {target} — you went {over} over.',
+  'summary.nextStar.three.cores':
+    '★★★ requires all {total} cores of the descent — you surfaced with {missing} still in the Vein.',
   'summary.nextStar.two': "★★ requires leaving with the Guardian's core.",
   'summary.nextStar.one': '★ requires reaching extraction alive.',
   'summary.seed': 'seed {seed}',

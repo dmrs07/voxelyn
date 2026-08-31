@@ -11,7 +11,7 @@
 // runs solo passam por `verifySoloRun`. Este arquivo guarda e ordena; ele nao
 // julga.
 
-import type { RunSummary } from '@voxelyn/survival-sim';
+import { compareRunScore, type RunSummary } from '@voxelyn/survival-sim';
 
 export type LeaderboardMode = 'solo' | 'coop';
 
@@ -25,7 +25,23 @@ export type LeaderboardEntry = {
   mode: LeaderboardMode;
   kills: number;
   /**
-   * Minerio da run. Desempata entre estrelas e tempo iguais.
+   * Nucleos que sairam do Veio nesta run. O CRITERIO PRIMARIO da pontuacao.
+   *
+   * Nao e derivavel de `phase`: `extracted_with_core` diz que houve ao menos um,
+   * e uma descida de G-03/G-04 pode trazer dois. Enquanto o placar ordenava por
+   * estrelas, as duas runs empatavam — e a segunda tinha cumprido o dobro.
+   */
+  cores: number;
+  /**
+   * Quantos setores esta run atravessou. A CLASSE do livro em que ela compete.
+   *
+   * Fica na linha, e nao e reconsultado do perfil: uma run de tres setores
+   * gravada hoje continua sendo de tres setores depois de o jogador chegar a
+   * G-04. A profundidade de uma run e um fato dela, nao do dono.
+   */
+  sectorCount: number;
+  /**
+   * Minerio da run. NAO entra na pontuacao — ver `compareEntries`.
    *
    * `not null default 0` no banco em vez de nulavel: bancos que ja existiam
    * ganham zero, que e a resposta correta — aquelas runs foram jogadas quando
@@ -33,6 +49,12 @@ export type LeaderboardEntry = {
    */
   ore: number;
   createdAt: string;
+};
+
+/** Um livro: uma classe de run e quantas expedicoes ja entraram nele. */
+export type LeaderboardClass = {
+  sectorCount: number;
+  entries: number;
 };
 
 export type SubmitInput = {
@@ -48,14 +70,42 @@ export type LeaderboardQuery = {
   /** Restringe a uma seed, para o placar "desta descida". */
   seed?: number;
   mode?: LeaderboardMode;
+  /**
+   * A CLASSE do livro: quantos setores a run atravessou.
+   *
+   * Ausente devolve TODAS as classes misturadas, e por isso nenhum caminho de
+   * leitura do jogo a omite — ver `createLeaderboardHandler`, que sempre
+   * resolve uma classe antes de consultar. O filtro e opcional na assinatura
+   * porque a auditoria (um operador olhando o banco inteiro) e um leitor
+   * legitimo; ele nao e opcional no jogo.
+   */
+  sectorCount?: number;
 };
 
 export interface LeaderboardStore {
   /** Devolve a entrada gravada, ou null se ja existia (dedupe por digest). */
   submit(input: SubmitInput): Promise<LeaderboardEntry | null>;
   top(query: LeaderboardQuery): Promise<LeaderboardEntry[]>;
+  /**
+   * Os livros que EXISTEM, do mais raso ao mais fundo.
+   *
+   * Derivado do que foi gravado, e nunca da tabela de geracoes: um seletor
+   * montado a partir de `SECTORS_BY_GENERATION` ofereceria quatro livros vazios
+   * no dia do deploy, e um livro vazio que o jogador abre e uma promessa que o
+   * placar nao cumpriu.
+   */
+  classes(query: Omit<LeaderboardQuery, 'limit' | 'sectorCount'>): Promise<LeaderboardClass[]>;
   close(): Promise<void>;
 }
+
+/**
+ * A classe de uma run que nao declarou profundidade.
+ *
+ * Tres, e nao "desconhecida": toda run gravada antes desta mudanca foi uma
+ * descida de tres setores — era a unica que existia. Chamar de desconhecida
+ * criaria um livro fantasma para o historico inteiro do jogo.
+ */
+export const LEGACY_SECTOR_COUNT = 3;
 
 const totalKills = (summary: RunSummary): number =>
   Object.values(summary.stats.kills).reduce((a, b) => a + b, 0);
@@ -65,25 +115,28 @@ export const isLeaderboardEligible = (summary: RunSummary): boolean =>
   summary.phase === 'extracted' || summary.phase === 'extracted_with_core';
 
 /**
- * A ordenacao do ranking, num lugar so.
+ * A ordenacao do ranking, num lugar so — e esse lugar delega.
  *
- * Mais estrelas primeiro; entre nota igual, MENOS TEMPO. E a mesma escada das
- * estrelas — a terceira ja e "a segunda com pressa" —, entao ordenar por tempo
- * dentro da nota nao introduz um criterio novo, so continua o que a nota
- * comecou. Empate desempata pelo mais antigo: quem chegou primeiro fica na
- * frente, e o ranking nao se reordena sozinho quando ninguem melhorou nada.
- */
-/**
- * Mais estrelas, menos tempo, mais MINERIO, e por fim quem chegou antes.
+ * `compareRunScore` mora na SIMULACAO, junto de quem constroi o sumario, e nao
+ * aqui: a pontuacao e uma regra do jogo, nao do banco. Duas implementacoes da
+ * mesma ordem — uma em TypeScript, outra no `order by` do Postgres — ja sao uma
+ * a mais do que o seguro; uma terceira, divergente da sim, era o jeito de a tela
+ * de resultado e o livro discordarem sobre quem ganhou.
  *
- * O minerio entra DEPOIS do tempo, e nao antes, de proposito. Ele nao pode virar
- * um objetivo que compete com a corrida — a terceira estrela ja e "a segunda com
- * pressa", e minerar custa tempo. Como desempate ele so decide entre duas runs
- * que ja empataram no que o jogo cobra, e ai a pergunta "quem tirou mais do
- * Veio?" e a unica que sobra, alem de ser a que a ficcao faria.
+ * Nucleos, tempo, e por fim quem chegou antes. Estrelas NAO ordenam mais: uma
+ * run de dois Nucleos fora do tempo-alvo vale duas estrelas e cumpriu o dobro
+ * de uma de tres estrelas com um Nucleo so — ordenar pela nota punia a descida
+ * mais fundo. As estrelas continuam sendo a leitura da run; elas so deixaram de
+ * ser a posicao dela.
+ *
+ * O minerio saiu junto. Ele era desempate, mas desempate tambem e criterio: era
+ * uma quarta pergunta que o livro fazia e o briefing nao.
+ *
+ * `a.id - b.id` no fim mantem quem chegou primeiro na frente, e e o que impede
+ * o ranking de se reordenar sozinho quando ninguem melhorou nada.
  */
 export const compareEntries = (a: LeaderboardEntry, b: LeaderboardEntry): number =>
-  b.stars - a.stars || a.ticks - b.ticks || b.ore - a.ore || a.id - b.id;
+  compareRunScore(a, b) || a.id - b.id;
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
@@ -113,6 +166,8 @@ export class MemoryLeaderboard implements LeaderboardStore {
       phase: input.summary.phase,
       mode: input.mode,
       kills: totalKills(input.summary),
+      cores: input.summary.cores,
+      sectorCount: input.summary.sectorCount,
       ore: input.summary.stats.oreCollected,
       createdAt: new Date().toISOString(),
     };
@@ -122,14 +177,31 @@ export class MemoryLeaderboard implements LeaderboardStore {
 
   async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {
     return this.rows
-      .filter(
-        (r) =>
-          r.phase !== 'dead' &&
-          (query.seed === undefined || r.seed === query.seed) &&
-          (query.mode === undefined || r.mode === query.mode),
-      )
+      .filter((r) => this.visible(r, query))
       .sort(compareEntries)
       .slice(0, clampLimit(query.limit));
+  }
+
+  async classes(
+    query: Omit<LeaderboardQuery, 'limit' | 'sectorCount'>,
+  ): Promise<LeaderboardClass[]> {
+    const counted = new Map<number, number>();
+    for (const row of this.rows) {
+      if (!this.visible(row, query)) continue;
+      counted.set(row.sectorCount, (counted.get(row.sectorCount) ?? 0) + 1);
+    }
+    return [...counted.entries()]
+      .map(([sectorCount, entries]) => ({ sectorCount, entries }))
+      .sort((a, b) => a.sectorCount - b.sectorCount);
+  }
+
+  private visible(row: LeaderboardEntry, query: LeaderboardQuery): boolean {
+    return (
+      row.phase !== 'dead' &&
+      (query.seed === undefined || row.seed === query.seed) &&
+      (query.mode === undefined || row.mode === query.mode) &&
+      (query.sectorCount === undefined || row.sectorCount === query.sectorCount)
+    );
   }
 
   async close(): Promise<void> {}
@@ -163,6 +235,8 @@ create table if not exists leaderboard_entries (
   mode        text        not null,
   kills       integer     not null,
   ore         integer     not null default 0,
+  cores       smallint    not null default 0,
+  sector_count smallint   not null default ${LEGACY_SECTOR_COUNT},
   digest      text        unique,
   created_at  timestamptz not null default now()
 );
@@ -173,16 +247,39 @@ create table if not exists leaderboard_entries (
 -- idempotente, que e o que permite o schema continuar morando aqui em vez de num
 -- sistema de migracao que ainda nao se justifica.
 alter table leaderboard_entries add column if not exists ore integer not null default 0;
+-- A classe do livro. Toda linha que existia foi uma descida de tres setores —
+-- era a unica que o jogo tinha —, entao o default preenche o passado com a
+-- verdade em vez de com zero.
+alter table leaderboard_entries
+  add column if not exists sector_count smallint not null default ${LEGACY_SECTOR_COUNT};
+-- Nucleos: a coluna nasce NULAVEL de proposito.
+--
+-- Um "default 0" direto gravaria zero Nucleo em toda run antiga que extraiu COM
+-- Nucleo, e essas runs cairiam para o fim do livro na primeira leitura depois do
+-- deploy — o historico inteiro rebaixado por uma coluna nova. Nascer nula deixa
+-- o UPDATE abaixo dizer o que aquelas runs de fato trouxeram (a fase e a prova:
+-- "extracted_with_core" era um Nucleo, porque um era o maximo que existia), e so
+-- entao a coluna vira NOT NULL para as proximas.
+alter table leaderboard_entries add column if not exists cores smallint;
+update leaderboard_entries
+   set cores = case when phase = 'extracted_with_core' then 1 else 0 end
+ where cores is null;
+alter table leaderboard_entries alter column cores set default 0;
+alter table leaderboard_entries alter column cores set not null;
 -- Indices com nome NOVO, e nao os antigos.
 --
 -- CREATE INDEX IF NOT EXISTS olha o NOME, nao as colunas: reusar o nome antigo
 -- deixaria o indice velho intacto em producao e silenciosamente fora de ordem
 -- com o ORDER BY. O indice tem de casar com compareEntries — um que discorde
 -- devolve as linhas certas na ordem errada.
-create index if not exists leaderboard_rank_ore_idx
-  on leaderboard_entries (stars desc, ticks asc, ore desc, id asc);
-create index if not exists leaderboard_seed_ore_idx
-  on leaderboard_entries (seed, stars desc, ticks asc, ore desc, id asc);
+--
+-- "sector_count" vem PRIMEIRO nos dois: toda leitura do jogo filtra por classe
+-- antes de ordenar, e um indice que so ordena obrigaria o banco a varrer os
+-- livros das outras profundidades para descartar linha a linha.
+create index if not exists leaderboard_rank_class_idx
+  on leaderboard_entries (sector_count, cores desc, ticks asc, id asc);
+create index if not exists leaderboard_seed_class_idx
+  on leaderboard_entries (sector_count, seed, cores desc, ticks asc, id asc);
 `;
 
 const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
@@ -196,9 +293,33 @@ const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
   phase: String(row.phase),
   mode: String(row.mode) as LeaderboardMode,
   kills: Number(row.kills),
+  cores: Number(row.cores ?? 0),
+  sectorCount: Number(row.sector_count ?? LEGACY_SECTOR_COUNT),
   ore: Number(row.ore ?? 0),
   createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
 });
+
+/**
+ * O WHERE compartilhado por `top` e `classes`.
+ *
+ * Compartilhado porque as duas consultas TEM de enxergar o mesmo conjunto: um
+ * seletor que conta livros com um filtro e uma lista que os abre com outro
+ * ofereceria uma aba que abre vazia. `phase <> 'dead'` esconde derrotas legadas,
+ * gravadas antes de a elegibilidade ser exigida no submit.
+ */
+const filterOf = (query: LeaderboardQuery): { where: string; values: unknown[] } => {
+  const conditions: string[] = [`phase <> 'dead'`];
+  const values: unknown[] = [];
+  const eq = (column: string, value: unknown): void => {
+    if (value === undefined) return;
+    values.push(value);
+    conditions.push(`${column} = $${values.length}`);
+  };
+  eq('seed', query.seed);
+  eq('mode', query.mode);
+  eq('sector_count', query.sectorCount);
+  return { where: `where ${conditions.join(' and ')}`, values };
+};
 
 export class PostgresLeaderboard implements LeaderboardStore {
   constructor(private readonly pool: PgPool) {}
@@ -230,8 +351,9 @@ export class PostgresLeaderboard implements LeaderboardStore {
     // entre o "ja existe?" e o insert. O indice unico e a unica barreira que
     // nao tem janela.
     const result = await this.pool.query(
-      `insert into leaderboard_entries (name, seed, stars, ticks, phase, mode, kills, ore, digest)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `insert into leaderboard_entries
+         (name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count, digest)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (digest) do nothing
        returning *`,
       [
@@ -243,6 +365,8 @@ export class PostgresLeaderboard implements LeaderboardStore {
         input.mode,
         totalKills(input.summary),
         input.summary.stats.oreCollected,
+        input.summary.cores,
+        input.summary.sectorCount,
         input.digest,
       ],
     );
@@ -251,26 +375,32 @@ export class PostgresLeaderboard implements LeaderboardStore {
   }
 
   async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {
-    // Hide legacy failed rows that may have been stored before eligibility was enforced.
-    const conditions: string[] = [`phase <> 'dead'`];
-    const values: unknown[] = [];
-    if (query.seed !== undefined) {
-      values.push(query.seed);
-      conditions.push(`seed = $${values.length}`);
-    }
-    if (query.mode !== undefined) {
-      values.push(query.mode);
-      conditions.push(`mode = $${values.length}`);
-    }
+    const { where, values } = filterOf(query);
     values.push(clampLimit(query.limit));
-    const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : '';
     const result = await this.pool.query(
       `select * from leaderboard_entries ${where}
-       order by stars desc, ticks asc, ore desc, id asc
+       order by cores desc, ticks asc, id asc
        limit $${values.length}`,
       values,
     );
     return result.rows.map(rowToEntry);
+  }
+
+  async classes(
+    query: Omit<LeaderboardQuery, 'limit' | 'sectorCount'>,
+  ): Promise<LeaderboardClass[]> {
+    const { where, values } = filterOf(query);
+    const result = await this.pool.query(
+      `select sector_count, count(*) as entries from leaderboard_entries ${where}
+       group by sector_count
+       order by sector_count asc`,
+      values,
+    );
+    return result.rows.map((row) => ({
+      sectorCount: Number(row.sector_count ?? LEGACY_SECTOR_COUNT),
+      // `count(*)` volta do pg como string: e um bigint.
+      entries: Number(row.entries),
+    }));
   }
 
   async close(): Promise<void> {

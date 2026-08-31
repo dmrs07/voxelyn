@@ -7,12 +7,17 @@ import {
   buildSummary,
   createRun,
   damageEntity,
+  deepestCoreSector,
   emptyCommand,
   hashAuthoritativeState,
+  markCoreTaken,
+  compareRunScore,
+  runClass,
+  runScore,
   starsFor,
   stepRun,
 } from '../src/index.js';
-import type { DamageCause, SurvivalState } from '../src/index.js';
+import type { DamageCause, RunSummary, StarInput, SurvivalState } from '../src/index.js';
 
 const idle = () => [emptyCommand()];
 
@@ -48,31 +53,171 @@ const killWith = (cause: DamageCause, seed = 7): SurvivalState => {
 const TARGET_TICKS = targetExtractionTicks(DEFAULT_SECTOR_COUNT);
 
 describe('as tres estrelas', () => {
+  /** Uma descida rasa: UM Nucleo disponivel, como G-00 a G-02. */
+  const rasa = (over: Partial<StarInput>): StarInput => ({
+    phase: 'extracted_with_core',
+    ticks: TARGET_TICKS - 1,
+    targetTicks: TARGET_TICKS,
+    cores: 1,
+    coresAvailable: 1,
+    ...over,
+  });
+  /** Uma descida funda: DOIS Nucleos disponiveis, como G-03 e G-04. */
+  const funda = (over: Partial<StarInput>): StarInput =>
+    rasa({ cores: 2, coresAvailable: 2, ...over });
+
   // A escada e de INTENCAO: morrer nao e um resultado parcial de extrair.
   it('nao concede estrela a quem morre, por mais rapido que seja', () => {
-    expect(starsFor('dead', 1, TARGET_TICKS)).toBe(0);
-    expect(starsFor('dead', TARGET_TICKS * 10, TARGET_TICKS)).toBe(0);
+    expect(starsFor(rasa({ phase: 'dead', ticks: 1, cores: 0 }))).toBe(0);
+    // Nem a quem morre CARREGANDO o Nucleo: morrer no Veio nao entrega nada.
+    expect(starsFor(rasa({ phase: 'dead', ticks: 1, cores: 1 }))).toBe(0);
   });
 
   it('da uma estrela a quem sai vivo de maos vazias, independente do tempo', () => {
-    expect(starsFor('extracted', 1, TARGET_TICKS)).toBe(1);
-    expect(starsFor('extracted', TARGET_TICKS * 10, TARGET_TICKS)).toBe(1);
+    expect(starsFor(rasa({ phase: 'extracted', ticks: 1, cores: 0 }))).toBe(1);
+    expect(starsFor(rasa({ phase: 'extracted', ticks: TARGET_TICKS * 10, cores: 0 }))).toBe(1);
   });
 
-  // A terceira nao adiciona objetivo novo: cobra o MESMO objetivo com pressa. E
-  // o que mantem viva a decisao "extrair agora ou arriscar" depois que o jogador
-  // ja aprendeu o mapa.
+  // A terceira nao adiciona objetivo novo: cobra o MESMO objetivo, inteiro e com
+  // pressa. E o que mantem viva a decisao "extrair agora ou arriscar" depois que
+  // o jogador ja aprendeu o mapa.
   it('a terceira estrela e a segunda cobrada no tempo', () => {
-    expect(starsFor('extracted_with_core', TARGET_TICKS - 1, TARGET_TICKS)).toBe(3);
-    expect(starsFor('extracted_with_core', TARGET_TICKS, TARGET_TICKS)).toBe(3);
-    expect(starsFor('extracted_with_core', TARGET_TICKS + 1, TARGET_TICKS)).toBe(2);
+    expect(starsFor(rasa({ ticks: TARGET_TICKS - 1 }))).toBe(3);
+    expect(starsFor(rasa({ ticks: TARGET_TICKS }))).toBe(3);
+    expect(starsFor(rasa({ ticks: TARGET_TICKS + 1 }))).toBe(2);
+  });
+
+  /**
+   * O buraco que a contagem de Nucleos fechou.
+   *
+   * Numa descida de G-04 (Nucleos nos setores 3 e 7) da para recolher o
+   * INTERMEDIARIO e subir na hora. Enquanto a nota lia so a fase, essa run
+   * ganhava TRES estrelas por metade do contrato — e ganhava facil, porque o
+   * tempo-alvo e derivado dos sete setores enquanto ela so precisou de tres. A
+   * saida antecipada era a jogada otima E a mais bem avaliada, que e o
+   * contrario do que a escada existe para dizer.
+   */
+  it('sair cedo com um Nucleo de dois nao chega na terceira estrela', () => {
+    const cedo = funda({ cores: 1, ticks: Math.floor(TARGET_TICKS / 4) });
+    expect(starsFor(cedo)).toBe(2);
+  });
+
+  it('os dois Nucleos dentro do tempo, ai sim', () => {
+    expect(starsFor(funda({ ticks: TARGET_TICKS }))).toBe(3);
+    expect(starsFor(funda({ ticks: TARGET_TICKS + 1 }))).toBe(2);
+  });
+
+  // A descida rasa nao mudou de nota nenhuma: com UM Nucleo disponivel, "todos"
+  // e "aquele", e a regra nova devolve exatamente a antiga.
+  it('em descida de um Nucleo so, a regra e a mesma de sempre', () => {
+    expect(starsFor(rasa({ cores: 1, ticks: TARGET_TICKS - 1 }))).toBe(3);
+    expect(starsFor(rasa({ cores: 1, ticks: TARGET_TICKS + 1 }))).toBe(2);
+    expect(starsFor(rasa({ cores: 0, phase: 'extracted' }))).toBe(1);
   });
 
   it('e monotonica no tempo: demorar nunca sobe a nota', () => {
     let previous = 4;
     for (let t = 0; t <= TARGET_TICKS * 2; t += TARGET_TICKS / 8) {
-      const stars = starsFor('extracted_with_core', t, TARGET_TICKS);
+      const stars = starsFor(funda({ ticks: t }));
       expect(stars).toBeLessThanOrEqual(previous);
+      previous = stars;
+    }
+  });
+
+  // …e monotonica nos Nucleos, na outra direcao: trazer mais nunca desce a nota.
+  it('e monotonica nos Nucleos: trazer mais nunca desce a nota', () => {
+    let previous = 0;
+    for (let cores = 0; cores <= 2; cores++) {
+      // `phase` acompanha a contagem: a sim nunca produz `extracted_with_core`
+      // com zero Nucleo, e passar essa combinacao aqui testaria um estado que
+      // nao existe.
+      const stars = starsFor(
+        funda({ cores, phase: cores === 0 ? 'extracted' : 'extracted_with_core' }),
+      );
+      expect(stars).toBeGreaterThanOrEqual(previous);
+      previous = stars;
+    }
+  });
+});
+
+describe('a pontuacao da run', () => {
+  /**
+   * Duas grandezas, e so elas. O sumario carrega minerio, abates, dano,
+   * descobertas — nenhuma entra: sao consequencia de como a run foi jogada, e
+   * nenhuma e o que a run pede. Este teste falha no dia em que alguem
+   * acrescentar a terceira.
+   */
+  const scored = (over: Partial<RunSummary>): RunSummary =>
+    ({ cores: 1, ticks: 1000, sectorCount: 3, ...over }) as RunSummary;
+
+  it('le so Nucleos e tempo do sumario', () => {
+    expect(runScore(scored({ cores: 2, ticks: 4321 }))).toEqual({ cores: 2, ticks: 4321 });
+  });
+
+  it('mais Nucleos primeiro', () => {
+    expect(compareRunScore(scored({ cores: 2 }), scored({ cores: 1 }))).toBeLessThan(0);
+  });
+
+  it('entre Nucleos iguais, menos tempo primeiro', () => {
+    expect(compareRunScore(scored({ ticks: 500 }), scored({ ticks: 900 }))).toBeLessThan(0);
+  });
+
+  /**
+   * O Nucleo vale mais que qualquer tempo, e de proposito: ele e o OBJETIVO, e
+   * uma descida que volta com dois cumpriu duas vezes o que a Aurix pediu.
+   * Nenhuma pressa compra isso.
+   */
+  it('nenhum tempo compra um Nucleo', () => {
+    const doisLento = scored({ cores: 2, ticks: 999_999 });
+    const umInstantaneo = scored({ cores: 1, ticks: 1 });
+    expect(compareRunScore(doisLento, umInstantaneo)).toBeLessThan(0);
+  });
+
+  // Empate REAL devolve zero: quem chama decide o desempate (o ranking mantem
+  // quem chegou antes). Desempatar aqui obrigaria a pontuacao a conhecer id,
+  // data ou nome — coisas que nao sao pontuacao.
+  it('empate nao inventa desempate', () => {
+    expect(compareRunScore(scored({}), scored({}))).toBe(0);
+  });
+
+  // A classe e a descida, e nao a geracao: G-00 e G-01 autorizam a MESMA
+  // descida, e separa-las criaria dois livros para uma prova so.
+  it('a classe da run e a profundidade que ela atravessou', () => {
+    expect(runClass(scored({ sectorCount: 7 }))).toBe(7);
+  });
+
+  /**
+   * A NOTA E A POSICAO NAO SE CONTRADIZEM — e este teste e o que sustenta a
+   * tela do ranking.
+   *
+   * Dentro de um livro (profundidade fixa), ordenar por `compareRunScore` tem de
+   * produzir estrelas que nunca SOBEM linha a linha. Se subissem, o jogador
+   * veria uma ★★★ abaixo de uma ★★☆ e leria a lista como quebrada — e teria
+   * razao em desconfiar, porque duas regras estariam medindo coisas diferentes.
+   *
+   * Antes de a nota contar Nucleos isto era falso: uma run de um Nucleo (de
+   * dois) e rapida tirava tres estrelas e caia para o terceiro lugar atras de
+   * duas de dois Nucleos com duas estrelas. Nao era so feio na tela — era o
+   * sintoma de a escada premiar meia entrega.
+   */
+  it('dentro de um livro, a nota nunca sobe ao descer na lista', () => {
+    const CORES_DISPONIVEIS = 2;
+    const ALVO = 20_000;
+    const runs: { cores: number; ticks: number }[] = [];
+    for (let cores = 0; cores <= CORES_DISPONIVEIS; cores++) {
+      for (const ticks of [1_000, ALVO - 1, ALVO, ALVO + 1, 90_000]) runs.push({ cores, ticks });
+    }
+    const ordenadas = [...runs].sort(compareRunScore);
+    let previous = 4;
+    for (const run of ordenadas) {
+      const stars = starsFor({
+        phase: run.cores > 0 ? 'extracted_with_core' : 'extracted',
+        ticks: run.ticks,
+        targetTicks: ALVO,
+        cores: run.cores,
+        coresAvailable: CORES_DISPONIVEIS,
+      });
+      expect(stars, `${run.cores} nucleos em ${run.ticks} ticks`).toBeLessThanOrEqual(previous);
       previous = stars;
     }
   });
@@ -160,6 +305,10 @@ describe('causa de morte', () => {
     const state = createRun({ seed: 5 });
     const events: never[] = [];
     damageEntity(state, state.player, 10, events, { kind: 'fire' });
+    // A fase E a posse, e nao so a fase. Forjar `extracted_with_core` com a
+    // mascara vazia montava um estado que a sim nao produz — e a nota, que
+    // agora conta Nucleos, lia dali "extraiu de maos vazias".
+    markCoreTaken(state, deepestCoreSector(state));
     state.phase = 'extracted_with_core';
     // buildSummary direto: alcancar a extracao de verdade exigiria dirigir uma
     // run inteira, e o que esta sob teste e a regra do campo, nao o trajeto.

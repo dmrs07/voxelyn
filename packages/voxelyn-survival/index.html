@@ -2161,10 +2161,16 @@
       }
 
       /* Ranking: livro de expedições homologadas */
+      /* Abas de profundidade: um livro por classe de descida. Coladas ao topo
+         do painel, com o mesmo desenho das abas da Matriz e do Registro — é a
+         mesma pergunta ("qual seção deste arquivo?"), não um controle novo. */
+      .ax-rank-classes {
+        margin: 0 0 10px;
+      }
       .ax-rank-head,
       .ax-rank-row {
         display: grid;
-        grid-template-columns: 34px 54px minmax(0, 1fr) 64px;
+        grid-template-columns: 34px minmax(0, 1fr) 46px 64px 54px;
         gap: 8px;
         align-items: baseline;
         padding: 5px 8px;
@@ -2199,6 +2205,20 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      /* Núcleos: o primeiro critério da posição, e por isso o número em ouro.
+         Ele fica ANTES do tempo pela mesma razão que ordena antes dele. */
+      .ax-rank-row .ax-rank-cores {
+        color: var(--ax-gold);
+        text-align: right;
+      }
+      .ax-rank-head span:nth-child(3),
+      .ax-rank-head span:nth-child(4),
+      .ax-rank-head span:nth-child(5) {
+        text-align: right;
+      }
+      .ax-rank-row .ax-stars {
+        text-align: right;
       }
       .ax-rank-row .ax-rank-time {
         color: var(--ax-teal);

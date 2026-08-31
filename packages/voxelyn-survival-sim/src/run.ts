@@ -19,7 +19,7 @@ import {
   WELL_OFFER_SPREAD,
   PURGE_CELL_HEAL,
   PURGE_CELL_RADIUS,
-  CONTAMINATION_PER_TICK,
+  contaminationPerTick,
   DISCHARGE_DAMAGE,
   LEYLINE_CHARGE_TICKS,
   LEYLINE_NODE_INTERACT_RADIUS,
@@ -148,6 +148,7 @@ import {
   markCoreTaken,
   runDepth,
   runIsReturning,
+  runSectorCount,
 } from './depth.js';
 import { sectorBiome, sectorProfile } from './strata.js';
 import {
@@ -1793,7 +1794,20 @@ const stepPlayer = (
     settleOverheat(state, slot, events);
   }
 
-  // Celula de Purga: cartucho interno de cura e descontaminacao.
+  // Celula de Purga: cartucho interno de cura e descontaminacao LOCAL.
+  //
+  // "Local" e a palavra que falta na promessa: ela cura, e limpa gas e esporos
+  // no raio — mas nao encosta em `state.contamination`, a barra global que de
+  // fato encerra a run. E o que faz da contaminacao o unico sistema de pressao
+  // do jogo sem contrajogada nenhuma: ela sobe, acelera por setor, dobra com o
+  // Nucleo, e a unica resposta disponivel e andar mais rapido.
+  //
+  // Nao foi decidido contra — nunca chegou a ser decidido. Poe-la para cortar
+  // uma fracao da barra e uma linha aqui; o trabalho todo e de calibragem, e a
+  // economia de celulas (um cofre por site, tres sites por setor, setor
+  // regenerado na subida) e o que decide se a ideia funciona. Numeros medidos,
+  // faixa a testar e riscos em
+  // docs/audit/2026-08-31-contaminacao-em-aberto.md §1.
   if (cmd.purge && extra.purgeCells > 0) {
     extra.purgeCells--;
     player.hp = Math.min(player.maxHp, player.hp + PURGE_CELL_HEAL);
@@ -2791,9 +2805,14 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
   // o que impede o poco de virar botao de reset; o nucleo e a cobranca do
   // caminho de volta.
   const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
+  // A taxa sai da PROFUNDIDADE DA RUN, e nao de uma constante de parede: uma
+  // descida de sete setores dura 2,3x mais que a de tres, e um relogio que nao
+  // soubesse disso mataria toda run funda no meio do caminho de volta. Ver
+  // `contaminationPerTick`.
+  const perTick = contaminationPerTick(runSectorCount(state));
   state.contamination = Math.min(
     1,
-    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coresTakenMask !== 0 ? 2.2 : 1),
+    state.contamination + perTick * sectorScale * (state.coresTakenMask !== 0 ? 2.2 : 1),
   );
   for (let w = 0; w < CONTAMINATION_WAVES.length; w++) {
     const [level, count] = CONTAMINATION_WAVES[w];

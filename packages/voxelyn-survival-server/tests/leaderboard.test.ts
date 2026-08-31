@@ -8,9 +8,15 @@ import {
   type RunSummary,
 } from '@voxelyn/survival-sim';
 import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
+import { runDepthForGeneration, type RunDepthConfig } from '@voxelyn/survival-sim';
 import type { SoloRunSubmission } from '@voxelyn/survival-protocol';
 import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from '../src/replay';
-import { MemoryLeaderboard, compareEntries, isLeaderboardEligible, type LeaderboardEntry } from '../src/leaderboard';
+import {
+  MemoryLeaderboard,
+  compareEntries,
+  isLeaderboardEligible,
+  type LeaderboardEntry,
+} from '../src/leaderboard';
 
 /**
  * Joga uma run de verdade e devolve o log codificado.
@@ -137,6 +143,59 @@ describe('recusa de entrada hostil', () => {
   });
 });
 
+describe('o digest do ranking carrega a configuracao', () => {
+  /**
+   * `seed + bytes` deixou de identificar uma run.
+   *
+   * Enquanto toda submissao rodava a descida de fabrica, os dois bastavam.
+   * Agora os MESMOS bytes, com a MESMA seed, produzem resultados diferentes
+   * conforme a profundidade que o ticket autorizou — e esses resultados entram
+   * em livros diferentes. Um digest cego a configuracao faria o segundo deles
+   * voltar como "duplicata" e sumir do livro dele.
+   */
+  const played = playAndLog(4242, (t) => ({
+    move: { x: Math.sin(t / 40), y: Math.cos(t / 37) },
+    fire: t % 4 === 0,
+  }));
+
+  const digestOf = (depth?: RunDepthConfig): string => {
+    const verdict = verifySoloRun(4242, played.base64, undefined, depth);
+    expect(verdict.ok, verdict.ok ? '' : verdict.reason).toBe(true);
+    return verdict.ok ? verdict.digest : '';
+  };
+
+  it('o mesmo log sob profundidades diferentes nao deduplica', () => {
+    const fabrica = digestOf();
+    const g04 = digestOf(runDepthForGeneration('G-04'));
+    expect(g04).not.toBe(fabrica);
+  });
+
+  // Estavel, senao a deduplicacao pararia de deduplicar: um reenvio do MESMO
+  // log sob o MESMO ticket entraria como linha nova a cada tentativa.
+  //
+  // G-04 e nao G-03 porque a run de fixture nao chega ao fim numa descida de
+  // cinco setores — o bot senoidal sobrevive alem do teto de ticks —, e um log
+  // que nao termina nao tem digest para comparar.
+  it('continua estavel: mesma configuracao, mesmo digest', () => {
+    const a = digestOf(runDepthForGeneration('G-04'));
+    const b = digestOf(runDepthForGeneration('G-04'));
+    expect(a).toBe(b);
+  });
+
+  /**
+   * E o historico fica INTACTO.
+   *
+   * A configuracao de fabrica imprime vazio de proposito: todo digest ja
+   * gravado no banco continua sendo o mesmo, e portanto a deduplicacao de todo
+   * reenvio de run que ja aconteceu continua funcionando. Se este teste falhar,
+   * um reenvio antigo passa a entrar como linha nova.
+   */
+  it('a descida de fabrica mantem o digest que o banco ja tem', () => {
+    const canonical = encodeCommandLog(played.log.slice(0, played.state.tick));
+    expect(digestOf()).toBe(replayDigest(4242, canonical));
+  });
+});
+
 describe('digest de replay', () => {
   it('e estavel e distingue bytes canonicos', () => {
     const abc = Uint8Array.from([97, 98, 99]);
@@ -182,7 +241,12 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
     timesDowned: 0,
     revivesGiven: 0,
     discoveries: 0,
+    oreCollected: 0,
+    innocentsKilled: 0,
   },
+  cores: 1,
+  coresAvailable: 1,
+  sectorCount: 3,
   stars: 3,
   targetTicks: 14400,
   ...over,
@@ -191,17 +255,35 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
 describe('ordenacao do ranking', () => {
   const entry = (over: Partial<LeaderboardEntry>): LeaderboardEntry => ({
     id: 1, name: 'x', seed: 1, stars: 3, ticks: 1000, phase: 'extracted_with_core',
-    mode: 'solo', kills: 0, createdAt: '', ...over,
+    mode: 'solo', kills: 0, cores: 1, sectorCount: 3, ore: 0, createdAt: '', ...over,
   });
 
-  it('mais estrelas primeiro', () => {
-    expect(compareEntries(entry({ stars: 2 }), entry({ stars: 3 }))).toBeGreaterThan(0);
+  it('mais NUCLEOS primeiro', () => {
+    expect(compareEntries(entry({ cores: 1 }), entry({ cores: 2 }))).toBeGreaterThan(0);
   });
 
-  // Continua a escada que as estrelas comecaram: a terceira ja e "a segunda com
-  // pressa", entao ordenar por tempo dentro da nota nao e criterio novo.
-  it('entre nota igual, menos tempo primeiro', () => {
+  it('entre Nucleos iguais, menos tempo primeiro', () => {
     expect(compareEntries(entry({ ticks: 500 }), entry({ ticks: 900 }))).toBeLessThan(0);
+  });
+
+  /**
+   * O caso que motivou trocar estrelas por Nucleos.
+   *
+   * Duas estrelas com dois Nucleos e uma run que cumpriu o objetivo DUAS VEZES,
+   * so que devagar; tres estrelas com um Nucleo cumpriu uma vez, com pressa.
+   * Enquanto a nota ordenava, a segunda passava a frente — e o placar punia
+   * quem desceu mais fundo.
+   */
+  it('dois Nucleos fora do tempo batem um Nucleo com tres estrelas', () => {
+    const doisNucleos = entry({ cores: 2, stars: 2, ticks: 20_000 });
+    const tresEstrelas = entry({ cores: 1, stars: 3, ticks: 6_000 });
+    expect(compareEntries(doisNucleos, tresEstrelas)).toBeLessThan(0);
+  });
+
+  // Minerar custa tempo e nao e o que a run pede. Enquanto o minerio desempatava,
+  // ele era um criterio — pequeno, mas criterio — que o briefing nunca cobrou.
+  it('minerio nao decide nada', () => {
+    expect(compareEntries(entry({ id: 1, ore: 0 }), entry({ id: 2, ore: 999 }))).toBeLessThan(0);
   });
 
   it('empate total mantem quem chegou antes', () => {
@@ -214,9 +296,27 @@ describe('store', () => {
     const store = new MemoryLeaderboard();
     await store.submit({ name: 'lento', mode: 'solo', summary: summary({ ticks: 12000 }), digest: 'a' });
     await store.submit({ name: 'rapido', mode: 'solo', summary: summary({ ticks: 7000 }), digest: 'b' });
-    await store.submit({ name: 'fraco', mode: 'solo', summary: summary({ stars: 1, ticks: 100 }), digest: 'c' });
+    // Extraiu vivo e depressa, mas de maos vazias: zero Nucleo, ultimo lugar.
+    await store.submit({
+      name: 'fraco',
+      mode: 'solo',
+      summary: summary({ phase: 'extracted', cores: 0, stars: 1, ticks: 100 }),
+      digest: 'c',
+    });
     const top = await store.top({});
     expect(top.map((e) => e.name)).toEqual(['rapido', 'lento', 'fraco']);
+  });
+
+  it('grava a classe e os Nucleos que a re-simulacao produziu', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await store.submit({
+      name: 'g04',
+      mode: 'solo',
+      summary: summary({ cores: 2, sectorCount: 7 }),
+      digest: 'g04',
+    });
+    expect(entry?.cores).toBe(2);
+    expect(entry?.sectorCount).toBe(7);
   });
 
   // A rede pode cair depois do POST e o cliente reenviar. Reenvio nao pode
@@ -242,6 +342,59 @@ describe('store', () => {
     await store.submit({ name: 'sala BCDF', mode: 'coop', summary: summary(), digest: null });
     await store.submit({ name: 'sala GHJK', mode: 'coop', summary: summary(), digest: null });
     expect(await store.top({})).toHaveLength(2);
+  });
+
+  /**
+   * O ponto inteiro do ranking por classe: uma descida de tres setores e uma de
+   * sete nao sao a mesma prova. A de sete tem mais Nucleos disponiveis e leva o
+   * dobro do tempo — no mesmo livro, ela nao compara habilidade, compara
+   * autorizacao. E autorizacao se compra, nao se joga.
+   */
+  it('runs de profundidades diferentes nao competem entre si', async () => {
+    const store = new MemoryLeaderboard();
+    await store.submit({
+      name: 'tres setores',
+      mode: 'solo',
+      summary: summary({ sectorCount: 3, cores: 1, ticks: 9000 }),
+      digest: 'a',
+    });
+    await store.submit({
+      name: 'sete setores',
+      mode: 'solo',
+      summary: summary({ sectorCount: 7, cores: 2, ticks: 20000 }),
+      digest: 'b',
+    });
+
+    expect((await store.top({ sectorCount: 3 })).map((e) => e.name)).toEqual(['tres setores']);
+    expect((await store.top({ sectorCount: 7 })).map((e) => e.name)).toEqual(['sete setores']);
+  });
+
+  it('lista os livros que existem, do mais raso ao mais fundo', async () => {
+    const store = new MemoryLeaderboard();
+    await store.submit({ name: 'a', mode: 'solo', summary: summary({ sectorCount: 7 }), digest: 'a' });
+    await store.submit({ name: 'b', mode: 'solo', summary: summary({ sectorCount: 3 }), digest: 'b' });
+    await store.submit({ name: 'c', mode: 'solo', summary: summary({ sectorCount: 3 }), digest: 'c' });
+    expect(await store.classes({})).toEqual([
+      { sectorCount: 3, entries: 2 },
+      { sectorCount: 7, entries: 1 },
+    ]);
+  });
+
+  // Um seletor que conta com um filtro e uma lista que abre com outro produziria
+  // uma aba que abre vazia — a unica forma de o placar mentir sem errar um numero.
+  it('os livros respeitam o mesmo filtro que a lista', async () => {
+    const store = new MemoryLeaderboard();
+    await store.submit({ name: 'solo', mode: 'solo', summary: summary({ sectorCount: 3 }), digest: 'a' });
+    await store.submit({ name: 'coop', mode: 'coop', summary: summary({ sectorCount: 7 }), digest: null });
+    expect(await store.classes({ mode: 'solo' })).toEqual([{ sectorCount: 3, entries: 1 }]);
+    // Derrotas nunca aparecem, nem na lista nem na contagem de livros.
+    await store.submit({
+      name: 'morto',
+      mode: 'coop',
+      summary: summary({ phase: 'dead', cores: 0, stars: 0, sectorCount: 5 }),
+      digest: null,
+    });
+    expect((await store.classes({})).map((c) => c.sectorCount)).toEqual([3, 7]);
   });
 
   it('filtra por seed e por modo', async () => {

@@ -6,7 +6,13 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { LIMITS, buildDeathEchoCapsule, encodeMessage } from '@voxelyn/survival-protocol';
+import {
+  LIMITS,
+  PROTOCOL_VERSION,
+  SIMULATION_VERSION,
+  buildDeathEchoCapsule,
+  encodeMessage,
+} from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
 import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
@@ -184,6 +190,58 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         allowedOrigins: opts.allowedOrigins,
         trustedProxyHops: opts.trustedProxyHops,
         budget: verificationBudget,
+        // A ponte entre o ticket e o livro: e por ela que uma descida de sete
+        // setores e re-simulada com sete setores e vai parar no livro de sete.
+        //
+        // `progressionStore` e lido AQUI DENTRO, e nao capturado agora, porque
+        // as duas conexoes de banco correm em paralelo: a do ranking pode ficar
+        // pronta primeiro, e uma captura no momento da criacao congelaria
+        // `null`. Sem progressao (banco fora, ambiente sem ela) devolve null, e
+        // a run cai na descida de fabrica — o comportamento anterior a esta
+        // mudanca, que continua correto para quem nao tem ticket.
+        runConfig: async (runId) => {
+          // Sem progressao no ar, nao ha ticket a resolver e nunca havera: toda
+          // run deste servidor E a descida de fabrica. E a unica situacao em que
+          // a fabrica e a verdade, e nao um palpite.
+          const store = progressionStore;
+          if (!store) return { status: 'unauthorized' };
+
+          const ticket = await store.getTicket(runId);
+          if (!ticket) {
+            // Terminal, e nao "cai na fabrica". Tickets sao VARRIDOS da tabela
+            // depois da retencao (`sweepExpiredTickets`), entao um ticket
+            // ausente e um caso real e honesto — e justamente por isso ele nao
+            // pode virar silenciosamente uma descida de tres setores. Sem o
+            // ticket ninguem sabe qual descida foi aquela; dizer isso e a
+            // resposta correta.
+            return { status: 'incompatible', reason: 'ticket da run nao encontrado' };
+          }
+          if (
+            ticket.protocolVersion !== PROTOCOL_VERSION ||
+            ticket.simulationVersion !== SIMULATION_VERSION
+          ) {
+            // A MESMA guarda que a liquidacao ja fazia, e pelo mesmo motivo:
+            // uma run jogada contra outra versao da simulacao nao pode ser
+            // re-simulada por esta. Faltava aqui, e ia doer no primeiro deploy
+            // que mudasse a versao — este mesmo, que leva SIMULATION_VERSION de
+            // 42 para 43. Todo ticket emitido antes dele descreve uma descida
+            // que esta simulacao ja nao reproduz.
+            return {
+              status: 'incompatible',
+              reason: 'run jogada em outra versao da simulacao',
+            };
+          }
+          // Ticket VENCIDO, esse sim, ainda serve — enquanto existir. A validade
+          // limita a janela de uma liquidacao que PAGA; o livro nao paga nada, e
+          // so precisa saber sob qual descida aqueles comandos foram gravados.
+          // Um ticket de ontem responde isso tao bem quanto um de agora, e
+          // recusar jogaria fora a submissao honesta de quem perdeu a rede no
+          // fim da run.
+          return {
+            status: 'authorized',
+            config: { seed: ticket.seed, tuning: ticket.tuning, depth: ticket.depth },
+          };
+        },
       });
     }),
     createDeathEchoStore(databaseUrl, log).then((store) => {

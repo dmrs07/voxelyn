@@ -7,8 +7,14 @@
 // As tres respostas, e cada uma tem um jeito proprio de falhar em silencio:
 //
 //   expedicao  -> o perfil, no momento de emitir o ticket
-//   ranqueado  -> nunca; G-00 de fabrica para todo mundo
+//   ranqueado  -> o TICKET emitido para aquela descida; sem ticket, G-00
 //   co-op      -> a SALA, congelada na criacao; nunca o perfil de quem entra
+//
+// A linha do ranqueado mudou quando o placar passou a ter um livro por
+// profundidade: enquanto havia um livro so, re-simular tudo em tres setores era
+// a politica que mantinha a comparacao justa. Ela cobrava caro — a run de sete
+// setores voltava recusada como fraude para quem a jogou honestamente — e o
+// livro por classe faz o mesmo trabalho sem cobrar isso.
 //
 // Ver docs/superpowers/specs/2026-08-05-survival-generation-depth-lineages.md.
 
@@ -66,7 +72,7 @@ describe('a profundidade da expedicao sai do perfil, no ticket', () => {
   });
 });
 
-describe('ranqueado nao herda profundidade', () => {
+describe('a profundidade e do TICKET, nunca do pedido', () => {
   /**
    * Uma run que TERMINA, porque `resimulateRun` recusa um log que nao chega ao
    * fim. O jogador de fixture se debate: e barato e morre.
@@ -87,26 +93,36 @@ describe('ranqueado nao herda profundidade', () => {
   };
 
   it('a re-simulacao SEM profundidade cai em tres setores', () => {
-    // E o caminho do leaderboard e do pool de Ecos: `verifySoloRun` e
-    // `verifySoloDeath` nao passam profundidade nenhuma.
+    // E o caminho de quem nao tem ticket: run offline, servidor sem
+    // progressao, e o pool de Ecos, que nunca passa profundidade nenhuma.
+    // Tres setores nao e um teto — e a descida de fabrica, a que o jogo
+    // sempre foi para quem nao comprou protocolo nenhum.
     const run = resimulateRun(1234, drivenLog());
     expect(run.ok, run.ok ? '' : run.reason).toBe(true);
     if (!run.ok) return;
     expect(run.state.config.depth).toEqual(DEFAULT_RUN_DEPTH);
   });
 
-  it('um perfil G-04 nao alonga a prova ranqueada', () => {
+  /**
+   * O perfil nao alonga run nenhuma; o TICKET alonga.
+   *
+   * A diferenca importa porque o ranking passou a aceitar descidas de qualquer
+   * profundidade, cada uma no seu livro. O que continua valendo — e o que este
+   * teste guarda — e que a autorizacao e lida de um ticket que o servidor
+   * emitiu, e nunca do perfil no momento da verificacao nem de um campo do
+   * corpo: um jogador que chegue a G-04 hoje nao pode realongar a run de tres
+   * setores que ele submeteu ontem.
+   */
+  it('a profundidade sai do ticket, e nao do perfil no momento da conferencia', () => {
     const g04 = depthForProfile(profileWith(UPGRADES.map((u) => u.id)));
     expect(g04.sectorCount).toBe(7);
-    // A submissao ranqueada e re-simulada sem o ticket: o servidor nunca ve
-    // esta profundidade, e a run continua sendo a de tres setores de todos.
     const run = resimulateRun(1234, drivenLog());
     expect(run.ok).toBe(true);
     if (!run.ok) return;
     expect(run.state.config.depth.sectorCount).toBe(DEFAULT_SECTOR_COUNT);
   });
 
-  it('a expedicao, essa sim, roda com a profundidade autorizada', () => {
+  it('com ticket, a run roda com a profundidade autorizada', () => {
     const run = resimulateRun(1234, drivenLog(), undefined, runDepthForGeneration('G-04'));
     expect(run.ok).toBe(true);
     if (!run.ok) return;

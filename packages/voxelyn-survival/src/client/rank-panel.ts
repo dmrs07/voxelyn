@@ -9,9 +9,16 @@
 // O redesign (doc AD-UI-2.0) transformou a lista em LIVRO-CAIXA: colunas de
 // posicao, estrelas, operador e tempo, com keyline dourada nas tres primeiras
 // linhas — distincao de papel timbrado, nao de podio de game show.
+//
+// UM LIVRO POR PROFUNDIDADE. As abas no topo nao sao um filtro de conveniencia:
+// elas sao a estrutura do placar. Descidas de tres e de sete setores nao sao a
+// mesma prova — a segunda tem mais Nucleos disponiveis e leva o dobro do tempo
+// — e uma lista unica compararia autorizacao em vez de habilidade. A coluna de
+// Nucleos existe pelo mesmo motivo: ela e a pontuacao, e um livro que ordena
+// por um numero que nao mostra parece quebrado mesmo quando esta certo.
 
 import { formatDuration, formatSeed } from './run-summary';
-import type { RankEntry } from './run-recorder';
+import type { RankClass, RankEntry } from './run-recorder';
 import { t } from './i18n';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
@@ -27,6 +34,12 @@ export type RankView = {
   entries: RankEntry[];
   /** Seed do placar, quando ele e de uma descida especifica. */
   seed?: number;
+  /** Os livros que existem, do mais raso ao mais fundo. */
+  classes?: RankClass[];
+  /** O livro aberto. Zero quando ainda nao ha resposta do servidor. */
+  sectorCount?: number;
+  /** Trocar de livro. Ausente enquanto carrega: aba que nao responde e pior que aba ausente. */
+  onSelectClass?: (sectorCount: number) => void;
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
   /**
@@ -40,6 +53,39 @@ export type RankView = {
   loading?: boolean;
 };
 
+/**
+ * As abas de profundidade.
+ *
+ * So aparecem com DOIS livros ou mais. Uma aba solitaria nao oferece escolha
+ * nenhuma e ainda assim ocupa a primeira linha da tela dizendo ao jogador que
+ * existe algo a decidir — e no dia do deploy, com um livro so, seria exatamente
+ * isso.
+ */
+const renderClasses = (host: HTMLElement, view: RankView): void => {
+  const classes = view.classes ?? [];
+  if (classes.length < 2) return;
+  const tabs = el('div', 'ax-tabs ax-rank-classes');
+  for (const board of classes) {
+    const active = board.sectorCount === view.sectorCount;
+    const tab = el(
+      'button',
+      `ax-tab${active ? ' is-active' : ''}`,
+      t('rank.class', { sectors: board.sectorCount }),
+    ) as HTMLButtonElement;
+    tab.type = 'button';
+    // `aria-pressed` e nao `aria-selected`: sao botoes num grupo, e nao um
+    // tablist com paineis irmaos — anunciar tablist obrigaria a navegacao por
+    // setas que este grupo nao implementa.
+    tab.setAttribute('aria-pressed', String(active));
+    tab.title = t('rank.class.entries', { entries: board.entries });
+    if (!active && view.onSelectClass) {
+      tab.addEventListener('click', () => view.onSelectClass?.(board.sectorCount));
+    }
+    tabs.appendChild(tab);
+  }
+  host.appendChild(tabs);
+};
+
 export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   host.textContent = '';
 
@@ -51,6 +97,8 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     ),
   );
 
+  renderClasses(host, view);
+
   if (view.entries.length === 0 && view.loading) {
     // Consultando o livro: varredura CRT, o unico CRT permitido (board 3p).
     host.appendChild(el('div', 'ax-scan ax-loading', view.emptyReason ?? t('rank.loading')));
@@ -60,19 +108,33 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     empty.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
     host.appendChild(empty);
   } else {
+    // A ORDEM DAS COLUNAS E A FORMULA DA POSICAO, lida da esquerda para a
+    // direita: posicao, quem, e entao os dois numeros que ordenam — Nucleos e
+    // tempo, nessa ordem. As estrelas ficam por ULTIMO, e a mudanca nao e
+    // estetica.
+    //
+    // Enquanto elas vinham em segundo lugar, ocupavam o slot em que o olho
+    // procura o criterio de ordenacao — e nao sao mais o criterio. Num livro
+    // fundo isso produzia uma lista que PARECE quebrada estando certa: uma
+    // ★★★ de um Nucleo aparece abaixo de duas ★★☆ de dois, e quem le a coluna
+    // de cima para baixo ve as notas fora de ordem antes de ver o porque. No
+    // fim da linha elas voltam a ser o que sao: a leitura da run, nao a
+    // posicao dela.
     const head = el('div', 'ax-rank-head');
     head.appendChild(el('span', undefined, '#'));
-    head.appendChild(el('span', undefined, '★'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
+    head.appendChild(el('span', undefined, t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
+    head.appendChild(el('span', undefined, '★'));
     host.appendChild(head);
 
     view.entries.forEach((entry, index) => {
       const row = el('div', `ax-rank-row${index < 3 ? ' is-podium' : ''}`);
       row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
-      row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       row.appendChild(el('span', 'ax-rank-name', entry.name));
+      row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));
       row.appendChild(el('span', 'ax-rank-time', formatDuration(entry.ticks)));
+      row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       host.appendChild(row);
     });
   }

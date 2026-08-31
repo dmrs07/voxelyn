@@ -84,11 +84,20 @@ export type SubmitOutcome =
  * Repare no que NAO e enviado: tempo, estrelas, abates. Nada de resultado. O
  * servidor re-simula e descobre sozinho — ver `replay.ts` no servidor. Isto
  * aqui e literalmente "aqui esta o que eu apertei, me diga o que aconteceu".
+ *
+ * @param runId O ticket que autorizou esta descida, quando houve um.
+ *
+ * Ele NAO carrega resultado nenhum — carrega identidade. O servidor le dele com
+ * quantos setores e com quais atributos a run foi autorizada a rodar, e e assim
+ * que uma descida de sete setores e verificada contra sete setores e entra no
+ * livro de sete. Sem ticket (offline, servidor sem progressao) a run e
+ * verificada como a descida de fabrica, que e o que ela foi.
  */
 export const submitRun = async (
   serverUrl: string,
   recorder: RunRecorder,
   name: string,
+  runId?: string | null,
 ): Promise<SubmitOutcome> => {
   if (!recorder.submittable) return { ok: false, reason: 'run-too-long' };
   // O endpoint e HTTP; a URL de jogo e WebSocket.
@@ -97,7 +106,12 @@ export const submitRun = async (
     const res = await fetch(`${base}/leaderboard`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ seed: recorder.recordedSeed, log: recorder.encode(), name }),
+      body: JSON.stringify({
+        seed: recorder.recordedSeed,
+        log: recorder.encode(),
+        name,
+        ...(runId ? { runId } : {}),
+      }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -122,22 +136,56 @@ export type RankEntry = {
   phase: string;
   mode: string;
   kills: number;
+  /** Nucleos extraidos: o primeiro criterio da pontuacao. */
+  cores: number;
+  /** Setores atravessados: a classe do livro em que a run compete. */
+  sectorCount: number;
 };
+
+/** Um livro do ranking: uma profundidade de descida e quantas runs tem. */
+export type RankClass = {
+  sectorCount: number;
+  entries: number;
+};
+
+/**
+ * O livro pedido, os livros que existem, e as runs do livro pedido.
+ *
+ * `classes` vem junto da lista, e nao de uma segunda chamada, porque o seletor
+ * e a lista tem de descrever o mesmo instante: buscados em separado, uma aba
+ * podia aparecer para um livro que a lista ao lado ja nao enxergava.
+ */
+export type RankPage = {
+  sectorCount: number;
+  classes: RankClass[];
+  entries: RankEntry[];
+};
+
+/** Offline, ou servidor fora: nenhum livro, nenhuma aba. Nunca um erro na tela. */
+const EMPTY_PAGE: RankPage = { sectorCount: 0, classes: [], entries: [] };
 
 export const fetchLeaderboard = async (
   serverUrl: string,
-  query: { seed?: number; limit?: number } = {},
-): Promise<RankEntry[]> => {
+  query: { seed?: number; limit?: number; sectorCount?: number } = {},
+): Promise<RankPage> => {
   const base = serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
   const params = new URLSearchParams();
   if (query.seed !== undefined) params.set('seed', String(query.seed));
   if (query.limit !== undefined) params.set('limit', String(query.limit));
+  if (query.sectorCount !== undefined) params.set('sectors', String(query.sectorCount));
   try {
     const res = await fetch(`${base}/leaderboard?${params.toString()}`);
-    if (!res.ok) return [];
-    const body = (await res.json()) as { entries?: RankEntry[] };
-    return body.entries ?? [];
+    if (!res.ok) return EMPTY_PAGE;
+    const body = (await res.json()) as Partial<RankPage>;
+    return {
+      // O servidor decide qual livro respondeu — inclusive quando o cliente nao
+      // pediu nenhum. Assumir aqui o que foi pedido faria a aba ativa mentir na
+      // primeira abertura, que e justamente quando o cliente nao pede nada.
+      sectorCount: body.sectorCount ?? query.sectorCount ?? 0,
+      classes: body.classes ?? [],
+      entries: body.entries ?? [],
+    };
   } catch {
-    return [];
+    return EMPTY_PAGE;
   }
 };

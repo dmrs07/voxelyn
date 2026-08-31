@@ -277,11 +277,23 @@ export const describeOutcome = (summary: RunSummary): OutcomeText => {
  * A linha que diz o que faltou para a proxima estrela.
  *
  * Existe porque uma nota sem criterio visivel e ruido: o jogador que tira duas
- * estrelas precisa saber que a terceira e a MESMA run com pressa, e nao um
- * objetivo escondido que ele ainda nao encontrou.
+ * estrelas precisa saber que a terceira e a MESMA run inteira e com pressa, e
+ * nao um objetivo escondido que ele ainda nao encontrou.
+ *
+ * O ramo dos Nucleos vem ANTES do tempo, e nao depois, porque e a ordem em que
+ * a nota cobra: quem voltou com um Nucleo de dois nao perdeu a estrela por
+ * lentidao — ele pode ate ter vindo bem dentro do alvo —, e dizer "voce passou
+ * do tempo" ali seria diagnostico errado. Era literalmente o que acontecia: o
+ * `over` saia NEGATIVO e a dica mandava correr quem ja tinha corrido.
  */
 export const nextStarHint = (summary: RunSummary): string | null => {
   if (summary.stars === 3) return null;
+  if (summary.cores > 0 && summary.cores < summary.coresAvailable) {
+    return t('summary.nextStar.three.cores', {
+      missing: summary.coresAvailable - summary.cores,
+      total: summary.coresAvailable,
+    });
+  }
   if (summary.phase === 'extracted_with_core') {
     const over = summary.ticks - summary.targetTicks;
     return t('summary.nextStar.three', {

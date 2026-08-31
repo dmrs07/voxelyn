@@ -457,6 +457,11 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   // A contaminacao NAO zera. Descer alivia, nunca absolve: comecar limpo faria
   // do poco um botao de reset e destruiria a pressao que da sentido a decisao
   // de explorar mais antes de descer.
+  //
+  // E este alivio e o UNICO que existe: `ascend` nao toca na barra, de
+  // proposito — descer e ar novo, voltar e a cobranca. A consequencia
+  // estrutural (a subida e o trecho sem freio da run) esta medida em
+  // docs/audit/2026-08-31-contaminacao-em-aberto.md §2.
   state.contamination = Math.min(1, state.contamination * CONTAMINATION_CARRYOVER);
   state.contaminationWaves = 0;
   // Os relogios da saturacao zeram junto com as ondas. O carryover derruba a
