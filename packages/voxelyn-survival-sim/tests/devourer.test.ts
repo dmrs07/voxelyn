@@ -10,7 +10,7 @@
 //    Sem isso o ciclo inteiro deixa de significar alguma coisa.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy } from '../src/entities';
+import { damageEntity, spawnEnemy, stunEntity } from '../src/entities';
 import { igniteCell } from '../src/cells';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
@@ -22,6 +22,7 @@ import {
   DEVOURER_LEAPS_PER_CYCLE,
   DEVOURER_BURROW_MIN_TICKS,
   DEVOURER_REPEAT_MIN_GAP,
+  CONDUCTIVE_STUN_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_CORE,
@@ -725,6 +726,48 @@ describe('Devorador Branco — a BOCA', () => {
     state.player.y = worm.y;
     stepRun(state, [emptyCommand()]);
     expect(state.player.hp, 'aberta de todo, a garganta perdoou').toBe(0);
+  });
+
+  it('ATORDOAR nao desliga a boca: a succao nao e uma decisao dele', () => {
+    // Regressao de um defeito real, e o pior tipo: ele devolvia o chefe ao que
+    // este encontro inteiro existe para deixar de ser.
+    //
+    // A boca rodava dentro do fluxo de IA, atras do portao generico de
+    // atordoamento (`updateEnemies`). Corrente atordoa por 1,2 s e o Devorador
+    // nao esta em `isStoneEnemy` — entao um unico tiro condutivo desligava
+    // succao, refeicao de areia e mordida por 24 ticks, enquanto `mawOpenedAt` e
+    // `nextActionAt` seguiam correndo em tick absoluto. O jogador ficava com a
+    // janela SEM o preco dela, com o vortice ainda desenhado no chao prometendo
+    // uma succao que nao acontecia: a TORRE de volta, comprada por um modulo.
+    const { state, worm, px, py } = arena(716);
+    const w = state.config.width;
+    for (let y = py - 8; y <= py + 8; y++) {
+      for (let x = px - 8; x <= px + 8; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        state.surface[y * w + x] = SURF_SILT;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+    openMaw(state, worm, px + 0.5, py + 0.5, true);
+    state.player.x = worm.x + 4;
+    state.player.y = worm.y;
+
+    stunEntity(state, worm, CONDUCTIVE_STUN_TICKS);
+    expect(worm.stunnedUntil, 'o chefe nem chegou a ser atordoado').toBeGreaterThan(state.tick);
+
+    const from = state.player.x;
+    const siltBefore = countSurface(state, SURF_SILT, px, py, 8);
+    stepRun(state, [emptyCommand()]);
+    expect(state.player.x, 'a succao parou no atordoamento').toBeLessThan(from - 0.001);
+    expect(countSurface(state, SURF_SILT, px, py, 8), 'a boca parou de comer areia')
+      .toBeLessThan(siltBefore);
+
+    // E a garganta continua cobrando: atordoado ele nao vira chao seguro.
+    state.player.x = worm.x;
+    state.player.y = worm.y;
+    state.player.hp = state.player.maxHp;
+    stepRun(state, [emptyCommand()]);
+    expect(state.player.hp, 'a garganta perdoou porque ele estava atordoado').toBe(0);
   });
 
   it('ANDAR ainda resolve fora da linha do sem-volta', () => {

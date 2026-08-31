@@ -127,10 +127,25 @@ export const mawStreak = (
   reach: number,
   count = MAW_STREAKS
 ): MawStreak => {
+  // ONDE O GRAO MORRE. A garganta, quando ela ja existe — e enquanto nao existe,
+  // um terco do alcance do instante.
+  //
+  // A garganta e um raio FIXO e o alcance CRESCE de zero: durante o primeiro
+  // segundo da janela o alcance ainda e menor que ela. Interpolar direto para
+  // DEVOURER_MAW_BITE_RADIUS invertia o caminho nesse trecho — o grao nascia no
+  // alcance (pequeno) e voava para FORA, ate um raio que a simulacao ainda nao
+  // tocava. O telegrafo de abertura desenhava o sentido errado, em cima de chao
+  // que nao estava sendo puxado, e sentido e a unica coisa que este efeito
+  // precisa dizer sem ambiguidade.
+  //
+  // O `min` cobre isso sem apagar o efeito: antes de a garganta existir os graos
+  // continuam caindo, so que para dentro do vao que ha. E o mesmo recorte que a
+  // simulacao faz — ela tambem so cobra a mordida quando `reach` alcanca o raio
+  // da garganta.
+  const inner = Math.min(DEVOURER_MAW_BITE_RADIUS, reach * 0.34);
   const at = (p: number): { dx: number; dy: number } => {
     const clamped = Math.max(0, Math.min(1, p));
-    const r =
-      DEVOURER_MAW_BITE_RADIUS + (reach - DEVOURER_MAW_BITE_RADIUS) * Math.pow(1 - clamped, 0.62);
+    const r = inner + (reach - inner) * Math.pow(1 - clamped, 0.62);
     // O angulo de partida usa o angulo aureo para os graos nao se alinharem em
     // raios: `i * 2pi/count` daria um pente girando, que le como roda dentada.
     const theta = i * 2.39996 + clamped * MAW_SWIRL_TURNS * Math.PI * 2;

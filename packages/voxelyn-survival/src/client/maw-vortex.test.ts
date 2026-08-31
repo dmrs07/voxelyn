@@ -69,6 +69,32 @@ describe('vortice da boca — os graos', () => {
     expect(chord, 'o rastro atravessa o disco').toBeLessThan(reach * 0.35);
   });
 
+  it('no primeiro segundo eles ficam DENTRO do alcance, e ainda caem para dentro', () => {
+    // Regressao de um defeito de leitura. O caminho do grao interpolava de
+    // `reach` (na borda) ate DEVOURER_MAW_BITE_RADIUS (na garganta) — e durante
+    // o primeiro segundo da janela o alcance ainda e MENOR que a garganta, que
+    // so passa a existir quando ele a alcanca. Com os dois invertidos, os graos
+    // nasciam pequenos e voavam para FORA, ate um raio fixo que a simulacao
+    // ainda nao tocava: o telegrafo de abertura desenhava o sentido errado, em
+    // cima de chao que nao estava sendo puxado.
+    for (const reach of [0.2, 0.9, DEVOURER_MAW_BITE_RADIUS * 0.99]) {
+      for (let i = 0; i < MAW_STREAKS; i++) {
+        for (let s = 0; s < 1.2; s += 0.05) {
+          const g = mawStreak(i, s, reach);
+          for (const point of g.path) {
+            expect(radius(point), `alcance ${reach}: grao fora do disco`).toBeLessThanOrEqual(
+              reach + 0.001
+            );
+          }
+          if (g.alpha <= 0.01) continue;
+          expect(radius(tail(g)), `alcance ${reach}: grao ${i} subiu`).toBeGreaterThan(
+            radius(head(g)) - 0.001
+          );
+        }
+      }
+    }
+  });
+
   it('caem PARA DENTRO: a cauda esta sempre mais longe que a cabeca', () => {
     // O sentido e a unica coisa que o efeito precisa dizer sem ambiguidade. Um
     // grao cuja cauda ficasse mais perto do centro desenharia materia SAINDO da

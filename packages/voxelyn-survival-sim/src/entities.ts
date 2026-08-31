@@ -2355,28 +2355,10 @@ const devourerStep = (
     return;
   }
 
-  // A BOCA: a janela. Ele continua sem andar, sem virar e sem areia absorvendo
-  // tiro — a abertura e a mesma, e tudo o que ela prometia continua de pe.
-  //
-  // O que ele NAO faz mais e nada. Antes ele ficava entalado e inerte, uma
-  // torre: a janela nao pedia nada de quem a usava alem de ter municao. Agora
-  // ela e um lugar com sucao, e usar a janela virou uma decisao de posicao.
-  //
-  // Antes disso existiu tambem um estado EXPOSTO em que ele perseguia devagar e
-  // cobrava contato. Ele saiu e nao volta: perseguir puniria a aproximacao que
-  // a abertura existe para convidar. A boca e o contrario disso — ela ATRAI, e
-  // quem decide se chegar perto vale a pena continua sendo o jogador.
-  if (enemy.mood === DEVOURER_MAW) {
-    if (state.tick >= enemy.nextActionAt) {
-      enemy.mood = DEVOURER_BURROWED;
-      state.bossRuntime.mawOpenedAt = -1;
-      state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
-      enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
-      return;
-    }
-    devourerMawStep(state, enemy, events);
-    return;
-  }
+  // A BOCA nao chega aqui: ela roda em `devourerMawTick`, antes dos portoes de
+  // acao e de atordoamento de `updateEnemies`. Este ramo nao existe de
+  // proposito — duplicar a chamada aqui faria a succao rodar duas vezes por
+  // tick em todo tick que nao fosse atordoado.
 
   // MERGULHADO. Ele nao colide e nao e alcancado pelo terreno: esta POR BAIXO
   // dele. O que fica na superficie e a faixa de silica solta — o aviso de por
@@ -2589,6 +2571,30 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
  * Ele nao se mexe em nenhum ramo. A boca nao persegue: ela espera, e o mundo e
  * que anda ate ela.
  */
+/**
+ * A JANELA INTEIRA de boca aberta, incluindo o fim dela.
+ *
+ * Existe separada de `devourerStep` porque nao pode ser chamada de la: o fluxo
+ * de IA fica atras de dois portoes (acao em curso, e atordoamento), e a boca
+ * nao pode ficar atras de nenhum dos dois. Ver a chamada em `updateEnemies`,
+ * onde o motivo esta escrito.
+ */
+export const devourerMawTick = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[]
+): void => {
+  if (state.tick >= enemy.nextActionAt) {
+    // A boca FECHA, e ele volta para baixo com a rajada recomposta.
+    enemy.mood = DEVOURER_BURROWED;
+    state.bossRuntime.mawOpenedAt = -1;
+    state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
+    enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    return;
+  }
+  devourerMawStep(state, enemy, events);
+};
+
 const devourerMawStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const opened = state.bossRuntime.mawOpenedAt;
   const reach = mawReach(state.tick, opened);
@@ -4340,6 +4346,29 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // cada golpe ou cada atordoamento ensinaria ao jogador uma janela que nao
     // existe — "acertei na hora certa" em vez de "ele estava no lugar errado".
     const onFungus = enemy.archetype === 'bishop' && bishopRegen(state, enemy, events);
+    // A BOCA DO DEVORADOR roda ANTES dos dois portoes — o de acao e o de
+    // atordoamento — pela mesma razao da cura do Bispo logo acima: ela nao e uma
+    // decisao dele, e o ESTADO em que ele esta.
+    //
+    // O portao de atordoamento e o que torna isto obrigatorio, e nao uma
+    // preferencia de arrumacao. Corrente atordoa por 1,2 s e o Devorador nao
+    // esta em `isStoneEnemy`: com a boca dentro do fluxo de IA, um unico tiro
+    // condutivo desligava succao, refeicao de areia e mordida por 24 ticks —
+    // enquanto `mawOpenedAt` e `nextActionAt`, que sao ticks ABSOLUTOS,
+    // continuavam correndo. O jogador ficava com a janela sem o preco dela, e o
+    // vortice seguia desenhado no chao prometendo uma succao que nao acontecia.
+    // Isto e a TORRE de volta, comprada por um modulo, e e exatamente o que este
+    // encontro deixou de ser.
+    //
+    // Interromper tambem nao faria sentido do outro lado: a boca nao e um
+    // telegrafo de golpe, e a JANELA DE DANO do chefe. Atordoar para encurtar a
+    // propria janela de dano nao e uma jogada — e o `continue` diz o resto, que
+    // e que de boca aberta ele nao faz mais nada nenhum.
+    if (enemy.archetype === 'white_devourer' && enemy.mood === DEVOURER_MAW) {
+      enemy.action = undefined;
+      devourerMawTick(state, enemy, events);
+      continue;
+    }
     if (advanceAction(state, enemy, events)) {
       if (!enemy.alive) continue;
       // Cavalo e Diamandis sao conduzidos passo a passo (a recuperacao E a
