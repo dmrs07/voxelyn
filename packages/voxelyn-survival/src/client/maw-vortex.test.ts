@@ -111,6 +111,47 @@ describe('vortice da boca — os graos', () => {
     }
   });
 
+  it('SUGA em vez de orbitar: cada passo anda mais para dentro que para o lado', () => {
+    // O relato de playtest que originou esta regra: "parece que nao suga nada,
+    // sao particulas circulando". Era medivel — o caminho fixava VOLTAS (duas),
+    // e no raio medio isso dava mais de 50 tiles de percurso tangencial contra 6
+    // de radial. Entre 89% e 96% de cada passo era orbita.
+    //
+    // O caminho agora e uma espiral de PASSO constante abaixo de 45 graus, entao
+    // a componente radial vence a tangencial em todo raio. E o invariante que
+    // separa "sugando" de "girando", e ele nao pode voltar a quebrar.
+    for (let i = 0; i < MAW_STREAKS; i++) {
+      for (let s = 0; s < 2; s += 0.03) {
+        const g = mawStreak(i, s, DEVOURER_MAW_RADIUS);
+        if (g.alpha <= 0.01) continue;
+        for (let k = 1; k < g.path.length; k++) {
+          const a = g.path[k - 1];
+          const b = g.path[k];
+          const step = Math.hypot(b.dx - a.dx, b.dy - a.dy);
+          if (step < 1e-6) continue;
+          // O quanto o passo encurtou o raio, contra o comprimento total dele.
+          const inward = radius(a) - radius(b);
+          expect(
+            inward / step,
+            `grao ${i}: passo ${(100 * (inward / step)).toFixed(0)}% radial — orbitando`
+          ).toBeGreaterThan(0.5);
+        }
+      }
+    }
+  });
+
+  it('ACELERA para dentro: o passo perto da garganta e maior que o da borda', () => {
+    // Conservacao de fluxo: `r * v_r` constante, entao `r^2` cai linear e a
+    // velocidade radial cresce para dentro. E o que faz o risco esticar conforme
+    // desce — a areia nao so vai para o centro, ela vai cada vez mais rapido.
+    const rim = mawStreak(0, 0.06, DEVOURER_MAW_RADIUS);
+    const throat = mawStreak(0, MAW_FALL_SECONDS * 0.94, DEVOURER_MAW_RADIUS);
+    const len = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) =>
+      Math.hypot(g.path[0].dx - head(g).dx, g.path[0].dy - head(g).dy);
+    expect(radius(head(throat))).toBeLessThan(radius(head(rim)));
+    expect(len(throat), 'o rastro nao esticou na descida').toBeGreaterThan(len(rim) * 1.5);
+  });
+
   it('nascem e morrem transparentes: nada pisca no chao', () => {
     for (let i = 0; i < MAW_STREAKS; i++) {
       const born = mawStreak(i, (i / MAW_STREAKS) * -MAW_FALL_SECONDS, reach);
