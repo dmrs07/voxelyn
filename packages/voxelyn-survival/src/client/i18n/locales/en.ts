@@ -411,6 +411,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.cause.discharge.world.headline': 'A discharge caught you in the pool',
   'summary.cause.discharge.world.lesson':
     'A broken crystal electrifies every connected biofluid. A pool is hostile ground.',
+  'summary.cause.leviathanDischarge.headline': 'The Leviathan electrified the Deluge',
+  'summary.cause.leviathanDischarge.lesson':
+    'Get fully inside one of the large air bubbles before the discharge.',
   'summary.cause.explosion.self.headline': 'You blew yourself up',
   'summary.cause.explosion.self.lesson':
     'The explosive module arms at 2.25 tiles. In a corridor, it comes back to you.',

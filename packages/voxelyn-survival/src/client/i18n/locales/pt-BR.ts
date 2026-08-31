@@ -426,6 +426,9 @@ export const PT_BR = {
   'summary.cause.discharge.world.headline': 'Uma descarga te pegou na poça',
   'summary.cause.discharge.world.lesson':
     'Cristal quebrado eletrifica todo biofluido conectado. Poça é terreno hostil.',
+  'summary.cause.leviathanDischarge.headline': 'O Leviatã eletrificou o Dilúvio',
+  'summary.cause.leviathanDischarge.lesson':
+    'Entre por inteiro em uma das grandes bolhas de ar antes da descarga.',
   'summary.cause.explosion.self.headline': 'Você se explodiu',
   'summary.cause.explosion.self.lesson':
     'O módulo explosivo arma a 2,25 tiles. Em corredor, ele volta para você.',

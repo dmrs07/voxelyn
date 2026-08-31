@@ -119,6 +119,11 @@ export const describeCause = (cause: DamageCause | null): CauseText => {
             headline: t('summary.cause.discharge.world.headline'),
             lesson: t('summary.cause.discharge.world.lesson'),
           };
+    case 'leviathan_discharge':
+      return {
+        headline: t('summary.cause.leviathanDischarge.headline'),
+        lesson: t('summary.cause.leviathanDischarge.lesson'),
+      };
     case 'explosion':
       return cause.source === 'player'
         ? {

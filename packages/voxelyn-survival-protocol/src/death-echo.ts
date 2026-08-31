@@ -208,6 +208,7 @@ export const isDeathEchoCause = (value: unknown): value is DamageCause => {
     case 'spores':
     case 'overheat':
     case 'bleedout':
+    case 'leviathan_discharge':
     case 'unknown':
       return true;
     case 'discharge':

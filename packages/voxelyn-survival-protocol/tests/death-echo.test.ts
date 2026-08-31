@@ -166,6 +166,12 @@ describe('cápsula compartilhada', () => {
     expect(parseDeathEchoCapsule(cause('miner', 'cart'))).not.toBeNull();
   });
 
+  it('preserva a descarga massiva do Leviata como causa de Eco', () => {
+    const state = createRun({ seed: 77 });
+    expect(parseDeathEchoCapsule(capsuleAt(state, 'leviathan', { kind: 'leviathan_discharge' })))
+      .not.toBeNull();
+  });
+
   it('nunca ocupa a mesma célula com dois corpos', () => {
     const state = createRun({ seed: 0x0b0b0b });
     const first = capsuleAt(state, 'a');

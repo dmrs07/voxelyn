@@ -92,6 +92,7 @@ describe('causa de morte legivel', () => {
       { kind: 'gas' },
       { kind: 'spores' },
       { kind: 'discharge', source: 'player' },
+      { kind: 'leviathan_discharge' },
       { kind: 'explosion', source: 'enemy' },
       { kind: 'overheat' },
       { kind: 'bleedout' },
