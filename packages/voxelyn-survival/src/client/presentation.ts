@@ -430,13 +430,19 @@ export class EntityPresentation {
     // dano do encontro: desenha-la com a pose de repouso apagaria o convite que
     // ela e, e o aviso que ela virou.
     //
-    // A pose `downed` do atlas ergue a metade dianteira para fora da cratera. O
-    // slot significava "fora de combate, vulneravel", e continua significando —
-    // ele esta mesmo aberto ao tiro. O que ele ganhou por cima e a unica
-    // silhueta do bicho com altura, virada para cima: e a leitura de BOCA, e e
-    // ela que o vortice desenhado no chao em volta (ver `maw-vortex.ts`)
-    // completa. O Devorador continua sendo o unico inimigo que usa este slot em
-    // vida.
+    // A pose `downed` do atlas e a CRATERA DENTADA rente ao chao: abas de
+    // mandibula descascadas para fora, carne exposta, um vao escuro no meio e
+    // um espasmo de seis quadros que nunca move duas pecas juntas. O slot
+    // significava "fora de combate, vulneravel", e continua significando — ele
+    // esta mesmo aberto ao tiro.
+    //
+    // Ela ja ergueu a metade dianteira para fora do buraco, e o que derrubou
+    // aquela versao foi a projecao: vista de cima, altura na beirada de perto
+    // tapa o vao atras dela, e o que sobrava era uma pilha bege. A leitura de
+    // BOCA e area de abertura, e nao altura — e o vortice desenhado no chao em
+    // volta (ver `maw-vortex.ts`) e quem completa a moldura.
+    //
+    // O Devorador continua sendo o unico inimigo que usa este slot em vida.
     if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_MAW) {
       const start = this.downedAt.get(entity.id) ?? nowMs;
       this.downedAt.set(entity.id, start);

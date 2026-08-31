@@ -375,6 +375,19 @@ E ela come de verdade: sílica engolida não vitrifica mais. Essa é a pressão 
 o contra-jogo de ser adiado de graça — quem guardou o rastro do verme "para depois"
 descobre que depois ele foi comido. O **vidro não é tocado**, pela regra de sempre.
 
+**A pose é a promessa.** Enquanto a boca está aberta, o atlas troca a silhueta:
+uma **cratera dentada rente ao chão** — cinco abas de mandíbula descascadas para fora
+e deitadas na areia, carne exposta por baixo delas, um anel de dentes curtos e
+desiguais e um vão escuro que afunda. Ela já foi um tronco **erguido**, e a projeção é
+que derrubou aquela versão: vista de cima em 2:1, um voxel de altura sobe 4px na tela
+e um de raio sobe 2px, então a arcada alta que devia emoldurar o buraco tapava o
+buraco inteiro. Boca vista de cima lê por **área de abertura**, não por altura.
+
+E ela **espasma**: seis quadros a 11 fps, com cada aba, cada dente e cada fio de
+tecido lendo o quadro pelo seu próprio relógio. A dilatação global não é senoidal — é
+uma tabela que pula (1,00 → 0,80 → 1,18 → 0,90 → 1,24 → 0,86). Senoide daria um
+pulmão, e pulmão é calmo; isto precisa parecer engasgo.
+
 **A mesma matéria, agora com três alavancas.** Calor sobre sílica solta já negava a
 emergência (ele não sobe por vidro) e já esticava o arco (ele não decola de vidro);
 agora também dá chão onde a boca não tem o que agarrar. Uma decisão, três pagamentos —

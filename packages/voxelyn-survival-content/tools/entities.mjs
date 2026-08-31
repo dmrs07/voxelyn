@@ -1512,6 +1512,21 @@ const diamandisModel = (anim, f) => {
 // frente: ha um anel de dentes montado em volta do vazio, com a goela escura ao
 // fundo dele. O que se ve de longe e a abertura, que e o que ela e.
 // ---------------------------------------------------------------------------
+/**
+ * Ruido inteiro estavel para o espasmo da boca: mesma (i, f) -> mesmo valor, em
+ * toda direcao autorada e em toda regeracao do atlas.
+ *
+ * Nao e `Math.random` e nao pode ser: o gerador tem de sair byte a byte igual a
+ * cada rodada, senao o atlas vira um diff de 200 KB toda vez que alguem toca no
+ * arquivo. E nao e uma senoide porque senoide e ordenada — o que esta pose pede
+ * e desordem, e desordem reprodutivel e exatamente o que um hash entrega.
+ */
+const twitch = (i, f) => {
+  let h = Math.imul((i | 0) * 374761393 + (f | 0) * 668265263, 1274126177);
+  h ^= h >>> 15;
+  return ((h >>> 0) % 1024) / 1024;
+};
+
 const devourerModel = (anim, f) => {
   // PRESO NO PROPRIO BURACO — a janela de dano do encontro, e a unica pose em
   // que o corpo sai do plano do chao.
@@ -1527,35 +1542,225 @@ const devourerModel = (anim, f) => {
   // enterrada e a dianteira de pe saindo de um colar de silica revirada. E a
   // pose que promete "atire AGORA" sem uma linha de interface.
   if (anim === 'downed') {
-    const sway = [0, 0.5, 0.8, 0.4][f % 4];
+    // A BOCA. Nao e o verme de pe: e o verme ABERTO, rente ao chao.
+    //
+    // Ela ja foi uma torre, e a torre tinha um motivo medido: recortar o corpo
+    // deitado na linha do chao deixava ~10px de lombo acima da areia, e a esse
+    // tamanho o chefe lia como uma PEDRA. A conclusao de entao — "uma janela de
+    // ataque precisa de um alvo com ALTURA" — estava certa sobre o diagnostico e
+    // errada sobre a cura: o que faltava nao era altura, era SILHUETA. Um lombo
+    // e uma forma sem informacao; erguer o lombo so deu informacao nenhuma mais
+    // alta.
+    //
+    // O que da silhueta a um buraco e o DIAMETRO e o que cerca a borda dele.
+    // Entao aqui o corpo nao sobe: ele se abre. As placas da frente descascam
+    // para fora como petalas rasgadas, a carne fica exposta entre elas, e o que
+    // ocupa o quadro e uma cratera dentada de 16 unidades de vao — mais larga
+    // que o corpo inteiro do bicho e a um quinto da altura da torre que ela
+    // substitui. Ninguem confunde isto com pedra: pedra nao tem dentes.
+    //
+    // E a leitura nao esta mais sozinha. Quando esta pose aparece, o cliente
+    // desenha o vortice no chao em volta dela (ver `maw-vortex.ts` no cliente) —
+    // os aneis e a areia girando emolduram a boca de fora. A pose nao precisa
+    // mais gritar sozinha; ela precisa ser o CENTRO de uma coisa que ja grita.
+    //
+    // -----------------------------------------------------------------------
+    // O ESPASMO
+    // -----------------------------------------------------------------------
+    // Enquanto suga, ela nao respira: ESPASMA. Cada peca — cada aba, cada dente,
+    // cada fio de carne — le o quadro pelo seu PROPRIO relogio, e os relogios
+    // sao numeros primos entre si. O resultado e que nunca ha dois quadros com o
+    // mesmo conjunto de pecas contraidas, e nenhuma parte do anel se move junto
+    // com a vizinha.
+    //
+    // A dilatacao global tambem nao e senoidal: e uma tabela que PULA (1,00 ->
+    // 0,80 -> 1,18 -> 0,90 -> 1,24 -> 0,86). Uma senoide daria um pulmao, e
+    // pulmao e uma coisa calma. Isto tem de parecer engasgo.
+    const GULP = [1, 0.8, 1.18, 0.9, 1.24, 0.86];
+    const gulp = GULP[f % GULP.length];
+    /** O relogio PROPRIO de uma peca: quadro deslocado pelo indice dela. */
+    const beat = (i) => GULP[(f + i * 2 + Math.floor(i / 3)) % GULP.length];
+    /** Desvio fixo da peca `i` (nao anima): a arcada e torta de nascenca. */
+    const warp = (i) => (twitch(i, 0) - 0.5) * 2;
+    /** Desvio que ANIMA: a peca `i` tremendo no quadro `f`. */
+    const jerk = (i) => (twitch(i, f * 7 + 1) - 0.5) * 2;
+
+    // AS PROPORCOES SAO A PECA INTEIRA, e duas versoes erraram antes desta.
+    //
+    // A primeira punha a goela com raio MAIOR que o anel de dentes internos:
+    // os dentes ficavam de pe DENTRO do buraco e o tapavam. A segunda corrigiu
+    // a ordem dos raios e mesmo assim saiu um monte de entulho bege — porque o
+    // erro de verdade nao era a ordem, era a ALTURA.
+    //
+    // Numa projecao 2:1 vista de cima, um voxel de altura sobe 4px na tela e um
+    // voxel de raio sobe 2px. Um dente de quatro unidades na beirada DE PERTO
+    // cobre 16px para cima; o vao de uma goela de raio 3 tem 17px de altura
+    // visivel. A conta e essa: a arcada alta que devia emoldurar o buraco
+    // apagava o buraco inteiro. Uma boca vista de cima nao le pela altura dos
+    // dentes — le pela AREA da abertura.
+    //
+    // Entao aqui tudo e largo e raso. O vao dobrou de raio, os dentes cairam
+    // para um terco da altura, o segundo anel deles saiu, as abas deitaram e a
+    // areia da borda virou um punhado de cacos. O que sobrou de vertical no
+    // sprite sao dois voxels e meio — e e por isso que ele finalmente le como
+    // um buraco no chao em vez de uma pilha.
+    // A ESCALA DA ARCADA. A boca desta pose nao e uma boca nova: e a MESMA
+    // cabeca da forma normal, aberta para cima e ampliada. Todo numero do anel
+    // de dentes abaixo e um numero da cabeca multiplicado por isto — 12 dentes,
+    // raio 2,5, alternancia 0,35 por paridade, segundo anel a 0,9 para dentro e
+    // meio passo atras. Escrito como fator e nao como constantes soltas porque
+    // e a unica forma de a semelhanca SOBREVIVER: mexer na cabeca e nao mexer
+    // aqui produziria duas bocas diferentes no mesmo bicho, e ninguem notaria
+    // ate ver as duas no mesmo minuto de jogo.
+    const MOUTH = 2.1;
+    const R_TEETH = 2.5 * MOUTH; //  o anel de dentes, na escala da cabeca
+    const R_HOLE = 1.62 * MOUTH; // o vao: a goela da cabeca tem 3,2 de vao
+    const R_GUM = 6.1; //   a carne em que a arcada esta cravada
+    const R_FLAP = 6.7; //  onde as abas comecam a descascar
     const b = [];
-    // Colar de silica: a borda do buraco. Sem ele o tronco brota de chao liso e
-    // a leitura vira "um verme de pe", nao "um verme entalado".
+
+    // A areia da borda NAO esta aqui, e a ausencia e a decisao. Ela existiu em
+    // duas versoes — primeiro um muro de vinte blocos, depois oito cacos — e nas
+    // duas foi o que abafou a arcada: silica clara em volta de dentes claros
+    // apaga a unica coisa que esta pose precisa dizer. E ela era redundante, o
+    // que e pior: enquanto a boca esta aberta, a simulacao COME a silica do
+    // disco (vira chao limpo, tick a tick) e o cliente desenha o vortice por
+    // cima. A cratera ja esta no chao, desenhada por quem sabe o raio dela.
+    //
+    // O que cerca a boca aqui e carne, e so carne.
+
+    // 2. AS ABAS: cinco placas de mandibula descascadas para fora, DEITADAS
+    //    sobre a areia — a beirada de dentro mal levanta e a de fora encosta no
+    //    chao. E o que torna a coisa repulsiva em vez de geometrica: uma boca
+    //    redonda e um cano; uma boca com abas rasgadas e um bicho.
+    //
+    //    O que se ve delas nao e a placa, e a CARNE por baixo: descascada para
+    //    fora, a aba mostra o lado que nao deveria ser visto. Por isso a face de
+    //    baixo e mais grossa que a de cima.
+    const FLAPS = 5;
+    for (let k = 0; k < FLAPS; k++) {
+      const a0 = (k * Math.PI * 2) / FLAPS + warp(k + 50) * 0.34;
+      const open = beat(k + 1);
+      for (let s = 0; s < 3; s++) {
+        const r = R_FLAP + s * 0.85;
+        const z = 1.1 * open - s * 0.6;
+        for (let m = -1; m <= 1; m++) {
+          const a = a0 + m * (0.34 - s * 0.06);
+          const w2 = 1.7 - s * 0.25;
+          b.push(box(Math.cos(a) * r - w2 / 2, Math.sin(a) * r - w2 / 2, z - 1, w2, w2, 1, 'blood'));
+          // A PLACA so sobreviveu na ponta de fora (s = 2). Perto da boca ela ja
+          // se rasgou, e o que esta ali e carne.
+          //
+          // A escolha e de VALOR, e nao de gosto: a arcada e de osso, o osso e
+          // claro, e a silica e vizinha dele na escala. Uma gola de silica em
+          // volta de dentes de silica apaga a arcada — foi o que aconteceu nas
+          // duas versoes anteriores, e nenhuma quantidade de geometria consertou
+          // porque o problema nunca foi a forma. Com a gola em carne o sprite
+          // passa a ter tres valores separados: osso claro, vao escuro, carne
+          // vermelha. So assim a boca da forma normal continua reconhecivel aqui.
+          b.push(box(Math.cos(a) * r - w2 / 2, Math.sin(a) * r - w2 / 2, z, w2, w2, 0.7, s === 2 ? 'silt' : 'blood'));
+        }
+      }
+    }
+
+    // 3. O ANEL DE CARNE, colado na beirada do vao. Ele DILATA com o gole: e a
+    //    unica peca que se move inteira, e por isso e ela que da a leitura de
+    //    succao — o resto so treme. Baixo de proposito: alto, voltaria a tapar
+    //    o buraco que ele existe para emoldurar.
+    for (let i = 0; i < 30; i++) {
+      const a = (i * Math.PI * 2) / 30;
+      const r = R_GUM * (0.96 + (gulp - 1) * 0.4) + warp(i + 11) * 0.35;
+      b.push(box(Math.cos(a) * r - 1, Math.sin(a) * r - 1, -0.2, 2, 2, 0.7 + jerk(i) * 0.3, 'blood'));
+    }
+    // Respingos escorrendo da carne para a areia. Poucos e assimetricos —
+    // sujeira, nao um segundo anel.
+    for (let i = 0; i < 5; i++) {
+      const a = twitch(i + 300, 0) * Math.PI * 2;
+      const r = R_GUM + 0.9 + twitch(i + 301, 0) * 1.6;
+      b.push(box(Math.cos(a) * r - 0.5, Math.sin(a) * r - 0.5, -0.4, 1, 1, 0.5, 'blood'));
+    }
+
+    // 4. A ARCADA — a mesma da cabeca, virada para cima.
+    //
+    //    Doze dentes, raio alternando por PARIDADE (2,5 e 2,85 na cabeca), e um
+    //    SEGUNDO ANEL meio passo atras e 0,9 mais fechado, em silica. Na cabeca
+    //    esse segundo anel existe para "dar PROFUNDIDADE ao furo"; aqui, com a
+    //    boca virada para cima, ele cai meio passo para BAIXO e vira o forro da
+    //    garganta — a mesma peca fazendo o mesmo trabalho, de outro angulo.
+    //
+    //    Nada disto e decoracao: e o que faz esta pose ser reconhecivel como a
+    //    boca DESTE bicho. O resto do sprite pode ser tao feio quanto se queira,
+    //    desde que a arcada continue sendo a arcada.
+    //
+    //    O que a pose acrescenta e so o que o corpo caido justifica: cada dente
+    //    tem tremor proprio, e nenhum se move junto com o vizinho.
     for (let i = 0; i < 12; i++) {
       const a = (i * Math.PI) / 6;
-      const r = 3.4 + (i % 3) * 0.4;
-      b.push(box(Math.cos(a) * r - 0.7, Math.sin(a) * r - 0.7, 0, 1.4, 1.4, 0.8 + (i % 3) * 0.4, 'silt'));
+      const r = (R_TEETH + (i % 2) * 0.35 * MOUTH) * (0.98 + (beat(i) - 1) * 0.4) + warp(i + 100) * 0.3;
+      // 1,2 e o comprimento do dente na cabeca. Aqui ele aponta para CIMA, e
+      // por isso vira altura — e por isso tambem nao pode crescer: um dente alto
+      // na beirada de perto tapa o vao inteiro (ver a conta de altura acima).
+      const h = 1.2 * MOUTH * (0.85 + twitch(i, 5) * 0.4) + jerk(i + 3) * 0.4;
+      const t = 0.9 * MOUTH;
+      b.push(box(Math.cos(a) * r - t / 2, Math.sin(a) * r - t / 2, 0.4, t, t, h, 'bone'));
+      // A PONTA, meio passo mais para FORA. Na cabeca o dente e reto porque a
+      // boca aponta para a frente e a ponta ja aparece; virada para cima, uma
+      // arcada reta fecha por cima do vao — o dente de perto sobe na tela e
+      // tapa o buraco atras dele. Abrindo a ponta para fora, a mesma arcada
+      // desencosta do centro, e e tambem o que a palavra "aberta" quer dizer:
+      // esta boca nao esta mordendo, esta escancarada.
+      const tip = 0.7 * MOUTH;
+      b.push(box(Math.cos(a) * (r + 0.6) - tip / 2, Math.sin(a) * (r + 0.6) - tip / 2, 0.4 + h * 0.55, tip, tip, h * 0.6, 'bone'));
+      // O SEGUNDO ANEL. Meio passo abaixo e 0,9 para dentro, como na cabeca —
+      // la ele da PROFUNDIDADE ao furo, aqui ele forra a garganta. Mesma peca,
+      // mesmo trabalho, outro angulo.
+      const r2 = (r - 0.9 * MOUTH);
+      const t2 = 0.8 * MOUTH;
+      b.push(box(Math.cos(a) * r2 - t2 / 2, Math.sin(a) * r2 - t2 / 2, -0.5, t2, t2, 1.1, 'silt'));
     }
-    // Cinco aneis empilhados em Z, afinando para cima. O balanco cresce com a
-    // altura: preso, ele nao anda — ele TENTA, e o topo e o que mais se mexe.
-    const RINGS = 6;
-    const STEP = 2.2;
-    for (let s = 0; s < RINGS; s++) {
-      const d = 4.6 - s * 0.55;
-      const lean = (sway * (s + 1)) / RINGS;
-      b.push(box(-d / 2 + lean, -d / 2, 0.5 + s * STEP, d, d, STEP, 'silt'));
-      // Sulco entre aneis, como no corpo deitado: sem ele o tronco e um tubo
-      // liso e perde a escala.
-      b.push(box(-d / 2 + lean + 0.35, -d / 2 + 0.35, 0.5 + s * STEP + STEP - 0.5, d - 0.7, d - 0.7, 0.5, 'rockDeep'));
+
+    // 5. A GOELA: o vao, e o maior objeto do sprite. Ela AFUNDA em vez de subir,
+    //    e e por isso que a pose cabe rente ao chao sem virar uma tampa — a
+    //    profundidade da a leitura de buraco que a altura dava de tronco.
+    //
+    //    Quatro unidades de fundo, e nao mais: passando disso o piso do poco
+    //    projeta ABAIXO da beirada de perto e desaparece atras dela — um poco
+    //    fundo demais volta a ser uma mancha, pelo outro motivo.
+    for (let s = 0; s < 6; s++) {
+      const r = R_HOLE * (0.96 + (gulp - 1) * 0.5) - s * 0.5;
+      if (r <= 0.5) break;
+      const z = -0.5 - s * 0.72;
+      // A primeira camada e o forro da garganta, e e a unica vermelha: duas
+      // camadas de carne em disco CHEIO — que foi a versao anterior — enchiam a
+      // abertura inteira de rosa e o buraco virava uma poca. O vermelho tem de
+      // ser a BORDA de onde o escuro comeca, e nao o escuro.
+      const mat = s === 0 ? 'blood' : s < 3 ? 'rockDeep' : 'scorch';
+      // ANEIS, e nao discos. Um disco em cada profundidade tapa o de baixo: o
+      // que se ve e sempre a camada de cima, e o poco inteiro colapsa numa
+      // tampa da cor dela. Vazando o miolo, cada degrau mostra so a sua faixa
+      // de parede e o olho desce ate o fundo — que e a unica camada cheia.
+      const inner = s === 5 ? -1 : r - 1.15;
+      for (let x = -Math.ceil(r); x <= r; x += 1) {
+        for (let y = -Math.ceil(r); y <= r; y += 1) {
+          const d = Math.hypot(x + 0.5, y + 0.5);
+          if (d > r || d < inner) continue;
+          b.push(box(x, y, z, 1, 1, 0.72, mat));
+        }
+      }
     }
-    // A BOCA no topo, aberta para cima: anel de dentes em volta da goela.
-    const topZ = 0.5 + RINGS * STEP;
-    const tip = sway;
-    b.push(box(-1.5 + tip, -1.5, topZ - 1.6, 3, 3, 1.8, 'blood'));
-    for (let i = 0; i < 12; i++) {
-      const a = (i * Math.PI) / 6;
-      const r = 2.2 + (i % 2) * 0.35;
-      b.push(box(Math.cos(a) * r - 0.45 + tip, Math.sin(a) * r - 0.45, topZ - 0.4, 0.9, 0.9, 1.3, 'bone'));
+
+    // 6. OS FIOS: tiras de tecido atravessando a abertura, que ARREBENTAM e se
+    //    refazem entre quadros. Nao ha nada de mecanico aqui — e a peca que
+    //    existe so para a boca parecer molhada.
+    for (let k = 0; k < 3; k++) {
+      if (twitch(k + 200, f * 3) > 0.62) continue; // este quadro esta sem ele
+      const a = twitch(k + 201, 0) * Math.PI;
+      const span = R_HOLE * gulp * 0.92;
+      for (let s = 0; s <= 7; s++) {
+        const t = s / 7 - 0.5;
+        const sag = 0.8 - (1 - Math.abs(t) * 2) * 1.6;
+        b.push(box(Math.cos(a) * t * span * 2, Math.sin(a) * t * span * 2, sag, 0.6, 0.6, 0.6, 'blood'));
+      }
     }
     return b;
   }
@@ -2095,7 +2300,7 @@ const magnetarchModel = (anim, f) => {
 const diamandisFrame = (dir, anim, f) =>
   renderVoxels(diamandisModel(anim, f), DIR_INDEX[dir], 120, 138, 58, 114);
 const devourerFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 104, 94, 50, 71);
+  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 112, 110, 54, 74);
 const archcantorFrame = (dir, anim, f) =>
   renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
 const leviathanFrame = (dir, anim, f) =>
@@ -2377,14 +2582,20 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 4, fps: 8, loop: false },
   }, diamandisFrame, 'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon', 1),
-  base('enemy-white-devourer', 104, 94, 50, 71, { w: 2.2, h: 1.2 }, { w: 2, h: 1.6, offsetX: 0, offsetY: 0 }, {
+  base('enemy-white-devourer', 112, 110, 54, 74, { w: 2.2, h: 1.2 }, { w: 2, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
-    // `downed` e a fase PRESA, e nao a morte: o Devorador e o unico inimigo que
-    // usa este slot em vida. O nome do slot ja existia no contrato de atlas e
-    // significa exatamente isto — "fora de combate, no chao, vulneravel".
-    downed: { frames: 4, fps: 5, loop: true },
-  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward', 1),
+    // `downed` e a BOCA ABERTA, e nao a morte: o Devorador e o unico inimigo
+    // que usa este slot em vida. O nome do slot ja existia no contrato de atlas
+    // e significa exatamente isto — "no chao, vulneravel".
+    //
+    // Seis quadros a 11 fps, e nao quatro a 5. A 5 fps a pose respirava, e
+    // respirar e calmo; o ciclo de 0,55 s com seis fases desalinhadas le como
+    // ESPASMO, que e o que uma coisa engolindo o setor faz. Seis tambem e o
+    // tamanho da tabela de gole (GULP): cada quadro do atlas e uma entrada
+    // dela, sem repetir nem sobrar.
+    downed: { frames: 6, fps: 11, loop: true },
+  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 2),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

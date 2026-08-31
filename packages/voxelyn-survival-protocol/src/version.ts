@@ -679,7 +679,24 @@ export const SIMULATION_VERSION = 44;
 // fechado e aberto, ANEXADOS ao fim da lista. A classe I mantem os nomes
 // historicos salvageCache/salvageCacheOpened, que tambem servem de fallback
 // para atlas antigo em cache. Puro conteudo visual — tier ja existia na sim.
-export const CONTENT_VERSION = 25;
+// 26: a pose PRESA do Devorador vira a BOCA. O atlas `enemy-white-devourer`
+// sobe para v2 e muda de canvas (104x94 -> 112x110, ancora 50,71 -> 54,75):
+// o corpo erguido saiu e no lugar dele ha uma cratera dentada rente ao chao —
+// cinco abas de mandibula descascadas para fora e deitadas na areia, carne
+// exposta por baixo delas, um anel de dentes curtos e desiguais e um vao escuro
+// que AFUNDA. O humor `downed` passa de 4 quadros a 5 fps para 6 a 11: nao e
+// mais uma respiracao, e um espasmo em que nenhuma peca se move junto com a
+// vizinha.
+//
+// O canvas cresceu porque a boca e mais larga que o corpo do bicho, e a ancora
+// mudou junto porque `fitSpriteToMargin` reenquadra o sheet inteiro pela uniao
+// dos quadros — declarar a ancora velha desenharia o verme dois pixels fora do
+// lugar em TODA animacao, e nao so nesta.
+//
+// Um cliente com o atlas antigo continua desenhando o tronco erguido enquanto a
+// simulacao arrasta corpos para dentro de um buraco que ele nao mostra: a pose
+// e o unico sinal de que a janela virou uma boca, e ela e o telegrafo do golpe.
+export const CONTENT_VERSION = 26;
 
 export type VersionTriple = {
   protocolVersion: number;

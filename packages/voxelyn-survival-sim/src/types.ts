@@ -775,13 +775,13 @@ export const DEVOURER_SURFACED = 1;
  */
 export const DEVOURER_AIRBORNE = 2;
 /**
- * A BOCA ABERTA: meio enterrado no proprio buraco, no fim da rajada de saltos.
+ * A BOCA ABERTA: aberto no proprio buraco, no fim da rajada de saltos.
  *
  * E a janela de dano do encontro inteiro, e por isso e um humor e nao um
  * cooldown invisivel: ele nao anda e nao tem areia absorvendo tiro. O cliente
- * troca a silhueta por causa dele — a pose `downed` do atlas ergue a metade
- * dianteira para fora da cratera, que e o unico desenho do bicho com altura, e
- * a unica leitura possivel de uma boca aberta virada para cima.
+ * troca a silhueta por causa dele — a pose `downed` do atlas e uma cratera
+ * dentada rente ao chao, com as placas da frente descascadas para fora, a carne
+ * a mostra e um vao escuro no meio, espasmando em seis quadros.
  *
  * Chamava-se `DEVOURER_STUCK`, "entalado", e o nome era honesto sobre o que a
  * janela era: um alvo imovel e inofensivo, uma TORRE. Ele continua imovel — o

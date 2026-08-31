@@ -160,7 +160,7 @@ describe('a marca de peca segue a peca', () => {
 });
 
 
-describe('o Devorador entalado troca de silhueta', () => {
+describe('o Devorador de boca aberta troca de silhueta', () => {
   // A janela de dano do encontro inteiro e um HUMOR, nao uma acao: preso ele
   // nao tem acao nenhuma. Sem a troca explicita de pose ele cairia em `idle` —
   // o corpo deitado passeando pelo chao — e a unica abertura do ciclo pareceria
