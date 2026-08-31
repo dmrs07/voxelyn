@@ -1047,11 +1047,7 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
  * chama nenhuma saindo. O fim natural nao avisa — ele coincide com o prazo que
  * o cliente ja conhece.
  */
-const settleBreathChannel = (
-  state: SurvivalState,
-  slot: number,
-  events: SemanticEvent[],
-): void => {
+const settleBreathChannel = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
   const extra = state.playerExtras[slot];
   if (extra.channelingUntil === 0) return;
   if (state.tick < extra.channelingUntil) {
@@ -1615,7 +1611,8 @@ const stepPlayer = (
     // arvore inteira o embalo cai de 0,82 para ~0,62 — o Prospector ainda
     // escorrega, so nao patina por tres tiles depois de soltar o comando.
     // Circuito fechado na Cripta: a inercia da lamina some junto com o degelo.
-    const glide = state.stratumSubverted && state.stratum === 'glacial' ? 0 : ICE_GLIDE * (1 - tuning.iceGlide);
+    const glide =
+      state.stratumSubverted && state.stratum === 'glacial' ? 0 : ICE_GLIDE * (1 - tuning.iceGlide);
     const vx = player.vx * glide + desiredX * (1 - glide);
     const vy = player.vy * glide + desiredY * (1 - glide);
     // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
@@ -1654,7 +1651,9 @@ const stepPlayer = (
         // Circuito fechado na Fornalha: a fissura para de segurar o calor da
         // arma. E uma das duas subversoes assimetricas — brasa so pressiona o
         // jogador —, e o preco dela esta no custo de fechar, nao no premio.
-        (onEmber && !(state.stratumSubverted && state.stratum === 'furnace') ? EMBER_HEAT_DECAY_SCALE : 1),
+        (onEmber && !(state.stratumSubverted && state.stratum === 'furnace')
+          ? EMBER_HEAT_DECAY_SCALE
+          : 1),
   );
 
   // Canal do sopro que chegou ao proprio fim: liquida ANTES do gate de cast —
@@ -2429,7 +2428,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         // decisao eletrica do jogador aconteceu AQUI, no impacto — a descarga
         // em si so sai do relogio dali a LEYLINE_CHARGE_TICKS (stepLeylines).
         const armedLeylineHere = impactEvents.some((event) => event.t === 'leyline_charge');
-        if (conductiveReady && ownerExtra && ownerSlot !== undefined && (dischargedHere || armedLeylineHere)) {
+        if (
+          conductiveReady &&
+          ownerExtra &&
+          ownerSlot !== undefined &&
+          (dischargedHere || armedLeylineHere)
+        ) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
         }
         // Quebrar cristal dentro de uma poca E o jogador usando corrente, mesmo
@@ -3337,6 +3341,14 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.delugeAt);
   mix(Math.round(state.bossRuntime.delugeX * 1000));
   mix(Math.round(state.bossRuntime.delugeY * 1000));
+  mix(state.bossRuntime.leviathanShockAt);
+  mix(state.bossRuntime.leviathanShockRecoverAt);
+  mix(state.bossRuntime.leviathanShockSeq);
+  for (const bubble of state.bossRuntime.protectiveBubbles) {
+    mix(Math.round(bubble.x * 1000));
+    mix(Math.round(bubble.y * 1000));
+    mix(Math.round(bubble.radius * 1000));
+  }
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
   // ja e hasheado por conta propria. Duas simulacoes discordando de

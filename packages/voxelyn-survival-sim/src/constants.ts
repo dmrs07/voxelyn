@@ -1842,6 +1842,11 @@ export const DELUGE_WINDUP_TICKS = 50;
  * segundos.
  */
 export const DELUGE_FRONT_SPEED = 0.55;
+/** Coluna final claramente acima da cabeca do Prospector. */
+export const DELUGE_MAX_DEPTH = 3.2;
+/** Altura ganha conforme a frente avanca para alem da celula. */
+export const DELUGE_DEPTH_PER_FRONT_TILE = 0.48;
+export const PROSPECTOR_HEAD_HEIGHT = 2.15;
 /**
  * O que o Diluvio da a ELE. Submerso no proprio elemento, em todo lugar.
  *
@@ -1893,6 +1898,12 @@ export const DELUGE_SHOCK_MIN_SCALE = 0.12;
  * tempo que a agua levaria mesmo.
  */
 export const DELUGE_FIELD_REFRESH_TICKS = 10;
+/** 3,6 s: a 4,6 tiles/s alcanca abrigo proximo, mas nao cruza a arena. */
+export const LEVIATHAN_SHOCK_WINDUP_TICKS = 72;
+export const LEVIATHAN_SHOCK_RECOVERY_TICKS = 24;
+export const LEVIATHAN_SHOCK_COOLDOWN_TICKS = 190;
+export const LEVIATHAN_SHOCK_DAMAGE = 78;
+export const LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS = 1.35;
 /**
  * Quantos dutos a Cripta... nao: o AQUIFERO recebe. Zero em todo o resto.
  *

@@ -20,6 +20,8 @@ import {
   SOLID_NONE,
   DELUGE_FRONT_SPEED,
   DELUGE_FIELD_REFRESH_TICKS,
+  DELUGE_MAX_DEPTH,
+  DELUGE_DEPTH_PER_FRONT_TILE,
   PIPE_MOUTH,
   isPipe,
   SOLID_ROCK,
@@ -102,6 +104,13 @@ export const isDeluged = (state: SurvivalState, i: number): boolean => {
   return delugeField(state)[i] <= front;
 };
 
+/** Altura autoritativa da coluna d'agua nesta celula, em tiles. */
+export const delugeDepth = (state: SurvivalState, i: number): number => {
+  if (i < 0 || i >= state.surface.length || state.solid[i] !== SOLID_NONE) return 0;
+  const passed = delugeFront(state) - delugeField(state)[i];
+  return Math.max(0, Math.min(DELUGE_MAX_DEPTH, passed * DELUGE_DEPTH_PER_FRONT_TILE));
+};
+
 /** Sem caminho ate nenhuma boca: esta celula nao enche nunca. */
 const DELUGE_UNREACHED = 0xffff;
 
@@ -144,7 +153,7 @@ export const delugeField = (state: SurvivalState): Uint16Array => {
     if (!isPipe(state.solid[i])) continue;
     const [dx, dy] = PIPE_MOUTH[state.solid[i]];
     const x = (i % w) + dx;
-    const y = ((i - (i % w)) / w) + dy;
+    const y = (i - (i % w)) / w + dy;
     if (x < 0 || y < 0 || x >= w || y >= h) continue;
     const mouth = y * w + x;
     if (state.solid[mouth] !== SOLID_NONE || field[mouth] === 0) continue;
@@ -239,19 +248,21 @@ const announceIgnite = (state: SurvivalState, i: number, events: SemanticEvent[]
  * fumegando antes da chama aparecer. `directHeat` representa um novo impacto
  * termico; proximidade de fogo apenas inicia a secagem e deixa o relogio correr.
  */
-export const heatFungalCell = (
-  state: SurvivalState,
-  i: number,
-  directHeat = false
-): boolean => {
+export const heatFungalCell = (state: SurvivalState, i: number, directHeat = false): boolean => {
   const surf = state.surface[i];
   if (surf === SURF_FUNGAL) {
-    const timer = Math.max(CELL_STEP_INTERVAL, FUNGAL_HEAT_TICKS - (directHeat ? FUNGAL_HEAT_IMPACT_TICKS : 0));
+    const timer = Math.max(
+      CELL_STEP_INTERVAL,
+      FUNGAL_HEAT_TICKS - (directHeat ? FUNGAL_HEAT_IMPACT_TICKS : 0),
+    );
     setSurface(state, i, SURF_FUNGAL_HEATED, timer);
     return true;
   }
   if (surf === SURF_FUNGAL_HEATED && directHeat) {
-    state.surfaceTimer[i] = Math.max(CELL_STEP_INTERVAL, state.surfaceTimer[i] - FUNGAL_HEAT_IMPACT_TICKS);
+    state.surfaceTimer[i] = Math.max(
+      CELL_STEP_INTERVAL,
+      state.surfaceTimer[i] - FUNGAL_HEAT_IMPACT_TICKS,
+    );
     return true;
   }
   return surf === SURF_FUNGAL_HEATED;
@@ -333,7 +344,7 @@ export const floodFrom = (
   sx: number,
   sy: number,
   budget: number,
-  connected: (index: number) => boolean
+  connected: (index: number) => boolean,
 ): number[] => {
   const w = W(state);
   const h = H(state);
@@ -407,7 +418,7 @@ export const dischargeAt = (
   sx: number,
   sy: number,
   events: SemanticEvent[],
-  origin: EffectOrigin = { source: 'environment' }
+  origin: EffectOrigin = { source: 'environment' },
 ): boolean => {
   const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => isConductiveCell(state, i));
   // O PONTO de entrada da corrente viaja com o evento, e nao so as celulas.
@@ -426,7 +437,7 @@ export const explodeAt = (
   ey: number,
   radius: number,
   events: SemanticEvent[],
-  origin: EffectOrigin = { source: 'environment' }
+  origin: EffectOrigin = { source: 'environment' },
 ): void => {
   const w = W(state);
   const h = H(state);
@@ -630,7 +641,12 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
 };
 
 /** Quebra uma celula solida por dano direcionado (projetil perfurante, investida, explosao). */
-export const breakSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+export const breakSolid = (
+  state: SurvivalState,
+  x: number,
+  y: number,
+  events: SemanticEvent[],
+): boolean => {
   const w = W(state);
   const i = y * w + x;
   const solid = state.solid[i];
@@ -689,7 +705,12 @@ export const canRip = (state: SurvivalState, x: number, y: number): boolean => {
   return solid === SOLID_ROCK || solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK;
 };
 
-export const ripSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+export const ripSolid = (
+  state: SurvivalState,
+  x: number,
+  y: number,
+  events: SemanticEvent[],
+): boolean => {
   const w = W(state);
   if (!canRip(state, x, y)) return false;
   const i = y * w + x;
@@ -736,7 +757,7 @@ export const closeArena = (
   cy: number,
   radius: number,
   exits: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): number => {
   const w = W(state);
   const h = state.config.height;
