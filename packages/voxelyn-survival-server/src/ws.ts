@@ -25,7 +25,10 @@ import { createDeathEchoStore, type DeathEchoStore } from './death-echoes.js';
 import { createDeathEchoHandler } from './death-echoes-http.js';
 import { createProgressionStore, type ProgressionStore } from './progression-store.js';
 import { createProgressionHandler } from './progression-http.js';
-import { resolveProgressionSecret } from './progression-auth.js';
+import {
+  assertProgressionSecretIsStable,
+  resolveProgressionSecret,
+} from './progression-auth.js';
 import { createDevlogStore } from './devlog.js';
 import { createDevlogHandler } from './devlog-http.js';
 import { createVerificationBudget } from './http-util.js';
@@ -73,6 +76,15 @@ export type WsOptions = ServerOptions & {
  * autoritativo a 20 Hz e transporta as mensagens do SurvivalServer.
  */
 export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
+  // ANTES de qualquer outra coisa — antes de abrir porta, conectar banco ou
+  // aceitar jogador. Persistir perfil com segredo efemero orfana toda a base a
+  // cada reinicio, e a hora de recusar isso e enquanto a instancia antiga ainda
+  // esta no ar servindo os tokens que os jogadores tem. Ver
+  // `assertProgressionSecretIsStable`.
+  assertProgressionSecretIsStable(
+    opts.databaseUrl ?? process.env.DATABASE_URL,
+    opts.progressionSecret ?? process.env.PROGRESSION_SECRET,
+  );
   let leaderboardStore: LeaderboardStore | null = null;
   let deathEchoStore: DeathEchoStore | null = null;
   // UM orcamento de re-simulacao para o processo inteiro. Ranking e pool disputam

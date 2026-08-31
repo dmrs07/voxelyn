@@ -94,12 +94,49 @@ export type SessionAuth = {
 const base64url = (buf: Buffer): string => buf.toString('base64url');
 
 /**
+ * Persistir perfil com segredo EFEMERO e uma contradicao, e ela ja custou caro.
+ *
+ * Sem `DATABASE_URL` o efemero e correto: nao ha o que preservar, e um segredo
+ * obrigatorio so atrapalharia `pnpm dev`. COM ele, os dois juntos significam
+ * "grave o perfil para sempre e jogue a chave fora": o `profileId` sao 128 bits
+ * de CSPRNG, nada mais indexa aquela linha, e a cada reinicio o token deixa de
+ * verificar. O jogador nao perde a carteira — ele perde o ENDERECO dela, e a
+ * linha fica no banco sem ninguem que a alcance.
+ *
+ * Aconteceu em producao: um deploy comum devolveu a arvore de protocolos em
+ * branco, e o `progression_secret_ephemeral` no log tinha sido escrito em todo
+ * boot anterior sem ninguem ler. O aviso estava certo e nao bastou — e por isso
+ * esta funcao LANCA em vez de avisar.
+ *
+ * Lancar aqui e mais seguro que subir. O health check do Render nao passa, o
+ * deploy e revertido, e a instancia ANTIGA continua no ar com o segredo que os
+ * jogadores ainda tem no navegador. O modo de falha vira "o deploy nao entrou",
+ * que se conserta em um minuto, em vez de "todo mundo perdeu o perfil", que nao
+ * se conserta.
+ */
+export const assertProgressionSecretIsStable = (
+  databaseUrl: string | undefined,
+  provided: string | undefined,
+): void => {
+  if (!databaseUrl) return;
+  if (provided && provided.length >= 16) return;
+  throw new Error(
+    provided
+      ? 'PROGRESSION_SECRET tem menos de 16 caracteres e ha DATABASE_URL: ' +
+        'um segredo fraco assina sessoes que guardam perfil persistido.'
+      : 'PROGRESSION_SECRET ausente e ha DATABASE_URL: o servidor gravaria perfis ' +
+        'que nenhum token conseguiria reabrir depois do proximo reinicio. ' +
+        'Defina um valor estavel (32 bytes aleatorios) antes de subir.',
+  );
+};
+
+/**
  * Segredo do ambiente, ou um efemero com AVISO no boot.
  *
- * Cair para efemero e melhor que recusar a subir: o jogo funciona, so as sessoes
- * nao sobrevivem a um restart. O que nao pode acontecer e isso ser silencioso —
- * em producao mal configurada, o sintoma seria "os jogadores perdem o perfil de
- * vez em quando", que e caro de diagnosticar e barato de anunciar.
+ * O efemero sobrevive para o caminho em que ele e a resposta certa: sem
+ * `DATABASE_URL`, nada e persistido e um segredo obrigatorio so atrapalharia
+ * `pnpm dev`. Onde ele destruiria dado, quem barra e
+ * `assertProgressionSecretIsStable`, antes de o servidor sequer abrir a porta.
  */
 export const resolveProgressionSecret = (
   provided: string | undefined,

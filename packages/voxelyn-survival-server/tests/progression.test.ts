@@ -6,6 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  assertProgressionSecretIsStable,
+  resolveProgressionSecret,
+} from '../src/progression-auth.js';
+import {
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_GAS_IGNITION,
   DISCOVERY_MINER_FLED,
@@ -983,5 +987,55 @@ describe('estado de leitura', () => {
     expect(pub.discoveries & DISCOVERY_GAS_IGNITION).toBeTruthy();
     expect(pub.readLoreFragmentIds).toEqual([]);
     expect(pub.loreIndex.assets.stalker).toContain(ASSET_LORE.stalker);
+  });
+});
+
+describe('segredo de sessao: efemero onde e certo, fatal onde destroi', () => {
+  /**
+   * O caso que aconteceu em producao.
+   *
+   * Com DATABASE_URL e sem PROGRESSION_SECRET, o servidor gravava perfis que
+   * nenhum token reabriria depois do proximo reinicio. O `profileId` sao 128
+   * bits de CSPRNG e nada mais indexa a linha: o jogador nao perde a carteira,
+   * perde o ENDERECO dela. O aviso no log existia desde sempre e nao bastou.
+   */
+  it('recusa subir com banco e sem segredo', () => {
+    expect(() => assertProgressionSecretIsStable('postgres://x/y', undefined)).toThrow(
+      /PROGRESSION_SECRET ausente/,
+    );
+  });
+
+  it('recusa subir com banco e segredo curto demais para assinar', () => {
+    expect(() => assertProgressionSecretIsStable('postgres://x/y', 'curto')).toThrow(
+      /menos de 16/,
+    );
+  });
+
+  // Sem banco nao ha o que orfanar, e exigir segredo so atrapalharia `pnpm dev`.
+  // Este ramo e o que mantem a suite inteira rodando sem configurar nada.
+  it('sem banco, o efemero continua sendo a resposta certa', () => {
+    expect(() => assertProgressionSecretIsStable(undefined, undefined)).not.toThrow();
+    expect(() => assertProgressionSecretIsStable('', 'curto')).not.toThrow();
+  });
+
+  it('com banco e segredo estavel, passa', () => {
+    expect(() => assertProgressionSecretIsStable('postgres://x/y', 'x'.repeat(32))).not.toThrow();
+  });
+
+  /**
+   * O efemero continua EFEMERO — e continua avisando.
+   *
+   * Prende as duas metades juntas porque separadas elas se contradizem sem que
+   * nada quebre: um `resolveProgressionSecret` que passasse a lancar tornaria o
+   * guard redundante e mataria o `pnpm dev`; um guard que nao lancasse deixaria
+   * o aviso sozinho de novo, que e exatamente o estado que falhou.
+   */
+  it('sem segredo, resolve para um efemero e anuncia no log', () => {
+    const lines: Record<string, unknown>[] = [];
+    const secret = resolveProgressionSecret(undefined, (line) => lines.push(line));
+    expect(secret.length).toBeGreaterThanOrEqual(16);
+    expect(lines.map((l) => l.ev)).toContain('progression_secret_ephemeral');
+    // Efemero de verdade: duas chamadas nao produzem a mesma assinatura.
+    expect(resolveProgressionSecret(undefined, () => {})).not.toBe(secret);
   });
 });
