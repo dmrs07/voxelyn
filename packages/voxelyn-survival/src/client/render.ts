@@ -45,6 +45,8 @@ import {
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
   HEAT_MAX,
+  PURGE_CELL_HEAL,
+  PURGE_CELL_RADIUS,
   MINIGUN_SPIN_FIRE_AT,
   MINIGUN_SPIN_MAX,
   RICOCHET_BOUNCES,
@@ -151,6 +153,7 @@ import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
+import { chassisFault, drawShortArc } from './chassis-fault';
 import {
   RouteMemory,
   drawSurveyHud,
@@ -1461,6 +1464,8 @@ export class SurvivalRenderer {
   private objectiveChangedAtMs = -1e9;
   private coresTakenSeen = -1;
   private coresChangedAtMs = -1e9;
+  /** Quando o Prospector local gastou a ultima Celula de Purga. */
+  private purgeUsedAtMs = -1e9;
   /**
    * A geracao do Prospector LOCAL, para os marcos visuais.
    *
@@ -1645,6 +1650,7 @@ export class SurvivalRenderer {
     this.objectiveChangedAtMs = -1e9;
     this.coresTakenSeen = -1;
     this.coresChangedAtMs = -1e9;
+    this.purgeUsedAtMs = -1e9;
   }
 
   /**
@@ -1982,6 +1988,34 @@ export class SurvivalRenderer {
             // Estourou o teto: o numero ainda pulsa, so nao ha lasca sobrando
             // para desenhar. Perder a animacao e melhor que perder a leitura.
             this.cargoPulseUntil = nowMs + 320;
+          }
+          break;
+        }
+        case 'purge_cell_used': {
+          // A PURGA e uma reinicializacao, nao uma cura: o chassi descarrega o
+          // que estava travando os sistemas e volta a operar. Por isso a frente
+          // e eletrica (fosforo e choque), nunca verde de "vida"; o corpo ganha
+          // a varredura de reboot no proprio desenho; e a linha do painel diz
+          // "sistemas restabelecidos", com o numero que a simulacao devolveu.
+          const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+          this.fxList.push({
+            kind: 'ring',
+            x: ev.x,
+            y: ev.y,
+            r: 0.2,
+            maxR: PURGE_CELL_RADIUS * 2.1,
+            color: PAL.biolum,
+            life: 460,
+            maxLife: 460,
+          });
+          this.addFlash(ev.x, ev.y, PURGE_CELL_RADIUS * 1.6, 0.85, nowMs, 380, PAL.biolum);
+          this.particles.emitPurgeVent(ev.x, ev.y, PURGE_CELL_RADIUS, fxScale);
+          if (ev.slot === this.localPlayerId - 1) {
+            this.purgeUsedAtMs = nowMs;
+            this.messages.push({
+              text: t('toast.purge.used', { amount: PURGE_CELL_HEAL }),
+              until: nowMs + 2400,
+            });
           }
           break;
         }
@@ -3709,8 +3743,17 @@ export class SurvivalRenderer {
       // em fase de tempo real e nao de quadro: a 120Hz um tremor por quadro
       // viraria chuvisco e a 30Hz um pulo.
       const overheating = state.tick < ex.overheatedUntil;
-      const shakeX = overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0;
-      const shakeY = overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0;
+      // FALHA DO CHASSI (chassis-fault.ts): com integridade baixa o corpo da
+      // solavancos curtos e solta faisca. E uma maquina perdendo continuidade
+      // eletrica, nao um ferido — o solavanco e seco e o arco e azul. Vale
+      // para o parceiro tambem: no co-op, ver o outro chassi em curto e o que
+      // avisa que ele precisa de uma Purga antes de cair.
+      const fault = chassisFault(nowMs, slot, pl.hp / pl.maxHp);
+      const reducedMotion = prefersReducedMotion();
+      const faultX = fault.active && !reducedMotion ? fault.jitterX * z : 0;
+      const faultY = fault.active && !reducedMotion ? fault.jitterY * z : 0;
+      const shakeX = (overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0) + faultX;
+      const shakeY = (overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0) + faultY;
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
@@ -3723,6 +3766,17 @@ export class SurvivalRenderer {
           // significa outra coisa.
           if (overheating) {
             this.particles.emitOverheatSmoke(
+              slot,
+              pl.x,
+              pl.y,
+              nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx,
+            );
+          }
+          // A faisca do curto sai mesmo com movimento reduzido: o solavanco e
+          // enfeite, a faisca e a informacao ("este chassi esta no fim").
+          if (fault.active) {
+            this.particles.emitShortCircuit(
               slot,
               pl.x,
               pl.y,
@@ -3831,6 +3885,25 @@ export class SurvivalRenderer {
                     this.quality.maxFx / PRESETS.high.maxFx,
                   );
                 }
+              }
+              // O ARCO do curto, por cima da chapa.
+              if (fault.active) drawShortArc(ctx, psx, psy, size, z, nowMs, slot);
+              // A VARREDURA DE REBOOT da Purga: uma linha de fosforo sobe dos
+              // pes a cabeca em meio segundo, com um veu que se apaga atras
+              // dela. E o chassi religando modulo por modulo — de baixo para
+              // cima, como um sistema que sobe.
+              const rebootT = (nowMs - this.purgeUsedAtMs) / 520;
+              if (isLocal && rebootT >= 0 && rebootT < 1 && !reducedMotion) {
+                const bodyH = size * 2.7;
+                const lineY = psy - rebootT * bodyH;
+                ctx.save();
+                ctx.globalAlpha = (1 - rebootT) * 0.45;
+                ctx.fillStyle = PAL.biolum;
+                ctx.fillRect(psx - size * 1.2, lineY, size * 2.4, psy - lineY);
+                ctx.globalAlpha = 0.95 * (1 - rebootT * 0.5);
+                ctx.fillStyle = PAL.player;
+                ctx.fillRect(psx - size * 1.3, lineY - z, size * 2.6, Math.max(1, z * 1.2));
+                ctx.restore();
               }
               // Os marcos geracionais vao DEPOIS do corpo, por cima dele, e so
               // no Prospector local: o parceiro do co-op e padronizado enquanto
@@ -5579,10 +5652,6 @@ export class SurvivalRenderer {
       width: layout.width * hs,
       height: layout.height * hs,
     };
-    this.hudPurgeGlyph = {
-      x: layout.resources.purgeGlyphX * hs,
-      y: layout.resources.glyphY * hs,
-    };
     this.hudResourcesGlyphY = layout.resources.glyphY * hs;
     this.hudModuleAnchor = layout.modules
       ? { x: (layout.modules.x + 15) * hs, y: (layout.modules.y + 15) * hs }
@@ -5705,6 +5774,25 @@ export class SurvivalRenderer {
       ctx.fillStyle = `rgba(255,255,255,${(1 - sinceHit / 200) * 0.5 * this.hpHitStrength})`;
       ctx.fillRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
     }
+    // A VARREDURA da Purga na barra: uma banda de fosforo cruza a barra da
+    // esquerda para a direita enquanto o chassi religa. E o mesmo evento que a
+    // linha subindo pelo corpo — duas leituras do mesmo reboot, no mesmo
+    // meio segundo.
+    const sweepT = (nowMs - this.purgeUsedAtMs) / 600;
+    if (!reduced && sweepT >= 0 && sweepT < 1) {
+      const sweepX = hpBar.x + hpBar.w * sweepT;
+      const sweepGrad = ctx.createLinearGradient(sweepX - 22, 0, sweepX + 4, 0);
+      sweepGrad.addColorStop(0, 'rgba(89,242,194,0)');
+      sweepGrad.addColorStop(0.8, `rgba(89,242,194,${0.75 * (1 - sweepT * 0.4)})`);
+      sweepGrad.addColorStop(1, 'rgba(232,241,255,0.9)');
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(hpBar.x + 1, hpBar.y + 1, hpBar.w - 2, hpBar.h - 2);
+      ctx.clip();
+      ctx.fillStyle = sweepGrad;
+      ctx.fillRect(sweepX - 22, hpBar.y, 26, hpBar.h);
+      ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(232,241,255,0.24)';
     ctx.lineWidth = 1;
     ctx.strokeRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
@@ -5713,7 +5801,7 @@ export class SurvivalRenderer {
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillText(hpText, hpBar.x + hpBar.w - 4, hpBar.y + 12);
-    ctx.fillStyle = PAL.player;
+    ctx.fillStyle = sweepT >= 0 && sweepT < 1 ? PAL.biolum : PAL.player;
     ctx.fillText(hpText, hpBar.x + hpBar.w - 5, hpBar.y + 11);
 
     // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
@@ -5811,32 +5899,83 @@ export class SurvivalRenderer {
     const purgePulse = nowMs < this.purgePulseUntil;
     const cargoPulse = nowMs < this.cargoPulseUntil;
     const { resources } = layout;
-    const purgeLabel = t('hud.purgeCells', { count: extra.purgeCells });
     const cargoLabel = t('hud.cargo', { count: this.cargoOre });
-    // Purga e carga dividem a linha, e no painel mais estreito (230 px) o
-    // portugues ("CÉLULA DE PURGA ×1" + "0 CARGA") nao cabe a 12 px. A fonte
-    // desce um ponto de cada vez ate os dois textos e o glifo da carga
-    // couberem — em vez de um por cima do outro, que foi como o playtest
-    // mobile os encontrou.
-    const purgeTextX = layout.x + 34;
+
+    // AS CELULAS DE PURGA, uma a uma.
+    //
+    // Antes era "CÉLULA DE PURGA ×1": um numero que o olho tinha de LER. Agora
+    // sao pilhas — um glifo por celula, lado a lado, como as baterias que sao.
+    // Quantidade vira comprimento, que se conta de relance; com zero celulas
+    // sobra um contorno vazio, que diz "o compartimento existe e esta vazio"
+    // em vez de sumir. Acima de seis, as pilhas viram seis e um "×N".
+    const purgeCount = extra.purgeCells;
+    const PIP_PITCH = 11;
+    const PIP_MAX = 6;
+    const pipsShown = Math.min(PIP_MAX, Math.max(1, purgeCount));
+    const purgeOverflow = purgeCount > PIP_MAX ? `×${purgeCount}` : '';
+    const purgeLabel = t('hud.purge');
+    ctx.font = 'bold 10px monospace';
+    const purgeLabelW = ctx.measureText(purgeLabel).width;
+    const pipsX = layout.innerLeft + purgeLabelW + 8;
+    ctx.font = 'bold 9px monospace';
+    const overflowW = purgeOverflow ? ctx.measureText(purgeOverflow).width + 4 : 0;
+    const purgeRowRight = pipsX + pipsShown * PIP_PITCH + overflowW;
+
+    // A carga ocupa o que sobra a direita; se o portugues nao couber a 12 px
+    // no painel de 230, a fonte dela desce um ponto de cada vez.
     let resourceSize = 12;
     for (; resourceSize > 9; resourceSize--) {
       ctx.font = `bold ${resourceSize}px monospace`;
-      const needed =
-        ctx.measureText(purgeLabel).width + ctx.measureText(cargoLabel).width + 9 + 15 + 8;
-      if (purgeTextX + needed <= layout.innerRight) break;
+      const needed = ctx.measureText(cargoLabel).width + 9 + 15 + 8;
+      if (purgeRowRight + needed <= layout.innerRight) break;
     }
-    ctx.font = `bold ${purgePulse ? resourceSize + 1 : resourceSize}px monospace`;
+
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
-    drawPurgeCellGlyph(
-      ctx,
-      resources.purgeGlyphX,
-      resources.glyphY,
-      purgePulse ? 15 : 13,
-      ctx.fillStyle as string,
-    );
-    ctx.fillText(purgeLabel, purgeTextX, resources.baseline);
+    ctx.fillText(purgeLabel, layout.innerLeft, resources.baseline);
+    const sincePurge = nowMs - this.purgeUsedAtMs;
+    const draining = !reduced && sincePurge >= 0 && sincePurge < 420;
+    for (let i = 0; i < pipsShown; i++) {
+      const filled = i < purgeCount;
+      const px = pipsX + i * PIP_PITCH + 3;
+      if (filled) {
+        drawPurgeCellGlyph(
+          ctx,
+          px,
+          resources.glyphY,
+          purgePulse ? 15 : 13,
+          purgePulse ? PAL.biolum : PAL.bone,
+        );
+      } else {
+        // O compartimento vazio: so o contorno, apagado.
+        ctx.strokeStyle = 'rgba(184,169,143,0.35)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - 3 + 0.5, resources.glyphY - 4 + 0.5, 6, 8);
+      }
+    }
+    // A pilha que ACABOU de ser gasta: brilha branca e se apaga no lugar onde
+    // estava, para o olho ver de onde saiu — em vez de a fileira so encurtar.
+    if (draining && purgeCount < PIP_MAX) {
+      const tD = sincePurge / 420;
+      const px = pipsX + purgeCount * PIP_PITCH + 3;
+      ctx.save();
+      ctx.globalAlpha = 1 - tD;
+      ctx.translate(px, resources.glyphY);
+      ctx.scale(1 + tD * 0.5, 1 + tD * 0.5);
+      drawPurgeCellGlyph(ctx, 0, 0, 13, PAL.player);
+      ctx.restore();
+    }
+    if (purgeOverflow) {
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = PAL.bone;
+      ctx.fillText(purgeOverflow, pipsX + pipsShown * PIP_PITCH + 2, resources.baseline);
+    }
+    // O voo da recompensa pousa na PROXIMA pilha — a que ele vai acender.
+    this.hudPurgeGlyph = {
+      x: (pipsX + Math.min(PIP_MAX - 1, Math.max(0, purgeCount - 1)) * PIP_PITCH + 3) * hs,
+      y: resources.glyphY * hs,
+    };
 
     // A carga fica na MESMA linha da purga, encostada a direita do painel: os
     // dois sao recursos que o jogador carrega, e uma linha propria custaria
