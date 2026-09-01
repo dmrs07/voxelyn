@@ -96,10 +96,7 @@ describe('traducao de evento para som', () => {
   // O hazard so muda o som de quem SENTE o dano: um bicho queimando continua
   // relatado como dano nos outros.
   it('hazard nos outros continua hitEnemy', () => {
-    const [cue] = cuesForEvent(
-      { t: 'hit', x: 1, y: 1, amount: 2, target: 7, hazard: true },
-      ctx,
-    );
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 2, target: 7, hazard: true }, ctx);
     expect(cue.voice).toBe('hitEnemy');
   });
 
@@ -152,8 +149,16 @@ describe('traducao de evento para som', () => {
   // bestiario. No `death` generico o jogo diria que matar alguem que estava
   // trabalhando soa igual a estourar um bomber.
   it('a morte do mineiro nao soa como a de um bicho nem como a de um chefe', () => {
-    const death = (archetype: string, entity: number): SemanticEvent =>
-      ({ t: 'death', x: 0, y: 0, entity, archetype, facingX: 1, facingY: 0, tick: 10 });
+    const death = (archetype: string, entity: number): SemanticEvent => ({
+      t: 'death',
+      x: 0,
+      y: 0,
+      entity,
+      archetype,
+      facingX: 1,
+      facingY: 0,
+      tick: 10,
+    });
     const mineiro = cuesForEvent(death('miner', 7), ctx);
     expect(mineiro[0].voice).toBe('deathMiner');
     expect(mineiro[0].voice).not.toBe(cuesForEvent(death('stalker', 8), ctx)[0].voice);
@@ -193,6 +198,38 @@ describe('traducao de evento para som', () => {
 
   it('nao inventa som para mensagem de texto', () => {
     expect(cuesForEvent({ t: 'message', key: 'sim.partnerRevived' }, ctx)).toEqual([]);
+  });
+
+  it('as vozes de interface sao do jogador local, nunca do parceiro', () => {
+    // No co-op os dois clientes recebem os mesmos eventos. O modulo que se
+    // esgotou no parceiro, a carga que ele gastou e a celula que ele recolheu
+    // nao tem posicao no mundo — e por isso nao podem soar aqui como se
+    // fossem deste jogador.
+    const partner = 1;
+    const mine = 0;
+    const expired = (slot: number): SemanticEvent => ({
+      t: 'module_expired',
+      slot,
+      module: 'piercing',
+    });
+    const charge = (slot: number): SemanticEvent => ({
+      t: 'module_charge_consumed',
+      slot,
+      module: 'piercing',
+      remaining: 0,
+      maximum: 3,
+    });
+    const cell = (slot: number): SemanticEvent => ({ t: 'purge_cell_acquired', slot, amount: 1 });
+    for (const make of [expired, charge, cell]) {
+      expect(cuesForEvent(make(partner), ctx)).toEqual([]);
+      expect(cuesForEvent(make(mine), ctx)).toHaveLength(1);
+    }
+  });
+
+  it('as vozes posicionais do parceiro continuam soando, no lugar dele', () => {
+    const overheat = cuesForEvent({ t: 'overheat', slot: 1, x: 40, y: 12 }, ctx);
+    expect(overheat).toHaveLength(1);
+    expect(overheat[0].x).toBe(40);
   });
 
   it('o bolt morrendo em parede firme deixou de ser mudo', () => {

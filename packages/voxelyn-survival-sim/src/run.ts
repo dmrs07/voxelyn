@@ -1320,7 +1320,7 @@ const settleOverheat = (state: SurvivalState, slot: number, events: SemanticEven
   extra.heat = tuning.heatMax * 0.55;
   damageEntity(state, player, tuning.overheatSelfDamage, events, { kind: 'overheat' });
   markDiscovery(state.stats, DISCOVERY_SELF_HARM);
-  events.push({ t: 'overheat', x: player.x, y: player.y });
+  events.push({ t: 'overheat', slot, x: player.x, y: player.y });
 };
 
 /**
@@ -1896,7 +1896,7 @@ const stepPlayer = (
         if (!coreUnlocked(state)) {
           // Selado. O cliente nem consegue forcar: a recusa e autoritativa e
           // acontece aqui, no unico ponto que escreve a posse.
-          events.push({ t: 'message', key: 'sim.coreSealedByBoss' });
+          events.push({ t: 'message', key: 'sim.coreSealedByBoss', slot });
           return;
         }
         markCoreTaken(state, state.sector);
@@ -1927,14 +1927,14 @@ const stepPlayer = (
       // setor. Antes disso (um Nucleo intermediario na carga) descer continua
       // liberado: recolhe-lo e uma aposta no meio da descida, nao o fim dela.
       if (runIsReturning(state)) {
-        events.push({ t: 'message', key: 'sim.wellSealedReturn' });
+        events.push({ t: 'message', key: 'sim.wellSealedReturn', slot });
         return;
       }
 
       // O SELO DO SETOR. Nada de "mate todos os inimigos": so o dono do setor
       // tranca o poco, e so enquanto ele estiver de pe.
       if (!descentUnlocked(state)) {
-        events.push({ t: 'message', key: 'sim.descentSealedByBoss' });
+        events.push({ t: 'message', key: 'sim.descentSealedByBoss', slot });
         return;
       }
 
@@ -1950,9 +1950,9 @@ const stepPlayer = (
         (e, i) => e.joined && state.players[i].alive && e.downed,
       );
       if (anyDowned) {
-        events.push({ t: 'message', key: 'sim.reviveBeforeDescend' });
+        events.push({ t: 'message', key: 'sim.reviveBeforeDescend', slot });
       } else if (!allNear) {
-        events.push({ t: 'message', key: 'sim.waitAtShaft' });
+        events.push({ t: 'message', key: 'sim.waitAtShaft', slot });
       } else {
         // Canal de sopro atravessando a descida e liquidado ANTES: o cooldown
         // cobrado sobrevive a transicao, senao descer no meio do canal seria o
@@ -2046,9 +2046,9 @@ const stepPlayer = (
       // qualquer profundidade, como sempre foi.
       if (withCore && state.sector > 1) {
         if (anyDowned) {
-          events.push({ t: 'message', key: 'sim.reviveBeforeExtract' });
+          events.push({ t: 'message', key: 'sim.reviveBeforeExtract', slot });
         } else if (!allAtEntry) {
-          events.push({ t: 'message', key: 'sim.waitAtExit' });
+          events.push({ t: 'message', key: 'sim.waitAtExit', slot });
         } else {
           // Mesma regra da descida: o preco do canal nao some na subida.
           for (let s = 0; s < state.playerExtras.length; s++) settleBreathChannel(state, s, events);
@@ -2060,9 +2060,9 @@ const stepPlayer = (
         state.phase = withCore ? 'extracted_with_core' : 'extracted';
         events.push({ t: 'extracted', withCore, cores });
       } else if (anyDowned) {
-        events.push({ t: 'message', key: 'sim.reviveBeforeExtract' });
+        events.push({ t: 'message', key: 'sim.reviveBeforeExtract', slot });
       } else {
-        events.push({ t: 'message', key: 'sim.waitAtExit' });
+        events.push({ t: 'message', key: 'sim.waitAtExit', slot });
       }
       // O return que faltava: sem ele, um no de leyline por acaso colado na
       // entrada toggle-aria JUNTO com a mensagem de "aguarde na saida".

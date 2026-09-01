@@ -524,6 +524,22 @@ export const moduleHudMetrics = (
   return { size, gap };
 };
 
+/** A cor do acento de uma notificacao: o que ela significa antes de ser lida. */
+export type HudMessageTone = 'info' | 'good' | 'warn';
+
+/**
+ * O tom de uma mensagem que a SIMULACAO manda pela chave. A simulacao nao
+ * sabe de cor; quem desenha decide, pelo que a chave conta: recusa, perigo e
+ * perda avisam; circuito fechado, parceiro de pe e Nucleo na mao sao boas.
+ */
+export const simMessageTone = (key: string): HudMessageTone => {
+  if (/contamination|Sealed|revive|waitAt|Dropped|Collapsed|ceiling|Siege/i.test(key)) {
+    return 'warn';
+  }
+  if (/Revived|Closed|coreTaken/i.test(key)) return 'good';
+  return 'info';
+};
+
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md)
 const PAL = {
   dark: '#0b0e14',
@@ -1293,7 +1309,24 @@ export class SurvivalRenderer {
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
-  messages: Array<{ text: string; startsAt?: number; until: number }> = [];
+  /**
+   * As NOTIFICACOES centrais. `tone` escolhe a cor do acento (bom, aviso,
+   * neutro); `shownAt` e o instante em que a mensagem apareceu de fato, para a
+   * entrada suave — preenchido no primeiro quadro em que ela e desenhada.
+   *
+   * O que entra aqui e PESSOAL ou do MUNDO, nunca do parceiro: um modulo que
+   * se esgotou nele, um Eco que ele assimilou, o cano dele que travou, a
+   * recusa que o poco deu a ele — nada disso muda uma decisao deste jogador,
+   * e no co-op os dois clientes recebem os mesmos eventos. Cada `case` que
+   * empurra mensagem decide pelo `slot` do evento.
+   */
+  messages: Array<{
+    text: string;
+    startsAt?: number;
+    until: number;
+    tone?: HudMessageTone;
+    shownAt?: number;
+  }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly surfaces = new SurfaceBank();
@@ -1834,16 +1867,24 @@ export class SurvivalRenderer {
           break;
         }
         case 'well_offers':
-          this.messages.push({ text: t('toast.well.resonance'), until: nowMs + 3400 });
+          this.messages.push({
+            text: t('toast.well.resonance'),
+            until: nowMs + 3400,
+            tone: 'info',
+          });
           break;
         case 'ability_taken':
+          // O clarao e do mundo (o poco acendeu); a frase e de quem assimilou.
           this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);
-          this.messages.push({
-            text: t('toast.ability.assimilated', {
-              ability: abilityPresentation(ev.ability).label,
-            }),
-            until: nowMs + 2600,
-          });
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t('toast.ability.assimilated', {
+                ability: abilityPresentation(ev.ability).label,
+              }),
+              until: nowMs + 2600,
+              tone: 'good',
+            });
+          }
           break;
         case 'dodge':
           this.fxList.push({
@@ -1868,6 +1909,7 @@ export class SurvivalRenderer {
                 ? t('toast.core.taken')
                 : t('toast.core.deeper', { taken: ev.taken, total: ev.total }),
             until: nowMs + 4200,
+            tone: 'good',
           });
           this.shake = { power: 4, until: nowMs + 300 };
           break;
@@ -1883,7 +1925,11 @@ export class SurvivalRenderer {
           });
           break;
         case 'boss_awake':
-          this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
+          this.messages.push({
+            text: t('toast.guardian.awake'),
+            until: nowMs + 3000,
+            tone: 'warn',
+          });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
         case 'boss_phase':
@@ -1899,7 +1945,11 @@ export class SurvivalRenderer {
           // vez. O `addFlash` negativo nao existe, entao quem apaga e a
           // ausencia — o que fica e o silencio depois de dez minutos de brasa.
           this.shake = { power: 0, until: 0 };
-          this.messages.push({ text: t('toast.furnace.cooled'), until: nowMs + 3200 });
+          this.messages.push({
+            text: t('toast.furnace.cooled'),
+            until: nowMs + 3200,
+            tone: 'good',
+          });
           break;
         case 'boss_module': {
           // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
@@ -1915,7 +1965,10 @@ export class SurvivalRenderer {
           break;
         }
         case 'module_charge_consumed':
-          this.modulePulseUntil.set(ev.module, nowMs + 260);
+          // O card que pulsa e o DESTE painel: a carga do parceiro nao mora aqui.
+          if (ev.slot === this.localPlayerId - 1) {
+            this.modulePulseUntil.set(ev.module, nowMs + 260);
+          }
           break;
         case 'module_selected': {
           // A INCORPORACAO. A origem preferida e o card do terminal, que este
@@ -1930,10 +1983,15 @@ export class SurvivalRenderer {
           break;
         }
         case 'module_expired':
-          this.messages.push({
-            text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
-            until: nowMs + 1800,
-          });
+          // A frase e de quem perdeu o modulo; a ejecao (abaixo) e do mundo —
+          // o cartucho do parceiro cai no chao ao lado dele, e isso se ve.
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
+              until: nowMs + 1800,
+              tone: 'warn',
+            });
+          }
           // A EJECAO. Posicao e rumo vem do estado no proprio quadro do
           // desenho (`stepModuleProps`), porque o evento nao os carrega — e
           // nao deve: um evento cosmetico que exigisse posicao obrigaria a
@@ -1962,7 +2020,11 @@ export class SurvivalRenderer {
           );
           break;
         case 'salvage_cache_opened':
-          this.messages.push({ text: t('toast.cache.opened'), until: nowMs + 2200 });
+          this.messages.push({
+            text: t('toast.cache.opened'),
+            until: nowMs + 2200,
+            tone: 'good',
+          });
           this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);
           if (ev.slot === this.localPlayerId - 1) {
             this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };
@@ -2015,6 +2077,7 @@ export class SurvivalRenderer {
             this.messages.push({
               text: t('toast.purge.used', { amount: PURGE_CELL_HEAL }),
               until: nowMs + 2400,
+              tone: 'good',
             });
           }
           break;
@@ -2022,7 +2085,12 @@ export class SurvivalRenderer {
         case 'purge_cell_acquired':
           if (ev.slot === this.localPlayerId - 1) {
             const startsAt = nowMs + 220;
-            this.messages.push({ text: t('toast.purgeCell'), startsAt, until: startsAt + 2200 });
+            this.messages.push({
+              text: t('toast.purgeCell'),
+              startsAt,
+              until: startsAt + 2200,
+              tone: 'good',
+            });
             if (this.pendingRewardOrigin?.slot === ev.slot) {
               this.rewardFlight = {
                 worldX: this.pendingRewardOrigin.x,
@@ -2036,16 +2104,29 @@ export class SurvivalRenderer {
           }
           break;
         case 'terminal_scan_complete':
-          this.messages.push({ text: t('toast.scan.complete'), until: nowMs + 2800 });
+          this.messages.push({
+            text: t('toast.scan.complete'),
+            until: nowMs + 2800,
+            tone: 'good',
+          });
           break;
         case 'overheat':
-          this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600 });
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600, tone: 'warn' });
+          }
           break;
         case 'message':
           // A simulacao manda a CHAVE, nunca a frase: ela roda tambem no
           // servidor (verificacao de replay), onde nao existe idioma de
-          // jogador. Traduzir e trabalho de quem desenha.
-          this.messages.push({ text: t(ev.key), until: nowMs + 3600 });
+          // jogador. Traduzir e trabalho de quem desenha. Com `slot`, a
+          // mensagem e a resposta a UMA acao — so o autor dela a le.
+          if (ev.slot === undefined || ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t(ev.key),
+              until: nowMs + 3600,
+              tone: simMessageTone(ev.key),
+            });
+          }
           break;
         default:
           break;
@@ -6104,29 +6185,51 @@ export class SurvivalRenderer {
     });
     ctx.restore();
 
-    // mensagens centrais
+    // AS NOTIFICACOES CENTRAIS.
+    //
+    // A mesma pele do painel — vidro escuro, fio de luz, moldura fina — com um
+    // acento a esquerda que diz o tom antes de a frase ser lida: fosforo para
+    // o que e bom, sangue para o aviso, osso para o neutro. Entram deslizando
+    // quatro pixels e desvanecem nos ultimos 300 ms. Em tela pequena descem um
+    // ponto de fonte junto com o painel. Tres no maximo, a mais nova embaixo.
     this.messages = this.messages.filter((m) => m.until > nowMs);
     const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);
+    const msgFont = hs < 1 ? 12 : 13;
+    const msgH = msgFont + 11;
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     let my = Math.max(this.safeArea.top + 28, vh * 0.2);
     for (const m of visibleMessages.slice(-3)) {
-      ctx.font = 'bold 14px monospace';
+      if (m.shownAt === undefined) m.shownAt = nowMs;
+      const age = nowMs - m.shownAt;
+      const enter = reduced ? 1 : Math.min(1, age / 160);
+      const leave = reduced ? 1 : Math.max(0, Math.min(1, (m.until - nowMs) / 300));
+      const alpha = Math.min(enter, leave);
+      const slide = (1 - enter) * 4;
+      ctx.font = `bold ${msgFont}px monospace`;
       const tw = ctx.measureText(m.text).width;
-      // Some em vez de sumir: os ultimos 300 ms sao um desvanecimento, e nao
-      // um corte — uma mensagem que desaparece de uma vez puxa o olho para
-      // onde ja nao ha nada.
-      ctx.globalAlpha = reduced ? 1 : Math.max(0, Math.min(1, (m.until - nowMs) / 300));
-      roundedPanel(vw / 2 - tw / 2 - 10, my - 15, tw + 20, 22, 6);
-      ctx.fillStyle = 'rgba(11,14,20,0.7)';
+      const boxW = tw + 30;
+      const boxX = vw / 2 - boxW / 2;
+      const boxY = my - msgH / 2 + slide;
+      ctx.globalAlpha = alpha;
+      roundedPanel(boxX, boxY, boxW, msgH, 6);
+      const msgGlass = ctx.createLinearGradient(0, boxY, 0, boxY + msgH);
+      msgGlass.addColorStop(0, 'rgba(17,22,31,0.88)');
+      msgGlass.addColorStop(1, 'rgba(9,12,18,0.84)');
+      ctx.fillStyle = msgGlass;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(232,241,255,0.18)';
+      ctx.strokeStyle = 'rgba(232,241,255,0.22)';
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.fillStyle = PAL.bone;
-      ctx.fillText(m.text, vw / 2, my);
+      const tone = m.tone ?? 'info';
+      ctx.fillStyle = tone === 'good' ? PAL.biolum : tone === 'warn' ? PAL.blood : PAL.bone;
+      ctx.fillRect(boxX + 6, boxY + 6, 2, msgH - 12);
+      ctx.fillStyle = tone === 'warn' ? PAL.player : PAL.bone;
+      ctx.fillText(m.text, vw / 2 + 4, my + slide);
       ctx.globalAlpha = 1;
-      my += 28;
+      my += msgH + 6;
     }
+    ctx.textBaseline = 'alphabetic';
 
     // Controles touch: mesma pele nos dois lados; esquerda move, direita mira
     // e atira. O reticulo e a unica diferenca semantica necessaria.
