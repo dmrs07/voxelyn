@@ -112,11 +112,12 @@ describe('as secoes do painel nunca se invadem', () => {
     expect(l.spinRail.y + l.spinRail.h).toBeLessThan(l.dividerA);
     // Recursos abaixo do primeiro divisor, com folga para o glifo de 15px.
     expect(l.resources.glyphY - 8).toBeGreaterThan(l.dividerA);
-    // Modulos: cards (mais o anel de 3px em volta) acima do segundo divisor.
+    // Modulos: o card e o badge inteiro (nada orbita fora dele), entre a
+    // linha de recursos e o segundo divisor, com um pixel de ar nos dois lados.
     if (input.moduleCount > 0) {
       expect(l.modules).not.toBeNull();
-      expect(l.modules!.y - 3).toBeGreaterThan(l.resources.baseline);
-      expect(l.modules!.y + l.modules!.size + 3).toBeLessThan(l.dividerB);
+      expect(l.modules!.y - 2).toBeGreaterThan(l.resources.baseline);
+      expect(l.modules!.y + l.modules!.size + 2).toBeLessThan(l.dividerB);
     } else {
       expect(l.modules).toBeNull();
       expect(l.resources.baseline).toBeLessThan(l.dividerB);

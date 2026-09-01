@@ -6128,30 +6128,11 @@ export class SurvivalRenderer {
     for (const module of modules) {
       if (cursor + size > viewportWidth - 12) break;
       const pulse = (this.modulePulseUntil.get(module.id) ?? 0) > nowMs;
-      const scale = pulse ? 1.12 : 1;
+      const scale = pulse ? 1.1 : 1;
       const drawSize = size * scale;
+      const half = drawSize / 2;
       const cx = cursor + size / 2;
       const cy = y + size / 2;
-      ctx.fillStyle = 'rgba(11,14,20,0.72)';
-      ctx.fillRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      ctx.strokeStyle = PAL.player;
-      ctx.lineWidth = pulse ? 2.5 : 1.5;
-      ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      if (module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion()) {
-        // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
-        // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
-        // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
-        // angulo deixaria o icone parado no pico —, e um relogio proprio
-        // faria o icone girar durante o travamento, que e exatamente o
-        // instante em que ele tem de estar parando.
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(minigunPhase * Math.PI * 2);
-        drawModuleGlyph(ctx, module.id, 0, 0, size * 0.47, PAL.biolum);
-        ctx.restore();
-      } else {
-        drawModuleGlyph(ctx, module.id, cx, cy, size * 0.47, PAL.biolum);
-      }
 
       let fraction = 1;
       let label = '';
@@ -6164,20 +6145,91 @@ export class SurvivalRenderer {
         fraction = Math.max(0, (module.lifetime.expiresAtTick - tick) / total);
         label = `${Math.max(0, Math.ceil((module.lifetime.expiresAtTick - tick) / 20))}s`;
       }
-      ctx.strokeStyle = fraction <= 0.2 ? PAL.loot : PAL.biolum;
-      ctx.lineWidth = fraction <= 0.2 ? 3 : 2;
+      const low = fraction <= 0.2;
+
+      // O CARD e o badge inteiro: nada sobra para fora dele. O anel que
+      // orbitava o quadrado a 3 px de distancia encostava no vizinho a cada
+      // fileira cheia, e num painel de tela pequena os dois aneis viravam um
+      // so. A carga restante agora e o NIVEL que sobe pelo fundo do card,
+      // como uma bateria: a leitura e a mesma ("quanto ainda tenho"), e cabe
+      // dentro da propria moldura.
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, size / 2 + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+      const radius = Math.max(3, Math.round(size * 0.14));
+      ctx.moveTo(cx - half + radius, cy - half);
+      ctx.lineTo(cx + half - radius, cy - half);
+      ctx.quadraticCurveTo(cx + half, cy - half, cx + half, cy - half + radius);
+      ctx.lineTo(cx + half, cy + half - radius);
+      ctx.quadraticCurveTo(cx + half, cy + half, cx + half - radius, cy + half);
+      ctx.lineTo(cx - half + radius, cy + half);
+      ctx.quadraticCurveTo(cx - half, cy + half, cx - half, cy + half - radius);
+      ctx.lineTo(cx - half, cy - half + radius);
+      ctx.quadraticCurveTo(cx - half, cy - half, cx - half + radius, cy - half);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(11,14,20,0.84)';
+      ctx.fill();
+      // O nivel: recorta pelo card, para o preenchimento herdar os cantos.
+      ctx.clip();
+      const levelH = (drawSize - 2) * Math.min(1, Math.max(0, fraction));
+      ctx.fillStyle = low ? 'rgba(255,209,102,0.34)' : 'rgba(89,242,194,0.22)';
+      ctx.fillRect(cx - half + 1, cy + half - 1 - levelH, drawSize - 2, levelH);
+      // A linha d'agua: um fio mais claro na borda do nivel, para o olho ler a
+      // altura sem comparar dois tons de verde.
+      if (fraction > 0 && fraction < 1) {
+        ctx.fillStyle = low ? PAL.loot : PAL.biolum;
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(cx - half + 1, cy + half - 1 - levelH, drawSize - 2, 1);
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+
+      // A moldura: fina em repouso, branca e grossa no pulso de instalacao,
+      // ambar quando a carga esta no fim.
+      ctx.strokeStyle = pulse ? PAL.player : low ? PAL.loot : 'rgba(232,241,255,0.42)';
+      ctx.lineWidth = pulse ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - half + radius, cy - half);
+      ctx.lineTo(cx + half - radius, cy - half);
+      ctx.quadraticCurveTo(cx + half, cy - half, cx + half, cy - half + radius);
+      ctx.lineTo(cx + half, cy + half - radius);
+      ctx.quadraticCurveTo(cx + half, cy + half, cx + half - radius, cy + half);
+      ctx.lineTo(cx - half + radius, cy + half);
+      ctx.quadraticCurveTo(cx - half, cy + half, cx - half, cy + half - radius);
+      ctx.lineTo(cx - half, cy - half + radius);
+      ctx.quadraticCurveTo(cx - half, cy - half, cx - half + radius, cy - half);
+      ctx.closePath();
       ctx.stroke();
-      // O numero ganha um fundo escuro: sem ele o anel de vida do card passa
-      // por tras dos algarismos, e "80" sobre um arco fosforo nao se le.
+
+      // O glifo, um pouco acima do centro para deixar o canto de baixo ao
+      // numero.
+      const glyphY = cy - Math.round(size * 0.06);
+      if (module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion()) {
+        // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
+        // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
+        // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
+        // angulo deixaria o icone parado no pico —, e um relogio proprio
+        // faria o icone girar durante o travamento, que e exatamente o
+        // instante em que ele tem de estar parando.
+        ctx.save();
+        ctx.translate(cx, glyphY);
+        ctx.rotate(minigunPhase * Math.PI * 2);
+        drawModuleGlyph(ctx, module.id, 0, 0, size * 0.4, PAL.biolum);
+        ctx.restore();
+      } else {
+        drawModuleGlyph(ctx, module.id, cx, glyphY, size * 0.4, PAL.biolum);
+      }
+
+      // O numero no canto de baixo, com fundo: o glifo e o nivel passam por
+      // tras dele, e "80" sobre um arco fosforo nao se le.
       ctx.font = `bold ${Math.max(8, Math.round(size * 0.3))}px monospace`;
       const labelW = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(11,14,20,0.82)';
-      ctx.fillRect(cursor + size - 3 - labelW, y + size - 10, labelW + 2, 10);
-      ctx.fillStyle = PAL.bone;
+      const labelRight = cx + half - 2;
+      const labelBaseline = cy + half - 3;
+      ctx.fillStyle = 'rgba(11,14,20,0.88)';
+      ctx.fillRect(labelRight - labelW - 1, labelBaseline - 8, labelW + 2, 10);
+      ctx.fillStyle = low ? PAL.loot : PAL.bone;
       ctx.textAlign = 'right';
-      ctx.fillText(label, cursor + size - 2, y + size - 2);
+      ctx.fillText(label, labelRight, labelBaseline);
       cursor += size + gap;
     }
   }
