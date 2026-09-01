@@ -559,7 +559,20 @@ describe('codex', () => {
     }
     // Um documento por bit, sem bit repetido.
     expect(new Set(DISCOVERY_LORE.map((d) => d.bit)).size).toBe(DISCOVERY_LORE.length);
-    expect(new Set(Object.values(ASSET_LORE)).size).toBe(ASSET_ARCHETYPES.length);
+    // Um documento por Ativo, sem repetido — contado sobre a LISTA CURADA e nao
+    // sobre o mapa. `ASSET_LORE` e `Record<EnemyArchetype, ...>` e o tipo cobra
+    // a uniao inteira, entao ha entradas para bichos que nao sao Ativos; a
+    // ninhada do Devorador e uma delas e aponta para o documento da mae.
+    expect(new Set(ASSET_ARCHETYPES.map((a) => ASSET_LORE[a])).size).toBe(ASSET_ARCHETYPES.length);
+  });
+
+  it('a ninhada nao e um Ativo: ela nao tem documento proprio para abrir', () => {
+    // Um documento se libera pelo primeiro abate, e os filhotes ficam fora da
+    // contagem de abates de proposito (o total alimenta o placar). Um id
+    // proprio para eles seria um documento que ninguem pode abrir — a mesma
+    // armadilha que a ficha do Codex teve, e que a revisao pegou la.
+    expect(ASSET_ARCHETYPES).not.toContain('devourer_brood');
+    expect(ASSET_LORE.devourer_brood).toBe(ASSET_LORE.white_devourer);
   });
 
   it('todo gatilho do catalogo e valido', () => {
