@@ -87,26 +87,34 @@ describe('a ninhada — ela nao pode machucar ninguem', () => {
 });
 
 describe('a ninhada — o bando', () => {
-  it('nao se sobrepoem: cada um tem o seu lugar', () => {
-    // "Sem overlap" era o pedido, e um anel comum nao basta — catorze corpos
-    // mirando o mesmo circulo se amontoam num arco so. E a separacao que
-    // transforma um cordao de contas num bando.
-    const { state } = nest(52);
-    for (let t = 0; t < 300; t++) stepRun(state, [emptyCommand()]);
-    const live = brood(state);
-    expect(live.length).toBeGreaterThan(4);
-    let worst = Infinity;
-    for (let i = 0; i < live.length; i++) {
-      for (let j = i + 1; j < live.length; j++) {
-        worst = Math.min(worst, Math.hypot(live[i].x - live[j].x, live[i].y - live[j].y));
+  it('nenhum TICK termina com dois filhotes dentro um do outro', () => {
+    // A versao forte de "sem sobreposicao": nao "o ninho fica arrumado depois de
+    // um tempo", mas "nenhum quadro do jogo mostra dois corpos ocupando o mesmo
+    // lugar". A mae puxa o bando para o anel dela sem parar, entao penetracao
+    // nova aparece a todo tick e a checagem tem valor a todo tick.
+    //
+    // O que sustenta isto e a resolucao de posicao ser feita UMA VEZ POR PAR com
+    // os dois corpos se movendo. A versao anterior movia so o filhote da vez,
+    // meia penetracao, contando com a visita reciproca para a outra metade — e a
+    // conta nao fecha: quando o irmao chega, a penetracao ja encolheu para p/2 e
+    // ele move p/4, sobrando p/4. A promessa valia por CONVERGENCIA (o residuo
+    // cai a cada tick ate sumir), que e exatamente o que ela existia para nao
+    // ser.
+    const { state } = nest(13);
+    const min = brood(state)[0].radius * 2;
+    for (let t = 0; t < 200; t++) {
+      stepRun(state, [emptyCommand()]);
+      const live = brood(state);
+      for (let i = 0; i < live.length; i++) {
+        for (let j = i + 1; j < live.length; j++) {
+          const gap = Math.hypot(live[i].x - live[j].x, live[i].y - live[j].y);
+          expect(
+            gap,
+            `tick ${t}: dois filhotes a ${gap.toFixed(4)} de ${min}`
+          ).toBeGreaterThanOrEqual(min - 1e-6);
+        }
       }
     }
-    // A separacao e uma FORCA e nao uma trava, entao dois filhotes empurrados
-    // pela mesma parede podem passar do limite por uma fracao. O que ela
-    // garante e que ninguem fica DENTRO de ninguem: dois raios.
-    expect(worst, `dois filhotes a ${worst.toFixed(2)} tiles`).toBeGreaterThan(
-      state.enemies[1].radius * 2
-    );
   });
 
   it('seguem a MAE: soltos longe dela, voltam', () => {

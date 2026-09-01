@@ -2641,36 +2641,68 @@ const broodStep = (
     moveEntity(state, enemy, (mx / len) * step, (my / len) * step);
   }
 
-  // A SEPARACAO TEM DE SER UMA GARANTIA, e nao uma forca.
-  //
-  // O empurrao la em cima e uma das tres coisas que disputam o passo, e ele
-  // PERDE: medido, dois filhotes puxados para a mesma beirada do anel da mae
-  // ficavam a 0,3386 tile — dois raios sao 0,34, entao eles se encostavam. "Sem
-  // sobreposicao" era o pedido, e um pedido desses nao se cumpre por
-  // ponderacao de forcas: uma soma vetorial nunca promete nada sobre o
-  // resultado.
-  //
-  // Entao a forca continua fazendo o que ela faz bem (dar FORMA ao bando,
-  // espalhando-o antes de haver contato) e a garantia vem depois, resolvendo a
-  // posicao: quem ficou dentro de um irmao sai de dentro dele. Meia distancia
-  // para cada um, porque o mesmo laco visita o outro no mesmo tick e as duas
-  // metades somam a separacao inteira.
-  for (const other of state.enemies) {
-    if (other === enemy || !other.alive || other.archetype !== 'devourer_brood') continue;
-    const dx = enemy.x - other.x;
-    const dy = enemy.y - other.y;
-    const d = Math.hypot(dx, dy);
-    const min = enemy.radius + other.radius;
-    if (d >= min) continue;
-    // Coincidentes por completo (nasceram no mesmo ponto, ou um empurrao os
-    // alinhou): sem uma direcao para separar, a paridade do id decide — o mesmo
-    // recurso que o sentido da volta ja usa, e pela mesma razao de sala de
-    // co-op.
-    const nx = d > 0.0001 ? dx / d : (enemy.id % 2 === 0 ? 1 : -1);
-    const ny = d > 0.0001 ? dy / d : 0;
-    const half = (min - d) * 0.5;
-    enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + nx * half));
-    enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + ny * half));
+};
+
+/**
+ * Quantas vezes a separacao varre os pares por tick.
+ *
+ * Uma varredura resolve cada par que ela visita, mas nao o CONJUNTO: separar A
+ * de B pode empurrar A para dentro de C, e C ja foi visitado. Duas varreduras a
+ * mais desfazem o que a primeira criou, e a partir da terceira nao ha mais o que
+ * desfazer nas densidades que este bando alcanca — medido em duzentos ticks do
+ * ninho de verdade, com a mae puxando todos para o mesmo anel.
+ *
+ * Nao e um laco ate convergir: um monte suficientemente denso nao TEM solucao
+ * (catorze corpos nao cabem num circulo de 0,34), e um laco assim gastaria o
+ * tick inteiro tentando. Tres passadas e o que resolve o caso real; o
+ * patologico nao acontece porque o nascimento espalha os corpos em espiral.
+ */
+const BROOD_SEPARATION_PASSES = 3;
+
+/**
+ * SEPARA A NINHADA, depois que todos ja andaram.
+ *
+ * Roda no fim de `updateEnemies` e nao dentro do passo de cada filhote, e a
+ * diferenca e o que faz a promessa valer. Dentro do passo, quem anda DEPOIS
+ * volta a entrar no irmao que ja tinha sido resolvido — medido no ninho de
+ * verdade, dois filhotes terminavam o tick 105 a 0,306 de uma distancia minima
+ * de 0,34. Nao adianta corrigir a aritmetica de um par se o par pode ser
+ * desfeito no mesmo tick por um terceiro que ainda nem se mexeu.
+ *
+ * Cada par e visitado UMA vez (`b.id > a.id`) e os DOIS corpos se movem meia
+ * penetracao a partir da mesma medida. A versao anterior movia so um deles,
+ * contando com a visita reciproca para a outra metade, e a conta nao fecha: na
+ * segunda visita a penetracao ja encolheu para p/2 e o segundo corpo move p/4,
+ * sobrando p/4.
+ */
+const separateBrood = (state: SurvivalState): void => {
+  const w = state.config.width;
+  const hi = state.config.height - 1.5;
+  const nest = state.enemies.filter((e) => e.alive && e.archetype === 'devourer_brood');
+  if (nest.length < 2) return;
+  for (let pass = 0; pass < BROOD_SEPARATION_PASSES; pass++) {
+    for (let i = 0; i < nest.length; i++) {
+      for (let j = i + 1; j < nest.length; j++) {
+        const a = nest[i];
+        const b = nest[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d = Math.hypot(dx, dy);
+        const min = a.radius + b.radius;
+        if (d >= min) continue;
+        // Coincidentes por completo (o mesmo ponto de partida, ou um empurrao
+        // que os alinhou): sem direcao para separar, a paridade do id decide —
+        // o mesmo recurso que o sentido da volta ja usa, e pela mesma razao de
+        // sala de co-op.
+        const nx = d > 0.0001 ? dx / d : a.id % 2 === 0 ? 1 : -1;
+        const ny = d > 0.0001 ? dy / d : 0;
+        const half = (min - d) * 0.5;
+        a.x = Math.max(1.5, Math.min(w - 1.5, a.x + nx * half));
+        a.y = Math.max(1.5, Math.min(hi, a.y + ny * half));
+        b.x = Math.max(1.5, Math.min(w - 1.5, b.x - nx * half));
+        b.y = Math.max(1.5, Math.min(hi, b.y - ny * half));
+      }
+    }
   }
 };
 
@@ -5784,6 +5816,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
   }
 
+  // A NINHADA SE DESEMBARALHA aqui, com todo mundo ja parado no lugar deste
+  // tick. Ver `separateBrood`: dentro do passo individual nao ha como garantir
+  // nada, porque quem anda depois desfaz o que foi resolvido antes.
+  //
+  // E AQUI, logo depois do laco, e nao no fim da funcao: o que vem abaixo sao as
+  // fases do Diamandis e do Guardiao, e a do Guardiao SAI DA FUNCAO quando nao
+  // ha Guardiao vivo (`if (!guardian || !guardian.alive) return`). Posta la, a
+  // separacao nunca rodava na camara do Devorador — que e a unica onde existe
+  // ninhada. O teste continuou reprovando com o mesmo numero, no mesmo tick, e
+  // foi isso que denunciou.
+  separateBrood(state);
+
   // O DIAMANDIS tem a propria fase de uma vez: o reator vaza abaixo da metade.
   const diamandis = state.enemies.find((e) => e.archetype === 'diamandis');
   if (diamandis && diamandis.alive) diamandisShedModules(state, diamandis, events);
@@ -5843,6 +5887,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
   }
+
 };
 
 export const applyExplosionDamage = (
