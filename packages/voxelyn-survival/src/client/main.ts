@@ -2223,8 +2223,12 @@ const recordsCodexLink = (): RecordsCodexLink => ({
     const ids = contextDocIds(context);
     const read = new Set(matrixView.profile?.readLoreFragmentIds ?? []);
     openCodexDocument(ids.find((id) => !read.has(id)) ?? ids[0] ?? null);
-    drawMatrix();
+    // A overlay precisa estar VISIVEL antes do desenho: o foco pos-desenho rola
+    // ate o documento medindo `getBoundingClientRect()`, e um container
+    // `display: none` devolve tudo zerado — a rolagem calculada seria zero e o
+    // documento abriria fora da dobra, sem jeito de saber que abriu.
     matrixOverlay.classList.remove('hidden');
+    drawMatrix();
     audio.ui();
     void refreshCodex();
   },
@@ -2444,8 +2448,12 @@ const loreToasts = new LoreToasts(document.getElementById('lore-toasts') as HTML
     matrixView.codexReturn = false;
     matrixView.notice = null;
     openCodexDocument(id);
-    drawMatrix();
+    // A overlay precisa estar VISIVEL antes do desenho: o foco pos-desenho rola
+    // ate o documento medindo `getBoundingClientRect()`, e um container
+    // `display: none` devolve tudo zerado — a rolagem calculada seria zero e o
+    // documento abriria fora da dobra, sem jeito de saber que abriu.
     openOverlay(matrixOverlay);
+    drawMatrix();
     void refreshCodex();
     void refreshProfile();
   },
