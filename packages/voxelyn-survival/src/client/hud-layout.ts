@@ -90,6 +90,22 @@ export type HudPanelLayout = HudRect & {
   };
 };
 
+/**
+ * A ESCALA do painel inteiro, pela tela.
+ *
+ * Num celular em pe o painel de 230 px come mais da metade da largura, e o
+ * jogo fica atras dele. Em vez de uma segunda geometria "compacta" — que
+ * seria outra copia da mesma conta, com os mesmos bugs a manter —, o painel
+ * e desenhado com uma escala unica: a geometria continua em "unidades de
+ * painel" e o render aplica `ctx.scale`. Todo consumidor do retangulo
+ * (caixa-preta, voos) recebe o retangulo JA multiplicado.
+ *
+ * 0,84 num aparelho de DPR 2 ou 3 ainda e texto de 9 px CSS na diretiva —
+ * legivel; abaixo disso a fonte monoespacada comeca a virar textura.
+ */
+export const hudScale = (viewportWidth: number, viewportHeight: number): number =>
+  viewportWidth < 640 || viewportHeight < 520 ? 0.84 : 1;
+
 /** Largura do painel: um terco da tela, presa entre o compacto e o confortavel. */
 export const hudPanelWidth = (viewportWidth: number): number =>
   Math.min(300, Math.max(230, viewportWidth * 0.34));

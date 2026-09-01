@@ -164,6 +164,7 @@ import {
   hpGhostStep,
   hudObjectiveMaxWidth,
   hudPanelLayout,
+  hudScale,
   wrapHudText,
   type HudRect,
 } from './hud-layout';
@@ -1545,7 +1546,13 @@ export class SurvivalRenderer {
     this.canvas.width = Math.floor(window.innerWidth * dpr);
     this.canvas.height = Math.floor(window.innerHeight * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.zoom = window.innerWidth < 700 ? 1.6 : 2;
+    // Tela pequena: o mundo encolhe um pouco para caber mais SALA na tela.
+    // O zoom de 1,6 mostrava pouco mais que o Prospector e o que esta a
+    // meia-duzia de tiles dele — num celular em pe, com o painel em cima e
+    // os manches embaixo, era pouca caverna para decidir para onde ir. A mira
+    // nao depende do zoom (screenToWorldAim le so a direcao), e o atlas ja
+    // era desenhado fora de 2x nesta faixa.
+    this.zoom = window.innerWidth < 700 || window.innerHeight < 520 ? 1.45 : 2;
   }
 
   /**
@@ -5113,14 +5120,25 @@ export class SurvivalRenderer {
     const hud =
       this.hudPanelRect ??
       (() => {
+        const hs = hudScale(vw, vh);
         const layout = hudPanelLayout({
-          viewportWidth: vw,
-          safe: this.safeArea,
+          viewportWidth: vw / hs,
+          safe: {
+            top: this.safeArea.top / hs,
+            right: this.safeArea.right / hs,
+            bottom: this.safeArea.bottom / hs,
+            left: this.safeArea.left / hs,
+          },
           moduleCount: state.playerExtra.activeModules.length,
           surveyHeight: 0,
           objectiveLines: 1,
         });
-        return { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
+        return {
+          x: layout.x * hs,
+          y: layout.y * hs,
+          width: layout.width * hs,
+          height: layout.height * hs,
+        };
       })();
     const region = deathEchoReadoutRegion(vw, vh, this.safeArea, hud);
     if (!region) return;
@@ -5513,7 +5531,7 @@ export class SurvivalRenderer {
     ctx.font = HUD_OBJECTIVE_FONT;
     const objectiveLines = wrapHudText(
       t(objectiveKey),
-      hudObjectiveMaxWidth(vw),
+      hudObjectiveMaxWidth(vw / hudScale(vw, vh)),
       (text) => ctx.measureText(text).width,
     ).slice(0, HUD_OBJECTIVE_MAX_LINES);
     if (objectiveKey !== this.objectiveKey) {
@@ -5524,20 +5542,38 @@ export class SurvivalRenderer {
       this.objectiveKey = objectiveKey;
     }
 
+    // Em tela pequena o painel inteiro e desenhado em escala (hud-layout.ts,
+    // `hudScale`): a geometria fica em unidades de painel — a viewport e a
+    // area segura entram DIVIDIDAS pela escala — e `ctx.scale` faz o resto.
+    // Tudo o que sai daqui para outros leitores e multiplicado de volta.
+    const hs = hudScale(vw, vh);
     const layout = hudPanelLayout({
-      viewportWidth: vw,
-      safe: this.safeArea,
+      viewportWidth: vw / hs,
+      safe: {
+        top: this.safeArea.top / hs,
+        right: this.safeArea.right / hs,
+        bottom: this.safeArea.bottom / hs,
+        left: this.safeArea.left / hs,
+      },
       moduleCount: extra.activeModules.length,
       surveyHeight,
       objectiveLines: objectiveLines.length,
     });
     // Os leitores do retangulo (caixa-preta, voos) usam o do ULTIMO quadro.
-    this.hudPanelRect = { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
-    this.hudPurgeGlyph = { x: layout.resources.purgeGlyphX, y: layout.resources.glyphY };
-    this.hudResourcesGlyphY = layout.resources.glyphY;
+    this.hudPanelRect = {
+      x: layout.x * hs,
+      y: layout.y * hs,
+      width: layout.width * hs,
+      height: layout.height * hs,
+    };
+    this.hudPurgeGlyph = {
+      x: layout.resources.purgeGlyphX * hs,
+      y: layout.resources.glyphY * hs,
+    };
+    this.hudResourcesGlyphY = layout.resources.glyphY * hs;
     this.hudModuleAnchor = layout.modules
-      ? { x: layout.modules.x + 15, y: layout.modules.y + 15 }
-      : { x: layout.innerLeft + 15, y: layout.resources.glyphY + 12 };
+      ? { x: (layout.modules.x + 15) * hs, y: (layout.modules.y + 15) * hs }
+      : { x: (layout.innerLeft + 15) * hs, y: (layout.resources.glyphY + 12) * hs };
 
     // O RASTRO da barra de HP: o preenchimento cai na hora, e um trilho palido
     // segura o valor antigo por um instante antes de descer ate ele. O tamanho
@@ -5595,6 +5631,8 @@ export class SurvivalRenderer {
     // estado em que o painel, e nao so a barra, tem algo a dizer.
     const lowHp = state.player.hp > 0 && hpFrac <= 0.35;
     const lowPulse = lowHp && !reduced ? 0.5 + 0.5 * Math.sin(nowMs / 170) : lowHp ? 0.6 : 0;
+    ctx.save();
+    ctx.scale(hs, hs);
     roundedPanel(layout.x, layout.y, layout.width, layout.height, 10);
     const glass = ctx.createLinearGradient(0, layout.y, 0, layout.y + layout.height);
     glass.addColorStop(0, 'rgba(17,22,31,0.86)');
@@ -5795,14 +5833,10 @@ export class SurvivalRenderer {
     ctx.font = `bold ${cargoPulse ? resourceSize + 1 : resourceSize}px monospace`;
     ctx.fillStyle = cargoPulse ? PAL.bone : PAL.loot;
     ctx.fillText(cargoLabel, cargoRight, resources.baseline);
-    this.cargoCounterX = cargoRight - ctx.measureText(cargoLabel).width - 9;
-    drawOreGlyph(
-      ctx,
-      this.cargoCounterX,
-      resources.glyphY,
-      cargoPulse ? 15 : 13,
-      ctx.fillStyle as string,
-    );
+    const cargoGlyphX = cargoRight - ctx.measureText(cargoLabel).width - 9;
+    // Em unidades de TELA: quem le e o voo da lasca, fora deste `ctx.scale`.
+    this.cargoCounterX = cargoGlyphX * hs;
+    drawOreGlyph(ctx, cargoGlyphX, resources.glyphY, cargoPulse ? 15 : 13, ctx.fillStyle as string);
     ctx.textAlign = 'left';
 
     if (layout.modules) {
@@ -5915,6 +5949,7 @@ export class SurvivalRenderer {
         900,
       );
     });
+    ctx.restore();
 
     // mensagens centrais
     this.messages = this.messages.filter((m) => m.until > nowMs);

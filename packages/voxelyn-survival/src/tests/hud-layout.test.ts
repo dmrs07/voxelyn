@@ -16,6 +16,7 @@ import {
   hudObjectiveMaxWidth,
   hudPanelLayout,
   hudPanelWidth,
+  hudScale,
   wrapHudText,
 } from '../client/hud-layout';
 import { setLocale, t } from '../client/i18n';
@@ -60,6 +61,25 @@ describe('a diretiva cabe no painel', () => {
   it('uma palavra maior que a linha nao e engolida', () => {
     expect(wrapHudText('ABCDEFGHIJ KL', 30, measure)).toEqual(['ABCDEFGHIJ', 'KL']);
     expect(wrapHudText('', 30, measure)).toEqual(['']);
+  });
+});
+
+describe('escala do painel em tela pequena', () => {
+  it('encolhe num celular em pe e num celular deitado, e nao no desktop', () => {
+    expect(hudScale(390, 844)).toBeLessThan(1);
+    expect(hudScale(844, 390)).toBeLessThan(1);
+    expect(hudScale(1280, 720)).toBe(1);
+    expect(hudScale(768, 1024)).toBe(1);
+  });
+
+  it('nunca desce a ponto de a diretiva virar textura (9 px CSS)', () => {
+    expect(hudScale(320, 568) * 11).toBeGreaterThanOrEqual(9);
+  });
+
+  it('num celular em pe o painel escalado fica em metade da largura', () => {
+    const vw = 390;
+    const hs = hudScale(vw, 844);
+    expect(hudPanelWidth(vw / hs) * hs).toBeLessThanOrEqual(vw * 0.5);
   });
 });
 
