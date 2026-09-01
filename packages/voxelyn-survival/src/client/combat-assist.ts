@@ -49,6 +49,8 @@ import {
   type SurvivalState,
   type Vec2,
 } from '@voxelyn/survival-sim';
+import { DEVOURER_HEAD_GONE_AT, devourerSubmergence } from './devourer-spine';
+import { leapProgress } from './leap-arc';
 
 export type CombatTuning = PlayerTuning['combat'];
 
@@ -107,7 +109,7 @@ export const threatPostureOf = (enemy: Entity): ThreatPosture => {
  * De boca aberta ele tambem continua alvo: a cratera esta na superficie, e ela
  * E a janela de dano do encontro.
  */
-const hasVisibleBody = (enemy: Entity): boolean => {
+const hasVisibleBody = (enemy: Entity, tick: number): boolean => {
   if (
     (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
     (enemy.mood ?? LURKER_HIDDEN) === LURKER_HIDDEN
@@ -115,7 +117,27 @@ const hasVisibleBody = (enemy: Entity): boolean => {
     return false;
   }
   if (enemy.archetype === 'white_devourer') {
-    return enemy.mood !== DEVOURER_BURROWED || enemy.action?.kind === 'erupt';
+    // A MESMA rampa que decide a altura dele decide a mira, contra o limiar em
+    // que a cabeca some do recorte. A primeira versao perguntava so pelo tipo
+    // da acao e soltava o alvo cedo demais: a erupcao comeca com o corpo ainda
+    // em 1,00 de afundamento e ele so rompe a areia por volta do decimo tick
+    // dos vinte e quatro — o auto-aim grudava no ponto de decolagem quase meio
+    // segundo antes de haver o que ver, e era o proprio assistente entregando
+    // onde ele ia sair.
+    //
+    // `sinceLandingTicks` vai NULO de proposito, e nao por falta de jeito. O
+    // instante do pouso e contado no cliente, e a mira nao pode depender de
+    // dado que so um lado tem: ela altera o COMANDO do jogador, entao duas
+    // maquinas da mesma sala precisam responder isto igual. Nulo e a resposta
+    // conservadora (escondido), e o preco esta medido: nos ~9 ticks de descida
+    // depois do pouso ele aparece na tela sem o auto-aim considera-lo. A mira
+    // manual continua funcionando, e o erro contrario — assistente colado num
+    // bicho que ninguem ve — e o que este mergulho existe para nao fazer.
+    const erupting = enemy.action?.kind === 'erupt' ? enemy.action : null;
+    const progress = erupting
+      ? leapProgress(tick, erupting.startedAt, erupting.releaseAt)
+      : null;
+    return devourerSubmergence(enemy.mood, null, progress) < DEVOURER_HEAD_GONE_AT;
   }
   return true;
 };
@@ -147,7 +169,7 @@ export const isAcquirableTarget = (state: SurvivalState, from: Vec2, enemy: Enti
   enemy.kind === 'enemy' &&
   enemy.alive &&
   threatPostureOf(enemy) === 'hostile' &&
-  hasVisibleBody(enemy) &&
+  hasVisibleBody(enemy, state.tick) &&
   distanceTo(from, enemy) <= ACQUIRE_RANGE_TILES &&
   hasLineOfSight(state, from.x, from.y, enemy.x, enemy.y);
 
@@ -346,7 +368,7 @@ export const threatMarks = (state: SurvivalState): ThreatMark[] => {
   let nearestHostile: Entity | null = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
   for (const enemy of state.enemies) {
-    if (!enemy.alive || !hasVisibleBody(enemy)) continue;
+    if (!enemy.alive || !hasVisibleBody(enemy, state.tick)) continue;
     const distance = distanceTo(player, enemy);
     if (distance > ACQUIRE_RANGE_TILES) continue;
     if (!hasLineOfSight(state, player.x, player.y, enemy.x, enemy.y)) continue;

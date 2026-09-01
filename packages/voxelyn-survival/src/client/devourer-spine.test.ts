@@ -29,7 +29,9 @@ import {
   devourerSubmergence,
   DEVOURER_BELOW_ANCHOR_PX,
   DEVOURER_DIVE_TICKS,
+  DEVOURER_HEAD_GONE_AT,
   DEVOURER_HIDDEN_PX,
+  devourerHeadShows,
   type SpineNode,
 } from './devourer-spine';
 
@@ -237,6 +239,41 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
     // inteiro e de pe, desenhado por cima do chao a frente dele.
     const anel = coilManifest as unknown as { frameHeight: number; anchorY: number };
     expect(anel.frameHeight - anel.anchorY).toBe(DEVOURER_BELOW_ANCHOR_PX);
+  });
+
+  it('a cabeca some do recorte MUITO antes de o afundamento chegar a 1', () => {
+    // O defeito que a revisao apontou: comparar com 1 para decidir o que
+    // desenhar em volta dele. A cabeca mede 104 px acima da ancora e 11 abaixo,
+    // e o desenho multiplica a altura por `z` enquanto o sprite escala por
+    // `spriteZoom` — no zoom largo (z = 2, spriteZoom = 1) ela desaparece com
+    // 115/190 de afundamento. Nove dos vinte e quatro ticks da rampa ficavam com
+    // a sombra e a barra desenhadas sozinhas, no ponto de emergencia.
+    const z = 2;
+    const spriteZoom = 1;
+    const some = (sub: number) =>
+      !devourerHeadShows(devourerHeadLiftPx(DEVOURER_BURROWED, 0, sub), z, spriteZoom);
+    expect(some(1)).toBe(true);
+    expect(some(DEVOURER_HEAD_GONE_AT + 0.001)).toBe(true);
+    expect(some(DEVOURER_HEAD_GONE_AT - 0.001)).toBe(false);
+    expect(DEVOURER_HEAD_GONE_AT).toBeLessThan(0.7);
+  });
+
+  it('o limiar da mira e o CONSERVADOR dos dois zooms', () => {
+    // A mira nao tem zoom, entao ela usa o limiar do zoom em que a cabeca some
+    // primeiro. A prova cobra a direcao do erro: no limiar, o zoom largo ja
+    // escondeu e o estreito ainda mostra — nunca o contrario, que seria a mira
+    // grudando em areia lisa.
+    const lift = devourerHeadLiftPx(DEVOURER_BURROWED, 0, DEVOURER_HEAD_GONE_AT);
+    expect(devourerHeadShows(lift, 2, 1), 'zoom largo ja escondeu').toBe(false);
+    expect(devourerHeadShows(lift, 1.6, 1), 'zoom estreito ainda mostra').toBe(true);
+  });
+
+  it('de boca aberta a cabeca continua a mostra', () => {
+    // A cratera E a janela de dano: ela nao pode cair no mesmo corte.
+    const crista = devourerSubmergence(DEVOURER_MAW, null, null);
+    const lift = devourerHeadLiftPx(DEVOURER_MAW, 0, crista);
+    expect(devourerHeadShows(lift, 2, 1)).toBe(true);
+    expect(crista).toBeLessThan(DEVOURER_HEAD_GONE_AT);
   });
 
   it('a profundidade de sumico esconde os DOIS atlas, nos dois zooms', () => {

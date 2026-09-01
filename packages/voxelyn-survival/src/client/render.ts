@@ -87,6 +87,7 @@ import {
   DEVOURER_BELOW_ANCHOR_PX,
   DEVOURER_HIDDEN_PX,
   devourerHeadLiftPx,
+  devourerHeadShows,
   devourerSubmergence,
   type SpineNode,
 } from './devourer-spine';
@@ -3495,18 +3496,30 @@ export class SurvivalRenderer {
 
       // SUMIDO NA AREIA: nao ha cabeca, e nao ha nada em volta dela.
       //
-      // O `continue` leva junto a sombra, a barra de vida e o anel de elite, e
-      // e por isso que ele fica aqui e nao dentro do desenho do sprite: uma
-      // barra de vida boiando sobre areia lisa entregaria a posicao exata de um
-      // bicho que acabou de sumir, e o intervalo enterrado existe justamente
-      // para o jogador NAO saber onde ele esta — o rastro de silica e a unica
-      // resposta que esse intervalo da.
+      // O `continue` leva junto a sombra, a barra de vida, o anel de elite e o
+      // indicador de atordoamento, e e por isso que ele fica aqui e nao dentro
+      // do desenho do sprite: uma barra de vida boiando sobre areia lisa
+      // entregaria a posicao exata de um bicho que acabou de sumir, e o
+      // intervalo enterrado existe justamente para o jogador NAO saber onde ele
+      // esta — o rastro de silica e a unica resposta que esse intervalo da.
+      //
+      // A PERGUNTA E A DO RECORTE, e nao "o afundamento chegou a 1". A primeira
+      // versao comparava com 1 e estava errada nas duas pontas da rampa: a
+      // cabeca some do recorte com 0,605 de afundamento (zoom largo), entao
+      // sobravam nove ticks de descida e nove de subida com a sombra e a barra
+      // desenhadas sozinhas — no ponto de emergencia, que e o que este mergulho
+      // existe para nao entregar.
       //
       // Os aneis ja passaram: eles saem por conta propria, porque a elevacao
       // deles vem do rastro e a cauda ainda esta entrando quando a cabeca ja
       // sumiu. O corpo termina de entrar depois da cabeca, que e o que um verme
       // faz.
-      if (submerged01 >= 1) continue;
+      if (
+        enemy.archetype === 'white_devourer' &&
+        !devourerHeadShows(headLiftPx, z, spriteZoom)
+      ) {
+        continue;
+      }
 
       // A NINHADA. Caminho proprio e curto, porque tudo o que o caminho comum
       // faz por um inimigo esta errado para ela: nao ha barra de vida (um

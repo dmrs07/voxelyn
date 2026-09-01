@@ -164,6 +164,45 @@ export const DEVOURER_HIDDEN_PX = 95;
 export const DEVOURER_BELOW_ANCHOR_PX = 11;
 
 /**
+ * Quanto a cabeca sobe ACIMA da propria ancora, em pixels de atlas.
+ *
+ * E o `anchorY` do atlas dela. Junto com `DEVOURER_BELOW_ANCHOR_PX` fecha a
+ * altura util do sprite — o pedaco que o recorte tem de engolir para nao sobrar
+ * um pixel.
+ */
+export const DEVOURER_HEAD_ABOVE_ANCHOR_PX = 104;
+
+/**
+ * A cabeca ainda mostra algum pixel acima da areia?
+ *
+ * A conta e a do proprio recorte, com `sy` cancelado dos dois lados: o topo do
+ * sprite esta em `sy - liftPx*z - ancoraAcima*zoom` e a areia em
+ * `sy + ancoraAbaixo*zoom`, entao sobra pixel enquanto
+ * `liftPx*z + (acima + abaixo)*zoom > 0`. Sai daqui e nao de um limiar escrito
+ * porque quem decide o que aparece e o recorte, e um segundo criterio ao lado
+ * dele divergiria — que e exatamente o defeito que esta funcao conserta.
+ */
+export const devourerHeadShows = (liftPx: number, z: number, spriteZoom: number): boolean =>
+  liftPx * z + (DEVOURER_HEAD_ABOVE_ANCHOR_PX + DEVOURER_BELOW_ANCHOR_PX) * spriteZoom > 0;
+
+/**
+ * O afundamento em que a cabeca PODE ja ter sumido, no zoom em que ela some
+ * primeiro.
+ *
+ * Existe porque a mira nao tem zoom: `combat-assist` decide sobre estado
+ * autoritativo, sem saber a que escala aquele cliente esta desenhando. Entao ela
+ * usa o limiar mais CONSERVADOR dos dois — o do zoom largo, onde `spriteZoom`
+ * fica em 1 enquanto `z` vai a 2 e a cabeca desaparece com 0,605 de
+ * afundamento; no zoom estreito ela ainda apareceria ate 0,756.
+ *
+ * O erro que sobra e o inofensivo: num quadro estreito a mira solta o alvo com
+ * uma lasca de crista ainda na tela. O erro contrario — mirar sozinho num ponto
+ * de areia lisa — e o que entrega a emergencia antes de ela acontecer.
+ */
+export const DEVOURER_HEAD_GONE_AT =
+  (DEVOURER_HEAD_ABOVE_ANCHOR_PX + DEVOURER_BELOW_ANCHOR_PX) / (DEVOURER_HIDDEN_PX * 2);
+
+/**
  * Quantos ticks a cabeca leva para sumir depois do pouso.
  *
  * Igual ao windup da erupcao de proposito: ele entra na areia com a mesma
