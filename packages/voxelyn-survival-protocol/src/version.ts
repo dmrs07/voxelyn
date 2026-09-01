@@ -858,7 +858,24 @@ export const SIMULATION_VERSION = 49;
 // porque o sulco virava um VAO PRETO sempre que dois vizinhos estavam em alturas
 // diferentes no arco do salto. O anel tambem cresceu de 5,2 para 6,6 unidades,
 // que e a sobreposicao que o degrau do arco come.
-export const CONTENT_VERSION = 30;
+// 31: o ORCAMENTO DE MEMORIA cobrou o preco do que a v29/v30 acrescentou. O
+// teto de RGBA no boot (160 MiB, em `validate.mjs`) reprovou por 1,1 MiB, e a
+// regra escrita la e explicita: peso novo nao se paga com teto maior.
+//
+// A abertura da boca cai de dez quadros para SEIS. Cada quadro de animacao
+// deste atlas custa 156x152x4 nas quatro direcoes — 371 KiB —, entao quatro
+// quadros a menos devolvem 1,5 MiB. A derivacao da duracao fica intacta: 6
+// quadros a 6,25 fps cobrem os mesmos 0,96 s em que a garganta passa a morder.
+// O que muda e a cadencia, nao o instante em que ela acaba. E seis e a mesma
+// contagem do espasmo, entao a abertura entrega para o ciclo no mesmo passo.
+//
+// E os dois atlas `part-` passam a ser dimensionados pela caixa MEDIDA, que e a
+// pratica que o proprio validador manda seguir ("nunca um numero redondo"): o
+// anel vai de 68x64 para 64x58 e a minhoquinha de 28x20 para 24x16. Eram
+// numeros redondos com folga, exatamente o que aquele comentario avisa.
+//
+// Boot fecha em 166,3 MiB, com 1,4 MiB de folga.
+export const CONTENT_VERSION = 31;
 
 export type VersionTriple = {
   protocolVersion: number;

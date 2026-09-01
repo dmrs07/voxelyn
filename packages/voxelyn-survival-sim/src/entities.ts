@@ -965,6 +965,10 @@ export const damageEntity = (
   // alivio depender de ele ser o dono do setor — o que ele sempre e hoje, e o
   // "hoje" e exatamente o tipo de coisa que envelhece calado.
   if (ent.archetype === 'furnace_heart') furnaceHeartCooldown(state, ent, events);
+  // A MAE CAIU: a ninhada vai junto. Ver `devourerBroodEnds` — sem isto, o que
+  // sobra na camara limpa sao catorze filhotes orfaos ocupando vaga do teto de
+  // inimigos e parando bala.
+  if (ent.archetype === 'white_devourer') devourerBroodEnds(state, events);
   if (state.sectorBoss.entityId === ent.id && isBossArchetype(ent.archetype)) {
     markSectorBossDown(state, state.sector);
     // O SELO CEDEU. Evento proprio, e nao o `death` reinterpretado: o cliente
@@ -2660,6 +2664,42 @@ const broodStep = (
 const BROOD_SEPARATION_PASSES = 3;
 
 /**
+ * A NINHADA ACABA COM A MAE.
+ *
+ * Nao e zelo de limpeza: e a frase que a propria ninhada ja dizia e que o
+ * codigo nao cumpria. O comentario do nascimento afirma "ela nasce com a mae,
+ * existe so onde ela existe e some do mapa junto com ela", e a segunda metade
+ * era falsa — morto o Devorador, catorze filhotes ficavam orfaos numa camara
+ * limpa, ocupando vaga do teto de inimigos e parando bala, sem nada para
+ * seguir.
+ *
+ * Eles MORREM, e nao desaparecem. O evento de morte de cada um vira o punhado
+ * de particulas de sempre, e o que o jogador ve no instante em que o chefe cai
+ * e a ninhada inteira se desfazendo junto — que e a unica leitura possivel de
+ * uma coisa que so existia porque ela existia.
+ *
+ * Sem `damageEntity` pela mesma razao do pisao: isto nao e um abate. Nenhum
+ * deles entra na contagem, aqui como la.
+ */
+const devourerBroodEnds = (state: SurvivalState, events: SemanticEvent[]): void => {
+  for (const b of state.enemies) {
+    if (!b.alive || b.archetype !== 'devourer_brood') continue;
+    b.hp = 0;
+    b.alive = false;
+    events.push({
+      t: 'death',
+      x: b.x,
+      y: b.y,
+      entity: b.id,
+      archetype: b.archetype,
+      facingX: b.facing.x,
+      facingY: b.facing.y,
+      tick: state.tick,
+    });
+  }
+};
+
+/**
  * SEPARA A NINHADA, depois que todos ja andaram.
  *
  * Roda no fim de `updateEnemies` e nao dentro do passo de cada filhote, e a
@@ -2675,9 +2715,15 @@ const BROOD_SEPARATION_PASSES = 3;
  * segunda visita a penetracao ja encolheu para p/2 e o segundo corpo move p/4,
  * sobrando p/4.
  */
+/** O corpo cabe nesse ponto? (dentro da moldura e fora da rocha) */
+const free = (state: SurvivalState, ent: Entity, x: number, y: number): boolean =>
+  x >= 1.5 &&
+  y >= 1.5 &&
+  x <= state.config.width - 1.5 &&
+  y <= state.config.height - 1.5 &&
+  !circleBlocked(state, x, y, ent.radius);
+
 const separateBrood = (state: SurvivalState): void => {
-  const w = state.config.width;
-  const hi = state.config.height - 1.5;
   const nest = state.enemies.filter((e) => e.alive && e.archetype === 'devourer_brood');
   if (nest.length < 2) return;
   for (let pass = 0; pass < BROOD_SEPARATION_PASSES; pass++) {
@@ -2697,10 +2743,28 @@ const separateBrood = (state: SurvivalState): void => {
         const nx = d > 0.0001 ? dx / d : a.id % 2 === 0 ? 1 : -1;
         const ny = d > 0.0001 ? dy / d : 0;
         const half = (min - d) * 0.5;
-        a.x = Math.max(1.5, Math.min(w - 1.5, a.x + nx * half));
-        a.y = Math.max(1.5, Math.min(hi, a.y + ny * half));
-        b.x = Math.max(1.5, Math.min(w - 1.5, b.x - nx * half));
-        b.y = Math.max(1.5, Math.min(hi, b.y - ny * half));
+        // O EMPURRAO RESPEITA A ROCHA. Estas atribuicoes sao diretas — nao
+        // passam por `moveEntity` — e sem a checagem elas desfaziam a garantia
+        // que o passo tinha acabado de dar: encostado numa quina, um filhote
+        // separado do irmao ia parar DENTRO da parede, onde ninguem pode pisar
+        // nele. "Podem ser esmagados" e metade do que eles sao.
+        //
+        // Quando um dos lados esbarra, o outro leva o deslocamento INTEIRO: a
+        // separacao continua acontecendo, so que toda para o lado que tem
+        // espaco. Com os dois presos nao ha para onde ir, e um tick sobreposto
+        // encostado na parede e melhor que um corpo enterrado nela.
+        const aFree = free(state, a, a.x + nx * half, a.y + ny * half);
+        const bFree = free(state, b, b.x - nx * half, b.y - ny * half);
+        const aStep = aFree ? (bFree ? half : min - d) : 0;
+        const bStep = bFree ? (aFree ? half : min - d) : 0;
+        if (aStep > 0 && free(state, a, a.x + nx * aStep, a.y + ny * aStep)) {
+          a.x = a.x + nx * aStep;
+          a.y = a.y + ny * aStep;
+        }
+        if (bStep > 0 && free(state, b, b.x - nx * bStep, b.y - ny * bStep)) {
+          b.x = b.x - nx * bStep;
+          b.y = b.y - ny * bStep;
+        }
       }
     }
   }

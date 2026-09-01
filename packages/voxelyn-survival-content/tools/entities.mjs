@@ -1555,15 +1555,24 @@ const devourerModel = (anim, f) => scaleBoxes(devourerBody(anim, f), DEVOURER_SC
 /**
  * Quantos quadros a ABERTURA da boca tem.
  *
- * Dez a 10 fps: um segundo exato, e o numero nao e de gosto. A garganta so
- * comeca a morder quando o alcance da sucao chega a `DEVOURER_MAW_BITE_RADIUS`
- * (1,6 de 7,5, ao longo de `DEVOURER_MAW_SPOOL_TICKS` = 90 ticks), o que
- * acontece no tick 19,2 — 0,96 s depois de a janela abrir. A boca termina de
- * escancarar no instante em que ela passa a poder engolir alguem, e nem um
- * quadro depois: uma cratera que morde antes de estar aberta e um golpe sem
- * aviso.
+ * A DURACAO e derivada e nao escolhida: a garganta so comeca a morder quando o
+ * alcance da sucao chega a `DEVOURER_MAW_BITE_RADIUS` (1,6 de 7,5, ao longo de
+ * `DEVOURER_MAW_SPOOL_TICKS` = 90 ticks), o que acontece no tick 19,2 — 0,96 s
+ * depois de a janela abrir. A boca termina de escancarar no instante em que ela
+ * passa a poder engolir alguem, e nem um quadro depois: uma cratera que morde
+ * antes de estar aberta e um golpe sem aviso.
+ *
+ * A CONTAGEM, essa, foi cobrada pelo orcamento de memoria. Comecou em dez a 10
+ * fps e o teto de RGBA no boot reprovou por 1,1 MiB — cada quadro deste atlas
+ * custa 156x152x4 nas quatro direcoes, quer dizer 371 KiB por quadro de
+ * animacao. A regra escrita em `validate.mjs` e clara: peso novo nao se paga
+ * com teto maior. Seis a 6,25 fps cobrem os mesmos 0,96 s, e a derivacao acima
+ * fica intacta — o que muda e a cadencia, nao o instante em que ela acaba.
+ *
+ * Seis tambem e a contagem do espasmo (`downed`), e a coincidencia ajuda: a
+ * abertura entrega para o ciclo no mesmo passo em que ele corre.
  */
-const DEVOURER_MAW_OPEN_FRAMES = 10;
+const DEVOURER_MAW_OPEN_FRAMES = 6;
 
 /**
  * A BOCA, com `open` de 0 (chao intacto) a 1 (a cratera inteira).
@@ -2109,7 +2118,7 @@ const devourerCoilModel = (k) => {
 };
 
 const devourerCoilFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(devourerCoilModel(f)), DIR_INDEX[dir], 68, 64, 34, 52);
+  renderVoxels(quarterTurn(devourerCoilModel(f)), DIR_INDEX[dir], 64, 58, 32, 49);
 
 // ---------------------------------------------------------------------------
 // part-devourer-brood — as MINHOQUINHAS: a ninhada do Devorador.
@@ -2202,10 +2211,10 @@ const broodFrame = (dir, anim, f) =>
   renderVoxels(
     quarterTurn(broodModel(Math.floor(f / BROOD_PHASES), f % BROOD_PHASES)),
     DIR_INDEX[dir],
-    28,
-    20,
-    14,
-    14
+    24,
+    16,
+    12,
+    12
   );
 
 
@@ -3089,7 +3098,7 @@ export const ENTITY_SPECS = [
     // dela, sem repetir nem sobrar.
     downed: { frames: 6, fps: 11, loop: true },
     // `burst` e a ABERTURA: o chao intacto rasgando ate virar a cratera de
-    // `downed`. Dez quadros a 10 fps, uma vez so.
+    // `downed`. Seis quadros a 6,25 fps — 0,96 s, uma vez so.
     //
     // Um slot proprio e nao os primeiros quadros de `downed`, porque `downed`
     // e um CICLO: com a abertura na frente dela, o espasmo reabriria a boca a
@@ -3097,7 +3106,7 @@ export const ENTITY_SPECS = [
     // caminho de VOLTA (levantar do chao), e este e o de ida.
     //
     // A duracao e derivada: ver DEVOURER_MAW_OPEN_FRAMES.
-    burst: { frames: DEVOURER_MAW_OPEN_FRAMES, fps: 10, loop: false },
+    burst: { frames: DEVOURER_MAW_OPEN_FRAMES, fps: 6.25, loop: false },
   }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 3),
   // O CORPO do Devorador, uma peca por quadro. Nao e uma criatura e nao entra
   // em `ARCHETYPE_SPRITE`: a simulacao nao tem entidade nenhuma para ele — os
@@ -3108,14 +3117,14 @@ export const ENTITY_SPECS = [
   // instantes: o cliente pede o quadro `k` por indice. A cadencia declarada
   // existe so porque o contrato de atlas exige uma, e nenhum caminho de desenho
   // a consulta.
-  base('part-white-devourer-coil', 68, 64, 32, 50, { w: 0.64, h: 0.64 }, { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 }, {
+  base('part-white-devourer-coil', 64, 58, 30, 47, { w: 0.64, h: 0.64 }, { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 }, {
     idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
   }, devourerCoilFrame, 'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip', 1),
   // A NINHADA do Devorador: uma linha de bloquinhos, tres variantes x seis
   // fases num slot so. `part-` e nao `enemy-` pela mesma razao do anel de
   // corpo: a validacao cobra de todo `enemy-` o conjunto de animacoes de uma
   // criatura, e um filhote inofensivo nao tem ataque nem pose de morte.
-  base('part-devourer-brood', 28, 20, 12, 12, { w: 0.3, h: 0.16 }, { w: 0.3, h: 0.3, offsetX: 0, offsetY: 0 }, {
+  base('part-devourer-brood', 24, 16, 10, 10, { w: 0.3, h: 0.16 }, { w: 0.3, h: 0.3, offsetX: 0, offsetY: 0 }, {
     idle: { frames: BROOD_VARIANTS * BROOD_PHASES, fps: 1, loop: true },
   }, broodFrame, 'voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths', 1),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {

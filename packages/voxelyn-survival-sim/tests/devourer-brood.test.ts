@@ -4,13 +4,14 @@
 // continua parecendo um filhote inofensivo enquanto cobra.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { spawnEnemy } from '../src/entities';
+import { damageEntity, spawnEnemy } from '../src/entities';
 import {
   DEVOURER_BROOD_COUNT,
   DEVOURER_BROOD_RING,
   DEVOURER_BROOD_SHY,
   DEVOURER_BROOD_SPREAD,
   SOLID_NONE,
+  SOLID_ROCK,
   SURF_NONE,
 } from '../src/constants';
 import type { SurvivalState } from '../src/types';
@@ -49,6 +50,24 @@ const nest = (seed: number) => {
  * lista nunca encolhia, entao ele reportava zero pisadas num ninho que estava
  * sendo pisoteado.
  */
+/**
+ * Mata o chefe de verdade.
+ *
+ * Um golpe de `hp + 1` NAO basta e a primeira versao destes testes caiu nisso:
+ * enterrado, o Devorador reduz todo dano a 12% (`DEVOURER_BURROWED_ARMOR`), e a
+ * mae sobrevivia — o que fazia o teste do placar passar por vacuidade, sem
+ * ninguem morrer.
+ */
+const kill = (state: SurvivalState, ent: SurvivalState['enemies'][number]) => {
+  for (let i = 0; i < 200 && ent.alive; i++) {
+    damageEntity(state, ent, 1000, [], {
+      kind: 'enemy_contact',
+      archetype: 'white_devourer',
+      elite: false,
+    });
+  }
+};
+
 const brood = (state: SurvivalState) =>
   state.enemies.filter((e) => e.alive && e.archetype === 'devourer_brood');
 
@@ -185,5 +204,65 @@ describe('a ninhada — pisar neles', () => {
     }
     expect(squashed, 'nao deu para pisar em nenhum').toBeGreaterThan(3);
     expect(state.stats.kills.devourer_brood, 'o placar contou os filhotes').toBe(0);
+  });
+});
+
+describe('a ninhada — ela nao sobrevive a mae', () => {
+  it('a mae cai e a ninhada vai junto', () => {
+    // O codigo dizia isto e nao fazia. O comentario do nascimento afirma que
+    // ela "nasce com a mae, existe so onde ela existe e some do mapa junto com
+    // ela" — e a segunda metade era falsa: morto o chefe, catorze filhotes
+    // ficavam orfaos numa camara limpa, ocupando vaga do teto de inimigos e
+    // parando bala, sem nada para seguir.
+    const { state, mother } = nest(41);
+    for (let t = 0; t < 30; t++) stepRun(state, [emptyCommand()]);
+    expect(brood(state).length, 'o ninho nem chegou a existir').toBeGreaterThan(4);
+    kill(state, mother);
+    expect(mother.alive).toBe(false);
+    expect(brood(state).length, 'sobraram filhotes orfaos na camara').toBe(0);
+  });
+
+  it('e o fim delas tambem nao conta no placar', () => {
+    // Morrer com a mae nao e mais um abate do que morrer pisada. A regra e a
+    // mesma nos dois caminhos, e vale a pena guardar nos dois: sao dois lugares
+    // diferentes do codigo criando corpos mortos.
+    const { state, mother } = nest(42);
+    for (let t = 0; t < 30; t++) stepRun(state, [emptyCommand()]);
+    const antes = brood(state).length;
+    kill(state, mother);
+    expect(antes, 'nao havia ninhada para morrer').toBeGreaterThan(4);
+    expect(brood(state).length).toBe(0);
+    expect(state.stats.kills.devourer_brood).toBe(0);
+  });
+});
+
+describe('a ninhada — ela nunca acaba dentro da pedra', () => {
+  it('nem quando o empurrao da separacao aponta para uma parede', () => {
+    // As atribuicoes de `separateBrood` sao diretas — nao passam por
+    // `moveEntity` —, entao sem checagem elas desfaziam a garantia que o passo
+    // tinha acabado de dar: encostado numa quina, um filhote separado do irmao
+    // ia parar DENTRO da parede, onde ninguem pode pisar nele.
+    //
+    // O ninho e empurrado contra a rocha de proposito: todos amontoados a um
+    // passo da parede, que e a situacao que produz o empurrao para dentro dela.
+    const { state, px, py } = nest(55);
+    const w = state.config.width;
+    // Uma parede solida rente ao ninho.
+    for (let y = py - 6; y <= py + 6; y++) state.solid[y * w + (px + 4)] = SOLID_ROCK;
+    for (const b of brood(state)) {
+      b.x = px + 3.6;
+      b.y = py + 0.5;
+    }
+    for (let t = 0; t < 120; t++) {
+      stepRun(state, [emptyCommand()]);
+      for (const b of brood(state)) {
+        const cx = Math.floor(b.x);
+        const cy = Math.floor(b.y);
+        expect(
+          state.solid[cy * w + cx],
+          `tick ${t}: filhote ${b.id} dentro da pedra em ${cx},${cy}`
+        ).toBe(SOLID_NONE);
+      }
+    }
   });
 });

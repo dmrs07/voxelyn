@@ -78,8 +78,8 @@
       "loop": true
     },
     "burst": {
-      "frames": 10,
-      "fps": 10,
+      "frames": 6,
+      "fps": 6.25,
       "loop": false
     }
   },
@@ -95,34 +95,34 @@
       "burst": 31
     },
     "dl": {
-      "idle": 41,
-      "walk": 45,
-      "attack": 51,
-      "special": 55,
-      "hit": 59,
-      "downed": 61,
-      "die": 67,
-      "burst": 72
+      "idle": 37,
+      "walk": 41,
+      "attack": 47,
+      "special": 51,
+      "hit": 55,
+      "downed": 57,
+      "die": 63,
+      "burst": 68
     },
     "ur": {
-      "idle": 82,
-      "walk": 86,
-      "attack": 92,
-      "special": 96,
-      "hit": 100,
-      "downed": 102,
-      "die": 108,
-      "burst": 113
+      "idle": 74,
+      "walk": 78,
+      "attack": 84,
+      "special": 88,
+      "hit": 92,
+      "downed": 94,
+      "die": 100,
+      "burst": 105
     },
     "ul": {
-      "idle": 123,
-      "walk": 127,
-      "attack": 133,
-      "special": 137,
-      "hit": 141,
-      "downed": 143,
-      "die": 149,
-      "burst": 154
+      "idle": 111,
+      "walk": 115,
+      "attack": 121,
+      "special": 125,
+      "hit": 129,
+      "downed": 131,
+      "die": 137,
+      "burst": 142
     }
   },
   "generation": {
