@@ -154,6 +154,7 @@ import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
 import { chassisFault, drawShortArc } from './chassis-fault';
+import { drawBatteryGlyph } from './battery-glyph';
 import {
   RouteMemory,
   drawSurveyHud,
@@ -1092,26 +1093,6 @@ const drawOreGlyph = (
   ctx.lineWidth = Math.max(1, size * 0.11);
   ctx.stroke();
   ctx.restore();
-};
-
-const drawPurgeCellGlyph = (
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  size: number,
-  color: string,
-): void => {
-  const u = Math.max(1, Math.floor(size / 8));
-  ctx.fillStyle = 'rgba(11,14,20,0.92)';
-  ctx.fillRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, u);
-  ctx.strokeRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, u);
-  ctx.fillRect(cx - u, cy, 2 * u, 3 * u);
-  ctx.fillStyle = PAL.player;
-  ctx.fillRect(cx - u, cy - 3 * u, 2 * u, u);
 };
 
 const wrapMeasuredText = (
@@ -5575,7 +5556,7 @@ export class SurvivalRenderer {
     ctx.globalAlpha = Math.min(1, (1 - sample.progress) * 1.7 + 0.25);
     ctx.translate(sample.x, sample.y);
     ctx.rotate((1 - sample.progress) * 0.35);
-    drawPurgeCellGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 4, PAL.biolum);
+    drawBatteryGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 5, PAL.biolum);
     ctx.restore();
   }
 
@@ -5990,7 +5971,7 @@ export class SurvivalRenderer {
     // sobra um contorno vazio, que diz "o compartimento existe e esta vazio"
     // em vez de sumir. Acima de seis, as pilhas viram seis e um "×N".
     const purgeCount = extra.purgeCells;
-    const PIP_PITCH = 11;
+    const PIP_PITCH = 12;
     const PIP_MAX = 6;
     const pipsShown = Math.min(PIP_MAX, Math.max(1, purgeCount));
     const purgeOverflow = purgeCount > PIP_MAX ? `×${purgeCount}` : '';
@@ -6021,18 +6002,16 @@ export class SurvivalRenderer {
       const filled = i < purgeCount;
       const px = pipsX + i * PIP_PITCH + 3;
       if (filled) {
-        drawPurgeCellGlyph(
+        drawBatteryGlyph(
           ctx,
           px,
           resources.glyphY,
-          purgePulse ? 15 : 13,
+          purgePulse ? 16 : 14,
           purgePulse ? PAL.biolum : PAL.bone,
         );
       } else {
-        // O compartimento vazio: so o contorno, apagado.
-        ctx.strokeStyle = 'rgba(184,169,143,0.35)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px - 3 + 0.5, resources.glyphY - 4 + 0.5, 6, 8);
+        // O compartimento vazio: a mesma pilha, sem carga e apagada.
+        drawBatteryGlyph(ctx, px, resources.glyphY, 14, PAL.bone, 'empty', 0.38);
       }
     }
     // A pilha que ACABOU de ser gasta: brilha branca e se apaga no lugar onde
@@ -6044,7 +6023,7 @@ export class SurvivalRenderer {
       ctx.globalAlpha = 1 - tD;
       ctx.translate(px, resources.glyphY);
       ctx.scale(1 + tD * 0.5, 1 + tD * 0.5);
-      drawPurgeCellGlyph(ctx, 0, 0, 13, PAL.player);
+      drawBatteryGlyph(ctx, 0, 0, 14, PAL.player);
       ctx.restore();
     }
     if (purgeOverflow) {
