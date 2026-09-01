@@ -88,6 +88,7 @@ export const PT_BR = {
   'aurix.options.operator': 'Operador',
   'aurix.options.video': 'Sistema de vídeo',
   'aurix.options.audio': 'Áudio',
+  'aurix.options.network': 'Rede',
   'aurix.options.telemetry': 'Telemetria',
   'aurix.options.credits': 'Créditos',
   'credits.game': 'jogo por DaniTools (@dani.tools)',
@@ -113,6 +114,14 @@ export const PT_BR = {
   'options.telemetry.on': 'Telemetria: ligada',
   'options.telemetry.off': 'Telemetria: desligada',
   'options.telemetry.note': 'dados anônimos de sessão, sem identificação',
+  'options.net.probe': 'Medir',
+  'options.net.probing': 'medindo…',
+  'options.net.idle': 'latência ainda não medida',
+  'options.net.live': 'ida e volta {rtt} ms até o servidor da sala',
+  'options.net.probed': 'ida e volta {rtt} ms até o servidor',
+  'options.net.unreachable': 'não consegui falar com o servidor',
+  'options.net.cushion':
+    'o desenho fica {cushion} ms atrás do servidor para absorver a variação — é o que separa mirar no que se vê de mirar atrás',
   'options.back': 'Voltar',
 
   // ---------------------------------------------------------------------

@@ -72,6 +72,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'aurix.options.operator': 'Operator',
   'aurix.options.video': 'Video system',
   'aurix.options.audio': 'Audio',
+  'aurix.options.network': 'Network',
   'aurix.options.telemetry': 'Telemetry',
   'aurix.options.credits': 'Credits',
   'credits.game': 'game by DaniTools (@dani.tools)',
@@ -97,6 +98,14 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.telemetry.on': 'Telemetry: on',
   'options.telemetry.off': 'Telemetry: off',
   'options.telemetry.note': 'anonymous session data, no identification',
+  'options.net.probe': 'Measure',
+  'options.net.probing': 'measuring…',
+  'options.net.idle': 'latency not measured yet',
+  'options.net.live': 'round trip {rtt} ms to the room server',
+  'options.net.probed': 'round trip {rtt} ms to the server',
+  'options.net.unreachable': 'could not reach the server',
+  'options.net.cushion':
+    'the drawing sits {cushion} ms behind the server to absorb the variation — it is what separates aiming at what you see from aiming behind it',
   'options.back': 'Back',
 
   // ---------------------------------------------------------------------

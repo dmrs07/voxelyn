@@ -25,6 +25,7 @@ import {
 import type { DeathEchoContract } from '@voxelyn/survival-protocol';
 import { LocalPlayout } from './local-playout';
 import { NetClient } from './net';
+import { netReadout, probeServerLatency } from './net-latency';
 import { TickEventQueue } from './playout';
 import { RestartGate } from './restart';
 import {
@@ -144,6 +145,9 @@ const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 const optionsControls = document.getElementById('options-controls') as HTMLDivElement;
 const optionsSlot = document.getElementById('options-slot') as HTMLDivElement;
 const pauseOptionsSlot = document.getElementById('pause-options-slot') as HTMLDivElement;
+const netReadoutEl = document.getElementById('net-readout') as HTMLSpanElement;
+const netDetailEl = document.getElementById('net-detail') as HTMLDivElement;
+const netProbeButton = document.getElementById('btn-net-probe') as HTMLButtonElement;
 const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
 const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
 const languageSelect = document.getElementById('language') as HTMLSelectElement;
@@ -967,6 +971,18 @@ const telemetry = new TelemetrySession(
 /** Estado vivo da run corrente, para o evento de abandono saber onde ela parou. */
 let liveRun: SurvivalState | null = null;
 
+/** Intervalo entre sondagens de latencia numa sala aberta. */
+const NET_PING_INTERVAL_MS = 1000;
+
+/**
+ * O cliente de rede da run online corrente, ou null fora do co-op.
+ *
+ * Existe por causa da folha de Opcoes: ela e a mesma no menu e na pausa, e no
+ * meio de uma sala precisa ler a latencia MEDIDA em vez de sondar por fora.
+ * Null e a resposta certa no solo, que nao fala com servidor nenhum.
+ */
+let liveNet: NetClient | null = null;
+
 /**
  * Ha uma descida em curso — mesmo que ainda nao exista estado nenhum.
  *
@@ -1732,6 +1748,8 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
   let running = true;
   let lastTime = performance.now();
   let reconnectAt = 0;
+  /** Quando saiu a ultima sondagem de latencia. Ver `NET_PING_INTERVAL_MS`. */
+  let lastPingAt = 0;
   let fatal = false; // erro sem retry (versao incompativel, URL invalida)
   /** O socket nem chegou a nascer: nao ha loop a montar. */
   let startupFailed = false;
@@ -1834,6 +1852,16 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
       }
       if (cmd.interact) deathEchoes.pressInteract();
       net.setCommand(cmd);
+      // Uma sondagem por segundo, e nao uma por quadro: a medida serve para o
+      // jogador ler, nao para o jogo reagir. Sessenta pings por segundo
+      // cobrariam banda de quem ja esta com a rede ruim — que e exatamente
+      // quem esta olhando este numero.
+      if (now - lastPingAt >= NET_PING_INTERVAL_MS) {
+        lastPingAt = now;
+        // `ping()` carimba a si mesmo: ver o cabecalho dele. Este `now` so
+        // decide QUANDO sondar.
+        net.ping();
+      }
       net.pump(now);
       const state = net.sampleRenderState(now);
       if (state) {
@@ -1918,9 +1946,14 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
     firstFrame: (): void => {},
     start: (): void => {
       lastTime = performance.now();
+      // A folha de Opcoes le a latencia daqui enquanto a sala existir. Fica
+      // aberto so entre `start` e `stopLoop` — fora disso nao ha socket, e
+      // apontar para um morto faria a tela mostrar a medida da sala anterior.
+      liveNet = net;
       requestAnimationFrame(frame);
       stopLoop = () => {
         running = false;
+        liveNet = null;
         showInvite(null);
         ws?.close();
       };
@@ -2723,6 +2756,85 @@ document.getElementById('btn-matrix')?.addEventListener('click', () => {
 document
   .getElementById('btn-matrix-close')
   ?.addEventListener('click', () => closeOverlay(matrixOverlay));
+
+// ---------------------------------------------------------------------------
+// Rede: o que a latencia esta cobrando
+// ---------------------------------------------------------------------------
+/**
+ * O resultado da ultima sondagem avulsa. `undefined` = nunca sondou.
+ *
+ * Distinto de `null` (sondou e nao chegou) porque as duas coisas dizem frases
+ * diferentes na tela — "toque para medir" e "nao consegui falar com o
+ * servidor". Ver `netReadout`.
+ */
+let lastProbeMs: number | null | undefined = undefined;
+let probing = false;
+
+const ms = (value: number): string => String(Math.round(value));
+
+const renderNetReadout = (): void => {
+  const readout = netReadout(liveNet?.netStats ?? null, lastProbeMs);
+  netReadoutEl.classList.remove('warn', 'danger');
+  // A chave sem interpolacao fica no dataset, para `applyStaticTranslations`
+  // reescrever a linha assim que o idioma trocar — o resto da folha faz o
+  // mesmo. As com numero saem do dataset: `applyStaticTranslations` chama
+  // `t(key)` sem parametro nenhum e deixaria "{rtt} ms" na tela. Elas se
+  // resolvem sozinhas no proximo passo do intervalo, que so roda com a linha a
+  // vista.
+  const set = (key: MessageKey, params?: Record<string, string | number>): void => {
+    if (params) delete netReadoutEl.dataset.i18n;
+    else netReadoutEl.dataset.i18n = key;
+    netReadoutEl.textContent = t(key, params);
+  };
+
+  // Numa sala medida, sondar por fora nao muda nada na tela: a sala tem
+  // prioridade sobre a sondagem (ver `netReadout`), e um botao que responde com
+  // o mesmo numero de antes e um botao que nao leva a lugar nenhum.
+  netProbeButton.classList.toggle('hidden', readout.kind === 'live');
+
+  if (readout.kind === 'live') {
+    set('options.net.live', { rtt: ms(readout.rttMs) });
+    netDetailEl.textContent = t('options.net.cushion', { cushion: ms(readout.cushionMs) });
+    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+    return;
+  }
+  netDetailEl.textContent = '';
+  if (readout.kind === 'probe') {
+    set('options.net.probed', { rtt: ms(readout.rttMs) });
+    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+  } else if (readout.kind === 'unreachable') {
+    set('options.net.unreachable');
+    netReadoutEl.classList.add('danger');
+  } else {
+    set(probing ? 'options.net.probing' : 'options.net.idle');
+  }
+};
+
+netProbeButton.addEventListener('click', () => {
+  if (probing) return;
+  probing = true;
+  audio.ui();
+  renderNetReadout();
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void probeServerLatency(url).then((result) => {
+    probing = false;
+    lastProbeMs = result;
+    renderNetReadout();
+  });
+});
+
+/**
+ * A leitura se atualiza sozinha enquanto estiver A VISTA.
+ *
+ * `offsetParent` nulo cobre as duas maneiras de ela sumir — a folha fechada e o
+ * bloco desmontado para o menu de campo — sem este arquivo precisar saber em
+ * qual dos dois slots o `#options-controls` esta agora.
+ */
+setInterval(() => {
+  if (netReadoutEl.offsetParent === null) return;
+  renderNetReadout();
+}, NET_PING_INTERVAL_MS);
+renderNetReadout();
 
 const renderTelemetryLabel = (): void => {
   telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');

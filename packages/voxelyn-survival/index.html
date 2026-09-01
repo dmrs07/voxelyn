@@ -3262,6 +3262,20 @@
                   <button id="btn-music-source" class="compact">Composta</button>
                 </div>
               </div>
+              <!--
+                Rede: o que a latencia esta cobrando. Numa sala aberta os
+                numeros sao os MEDIDOS pelo `pong`; fora dela o botao sonda o
+                servidor por HTTP, porque a pergunta ("da para jogar co-op
+                agora?") quase sempre e feita antes de entrar.
+              -->
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.network">Rede</div>
+                <div class="row">
+                  <span id="net-readout" class="sub" data-i18n="options.net.idle"></span>
+                  <button id="btn-net-probe" class="compact" data-i18n="options.net.probe"></button>
+                </div>
+                <div id="net-detail" class="sub"></div>
+              </div>
               <div class="ax-optgroup">
                 <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
                 <div class="row">
