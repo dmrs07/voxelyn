@@ -220,6 +220,8 @@ export class VoxelParticles {
   private lastFurnaceBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
   private readonly lastBubbleBucket = new Map<number, number>();
+  /** Ultimo bucket de faisca do curto-circuito, por SLOT (ver emitDashJets). */
+  private readonly lastShortBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
@@ -234,6 +236,7 @@ export class VoxelParticles {
     this.lastFungalSmokeBucket.clear();
     this.lastOverheatBucket.clear();
     this.lastBubbleBucket.clear();
+    this.lastShortBucket.clear();
   }
 
   private push(p: Particle): void {
@@ -774,6 +777,46 @@ export class VoxelParticles {
         kind: 'ember',
       });
     }
+  }
+
+  /**
+   * CURTO-CIRCUITO: faiscas azuis saltando do chassi com integridade baixa.
+   *
+   * Saem do meio do corpo, para cima e para os lados, e morrem rapido: e
+   * eletricidade escapando de uma placa, nao brasa de uma fogueira. Chaveado
+   * por slot como os jatos da esquiva, porque o Prospector anda.
+   */
+  emitShortCircuit(slot: number, x: number, y: number, nowMs: number, scale: number): void {
+    const bucket = (nowMs / 55) | 0;
+    if (this.lastShortBucket.get(slot) === bucket) return;
+    this.lastShortBucket.set(slot, bucket);
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 668265263) ^ (slot + 11)));
+    const count = Math.max(1, Math.round(2 * scale));
+    for (let i = 0; i < count; i++) {
+      this.push({
+        x: x + (rnd() - 0.5) * 0.3,
+        y: y + (rnd() - 0.5) * 0.3,
+        z: 0.35 + rnd() * 0.55,
+        vx: (rnd() - 0.5) * 1.8,
+        vy: (rnd() - 0.5) * 1.8,
+        vz: 0.5 + rnd() * 0.9,
+        life: 130 + rnd() * 120,
+        maxLife: 250,
+        kind: 'spark',
+      });
+    }
+  }
+
+  /**
+   * A PURGA: o chassi venta. Uma coroa de faiscas quentes que sobe do corpo
+   * (o sistema descarregando o que estava travando) e uma frente rasteira que
+   * vai ate onde o gas foi limpo — o alcance da limpeza e informacao, e a
+   * frente e a unica coisa que o mostra.
+   */
+  emitPurgeVent(x: number, y: number, radius: number, scale: number): void {
+    this.burst(x, y, 'shock', Math.max(4, Math.round(10 * scale)), 1.2, 2.4, 420, 41, 0.35);
+    this.burst(x, y, 'spark', Math.max(3, Math.round(8 * scale)), 0.8, 1.6, 360, 43, 0.7);
+    this.ring(x, y, 'shock', Math.max(8, Math.round(18 * scale)), radius, 380, 47, 0.1);
   }
 
   step(dtMs: number): void {

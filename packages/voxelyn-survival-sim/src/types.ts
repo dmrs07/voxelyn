@@ -1409,7 +1409,7 @@ export type SemanticEvent =
       rounds: number;
       spin: number;
     }
-  | { t: 'overheat'; x: number; y: number }
+  | { t: 'overheat'; slot: number; x: number; y: number }
   /**
    * O chefe do setor acordou. Chamava-se `guardian_awake`: o Guardiao era o
    * unico chefe que dormia ate ser notado, e desde `bossForBiome` a camara
@@ -1564,7 +1564,18 @@ export type SemanticEvent =
    * modelo. A chave viaja no wire com o mesmo custo e e traduzida por quem
    * desenha, no idioma daquele cliente.
    */
-  | { t: 'message'; key: SimMessageKey };
+  | {
+      t: 'message';
+      key: SimMessageKey;
+      /**
+       * Para QUEM a mensagem e. Ausente, e um anuncio do mundo (contaminacao,
+       * Nucleo caido) e todo cliente a mostra; presente, e a resposta a uma
+       * acao daquele jogador ("reviva o parceiro antes de descer") e so o
+       * cliente dele a ve. No co-op os dois recebem os mesmos eventos, e sem
+       * isto o parceiro lia as recusas do outro como se fossem as suas.
+       */
+      slot?: number;
+    };
 
 /**
  * As mensagens que a simulacao sabe emitir.

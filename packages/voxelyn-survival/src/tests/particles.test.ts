@@ -295,7 +295,7 @@ describe('particulas voxel', () => {
   // colada na da explosao, com posicao e velocidade identicas.
   it('nao repete o sorteio entre eventos coincidentes', () => {
     const p = new VoxelParticles();
-    p.ingest([{ t: 'ignite', x: 12, y: 12 }, { t: 'overheat', x: 12, y: 12 }], 96, 1);
+    p.ingest([{ t: 'ignite', x: 12, y: 12 }, { t: 'overheat', slot: 0, x: 12, y: 12 }], 96, 1);
     const items = (p as unknown as { items: Array<{ x: number; y: number; vx: number; vz: number }> }).items;
     const assinaturas = new Set(items.map((i) => `${i.vx.toFixed(6)},${i.vz.toFixed(6)}`));
     expect(assinaturas.size).toBe(items.length);

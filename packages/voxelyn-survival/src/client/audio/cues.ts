@@ -307,7 +307,12 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'salvage_cache_opened':
       return [{ voice: 'cacheOpened', x: ev.x, y: ev.y, scale: 1 }];
 
+    // As vozes de INTERFACE (sem posicao no mundo) sao do jogador local: a
+    // celula que o parceiro recolheu, a carga que ele gastou e o modulo que
+    // se esgotou nele nao soam aqui. As vozes posicionais (purga usada,
+    // superaquecimento) continuam: o ouvido as localiza no parceiro.
     case 'purge_cell_acquired':
+      if (ev.slot !== ctx.localPlayerId - 1) return [];
       return [{ voice: 'purgeAcquired', x: 0, y: 0, scale: 1 }];
 
     case 'purge_cell_used':
@@ -319,9 +324,11 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'module_charge_consumed':
       // A carga que ACABA soa diferente das outras. Sem isso o jogador so
       // descobre que ficou sem modulo no tiro seguinte, que ja saiu errado.
+      if (ev.slot !== ctx.localPlayerId - 1) return [];
       return [{ voice: 'moduleCharge', x: 0, y: 0, scale: ev.remaining === 0 ? 1.3 : 0.8 }];
 
     case 'module_expired':
+      if (ev.slot !== ctx.localPlayerId - 1) return [];
       return [{ voice: 'moduleExpired', x: 0, y: 0, scale: 1 }];
 
     case 'boss_awake':

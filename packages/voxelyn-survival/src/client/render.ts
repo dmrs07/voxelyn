@@ -46,6 +46,8 @@ import {
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
   HEAT_MAX,
+  PURGE_CELL_HEAL,
+  PURGE_CELL_RADIUS,
   MINIGUN_SPIN_FIRE_AT,
   MINIGUN_SPIN_MAX,
   RICOCHET_BOUNCES,
@@ -156,7 +158,26 @@ import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
-import { RouteMemory, drawSurveyHud, drawSurveyWorld, hasSurvey } from './survey-overlay';
+import { chassisFault, drawShortArc } from './chassis-fault';
+import { drawBatteryGlyph } from './battery-glyph';
+import {
+  RouteMemory,
+  drawSurveyHud,
+  drawSurveyWorld,
+  hasSurvey,
+  surveyHudHeight,
+} from './survey-overlay';
+import {
+  HUD_OBJECTIVE_FONT,
+  HUD_OBJECTIVE_MAX_LINES,
+  hpGhostStep,
+  hudObjectiveMaxWidth,
+  hudDense,
+  hudPanelLayout,
+  hudScale,
+  wrapHudText,
+  type HudRect,
+} from './hud-layout';
 import {
   TargetMotion,
   combatTuningOf,
@@ -495,19 +516,45 @@ const prefersReducedMotion = (): boolean =>
 export type ModuleHudMetrics = { size: number; gap: number };
 
 /** Mantem todos os modulos visiveis dentro da largura compacta do painel. */
-export const moduleHudMetrics = (count: number, availableWidth: number): ModuleHudMetrics => {
+export const moduleHudMetrics = (
+  count: number,
+  availableWidth: number,
+  maxSize = 30,
+): ModuleHudMetrics => {
   const normalizedCount = Math.max(0, Math.floor(count));
-  if (normalizedCount <= 0) return { size: 30, gap: 7 };
-  if (normalizedCount === 1) return { size: Math.max(24, Math.min(30, availableWidth)), gap: 0 };
+  const minSize = Math.min(24, maxSize);
+  if (normalizedCount <= 0) return { size: maxSize, gap: 7 };
+  if (normalizedCount === 1) {
+    return { size: Math.max(minSize, Math.min(maxSize, availableWidth)), gap: 0 };
+  }
 
   const baseGap = 7;
   const size = Math.max(
-    24,
-    Math.min(30, Math.floor((availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount)),
+    minSize,
+    Math.min(
+      maxSize,
+      Math.floor((availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount),
+    ),
   );
   const remaining = Math.max(0, availableWidth - size * normalizedCount);
   const gap = Math.max(3, Math.min(baseGap, remaining / (normalizedCount - 1)));
   return { size, gap };
+};
+
+/** A cor do acento de uma notificacao: o que ela significa antes de ser lida. */
+export type HudMessageTone = 'info' | 'good' | 'warn';
+
+/**
+ * O tom de uma mensagem que a SIMULACAO manda pela chave. A simulacao nao
+ * sabe de cor; quem desenha decide, pelo que a chave conta: recusa, perigo e
+ * perda avisam; circuito fechado, parceiro de pe e Nucleo na mao sao boas.
+ */
+export const simMessageTone = (key: string): HudMessageTone => {
+  if (/contamination|Sealed|revive|waitAt|Dropped|Collapsed|ceiling|Siege/i.test(key)) {
+    return 'warn';
+  }
+  if (/Revived|Closed|coreTaken/i.test(key)) return 'good';
+  return 'info';
 };
 
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md)
@@ -1064,26 +1111,6 @@ const drawOreGlyph = (
   ctx.restore();
 };
 
-const drawPurgeCellGlyph = (
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  size: number,
-  color: string,
-): void => {
-  const u = Math.max(1, Math.floor(size / 8));
-  ctx.fillStyle = 'rgba(11,14,20,0.92)';
-  ctx.fillRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, u);
-  ctx.strokeRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, u);
-  ctx.fillRect(cx - u, cy, 2 * u, 3 * u);
-  ctx.fillStyle = PAL.player;
-  ctx.fillRect(cx - u, cy - 3 * u, 2 * u, u);
-};
-
 const wrapMeasuredText = (
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -1279,7 +1306,24 @@ export class SurvivalRenderer {
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
-  messages: Array<{ text: string; startsAt?: number; until: number }> = [];
+  /**
+   * As NOTIFICACOES centrais. `tone` escolhe a cor do acento (bom, aviso,
+   * neutro); `shownAt` e o instante em que a mensagem apareceu de fato, para a
+   * entrada suave — preenchido no primeiro quadro em que ela e desenhada.
+   *
+   * O que entra aqui e PESSOAL ou do MUNDO, nunca do parceiro: um modulo que
+   * se esgotou nele, um Eco que ele assimilou, o cano dele que travou, a
+   * recusa que o poco deu a ele — nada disso muda uma decisao deste jogador,
+   * e no co-op os dois clientes recebem os mesmos eventos. Cada `case` que
+   * empurra mensagem decide pelo `slot` do evento.
+   */
+  messages: Array<{
+    text: string;
+    startsAt?: number;
+    until: number;
+    tone?: HudMessageTone;
+    shownAt?: number;
+  }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly surfaces = new SurfaceBank();
@@ -1443,6 +1487,28 @@ export class SurvivalRenderer {
    */
   private cargoCounterX = 0;
   /**
+   * A geometria do painel de status, do ULTIMO quadro desenhado. E dela que a
+   * caixa-preta reserva espaco e que os voos (lasca, Purga, cartucho) tiram o
+   * alvo — nenhum deles refaz a conta de `hud-layout.ts`.
+   */
+  private hudPanelRect: HudRect | null = null;
+  private hudPurgeGlyph = { x: 30, y: 68 };
+  private hudResourcesGlyphY = 68;
+  private hudModuleAnchor = { x: 39, y: 95 };
+  private hudLastMs = 0;
+  /** O rastro da barra de HP (ver `hpGhostStep`). Negativo = ainda nao viu HP. */
+  private hpGhost = 1;
+  private hpLastFrac = -1;
+  private hpHitAtMs = -1e9;
+  private hpHitStrength = 0;
+  /** A ultima diretiva desenhada, para o veu de "isto e novo" na troca. */
+  private objectiveKey: string | null = null;
+  private objectiveChangedAtMs = -1e9;
+  private coresTakenSeen = -1;
+  private coresChangedAtMs = -1e9;
+  /** Quando o Prospector local gastou a ultima Celula de Purga. */
+  private purgeUsedAtMs = -1e9;
+  /**
    * A geracao do Prospector LOCAL, para os marcos visuais.
    *
    * Vem do perfil autoritativo, e nao da run: a run nao carrega a arvore, so o
@@ -1538,7 +1604,13 @@ export class SurvivalRenderer {
     this.canvas.width = Math.floor(window.innerWidth * dpr);
     this.canvas.height = Math.floor(window.innerHeight * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.zoom = window.innerWidth < 700 ? 1.6 : 2;
+    // Tela pequena: o mundo encolhe um pouco para caber mais SALA na tela.
+    // O zoom de 1,6 mostrava pouco mais que o Prospector e o que esta a
+    // meia-duzia de tiles dele — num celular em pe, com o painel em cima e
+    // os manches embaixo, era pouca caverna para decidir para onde ir. A mira
+    // nao depende do zoom (screenToWorldAim le so a direcao), e o atlas ja
+    // era desenhado fora de 2x nesta faixa.
+    this.zoom = window.innerWidth < 700 || window.innerHeight < 520 ? 1.45 : 2;
   }
 
   /**
@@ -1612,6 +1684,16 @@ export class SurvivalRenderer {
     this.route.reset();
     this.lastSector = 0;
     this.sectorEnteredAtMs = 0;
+    // A memoria do painel e da RUN: o rastro de HP da run passada desceria
+    // sobre a barra cheia da nova, e a diretiva/Nucleos anunciariam "novo"
+    // para o que e so o comeco de sempre.
+    this.hpLastFrac = -1;
+    this.hpHitAtMs = -1e9;
+    this.objectiveKey = null;
+    this.objectiveChangedAtMs = -1e9;
+    this.coresTakenSeen = -1;
+    this.coresChangedAtMs = -1e9;
+    this.purgeUsedAtMs = -1e9;
   }
 
   /**
@@ -1795,16 +1877,24 @@ export class SurvivalRenderer {
           break;
         }
         case 'well_offers':
-          this.messages.push({ text: t('toast.well.resonance'), until: nowMs + 3400 });
+          this.messages.push({
+            text: t('toast.well.resonance'),
+            until: nowMs + 3400,
+            tone: 'info',
+          });
           break;
         case 'ability_taken':
+          // O clarao e do mundo (o poco acendeu); a frase e de quem assimilou.
           this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);
-          this.messages.push({
-            text: t('toast.ability.assimilated', {
-              ability: abilityPresentation(ev.ability).label,
-            }),
-            until: nowMs + 2600,
-          });
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t('toast.ability.assimilated', {
+                ability: abilityPresentation(ev.ability).label,
+              }),
+              until: nowMs + 2600,
+              tone: 'good',
+            });
+          }
           break;
         case 'dodge':
           this.fxList.push({
@@ -1829,6 +1919,7 @@ export class SurvivalRenderer {
                 ? t('toast.core.taken')
                 : t('toast.core.deeper', { taken: ev.taken, total: ev.total }),
             until: nowMs + 4200,
+            tone: 'good',
           });
           this.shake = { power: 4, until: nowMs + 300 };
           break;
@@ -1844,7 +1935,11 @@ export class SurvivalRenderer {
           });
           break;
         case 'boss_awake':
-          this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
+          this.messages.push({
+            text: t('toast.guardian.awake'),
+            until: nowMs + 3000,
+            tone: 'warn',
+          });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
         case 'boss_phase':
@@ -1860,7 +1955,11 @@ export class SurvivalRenderer {
           // vez. O `addFlash` negativo nao existe, entao quem apaga e a
           // ausencia — o que fica e o silencio depois de dez minutos de brasa.
           this.shake = { power: 0, until: 0 };
-          this.messages.push({ text: t('toast.furnace.cooled'), until: nowMs + 3200 });
+          this.messages.push({
+            text: t('toast.furnace.cooled'),
+            until: nowMs + 3200,
+            tone: 'good',
+          });
           break;
         case 'boss_module': {
           // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
@@ -1876,7 +1975,10 @@ export class SurvivalRenderer {
           break;
         }
         case 'module_charge_consumed':
-          this.modulePulseUntil.set(ev.module, nowMs + 260);
+          // O card que pulsa e o DESTE painel: a carga do parceiro nao mora aqui.
+          if (ev.slot === this.localPlayerId - 1) {
+            this.modulePulseUntil.set(ev.module, nowMs + 260);
+          }
           break;
         case 'module_selected': {
           // A INCORPORACAO. A origem preferida e o card do terminal, que este
@@ -1891,10 +1993,15 @@ export class SurvivalRenderer {
           break;
         }
         case 'module_expired':
-          this.messages.push({
-            text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
-            until: nowMs + 1800,
-          });
+          // A frase e de quem perdeu o modulo; a ejecao (abaixo) e do mundo —
+          // o cartucho do parceiro cai no chao ao lado dele, e isso se ve.
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
+              until: nowMs + 1800,
+              tone: 'warn',
+            });
+          }
           // A EJECAO. Posicao e rumo vem do estado no proprio quadro do
           // desenho (`stepModuleProps`), porque o evento nao os carrega — e
           // nao deve: um evento cosmetico que exigisse posicao obrigaria a
@@ -1923,7 +2030,11 @@ export class SurvivalRenderer {
           );
           break;
         case 'salvage_cache_opened':
-          this.messages.push({ text: t('toast.cache.opened'), until: nowMs + 2200 });
+          this.messages.push({
+            text: t('toast.cache.opened'),
+            until: nowMs + 2200,
+            tone: 'good',
+          });
           this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);
           if (ev.slot === this.localPlayerId - 1) {
             this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };
@@ -1952,10 +2063,44 @@ export class SurvivalRenderer {
           }
           break;
         }
+        case 'purge_cell_used': {
+          // A PURGA e uma reinicializacao, nao uma cura: o chassi descarrega o
+          // que estava travando os sistemas e volta a operar. Por isso a frente
+          // e eletrica (fosforo e choque), nunca verde de "vida"; o corpo ganha
+          // a varredura de reboot no proprio desenho; e a linha do painel diz
+          // "sistemas restabelecidos", com o numero que a simulacao devolveu.
+          const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+          this.fxList.push({
+            kind: 'ring',
+            x: ev.x,
+            y: ev.y,
+            r: 0.2,
+            maxR: PURGE_CELL_RADIUS * 2.1,
+            color: PAL.biolum,
+            life: 460,
+            maxLife: 460,
+          });
+          this.addFlash(ev.x, ev.y, PURGE_CELL_RADIUS * 1.6, 0.85, nowMs, 380, PAL.biolum);
+          this.particles.emitPurgeVent(ev.x, ev.y, PURGE_CELL_RADIUS, fxScale);
+          if (ev.slot === this.localPlayerId - 1) {
+            this.purgeUsedAtMs = nowMs;
+            this.messages.push({
+              text: t('toast.purge.used', { amount: PURGE_CELL_HEAL }),
+              until: nowMs + 2400,
+              tone: 'good',
+            });
+          }
+          break;
+        }
         case 'purge_cell_acquired':
           if (ev.slot === this.localPlayerId - 1) {
             const startsAt = nowMs + 220;
-            this.messages.push({ text: t('toast.purgeCell'), startsAt, until: startsAt + 2200 });
+            this.messages.push({
+              text: t('toast.purgeCell'),
+              startsAt,
+              until: startsAt + 2200,
+              tone: 'good',
+            });
             if (this.pendingRewardOrigin?.slot === ev.slot) {
               this.rewardFlight = {
                 worldX: this.pendingRewardOrigin.x,
@@ -1969,16 +2114,29 @@ export class SurvivalRenderer {
           }
           break;
         case 'terminal_scan_complete':
-          this.messages.push({ text: t('toast.scan.complete'), until: nowMs + 2800 });
+          this.messages.push({
+            text: t('toast.scan.complete'),
+            until: nowMs + 2800,
+            tone: 'good',
+          });
           break;
         case 'overheat':
-          this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600 });
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600, tone: 'warn' });
+          }
           break;
         case 'message':
           // A simulacao manda a CHAVE, nunca a frase: ela roda tambem no
           // servidor (verificacao de replay), onde nao existe idioma de
-          // jogador. Traduzir e trabalho de quem desenha.
-          this.messages.push({ text: t(ev.key), until: nowMs + 3600 });
+          // jogador. Traduzir e trabalho de quem desenha. Com `slot`, a
+          // mensagem e a resposta a UMA acao — so o autor dela a le.
+          if (ev.slot === undefined || ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t(ev.key),
+              until: nowMs + 3600,
+              tone: simMessageTone(ev.key),
+            });
+          }
           break;
         default:
           break;
@@ -3755,8 +3913,17 @@ export class SurvivalRenderer {
       // em fase de tempo real e nao de quadro: a 120Hz um tremor por quadro
       // viraria chuvisco e a 30Hz um pulo.
       const overheating = state.tick < ex.overheatedUntil;
-      const shakeX = overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0;
-      const shakeY = overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0;
+      // FALHA DO CHASSI (chassis-fault.ts): com integridade baixa o corpo da
+      // solavancos curtos e solta faisca. E uma maquina perdendo continuidade
+      // eletrica, nao um ferido — o solavanco e seco e o arco e azul. Vale
+      // para o parceiro tambem: no co-op, ver o outro chassi em curto e o que
+      // avisa que ele precisa de uma Purga antes de cair.
+      const fault = chassisFault(nowMs, slot, pl.hp / pl.maxHp);
+      const reducedMotion = prefersReducedMotion();
+      const faultX = fault.active && !reducedMotion ? fault.jitterX * z : 0;
+      const faultY = fault.active && !reducedMotion ? fault.jitterY * z : 0;
+      const shakeX = (overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0) + faultX;
+      const shakeY = (overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0) + faultY;
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
@@ -3769,6 +3936,17 @@ export class SurvivalRenderer {
           // significa outra coisa.
           if (overheating) {
             this.particles.emitOverheatSmoke(
+              slot,
+              pl.x,
+              pl.y,
+              nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx,
+            );
+          }
+          // A faisca do curto sai mesmo com movimento reduzido: o solavanco e
+          // enfeite, a faisca e a informacao ("este chassi esta no fim").
+          if (fault.active) {
+            this.particles.emitShortCircuit(
               slot,
               pl.x,
               pl.y,
@@ -3877,6 +4055,25 @@ export class SurvivalRenderer {
                     this.quality.maxFx / PRESETS.high.maxFx,
                   );
                 }
+              }
+              // O ARCO do curto, por cima da chapa.
+              if (fault.active) drawShortArc(ctx, psx, psy, size, z, nowMs, slot);
+              // A VARREDURA DE REBOOT da Purga: uma linha de fosforo sobe dos
+              // pes a cabeca em meio segundo, com um veu que se apaga atras
+              // dela. E o chassi religando modulo por modulo — de baixo para
+              // cima, como um sistema que sobe.
+              const rebootT = (nowMs - this.purgeUsedAtMs) / 520;
+              if (isLocal && rebootT >= 0 && rebootT < 1 && !reducedMotion) {
+                const bodyH = size * 2.7;
+                const lineY = psy - rebootT * bodyH;
+                ctx.save();
+                ctx.globalAlpha = (1 - rebootT) * 0.45;
+                ctx.fillStyle = PAL.biolum;
+                ctx.fillRect(psx - size * 1.2, lineY, size * 2.4, psy - lineY);
+                ctx.globalAlpha = 0.95 * (1 - rebootT * 0.5);
+                ctx.fillStyle = PAL.player;
+                ctx.fillRect(psx - size * 1.3, lineY - z, size * 2.6, Math.max(1, z * 1.2));
+                ctx.restore();
               }
               // Os marcos geracionais vao DEPOIS do corpo, por cima dele, e so
               // no Prospector local: o parceiro do co-op e padronizado enquanto
@@ -5198,23 +5395,34 @@ export class SurvivalRenderer {
     if (!link) return;
     const echo = link.echo;
 
-    const extra = state.playerExtra;
-    const safeTop = this.safeArea.top + 10;
-    const safeLeft = this.safeArea.left + 12;
-    const hasModules = extra.activeModules.length > 0;
-    const panelW = Math.min(300, Math.max(230, vw * 0.34));
-    const sectorY = safeTop + (hasModules ? 112 : 84);
-    const biomeY = sectorY + 14;
-    const objectiveY = biomeY + 18;
-    // O painel nao reserva mais a linha do cofre: o localizador de cofre vive
-    // no topo-centro (ver renderHud), e a caixa-preta encosta mais alto.
-    const panelH = objectiveY - safeTop + 13;
-    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
-      x: safeLeft,
-      y: safeTop,
-      width: panelW,
-      height: panelH,
-    });
+    // O retangulo do painel e o que `renderHud` acabou de desenhar neste
+    // quadro — uma conta so, em hud-layout.ts. Antes do primeiro quadro, a
+    // geometria minima serve de reserva.
+    const hud =
+      this.hudPanelRect ??
+      (() => {
+        const hs = hudScale(vw, vh);
+        const layout = hudPanelLayout({
+          viewportWidth: vw / hs,
+          safe: {
+            top: this.safeArea.top / hs,
+            right: this.safeArea.right / hs,
+            bottom: this.safeArea.bottom / hs,
+            left: this.safeArea.left / hs,
+          },
+          dense: hudDense(vw, vh),
+          moduleCount: state.playerExtra.activeModules.length,
+          surveyHeight: 0,
+          objectiveLines: 1,
+        });
+        return {
+          x: layout.x * hs,
+          y: layout.y * hs,
+          width: layout.width * hs,
+          height: layout.height * hs,
+        };
+      })();
+    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, hud);
     if (!region) return;
 
     const ctx = this.ctx;
@@ -5324,7 +5532,7 @@ export class SurvivalRenderer {
     // glifo de purga na esquerda, para onde o voo da recompensa vai. As duas
     // animacoes tem alvos diferentes porque sao coisas diferentes chegando; a
     // lasca que pousasse em cima da purga diria que minerar rende purga.
-    const target = { x: this.cargoCounterX, y: this.safeArea.top + 61 };
+    const target = { x: this.cargoCounterX, y: this.hudResourcesGlyphY };
     const alive: typeof this.cargoFlights = [];
     for (const flight of this.cargoFlights) {
       if (!flight.startScreen) {
@@ -5423,7 +5631,7 @@ export class SurvivalRenderer {
     nowMs: number,
   ): void {
     if (this.moduleProps.flightCount === 0) return;
-    const hudFallback = { x: this.safeArea.left + 30, y: this.safeArea.top + 80 };
+    const hudFallback = { x: this.hudModuleAnchor.x, y: this.hudModuleAnchor.y };
     // REDUCAO DE MOVIMENTO: quem pediu menos movimento nao recebe o arco, e
     // sim o clarao de encaixe direto sobre o proprio Prospector. Nao ha um
     // segundo caminho para manter — recusar a origem e exatamente o mesmo
@@ -5466,7 +5674,7 @@ export class SurvivalRenderer {
       const [x, y] = toScreen(flight.worldX, flight.worldY);
       flight.startScreen = { x, y };
     }
-    const target = { x: this.safeArea.left + 30, y: this.safeArea.top + 67 };
+    const target = { x: this.hudPurgeGlyph.x, y: this.hudPurgeGlyph.y };
     const sample = rewardFlightPosition(
       flight.startScreen,
       target,
@@ -5483,7 +5691,7 @@ export class SurvivalRenderer {
     ctx.globalAlpha = Math.min(1, (1 - sample.progress) * 1.7 + 0.25);
     ctx.translate(sample.x, sample.y);
     ctx.rotate((1 - sample.progress) * 0.35);
-    drawPurgeCellGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 4, PAL.biolum);
+    drawBatteryGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 5, PAL.biolum);
     ctx.restore();
   }
 
@@ -5496,8 +5704,6 @@ export class SurvivalRenderer {
   ): void {
     const ctx = this.ctx;
     const extra = state.playerExtra;
-    const safeTop = this.safeArea.top + 10;
-    const safeLeft = this.safeArea.left + 12;
     ctx.textBaseline = 'alphabetic';
 
     // Contaminacao continua sendo a unica faixa presa ao topo inteiro.
@@ -5572,15 +5778,97 @@ export class SurvivalRenderer {
       this.locatorBearing = null;
     }
 
-    const hasModules = extra.activeModules.length > 0;
-    const panelW = Math.min(300, Math.max(230, vw * 0.34));
-    const moduleY = safeTop + 68;
-    const sectorY = safeTop + (hasModules ? 112 : 84);
-    const biomeY = sectorY + 14;
-    const objectiveY = biomeY + 18;
-    // O espaco vertical do antigo texto de cofre foi DEVOLVIDO ao painel: o
-    // localizador vive no topo-centro e nao ocupa mais uma linha aqui.
-    const panelH = objectiveY - safeTop + 13;
+    // ------------------------------------------------------------------
+    // O PAINEL DE STATUS. A geometria vem de hud-layout.ts; aqui e so tinta.
+    // ------------------------------------------------------------------
+    const reduced = prefersReducedMotion();
+    const hpFrac = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
+    const nav = state.config.tuning.navigation;
+    const surveyHeight =
+      nav.routeMemory || nav.contaminationForecast ? surveyHudHeight(state, nav, this.route) : 0;
+
+    // A diretiva, em ordem de urgencia:
+    //
+    // 1. o selo do setor, quando ha um — enquanto o dono esta de pe, nem o poco
+    //    nem o pedestal aceitam a mao, e mandar "desca pelo poco" apontaria
+    //    para uma interacao recusada;
+    // 2. o caminho de VOLTA, quando o Nucleo do fundo ja esta na mao: a
+    //    diretiva vira a mesma para os dois jogadores em qualquer setor — va a
+    //    ENTRADA, subir (setor > 1) ou fechar o contrato (setor 1);
+    // 3. o Nucleo deste setor, se houver um por recolher;
+    // 4. descer.
+    //
+    // Medida ANTES do painel: a diretiva mais longa nao cabe numa linha do
+    // painel compacto, e a altura do painel depende de em quantas ela quebrou.
+    const hudObjective = objectiveViewOf(state);
+    const objectiveKey = hudObjective.sealedByBoss
+      ? 'hud.objective.breakSeal'
+      : hudObjective.returning
+        ? state.sector > 1
+          ? 'hud.objective.ascend'
+          : 'hud.objective.extract'
+        : hudObjective.hasCore && !hudObjective.coreTakenHere
+          ? 'hud.objective.findCore'
+          : 'hud.objective.descend';
+    ctx.font = HUD_OBJECTIVE_FONT;
+    const objectiveLines = wrapHudText(
+      t(objectiveKey),
+      hudObjectiveMaxWidth(vw / hudScale(vw, vh)),
+      (text) => ctx.measureText(text).width,
+    ).slice(0, HUD_OBJECTIVE_MAX_LINES);
+    if (objectiveKey !== this.objectiveKey) {
+      // A diretiva TROCOU: e o unico momento em que ela precisa puxar o olho.
+      // Depois disso ela e a linha mais lenta do painel, e um texto que grita
+      // o tempo todo ensina a nao olhar.
+      this.objectiveChangedAtMs = this.objectiveKey === null ? -1e9 : nowMs;
+      this.objectiveKey = objectiveKey;
+    }
+
+    // Em tela pequena o painel inteiro e desenhado em escala (hud-layout.ts,
+    // `hudScale`): a geometria fica em unidades de painel — a viewport e a
+    // area segura entram DIVIDIDAS pela escala — e `ctx.scale` faz o resto.
+    // Tudo o que sai daqui para outros leitores e multiplicado de volta.
+    const hs = hudScale(vw, vh);
+    const layout = hudPanelLayout({
+      viewportWidth: vw / hs,
+      safe: {
+        top: this.safeArea.top / hs,
+        right: this.safeArea.right / hs,
+        bottom: this.safeArea.bottom / hs,
+        left: this.safeArea.left / hs,
+      },
+      dense: hudDense(vw, vh),
+      moduleCount: extra.activeModules.length,
+      surveyHeight,
+      objectiveLines: objectiveLines.length,
+    });
+    // Os leitores do retangulo (caixa-preta, voos) usam o do ULTIMO quadro.
+    this.hudPanelRect = {
+      x: layout.x * hs,
+      y: layout.y * hs,
+      width: layout.width * hs,
+      height: layout.height * hs,
+    };
+    this.hudResourcesGlyphY = layout.resources.glyphY * hs;
+    this.hudModuleAnchor = layout.modules
+      ? { x: (layout.modules.x + 15) * hs, y: (layout.modules.y + 15) * hs }
+      : { x: (layout.innerLeft + 15) * hs, y: (layout.resources.glyphY + 12) * hs };
+
+    // O RASTRO da barra de HP: o preenchimento cai na hora, e um trilho palido
+    // segura o valor antigo por um instante antes de descer ate ele. O tamanho
+    // do rastro E o tamanho do golpe — sem numero flutuante nenhum.
+    const dtMs = Math.min(100, Math.max(0, nowMs - this.hudLastMs));
+    this.hudLastMs = nowMs;
+    if (this.hpLastFrac < 0) {
+      this.hpGhost = hpFrac;
+    } else if (hpFrac < this.hpLastFrac - 1e-6) {
+      this.hpHitAtMs = nowMs;
+      this.hpHitStrength = Math.min(1, 0.35 + (this.hpLastFrac - hpFrac) * 4);
+    }
+    this.hpLastFrac = hpFrac;
+    this.hpGhost = reduced
+      ? hpFrac
+      : hpGhostStep(this.hpGhost, hpFrac, nowMs - this.hpHitAtMs, dtMs);
 
     const roundedPanel = (x: number, y: number, w: number, h: number, radius: number): void => {
       const r = Math.min(radius, w / 2, h / 2);
@@ -5597,63 +5885,151 @@ export class SurvivalRenderer {
       ctx.closePath();
     };
 
-    roundedPanel(safeLeft, safeTop, panelW, panelH, 12);
-    ctx.fillStyle = 'rgba(11,14,20,0.78)';
+    // Um texto que ACABOU de mudar: a cor base, com um veu branco que se
+    // desfaz em `durationMs`. E a mesma linguagem para setor, Nucleos e
+    // diretiva — uma so forma de "isto e novo", e nao tres.
+    const flashText = (
+      text: string,
+      x: number,
+      y: number,
+      base: string,
+      elapsedMs: number,
+      durationMs: number,
+    ): void => {
+      ctx.fillStyle = base;
+      ctx.fillText(text, x, y);
+      if (reduced || elapsedMs < 0 || elapsedMs >= durationMs) return;
+      ctx.globalAlpha = 1 - elapsedMs / durationMs;
+      ctx.fillStyle = PAL.player;
+      ctx.fillText(text, x, y);
+      ctx.globalAlpha = 1;
+    };
+
+    // O vidro: um degrade curto de cima para baixo e um fio de luz na borda
+    // superior. Com HP baixo a moldura inteira respira em sangue — e o unico
+    // estado em que o painel, e nao so a barra, tem algo a dizer.
+    const lowHp = state.player.hp > 0 && hpFrac <= 0.35;
+    const lowPulse = lowHp && !reduced ? 0.5 + 0.5 * Math.sin(nowMs / 170) : lowHp ? 0.6 : 0;
+    ctx.save();
+    ctx.scale(hs, hs);
+    roundedPanel(layout.x, layout.y, layout.width, layout.height, 10);
+    const glass = ctx.createLinearGradient(0, layout.y, 0, layout.y + layout.height);
+    glass.addColorStop(0, 'rgba(17,22,31,0.86)');
+    glass.addColorStop(1, 'rgba(9,12,18,0.82)');
+    ctx.fillStyle = glass;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(232,241,255,0.32)';
+    ctx.strokeStyle = lowHp ? `rgba(217,59,76,${0.4 + 0.45 * lowPulse})` : 'rgba(232,241,255,0.26)';
     ctx.lineWidth = 1.25;
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,241,255,0.09)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(layout.x + 10, layout.y + 1.5);
+    ctx.lineTo(layout.x + layout.width - 10, layout.y + 1.5);
+    ctx.stroke();
 
-    // Coracao voxel + HP numerico: a vida do jogador vive somente aqui.
-    const heartX = safeLeft + 20;
-    const heartY = safeTop + 21;
-    ctx.fillStyle = state.player.hp / state.player.maxHp > 0.35 ? PAL.fungusLight : PAL.blood;
-    ctx.fillRect(heartX - 8, heartY - 7, 6, 6);
-    ctx.fillRect(heartX + 2, heartY - 7, 6, 6);
-    ctx.fillRect(heartX - 10, heartY - 3, 20, 7);
-    ctx.fillRect(heartX - 6, heartY + 4, 12, 4);
-    ctx.fillRect(heartX - 2, heartY + 8, 4, 4);
-
-    const hpFrac = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
-    const hpBarX = safeLeft + 42;
-    const hpBarY = safeTop + 14;
-    const hpBarW = panelW - 54;
-    const hpBarH = 14;
-    ctx.fillStyle = 'rgba(0,0,0,0.62)';
-    ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    // Coracao voxel + HP numerico: a vida do jogador vive somente aqui. Com HP
+    // baixo o coracao BATE — a mesma batida da moldura.
+    const heartBeat = lowHp && !reduced ? 1 + 0.14 * Math.max(0, Math.sin(nowMs / 170)) ** 3 : 1;
+    ctx.save();
+    ctx.translate(layout.heart.x, layout.heart.y);
+    ctx.scale(heartBeat, heartBeat);
     ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
-    ctx.fillRect(hpBarX + 1, hpBarY + 1, (hpBarW - 2) * hpFrac, hpBarH - 2);
+    ctx.fillRect(-8, -7, 6, 6);
+    ctx.fillRect(2, -7, 6, 6);
+    ctx.fillRect(-10, -3, 20, 7);
+    ctx.fillRect(-6, 4, 12, 4);
+    ctx.fillRect(-2, 8, 4, 4);
+    ctx.restore();
+
+    const { hpBar } = layout;
+    const hpInnerW = hpBar.w - 2;
+    const hpFillW = hpInnerW * hpFrac;
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    if (this.hpGhost > hpFrac + 0.002) {
+      ctx.fillStyle = 'rgba(232,241,255,0.55)';
+      ctx.fillRect(
+        hpBar.x + 1 + hpFillW,
+        hpBar.y + 1,
+        hpInnerW * (this.hpGhost - hpFrac),
+        hpBar.h - 2,
+      );
+    }
+    ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
+    ctx.fillRect(hpBar.x + 1, hpBar.y + 1, hpFillW, hpBar.h - 2);
+    // Um fio de luz no topo do preenchimento e tres marcas de quarto: a barra
+    // passa a ter relevo e escala sem ganhar um numero a mais.
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(hpBar.x + 1, hpBar.y + 1, hpFillW, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let q = 1; q < 4; q++) {
+      ctx.fillRect(hpBar.x + Math.round((hpBar.w * q) / 4), hpBar.y + 1, 1, hpBar.h - 2);
+    }
+    const sinceHit = nowMs - this.hpHitAtMs;
+    if (!reduced && sinceHit >= 0 && sinceHit < 200) {
+      ctx.fillStyle = `rgba(255,255,255,${(1 - sinceHit / 200) * 0.5 * this.hpHitStrength})`;
+      ctx.fillRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    }
+    // A VARREDURA da Purga na barra: uma banda de fosforo cruza a barra da
+    // esquerda para a direita enquanto o chassi religa. E o mesmo evento que a
+    // linha subindo pelo corpo — duas leituras do mesmo reboot, no mesmo
+    // meio segundo.
+    const sweepT = (nowMs - this.purgeUsedAtMs) / 600;
+    if (!reduced && sweepT >= 0 && sweepT < 1) {
+      const sweepX = hpBar.x + hpBar.w * sweepT;
+      const sweepGrad = ctx.createLinearGradient(sweepX - 22, 0, sweepX + 4, 0);
+      sweepGrad.addColorStop(0, 'rgba(89,242,194,0)');
+      sweepGrad.addColorStop(0.8, `rgba(89,242,194,${0.75 * (1 - sweepT * 0.4)})`);
+      sweepGrad.addColorStop(1, 'rgba(232,241,255,0.9)');
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(hpBar.x + 1, hpBar.y + 1, hpBar.w - 2, hpBar.h - 2);
+      ctx.clip();
+      ctx.fillStyle = sweepGrad;
+      ctx.fillRect(sweepX - 22, hpBar.y, 26, hpBar.h);
+      ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(232,241,255,0.24)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(hpBarX, hpBarY, hpBarW, hpBarH);
-    ctx.fillStyle = PAL.player;
+    ctx.strokeRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    const hpText = `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`;
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(
-      `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`,
-      hpBarX + hpBarW - 5,
-      hpBarY + 11,
-    );
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(hpText, hpBar.x + hpBar.w - 4, hpBar.y + 12);
+    ctx.fillStyle = sweepT >= 0 && sweepT < 1 ? PAL.biolum : PAL.player;
+    ctx.fillText(hpText, hpBar.x + hpBar.w - 5, hpBar.y + 11);
 
     // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
+    //
+    // Com a Minigun equipada os dois trilhos param antes da borda: a ponta
+    // direita e reservada a PALAVRA de estado do canhao ("GIRANDO", "CANO
+    // TRAVADO"), que antes era desenhada por cima do proprio trilho de calor.
+    const minigunEquipped = extra.activeModules.some((module) => module.id === 'minigun');
+    const spinFrac = extra.minigun.spin / MINIGUN_SPIN_MAX;
+    const showSpin = minigunEquipped || spinFrac > 0;
+    const railX = hpBar.x;
+    const railW = showSpin ? hpBar.w - 66 : hpBar.w;
     const heatFrac = Math.min(1, extra.heat / HEAT_MAX);
     const overheated = state.tick < extra.overheatedUntil;
+    const { heatRail, spinRail } = layout;
     ctx.fillStyle = 'rgba(0,0,0,0.58)';
-    ctx.fillRect(hpBarX, safeTop + 32, hpBarW, 4);
+    ctx.fillRect(railX, heatRail.y, railW, heatRail.h);
     // Acima do limiar a barra PULSA, na mesma fronteira em que o tique de aviso
     // comeca a soar. Sem isso as duas leituras contariam historias diferentes: o
     // audio calaria num ponto que a barra nao mostra, e o jogador atribuiria o
     // silencio a sorte em vez de a um limite que ele pode aprender.
     const warning = !overheated && heatFrac > HEAT_WARN_AT;
-    ctx.globalAlpha = warning ? 0.72 + 0.28 * Math.sin(nowMs / 90) : 1;
+    ctx.globalAlpha = warning && !reduced ? 0.72 + 0.28 * Math.sin(nowMs / 90) : 1;
     ctx.fillStyle = overheated ? PAL.blood : PAL.fire;
-    ctx.fillRect(hpBarX, safeTop + 32, hpBarW * heatFrac, 4);
+    ctx.fillRect(railX, heatRail.y, railW * heatFrac, heatRail.h);
     ctx.globalAlpha = 1;
     // A marca do limiar fica visivel com o trilho VAZIO. Ela e o que informa que
     // existe um ponto de virada antes de o jogador chegar nele — depois de
     // atingido, quem avisa ja e o tique.
     ctx.fillStyle = 'rgba(232,241,255,0.45)';
-    ctx.fillRect(hpBarX + Math.round(hpBarW * HEAT_WARN_AT), safeTop + 31, 1, 6);
+    ctx.fillRect(railX + Math.round(railW * HEAT_WARN_AT), heatRail.y - 1, 1, heatRail.h + 2);
 
     // ROTACAO DO CANHAO, colada ao trilho de calor.
     //
@@ -5665,12 +6041,9 @@ export class SurvivalRenderer {
     //
     // O trilho so aparece quando ha rotacao para mostrar: com a arma parada e
     // sem municao ele nao ocupa pixel nenhum.
-    const minigunEquipped = extra.activeModules.some((module) => module.id === 'minigun');
-    const spinFrac = extra.minigun.spin / MINIGUN_SPIN_MAX;
-    if (minigunEquipped || spinFrac > 0) {
-      const spinY = safeTop + 37;
+    if (showSpin) {
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(hpBarX, spinY, hpBarW, 2);
+      ctx.fillRect(railX, spinRail.y, railW, spinRail.h);
       // Verde enquanto sobe, BRANCO quando ja esta cuspindo: a cor troca no
       // MESMO ponto em que a arma comeca a atirar, entao a barra ensina o
       // limiar sem numero nenhum.
@@ -5683,14 +6056,14 @@ export class SurvivalRenderer {
       // usa, e nenhuma das duas colide com o calor.
       const firing = extra.minigun.phase === 'firing';
       ctx.fillStyle = firing ? PAL.player : PAL.biolum;
-      ctx.fillRect(hpBarX, spinY, hpBarW * spinFrac, 2);
+      ctx.fillRect(railX, spinRail.y, railW * spinFrac, spinRail.h);
       // A marca do limiar operacional: o ponto a partir do qual sai bala.
       ctx.fillStyle = 'rgba(232,241,255,0.5)';
       ctx.fillRect(
-        hpBarX + Math.round((hpBarW * MINIGUN_SPIN_FIRE_AT) / MINIGUN_SPIN_MAX),
-        spinY - 1,
+        railX + Math.round((railW * MINIGUN_SPIN_FIRE_AT) / MINIGUN_SPIN_MAX),
+        spinRail.y - 1,
         1,
-        4,
+        spinRail.h + 2,
       );
       // O ESTADO em palavra, so nos dois momentos em que ele nao e obvio pela
       // barra: girando sem atirar, e travado. "Atirando" nao precisa de
@@ -5705,142 +6078,272 @@ export class SurvivalRenderer {
         ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'right';
         ctx.fillStyle = extra.minigun.phase === 'overheated' ? PAL.blood : PAL.biolum;
-        ctx.fillText(label, hpBarX + hpBarW, spinY - 4);
+        ctx.fillText(label, hpBar.x + hpBar.w, heatRail.y + 6);
         ctx.textAlign = 'left';
       }
     }
 
-    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
-    ctx.beginPath();
-    ctx.moveTo(safeLeft + 12, safeTop + 43);
-    ctx.lineTo(safeLeft + panelW - 12, safeTop + 43);
-    ctx.stroke();
+    const divider = (y: number): void => {
+      ctx.strokeStyle = 'rgba(232,241,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(layout.innerLeft, y + 0.5);
+      ctx.lineTo(layout.innerRight, y + 0.5);
+      ctx.stroke();
+    };
+    divider(layout.dividerA);
 
     const purgePulse = nowMs < this.purgePulseUntil;
-    const purgeY = safeTop + 57;
-    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
+    const cargoPulse = nowMs < this.cargoPulseUntil;
+    const { resources } = layout;
+    const cargoLabel = t('hud.cargo', { count: this.cargoOre });
+
+    // AS CELULAS DE PURGA, uma a uma.
+    //
+    // Antes era "CÉLULA DE PURGA ×1": um numero que o olho tinha de LER. Agora
+    // sao pilhas — um glifo por celula, lado a lado, como as baterias que sao.
+    // Quantidade vira comprimento, que se conta de relance; com zero celulas
+    // sobra um contorno vazio, que diz "o compartimento existe e esta vazio"
+    // em vez de sumir. Acima de seis, as pilhas viram seis e um "×N".
+    const purgeCount = extra.purgeCells;
+    const PIP_PITCH = 12;
+    const PIP_MAX = 6;
+    const pipsShown = Math.min(PIP_MAX, Math.max(1, purgeCount));
+    const purgeOverflow = purgeCount > PIP_MAX ? `×${purgeCount}` : '';
+    const purgeLabel = t('hud.purge');
+    ctx.font = 'bold 10px monospace';
+    const purgeLabelW = ctx.measureText(purgeLabel).width;
+    const pipsX = layout.innerLeft + purgeLabelW + 8;
+    ctx.font = 'bold 9px monospace';
+    const overflowW = purgeOverflow ? ctx.measureText(purgeOverflow).width + 4 : 0;
+    const purgeRowRight = pipsX + pipsShown * PIP_PITCH + overflowW;
+
+    // A carga ocupa o que sobra a direita; se o portugues nao couber a 12 px
+    // no painel de 230, a fonte dela desce um ponto de cada vez.
+    let resourceSize = 12;
+    for (; resourceSize > 9; resourceSize--) {
+      ctx.font = `bold ${resourceSize}px monospace`;
+      const needed = ctx.measureText(cargoLabel).width + 9 + 15 + 8;
+      if (purgeRowRight + needed <= layout.innerRight) break;
+    }
+
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
-    drawPurgeCellGlyph(ctx, safeLeft + 18, purgeY, purgePulse ? 15 : 13, ctx.fillStyle as string);
-    ctx.fillText(t('hud.purgeCells', { count: extra.purgeCells }), safeLeft + 34, purgeY + 4);
+    ctx.fillText(purgeLabel, layout.innerLeft, resources.baseline);
+    const sincePurge = nowMs - this.purgeUsedAtMs;
+    const draining = !reduced && sincePurge >= 0 && sincePurge < 420;
+    for (let i = 0; i < pipsShown; i++) {
+      const filled = i < purgeCount;
+      const px = pipsX + i * PIP_PITCH + 3;
+      if (filled) {
+        drawBatteryGlyph(
+          ctx,
+          px,
+          resources.glyphY,
+          purgePulse ? 16 : 14,
+          purgePulse ? PAL.biolum : PAL.bone,
+        );
+      } else {
+        // O compartimento vazio: a mesma pilha, sem carga e apagada.
+        drawBatteryGlyph(ctx, px, resources.glyphY, 14, PAL.bone, 'empty', 0.38);
+      }
+    }
+    // A pilha que ACABOU de ser gasta: brilha branca e se apaga no lugar onde
+    // estava, para o olho ver de onde saiu — em vez de a fileira so encurtar.
+    if (draining && purgeCount < PIP_MAX) {
+      const tD = sincePurge / 420;
+      const px = pipsX + purgeCount * PIP_PITCH + 3;
+      ctx.save();
+      ctx.globalAlpha = 1 - tD;
+      ctx.translate(px, resources.glyphY);
+      ctx.scale(1 + tD * 0.5, 1 + tD * 0.5);
+      drawBatteryGlyph(ctx, 0, 0, 14, PAL.player);
+      ctx.restore();
+    }
+    if (purgeOverflow) {
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = PAL.bone;
+      ctx.fillText(purgeOverflow, pipsX + pipsShown * PIP_PITCH + 2, resources.baseline);
+    }
+    // O voo da recompensa pousa na PROXIMA pilha — a que ele vai acender.
+    this.hudPurgeGlyph = {
+      x: (pipsX + Math.min(PIP_MAX - 1, Math.max(0, purgeCount - 1)) * PIP_PITCH + 3) * hs,
+      y: resources.glyphY * hs,
+    };
 
     // A carga fica na MESMA linha da purga, encostada a direita do painel: os
     // dois sao recursos que o jogador carrega, e uma linha propria custaria
     // altura de HUD num painel que ja disputa espaco com os modulos.
-    const cargoPulse = nowMs < this.cargoPulseUntil;
-    const cargoRight = safeLeft + panelW - 12;
+    const cargoRight = layout.innerRight;
     ctx.textAlign = 'right';
-    ctx.font = `bold ${cargoPulse ? 13 : 12}px monospace`;
+    ctx.font = `bold ${cargoPulse ? resourceSize + 1 : resourceSize}px monospace`;
     ctx.fillStyle = cargoPulse ? PAL.bone : PAL.loot;
-    const cargoLabel = t('hud.cargo', { count: this.cargoOre });
-    ctx.fillText(cargoLabel, cargoRight, purgeY + 4);
-    this.cargoCounterX = cargoRight - ctx.measureText(cargoLabel).width - 9;
-    drawOreGlyph(ctx, this.cargoCounterX, purgeY, cargoPulse ? 15 : 13, ctx.fillStyle as string);
+    ctx.fillText(cargoLabel, cargoRight, resources.baseline);
+    const cargoGlyphX = cargoRight - ctx.measureText(cargoLabel).width - 9;
+    // Em unidades de TELA: quem le e o voo da lasca, fora deste `ctx.scale`.
+    this.cargoCounterX = cargoGlyphX * hs;
+    drawOreGlyph(ctx, cargoGlyphX, resources.glyphY, cargoPulse ? 15 : 13, ctx.fillStyle as string);
     ctx.textAlign = 'left';
 
-    if (hasModules) {
+    if (layout.modules) {
       this.renderModuleHud(
         extra.activeModules,
         state.tick,
         nowMs,
-        safeLeft + 12,
-        moduleY,
-        safeLeft + panelW,
+        layout.modules.x,
+        layout.modules.y,
+        layout.modules.right,
         this.minigunViews.get(this.localPlayerId - 1).barrelPhase,
+        layout.modules.size,
       );
     }
 
-    const lowerDividerY = safeTop + (hasModules ? 104 : 75);
-    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
-    ctx.beginPath();
-    ctx.moveTo(safeLeft + 12, lowerDividerY);
-    ctx.lineTo(safeLeft + panelW - 12, lowerDividerY);
-    ctx.stroke();
+    divider(layout.dividerB);
 
-    ctx.textAlign = 'left';
-    ctx.fillStyle = PAL.rockLight;
-    ctx.font = '11px monospace';
+    // SETOR e NUCLEOS na mesma linha: sao a mesma pergunta ("onde estou na
+    // descida?"), e uma linha a menos aqui e uma linha a mais para a diretiva.
+    //
     // O denominador e o TOTAL ACESSIVEL desta run, e nunca o maximo potencial
     // da linhagem. Uma expedicao de G-01 mostra "SETOR 3/3" e le como completa;
     // mostrar "3/7" a faria parecer truncada por uma area perdida que ela nunca
     // teve autorizacao para ver.
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 10px monospace';
     const runSectors = state.config.depth.sectorCount;
-    ctx.fillText(
+    flashText(
       t('hud.sector', { sector: state.sector, total: runSectors }),
-      safeLeft + 12,
-      sectorY,
+      layout.innerLeft,
+      layout.sectorBaseline,
+      PAL.bone,
+      nowMs - this.sectorEnteredAtMs,
+      1200,
     );
-
-    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
-    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
-    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
-    ctx.fillStyle = PAL.bone;
-    ctx.font = '9px monospace';
-    ctx.fillText(biomeLabel(state.stratum, state.occupation), safeLeft + 12, biomeY);
-
-    // Instrumentacao de Levantamento: mapa de saloes visitados e previsao de
-    // onda. Depois do bioma porque sao a leitura MAIS lenta do painel — quem
-    // consulta um mapa nao esta no meio de uma luta.
-    const nav = state.config.tuning.navigation;
-    if (nav.routeMemory || nav.contaminationForecast) {
-      drawSurveyHud(ctx, state, nav, this.route, safeLeft + 12, biomeY + 6, nowMs);
-    }
 
     // NUCLEOS: so aparece quando a run tem mais de um, e ai ele e a informacao
     // que decide se vale continuar descendo. Numa run de um Nucleo a linha
     // seria ruido — o objetivo logo abaixo ja diz tudo.
     const coreSectors = state.config.depth.coreSectors;
-    const hudObjective = objectiveViewOf(state);
     if (coreSectors.length > 1) {
-      ctx.fillStyle = PAL.biolum;
-      ctx.font = '9px monospace';
-      ctx.fillText(
-        t('hud.cores', {
-          taken: countCoresTaken(state),
-          total: coreSectors.length,
-        }),
-        safeLeft + 12,
-        biomeY + 9,
+      const taken = countCoresTaken(state);
+      if (taken !== this.coresTakenSeen) {
+        this.coresChangedAtMs = this.coresTakenSeen < 0 ? -1e9 : nowMs;
+        this.coresTakenSeen = taken;
+      }
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 9px monospace';
+      flashText(
+        t('hud.cores', { taken, total: coreSectors.length }),
+        layout.innerRight,
+        layout.sectorBaseline,
+        PAL.biolum,
+        nowMs - this.coresChangedAtMs,
+        900,
       );
+      ctx.textAlign = 'left';
     }
 
-    ctx.fillStyle = PAL.loot;
-    ctx.font = 'bold 12px monospace';
-    // A diretiva, em ordem de urgencia:
-    //
-    // 1. o selo do setor, quando ha um — enquanto o dono esta de pe, nem o poco
-    //    nem o pedestal aceitam a mao, e mandar "desca pelo poco" apontaria
-    //    para uma interacao recusada;
-    // 2. o caminho de VOLTA, quando o Nucleo do fundo ja esta na mao: a
-    //    diretiva vira a mesma para os dois jogadores em qualquer setor — va a
-    //    ENTRADA, subir (setor > 1) ou fechar o contrato (setor 1);
-    // 3. o Nucleo deste setor, se houver um por recolher;
-    // 4. descer.
-    const objectiveKey = hudObjective.sealedByBoss
-      ? 'hud.objective.breakSeal'
-      : hudObjective.returning
-        ? state.sector > 1
-          ? 'hud.objective.ascend'
-          : 'hud.objective.extract'
-        : hudObjective.hasCore && !hudObjective.coreTakenHere
-          ? 'hud.objective.findCore'
-          : 'hud.objective.descend';
-    ctx.fillText(t(objectiveKey), safeLeft + 12, objectiveY);
+    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
+    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
+    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
+    ctx.fillStyle = 'rgba(184,169,143,0.78)';
+    ctx.font = '9px monospace';
+    ctx.fillText(
+      biomeLabel(state.stratum, state.occupation),
+      layout.innerLeft,
+      layout.biomeBaseline,
+    );
 
-    // mensagens centrais
+    // Instrumentacao de Levantamento: mapa de saloes visitados e previsao de
+    // onda. Depois do bioma porque sao a leitura MAIS lenta do painel — quem
+    // consulta um mapa nao esta no meio de uma luta.
+    if (surveyHeight > 0) {
+      drawSurveyHud(ctx, state, nav, this.route, layout.innerLeft, layout.surveyTop, nowMs);
+    }
+
+    // A DIRETIVA. Uma barra de acento a esquerda diz de que TIPO ela e antes de
+    // o texto ser lido: sangue para um selo a derrubar, fosforo para o caminho
+    // de volta, ambar para o Nucleo a recolher, osso para a descida comum.
+    const { objective } = layout;
+    const accent = hudObjective.sealedByBoss
+      ? PAL.blood
+      : hudObjective.returning
+        ? PAL.biolum
+        : objectiveKey === 'hud.objective.findCore'
+          ? PAL.loot
+          : PAL.bone;
+    const objectiveElapsed = nowMs - this.objectiveChangedAtMs;
+    const objectiveFresh = !reduced && objectiveElapsed >= 0 && objectiveElapsed < 900;
+    const lastBaseline =
+      objective.firstBaseline + (objectiveLines.length - 1) * objective.lineHeight;
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = objectiveFresh ? 1 : 0.85;
+    ctx.fillRect(
+      objective.accentX,
+      objective.firstBaseline - 9,
+      2,
+      lastBaseline + 2 - (objective.firstBaseline - 9),
+    );
+    ctx.globalAlpha = 1;
+    ctx.font = HUD_OBJECTIVE_FONT;
+    ctx.textAlign = 'left';
+    objectiveLines.forEach((line, index) => {
+      flashText(
+        line,
+        objective.x,
+        objective.firstBaseline + index * objective.lineHeight,
+        PAL.loot,
+        objectiveElapsed,
+        900,
+      );
+    });
+    ctx.restore();
+
+    // AS NOTIFICACOES CENTRAIS.
+    //
+    // A mesma pele do painel — vidro escuro, fio de luz, moldura fina — com um
+    // acento a esquerda que diz o tom antes de a frase ser lida: fosforo para
+    // o que e bom, sangue para o aviso, osso para o neutro. Entram deslizando
+    // quatro pixels e desvanecem nos ultimos 300 ms. Em tela pequena descem um
+    // ponto de fonte junto com o painel. Tres no maximo, a mais nova embaixo.
     this.messages = this.messages.filter((m) => m.until > nowMs);
     const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);
+    const msgFont = hs < 1 ? 12 : 13;
+    const msgH = msgFont + 11;
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     let my = Math.max(this.safeArea.top + 28, vh * 0.2);
     for (const m of visibleMessages.slice(-3)) {
-      ctx.font = 'bold 14px monospace';
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      if (m.shownAt === undefined) m.shownAt = nowMs;
+      const age = nowMs - m.shownAt;
+      const enter = reduced ? 1 : Math.min(1, age / 160);
+      const leave = reduced ? 1 : Math.max(0, Math.min(1, (m.until - nowMs) / 300));
+      const alpha = Math.min(enter, leave);
+      const slide = (1 - enter) * 4;
+      ctx.font = `bold ${msgFont}px monospace`;
       const tw = ctx.measureText(m.text).width;
-      ctx.fillRect(vw / 2 - tw / 2 - 8, my - 14, tw + 16, 20);
-      ctx.fillStyle = PAL.bone;
-      ctx.fillText(m.text, vw / 2, my);
-      my += 26;
+      const boxW = tw + 30;
+      const boxX = vw / 2 - boxW / 2;
+      const boxY = my - msgH / 2 + slide;
+      ctx.globalAlpha = alpha;
+      roundedPanel(boxX, boxY, boxW, msgH, 6);
+      const msgGlass = ctx.createLinearGradient(0, boxY, 0, boxY + msgH);
+      msgGlass.addColorStop(0, 'rgba(17,22,31,0.88)');
+      msgGlass.addColorStop(1, 'rgba(9,12,18,0.84)');
+      ctx.fillStyle = msgGlass;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(232,241,255,0.22)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      const tone = m.tone ?? 'info';
+      ctx.fillStyle = tone === 'good' ? PAL.biolum : tone === 'warn' ? PAL.blood : PAL.bone;
+      ctx.fillRect(boxX + 6, boxY + 6, 2, msgH - 12);
+      ctx.fillStyle = tone === 'warn' ? PAL.player : PAL.bone;
+      ctx.fillText(m.text, vw / 2 + 4, my + slide);
+      ctx.globalAlpha = 1;
+      my += msgH + 6;
     }
+    ctx.textBaseline = 'alphabetic';
 
     // Controles touch: mesma pele nos dois lados; esquerda move, direita mira
     // e atira. O reticulo e a unica diferenca semantica necessaria.
@@ -5971,38 +6474,21 @@ export class SurvivalRenderer {
      * ponto", e ela chega ao olho sem custar uma linha de HUD.
      */
     minigunPhase = 0,
+    /** Lado maximo de cada card; o ritmo denso da tela pequena pede 24. */
+    maxSize = 30,
   ): void {
     const ctx = this.ctx;
     const availableWidth = Math.max(0, viewportWidth - 12 - x);
-    const { size, gap } = moduleHudMetrics(modules.length, availableWidth);
+    const { size, gap } = moduleHudMetrics(modules.length, availableWidth, maxSize);
     let cursor = x;
     for (const module of modules) {
       if (cursor + size > viewportWidth - 12) break;
       const pulse = (this.modulePulseUntil.get(module.id) ?? 0) > nowMs;
-      const scale = pulse ? 1.12 : 1;
+      const scale = pulse ? 1.1 : 1;
       const drawSize = size * scale;
+      const half = drawSize / 2;
       const cx = cursor + size / 2;
       const cy = y + size / 2;
-      ctx.fillStyle = 'rgba(11,14,20,0.72)';
-      ctx.fillRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      ctx.strokeStyle = PAL.player;
-      ctx.lineWidth = pulse ? 2.5 : 1.5;
-      ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      if (module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion()) {
-        // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
-        // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
-        // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
-        // angulo deixaria o icone parado no pico —, e um relogio proprio
-        // faria o icone girar durante o travamento, que e exatamente o
-        // instante em que ele tem de estar parando.
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(minigunPhase * Math.PI * 2);
-        drawModuleGlyph(ctx, module.id, 0, 0, size * 0.47, PAL.biolum);
-        ctx.restore();
-      } else {
-        drawModuleGlyph(ctx, module.id, cx, cy, size * 0.47, PAL.biolum);
-      }
 
       let fraction = 1;
       let label = '';
@@ -6015,15 +6501,105 @@ export class SurvivalRenderer {
         fraction = Math.max(0, (module.lifetime.expiresAtTick - tick) / total);
         label = `${Math.max(0, Math.ceil((module.lifetime.expiresAtTick - tick) / 20))}s`;
       }
-      ctx.strokeStyle = fraction <= 0.2 ? PAL.loot : PAL.biolum;
-      ctx.lineWidth = fraction <= 0.2 ? 3 : 2;
+      const low = fraction <= 0.2;
+
+      // O CARD e o badge inteiro: nada sobra para fora dele. O anel que
+      // orbitava o quadrado a 3 px de distancia encostava no vizinho a cada
+      // fileira cheia, e num painel de tela pequena os dois aneis viravam um
+      // so. A carga restante agora e o NIVEL que sobe pelo fundo do card,
+      // como uma bateria: a leitura e a mesma ("quanto ainda tenho"), e cabe
+      // dentro da propria moldura.
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, size / 2 + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+      const radius = Math.max(3, Math.round(size * 0.14));
+      ctx.moveTo(cx - half + radius, cy - half);
+      ctx.lineTo(cx + half - radius, cy - half);
+      ctx.quadraticCurveTo(cx + half, cy - half, cx + half, cy - half + radius);
+      ctx.lineTo(cx + half, cy + half - radius);
+      ctx.quadraticCurveTo(cx + half, cy + half, cx + half - radius, cy + half);
+      ctx.lineTo(cx - half + radius, cy + half);
+      ctx.quadraticCurveTo(cx - half, cy + half, cx - half, cy + half - radius);
+      ctx.lineTo(cx - half, cy - half + radius);
+      ctx.quadraticCurveTo(cx - half, cy - half, cx - half + radius, cy - half);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(11,14,20,0.84)';
+      ctx.fill();
+      // O nivel: recorta pelo card, para o preenchimento herdar os cantos.
+      ctx.clip();
+      const levelH = (drawSize - 2) * Math.min(1, Math.max(0, fraction));
+      const levelTop = cy + half - 1 - levelH;
+      ctx.fillStyle = low ? 'rgba(255,209,102,0.62)' : 'rgba(89,242,194,0.5)';
+      ctx.fillRect(cx - half + 1, levelTop, drawSize - 2, levelH);
+      // A linha d'agua: um fio mais claro na borda do nivel, para o olho ler a
+      // altura sem comparar dois tons de verde.
+      if (fraction > 0 && fraction < 1) {
+        ctx.fillStyle = low ? PAL.loot : PAL.biolum;
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(cx - half + 1, levelTop, drawSize - 2, 1);
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+
+      // A moldura: fina em repouso, branca e grossa no pulso de instalacao,
+      // ambar quando a carga esta no fim.
+      ctx.strokeStyle = pulse ? PAL.player : low ? PAL.loot : 'rgba(232,241,255,0.42)';
+      ctx.lineWidth = pulse ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - half + radius, cy - half);
+      ctx.lineTo(cx + half - radius, cy - half);
+      ctx.quadraticCurveTo(cx + half, cy - half, cx + half, cy - half + radius);
+      ctx.lineTo(cx + half, cy + half - radius);
+      ctx.quadraticCurveTo(cx + half, cy + half, cx + half - radius, cy + half);
+      ctx.lineTo(cx - half + radius, cy + half);
+      ctx.quadraticCurveTo(cx - half, cy + half, cx - half, cy + half - radius);
+      ctx.lineTo(cx - half, cy - half + radius);
+      ctx.quadraticCurveTo(cx - half, cy - half, cx - half + radius, cy - half);
+      ctx.closePath();
       ctx.stroke();
-      ctx.fillStyle = PAL.bone;
+
+      // O glifo, um pouco acima do centro para deixar o canto de baixo ao
+      // numero — e pintado em DUAS passagens, recortadas pela linha d'agua.
+      // Acima do nivel ele e claro sobre o fundo escuro; abaixo, escuro sobre
+      // a carga. Com a carga pela metade, metade do icone e de cada cor, e
+      // ele continua legivel em qualquer fracao — um icone de uma cor so
+      // sumiria justamente na faixa em que se confunde com o preenchimento.
+      const glyphY = cy - Math.round(size * 0.06);
+      const spinning = module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion();
+      const paintGlyph = (color: string, clipTop: number, clipBottom: number): void => {
+        if (clipBottom <= clipTop) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cx - half, clipTop, drawSize, clipBottom - clipTop);
+        ctx.clip();
+        if (spinning) {
+          // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
+          // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
+          // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
+          // angulo deixaria o icone parado no pico —, e um relogio proprio
+          // faria o icone girar durante o travamento, que e exatamente o
+          // instante em que ele tem de estar parando.
+          ctx.translate(cx, glyphY);
+          ctx.rotate(minigunPhase * Math.PI * 2);
+          drawModuleGlyph(ctx, module.id, 0, 0, size * 0.4, color);
+        } else {
+          drawModuleGlyph(ctx, module.id, cx, glyphY, size * 0.4, color);
+        }
+        ctx.restore();
+      };
+      paintGlyph(low ? PAL.loot : PAL.biolum, cy - half, levelTop);
+      paintGlyph(PAL.dark, levelTop, cy + half);
+
+      // O numero no canto de baixo, com fundo: o glifo e o nivel passam por
+      // tras dele, e "80" sobre um arco fosforo nao se le.
       ctx.font = `bold ${Math.max(8, Math.round(size * 0.3))}px monospace`;
+      const labelW = ctx.measureText(label).width;
+      const labelRight = cx + half - 2;
+      const labelBaseline = cy + half - 3;
+      ctx.fillStyle = 'rgba(11,14,20,0.88)';
+      ctx.fillRect(labelRight - labelW - 1, labelBaseline - 8, labelW + 2, 10);
+      ctx.fillStyle = low ? PAL.loot : PAL.bone;
       ctx.textAlign = 'right';
-      ctx.fillText(label, cursor + size - 2, y + size - 2);
+      ctx.fillText(label, labelRight, labelBaseline);
       cursor += size + gap;
     }
   }

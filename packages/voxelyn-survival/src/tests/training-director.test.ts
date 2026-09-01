@@ -9,7 +9,7 @@ import { createTrainingRun } from '../client/training-setup';
  * mao — mais fiel que um mock, e igualmente headless.
  */
 const dodge: SemanticEvent = { t: 'dodge', x: 0, y: 0 };
-const overheat: SemanticEvent = { t: 'overheat', x: 0, y: 0 };
+const overheat: SemanticEvent = { t: 'overheat', slot: 0, x: 0, y: 0 };
 const extracted: SemanticEvent = { t: 'extracted', withCore: true, cores: 1 };
 
 const banners = (cues: TrainingCue[]): string[] =>

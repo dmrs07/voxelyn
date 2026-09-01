@@ -374,6 +374,36 @@ export const drawSurveyWorld = (draw: SurveyDrawContext): void => {
   }
 };
 
+/** Lado de cada celula do mapa de saloes, em pixels. */
+const ROUTE_CELL = 3;
+/** Folga abaixo do mapa de saloes. */
+const ROUTE_GAP = 6;
+/** Altura da barra de previsao mais a folga abaixo dela. */
+const FORECAST_ROW = 9;
+
+/**
+ * Quanto os instrumentos do HUD vao ocupar, ANTES de desenha-los.
+ *
+ * O painel de status desenha o fundo primeiro e so depois o conteudo, entao a
+ * altura tem de ser conhecida antes de qualquer `fillRect`. Mesmas constantes
+ * e mesmas condicoes de `drawSurveyHud`: o que esta funcao promete, aquela
+ * desenha — `drawSurveyHud(...)` devolve exatamente `y + surveyHudHeight(...)`.
+ */
+export const surveyHudHeight = (
+  state: SurvivalState,
+  nav: PlayerTuning['navigation'],
+  route: RouteMemory,
+): number => {
+  let height = 0;
+  if (nav.routeMemory && route.size > 0) {
+    height += Math.ceil(state.config.height / 16) * ROUTE_CELL + ROUTE_GAP;
+  }
+  if (nav.contaminationForecast && forecastWave(state.contamination, state.contaminationWaves)) {
+    height += FORECAST_ROW;
+  }
+  return height;
+};
+
 /** Os efeitos que vivem NO HUD (memoria de rota, previsao de onda). */
 export const drawSurveyHud = (
   ctx: CanvasRenderingContext2D,
@@ -388,7 +418,7 @@ export const drawSurveyHud = (
 
   // SV-04 · Memoria de rota: um mapa de CHUNKS visitados, nao do mundo.
   if (nav.routeMemory && route.size > 0) {
-    const cell = 3;
+    const cell = ROUTE_CELL;
     const columns = route.columns;
     const rows = Math.ceil(state.config.height / 16);
     const playerChunk = Math.floor(state.player.y / 16) * columns + Math.floor(state.player.x / 16);
@@ -400,7 +430,7 @@ export const drawSurveyHud = (
         ctx.fillRect(x + cx * cell, cursor + cy * cell, cell - 1, cell - 1);
       }
     }
-    cursor += rows * cell + 6;
+    cursor += rows * cell + ROUTE_GAP;
   }
 
   // SV-X · Previsao: barra fina que enche ate a proxima onda.
@@ -416,7 +446,7 @@ export const drawSurveyHud = (
       ctx.fillStyle = forecast.imminent ? '#d93b4c' : INSTRUMENT;
       ctx.fillRect(x, cursor, width * forecast.progress, 3);
       ctx.globalAlpha = 1;
-      cursor += 9;
+      cursor += FORECAST_ROW;
     }
   }
   return cursor;
