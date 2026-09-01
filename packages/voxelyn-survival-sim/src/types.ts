@@ -117,6 +117,22 @@ export type EnemyArchetype =
    */
   | 'white_devourer'
   /**
+   * NINHADA DO DEVORADOR: os filhotes, e o unico corpo do bestiario que NAO e
+   * uma ameaca.
+   *
+   * `contactDamage` zero, um ponto de vida, sem acao nenhuma no repertorio:
+   * eles nao mordem, nao perseguem e nao podem ser perigosos nem por acidente.
+   * O que eles fazem e existir aos montes em volta da mae e morrer com um passo.
+   *
+   * A razao de estarem na simulacao e nao no cliente e uma so, e ela e de
+   * mecanica: eles sao MATERIA no disco da boca. A sucao ja arrasta todo corpo
+   * que nao seja chefe, entao a ninhada e arrastada e devorada junto com o
+   * jogador — e ver dez filhotes desaparecendo garganta abaixo ensina o raio da
+   * coisa melhor que qualquer anel desenhado no chao. Feitos de enfeite no
+   * cliente, eles atravessariam o vortice como se ele nao existisse.
+   */
+  | 'devourer_brood'
+  /**
    * Os seis chefes de estrato. Cada um opera, em escala de chefe, a alavanca
    * que a propria geologia ja tem: cristal que descarrega, agua que conduz,
    * gas que ocupa espaco, brasa que aquece, gelo que derrete, minerio que

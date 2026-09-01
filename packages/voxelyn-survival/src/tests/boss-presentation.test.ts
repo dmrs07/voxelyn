@@ -27,7 +27,8 @@ import {
   SURF_WATER,
 } from '@voxelyn/survival-sim';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
-import { ARCHETYPE_SPRITE } from '../client/sprites';
+import { ARCHETYPE_SPRITE, DEVOURER_BROOD_ATLAS } from '../client/sprites';
+import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import { EntityPresentation } from '../client/presentation';
 import {
@@ -52,10 +53,37 @@ import { t } from '../client/i18n';
 
 const ARCHETYPES = Object.keys(emptyStats().kills);
 
+/**
+ * Os arquetipos que o RENDERER desenha por um caminho proprio.
+ *
+ * `ARCHETYPE_SPRITE` e o mapa do caminho GENERICO, e o teste abaixo existe
+ * porque oito chefes chegaram ao jogo sem entrada nele e apareciam como um
+ * losango de cor. O invariante de verdade nunca foi "estar no mapa" — e "nao
+ * cair no losango", e ha mais de uma forma de cumpri-lo.
+ *
+ * A ninhada cumpre pelo outro caminho, e por uma razao que o mapa nao
+ * comportaria: os quadros do atlas dela sao (variante x fase), e o caminho
+ * generico deriva o quadro so do relogio. Posta no mapa, as tres variantes
+ * virariam uma unica minhoquinha trocando de corpo enquanto anda.
+ *
+ * A lista e explicita de proposito: cada nome aqui e uma promessa de que ALGUEM
+ * desenha aquele bicho, e quem a escreve tem de ter escrito o desenho tambem.
+ */
+const DRAWN_BY_HAND = new Set(['devourer_brood']);
+
 describe('todo arquetipo tem atlas', () => {
   it('nenhum inimigo da simulacao cai no losango de recuo', () => {
-    const missing = ARCHETYPES.filter((a) => !ARCHETYPE_SPRITE[a]);
+    const missing = ARCHETYPES.filter((a) => !ARCHETYPE_SPRITE[a] && !DRAWN_BY_HAND.has(a));
     expect(missing, `sem atlas: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('quem e desenhado a mao tem MESMO um atlas proprio carregado', () => {
+    // A contrapartida da lista acima: sem esta linha, `DRAWN_BY_HAND` viraria
+    // uma lista de isencoes — bastaria por um nome nela para o teste calar
+    // sobre um bicho que ninguem desenha.
+    expect(DEVOURER_BROOD_ATLAS).toBeTruthy();
+    const m = broodManifest as unknown as { animations: Record<string, { frames: number }> };
+    expect(m.animations.idle.frames).toBeGreaterThan(0);
   });
 
   it('o jogador tambem, e cada atlas e usado por alguem', () => {

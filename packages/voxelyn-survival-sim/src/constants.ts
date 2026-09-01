@@ -1166,6 +1166,58 @@ export const DEVOURER_SLAM_RADIUS = 3.8;
  */
 export const DEVOURER_SLAM_DAMAGE = 10;
 
+// ---------------------------------------------------------------------------
+// A NINHADA — as minhoquinhas.
+// ---------------------------------------------------------------------------
+/**
+ * Quantos filhotes a camara do Devorador tem.
+ *
+ * Um enxame, e o numero e alto de proposito: dois ou tres seriam um DETALHE, e
+ * detalhe se lê como coisa que o jogador tem de investigar. Quatorze sao
+ * populacao — o olho para de contar e passa a ver "o chao daqui e assim".
+ *
+ * O teto e o custo deles, e ele e real: cada um e um corpo no snapshot e no
+ * hash. Quatorze cabem no que a camara ja gasta com fauna comum; cinquenta
+ * fariam a sala inteira pagar por um enfeite.
+ */
+export const DEVOURER_BROOD_COUNT = 14;
+/**
+ * A que distancia da mae eles ficam, em tiles.
+ *
+ * Nao e um raio de perseguicao — e um ANEL, como o da espreita do chefe
+ * (`DEVOURER_STALK_RANGE`), e pela mesma razao: mirar o centro sem distancia de
+ * parada faz o corpo oscilar em cima do alvo. Aqui seriam catorze corpos
+ * oscilando em cima do mesmo ponto, o que le como um monte tremendo.
+ *
+ * Cinco tiles poe a ninhada em volta da mae sem entrar no raio da mordida
+ * (`DEVOURER_MAW_BITE_RADIUS` = 1,6): eles rondam a boca, e a sucao pega os que
+ * se aproximam demais. E o que se quer ver.
+ */
+export const DEVOURER_BROOD_RING = 5;
+/**
+ * A que distancia um filhote comeca a empurrar o irmao, em tiles.
+ *
+ * "Sem overlap" era o pedido, e um anel comum nao basta: catorze corpos mirando
+ * o mesmo circulo se amontoam num arco so. A separacao e o que transforma um
+ * cordao de contas num BANDO — cada um com o seu lugar, todos indo para o mesmo
+ * sitio.
+ *
+ * Vale pouco mais que dois diametros (o raio deles e 0,17): perto o bastante
+ * para eles se tocarem quase, longe o bastante para nunca se sobreporem.
+ */
+export const DEVOURER_BROOD_SPREAD = 0.75;
+/**
+ * O quanto eles fogem de um Prospector que chega perto, em tiles.
+ *
+ * Eles nao atacam e nao podem: o unico jeito de um bicho inofensivo REAGIR ao
+ * jogador e recuar. E o que faz o enxame parecer vivo em vez de decorativo — o
+ * chao se abre na frente de quem anda, e volta a fechar atras.
+ *
+ * Menor que a distancia em que ele os esmaga: quem anda devagar os espanta,
+ * quem corre passa por cima. E a diferenca inteira entre os dois desfechos.
+ */
+export const DEVOURER_BROOD_SHY = 2.2;
+
 /**
  * O SALTO. A emergencia nao e um ponto, e um ARCO.
  *

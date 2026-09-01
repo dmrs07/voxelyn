@@ -279,6 +279,7 @@ export const PT_BR = {
   'enemy.undertaker': 'Coveiro',
   'enemy.diamandis': 'Diamandis',
   'enemy.white_devourer': 'Devorador Branco',
+  'enemy.devourer_brood': 'Ninhada',
   'enemy.archcantor': 'Arquicantor',
   'enemy.sheet_leviathan': 'Leviatã do Lençol',
   'enemy.lung_matrix': 'Pulmão-Matriz',
@@ -301,6 +302,7 @@ export const PT_BR = {
   'bestiary.name.undertaker': 'Coveiro',
   'bestiary.name.diamandis': 'Diamandis',
   'bestiary.name.white_devourer': 'Devorador Branco',
+  'bestiary.name.devourer_brood': 'Minhoquinha',
   'bestiary.name.archcantor': 'Arquicantor',
   'bestiary.name.sheet_leviathan': 'Leviatã do Lençol',
   'bestiary.name.lung_matrix': 'Pulmão-Matriz',
@@ -348,6 +350,7 @@ export const PT_BR = {
   'bestiary.code.undertaker': 'UNIDADE EX-041',
   'bestiary.code.diamandis': 'ATIVO DE PATRIMÔNIO DX-001',
   'bestiary.code.white_devourer': 'PADRÃO DE MOVIMENTO SIL-00',
+  'bestiary.code.devourer_brood': 'PADRÃO DE MOVIMENTO SIL-00b',
   'bestiary.code.archcantor': 'ARRANJO PIEZOELÉTRICO PRZ-00',
   'bestiary.note.archcantor':
     'A companhia o classifica como "arranjo piezoelétrico natural". Os laudos posteriores registram que os cristais reproduzem frequências da transmissão — e que alguns respondem ANTES de receber o pulso.',
@@ -366,6 +369,8 @@ export const PT_BR = {
   'bestiary.code.magnetarch': 'ANOMALIA MAGNÉTICA MGN-00',
   'bestiary.note.magnetarch':
     'A companhia afirma que o campo foi criado por décadas de mineração. Registros anteriores à operação já mostram o mesmo padrão magnético. Talvez a companhia tenha escolhido aquele lugar porque o campo já transmitia dados através do minério.',
+  'bestiary.note.devourer_brood':
+    'Mesma assinatura do SIL-00, em escala de centímetros e em número. Não atacam, não fogem do calor e não têm nada que se pareça com uma boca. O relatório de campo anexa a única observação que a equipe considerou relevante e que a companhia não citou em lugar nenhum: eles acompanham o adulto. Alguma coisa ali cuida de alguma coisa.',
   'bestiary.note.white_devourer':
     'A massa estimada excede em várias ordens a matéria orgânica que o estrato inteiro poderia sustentar. A hipótese que os laudos posteriores formulam, e que nenhum deles assina: o corpo não atravessa a sílica — a sílica assume temporariamente a forma do corpo.',
   'bestiary.note.diamandis':

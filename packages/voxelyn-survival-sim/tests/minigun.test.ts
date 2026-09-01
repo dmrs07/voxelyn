@@ -549,7 +549,20 @@ describe('granularidade contra a vida real dos inimigos', () => {
   const boltTime = (hp: number): number => Math.ceil(hp / BOLT_DAMAGE) * BOLT_PERIOD;
   const minigunTime = (hp: number): number => Math.ceil(hp / MINIGUN_DAMAGE) * MINIGUN_PERIOD;
 
-  const archetypes = Object.entries(ARCHETYPES).filter(([, def]) => def.hp > 0);
+  /**
+   * Os corpos contra os quais uma ARMA e uma escolha.
+   *
+   * O filtro de `contactDamage` nao e uma isencao de conveniencia: as tres
+   * regras abaixo perguntam se um modulo de tier 3 vale a pena e se ele nao
+   * trivializa alguem, e as duas perguntas so existem contra quem pode cobrar
+   * de volta. A ninhada do Devorador nao cobra nada, nao rende abate e nao
+   * larga nada — gastar bala nela ja e desperdicio puro, entao nao ha vantagem
+   * a medir. Ela entraria aqui so pelos 1 HP dela, reprovando o teto por um
+   * encaixe exato que ninguem tem interesse em explorar.
+   */
+  const archetypes = Object.entries(ARCHETYPES).filter(
+    ([, def]) => def.hp > 0 && def.contactDamage > 0
+  );
 
   it('a arma vale a pena contra TODO inimigo do jogo', () => {
     // O piso de um tier 3: um modulo que mata mais devagar que a arma padrao

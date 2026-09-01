@@ -32,6 +32,9 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SURF_FUNGAL,
+  DEVOURER_BROOD_COUNT,
+  DEVOURER_BROOD_RING,
+  DEVOURER_MAW_BITE_RADIUS,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
 import { resetMinigun } from './minigun.js';
@@ -291,9 +294,59 @@ export const populateSector = (
       // acontece de verdade quando um Bispo guarda uma camara micelial cheia de
       // fauna micelial.
       state.sectorBoss.entityId = body.id;
+      // A NINHADA nasce com a mae, e so com ela: catorze filhotes espalhados em
+      // volta da camara.
+      //
+      // Dentro da guarda de `defeated` de proposito. Chefe abatido nao volta na
+      // subida da extracao de retorno, e a ninhada dele nao pode voltar
+      // sozinha — um enxame de filhotes rondando o lugar onde a mae ja nao esta
+      // seria um bando orfao, e a leitura inteira deles (ELES SEGUEM ELA)
+      // desapareceria.
+      if (bossArchetype === 'white_devourer') spawnDevourerBrood(state, bossSpawn.x, bossSpawn.y);
     }
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
+};
+
+/**
+ * Os filhotes do Devorador, espalhados em volta da camara.
+ *
+ * A distribuicao e uma espiral de ANGULO AUREO e nao um circulo, pela mesma
+ * razao que o vortice da boca ja usa para os graos: `i * 2pi/n` alinha tudo em
+ * raios e sai um pente — catorze bichos em fila reta lem como coisa colocada. O
+ * angulo aureo espalha sem repetir e sem padrao visivel.
+ *
+ * O raio cresce com a RAIZ do indice para a densidade ficar constante: sem ela
+ * os primeiros nascem amontoados no centro e os ultimos sozinhos na borda.
+ *
+ * Nenhum nasce colado na mae: o anel de partida comeca fora do raio da mordida,
+ * porque um filhote que nasce dentro da garganta e devorado no primeiro tick da
+ * primeira janela e ninguem chega a ve-lo.
+ */
+const spawnDevourerBrood = (state: SurvivalState, cx: number, cy: number): void => {
+  for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
+    const a = i * 2.39996;
+    const r =
+      DEVOURER_MAW_BITE_RADIUS + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    // A CELULA QUE O CORPO VAI OCUPAR, e nao a que o argumento aponta:
+    // `spawnEnemy` soma meio tile aos dois eixos (os chamadores passam
+    // coordenada de TILE, nao de mundo). A primeira versao desta guarda testava
+    // `floor(x)` e deixava passar todo caso em que o meio tile atravessava a
+    // fronteira — e o invariante do repositorio pegou exatamente esses.
+    const tx = Math.floor(x + 0.5);
+    const ty = Math.floor(y + 0.5);
+    if (tx < 2 || ty < 2 || tx >= state.config.width - 2 || ty >= state.config.height - 2) continue;
+    // CHAO ABERTO, e a guarda nao e zelo — e a promessa deles.
+    //
+    // A primeira versao nascia em qualquer lugar, no argumento de que eles vivem
+    // NA areia como a mae. A mae esta ENTERRADA; eles nao. Um filhote dentro da
+    // rocha e invisivel e nao pode ser pisado, e "podem ser esmagados" e metade
+    // do que eles sao.
+    if (state.solid[ty * state.config.width + tx] !== SOLID_NONE) continue;
+    spawnEnemy(state, 'devourer_brood', x, y, false);
+  }
 };
 
 /**

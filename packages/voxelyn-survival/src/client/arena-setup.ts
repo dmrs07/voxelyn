@@ -271,8 +271,21 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   }
   for (let c = 0; c < state.chunkVersion.length; c++) state.chunkVersion[c]++;
 
-  // Sem mobs: so o dono da sala. O que ele invocar depois e a luta.
-  state.enemies = state.enemies.filter((e) => e === boss);
+  // Sem mobs: so o dono da sala — E O QUE E DELE.
+  //
+  // A ninhada do Devorador nao e fauna do setor: ela nasce com a mae, existe so
+  // onde ela existe e some do mapa junto com ela. Varre-la daqui tiraria da
+  // arena metade do encontro que a arena serve para testar, e a ferramenta
+  // passaria a mostrar uma luta que o jogo nao tem.
+  //
+  // Os que ficaram FORA do recorte vao junto com o resto: a arena emparedou
+  // aquilo, e um filhote do outro lado da rocha nova nao pode ser pisado nem
+  // sugado — ele so ficaria empurrando a parede para sempre.
+  state.enemies = state.enemies.filter(
+    (e) =>
+      e === boss ||
+      (e.archetype === 'devourer_brood' && dist[Math.floor(e.y) * w + Math.floor(e.x)] >= 0),
+  );
   // Cenario que so faria sentido no setor inteiro. Os respiradouros e os
   // trilhos que sobraram DENTRO da arena ficam: eles sao o chao do bioma, e o
   // chao do bioma e metade do que se esta testando.

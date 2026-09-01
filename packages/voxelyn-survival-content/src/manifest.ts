@@ -145,6 +145,11 @@ export const CHARACTER_SPRITE_IDS = [
   // nenhuma para eles, e a colisao continua sendo so a da cabeca. Os quadros
   // sao POSTOS na fila, do mais grosso ao mais fino, e nao instantes.
   'part-white-devourer-coil',
+  // A NINHADA do Devorador. Mesmo prefixo e mesma razao: nao e um bicho com
+  // repertorio, e uma peca com variantes. Os quadros sao (variante x fase) e o
+  // cliente escolhe os dois eixos — a variante pelo id do filhote, a fase pelo
+  // relogio.
+  'part-devourer-brood',
   'enemy-archcantor',
   'enemy-sheet-leviathan',
   'enemy-lung-matrix',

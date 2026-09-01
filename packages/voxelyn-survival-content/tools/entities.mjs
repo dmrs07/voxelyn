@@ -2039,29 +2039,70 @@ const coilDepth = (k) => {
 
 const devourerCoilModel = (k) => {
   const d = coilDepth(k);
+  const h = d * 1.05;
   const b = [];
-  // O TUBO. Ancorado no chao (z = 0) porque e assim que o cliente o posiciona:
-  // a elevacao que ele passa e a do CONTATO com a areia, e nao a da linha de
-  // centro — um anel de elevacao zero esta pousado, e um de elevacao negativa
-  // esta enterrado ate a linha que o recorte corta.
-  b.push(box(-2.6, -d / 2, 0, 5.2, d, d * 1.05, 'silt'));
-  // Cume mais estreito: o anel deixa de ser um cubo e passa a ler como tubo.
-  b.push(box(-2.6, -d * 0.3, d * 1.05, 5.2, d * 0.6, 0.7, 'silt'));
-  // O SULCO da juntura, na traseira: uma fatia estreita e escura, recuada nos
-  // dois eixos. Sem ela dez aneis de silica em fila viram um tubo liso e o
-  // corpo perde a contagem — e a contagem e o que diz que ele e segmentado.
-  b.push(box(2.1, -d / 2 + 0.35, 0.1, 0.6, d - 0.7, d * 0.95, 'rockDeep'));
-  // AS PLACAS LATERAIS: duas cristas de silica saindo dos flancos, inclinadas
-  // para tras. Elas nao sao enfeite — sao o que da ao corpo uma silhueta que
-  // nao e um cilindro, e sao tambem por onde ele agarra a areia quando cava.
+
+  // A SECAO E REDONDA, e nao um quadrado — e isso e a diferenca entre um verme
+  // e uma fila de caixotes.
   //
-  // Encolhem mais rapido que o corpo (potencia sobre a razao de espessura), de
-  // modo que os tres ultimos aneis ficam lisos: uma cauda ainda cravejada de
-  // placas leria como uma segunda cabeca.
+  // A primeira versao era UMA caixa de lado `d` por altura `d * 1,05`, ou seja
+  // um cubo, e a captura do jogo foi impiedosa: dez cubos bege em fila leem
+  // como entulho empilhado. Nao adiantava afinar nem separar — a silhueta de
+  // uma caixa nao tem como dizer "tubo", em nenhuma quantidade.
+  //
+  // Cinco degraus de largura desigual resolvem: estreito no chao (um tubo
+  // deitado toca a areia numa faixa, nao na largura inteira), mais largo na
+  // barriga, e afinando de novo para o dorso. A projecao 2:1 mostra exatamente
+  // esse perfil de lado, e a silhueta passa a ser um barril.
+  const TIERS = [
+    { w: 0.58, z: 0, h: 0.18 },
+    { w: 0.86, z: 0.18, h: 0.2 },
+    { w: 1, z: 0.38, h: 0.26 },
+    { w: 0.86, z: 0.64, h: 0.2 },
+    { w: 0.54, z: 0.84, h: 0.16 },
+  ];
+  // O anel e mais COMPRIDO que o passo entre eles (6,6 unidades contra os 4,16
+  // de 0,52 tile), e a folga e obrigatoria e nao generosidade: a captura
+  // mostrou vao aberto entre os aneis no meio do arco do salto, porque ali
+  // vizinhos estao em ALTURAS diferentes e a sobreposicao no chao nao cobre o
+  // degrau na tela. Com 37% de sobreposicao o degrau fica dentro do corpo.
+  const L = 6.6;
+  for (const t of TIERS) {
+    const w = d * t.w;
+    // +0,06 de altura em cada degrau: sem a folga, o arredondamento da grade
+    // fina abre uma linha de furos entre um degrau e o seguinte.
+    b.push(box(-L / 2, -w / 2, h * t.z, L, w, h * t.h + 0.06, 'silt'));
+  }
+
+  // A CRISTA DORSAL, correndo o comprimento inteiro.
+  //
+  // Ela e a linha que costura dez sprites soltos num corpo so: passa de anel em
+  // anel sem interrupcao e o olho a segue da cabeca ate a ponta. Estreita e
+  // alta de proposito — a versao anterior tinha 0,7 de altura sobre um corpo de
+  // 7,6, quer dizer 9%, e a essa proporcao ela nao existia.
+  b.push(box(-L / 2, -d * 0.1, h, L, d * 0.2, 1.2, 'silt'));
+
+  // O COLAR da juntura: um degrau mais largo na traseira, e nao um sulco
+  // escuro.
+  //
+  // O sulco existia para separar os aneis quando o corpo inteiro cabia num
+  // sprite so. Aqui ele fazia o oposto: uma fatia de `rockDeep` de altura
+  // cheia, exposta sempre que o vizinho estava mais alto no arco, e o que se
+  // via era um VAO PRETO entre as pecas. A segmentacao agora vem da propria
+  // sobreposicao dos sprites; o colar so a sublinha, como um degrau de
+  // telescopio — silica sobre silica, sem abrir buraco nenhum.
+  b.push(box(L / 2 - 1.1, -d * 0.56, h * 0.16, 1.1, d * 1.12, h * 0.62, 'silt'));
+
+  // AS PLACAS LATERAIS: duas cristas saindo dos flancos. Elas nao sao enfeite —
+  // sao o que da ao corpo uma silhueta que nao e um cilindro liso, e sao
+  // tambem por onde ele agarra a areia quando cava.
+  //
+  // Encolhem mais rapido que o corpo, de modo que os tres ultimos aneis ficam
+  // lisos: uma cauda ainda cravejada de placas leria como uma segunda cabeca.
   const plate = Math.max(0, (d - 3.9) * 0.42);
   if (plate > 0.3) {
     for (const s of [-1, 1]) {
-      b.push(box(-1.8, s * (d / 2) - (s < 0 ? plate : 0), d * 0.3, 2, plate, 1.5, 'bone'));
+      b.push(box(-2, s * (d / 2) - (s < 0 ? plate : 0), h * 0.34, 2.4, plate, 1.6, 'bone'));
     }
   }
   return b;
@@ -2069,6 +2110,104 @@ const devourerCoilModel = (k) => {
 
 const devourerCoilFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(devourerCoilModel(f)), DIR_INDEX[dir], 68, 64, 34, 52);
+
+// ---------------------------------------------------------------------------
+// part-devourer-brood — as MINHOQUINHAS: a ninhada do Devorador.
+//
+// Sao inofensivas, e a inofensividade e o desenho inteiro. Um sumidouro com um
+// unico verme gigante e uma arena com um obstaculo; um sumidouro fervilhando de
+// filhotes que fogem dos pes do jogador e um LUGAR ONDE ELE VIVE. Elas nao
+// acrescentam uma ameaca — acrescentam a razao de a ameaca estar ali.
+//
+// Por isso elas sao minusculas e tem exatamente a forma que o pedido descreveu:
+// uma LINHA de bloquinhos. Nada de cabeca, nada de dentes, nada de olho. Um
+// filhote com rosto viraria um bicho, e um bicho no chao durante a janela da
+// boca competiria pela atencao com a unica coisa que importa ali.
+//
+// TRES VARIANTES, e nao uma. Um enxame de coisas identicas le como uma textura
+// animada — o olho junta tudo num tapete que se mexe. Tres comprimentos e tres
+// ritmos de ondulacao diferentes bastam para o olho separar individuos, que e o
+// que faz o chao parecer VIVO em vez de padronizado.
+//
+// Os quadros sao (variante x fase), como os postos do anel de corpo — o cliente
+// escolhe a variante pelo id do bicho e a fase pelo relogio, e por isso este e
+// um atlas `part-` e nao `enemy-`: a validacao cobra de todo `enemy-` o
+// conjunto de animacoes de uma criatura, e a minhoquinha nao tem ataque nem
+// morte (ela some num punhado de particulas, como todo corpo pequeno deste
+// jogo).
+// ---------------------------------------------------------------------------
+
+/** Quantos corpos diferentes a ninhada tem. */
+export const BROOD_VARIANTS = 3;
+/** Quantas fases tem a ondulacao de cada um. */
+export const BROOD_PHASES = 6;
+
+/**
+ * Uma minhoquinha da variante `v` na fase `f`.
+ *
+ * Autorada com a frente em +x, como a mae (ver `quarterTurn`). O corpo e uma
+ * fila de cubos de meio passo com um deslocamento lateral senoidal — e
+ * literalmente uma linha desenhada, que era o pedido.
+ *
+ * A ondulacao e o unico movimento, e ela viaja da CABECA para a cauda: cada
+ * elo le a fase com um atraso proporcional a posicao dele, que e como uma onda
+ * anda por um corpo mole. Sem o atraso, todos os elos oscilariam juntos e o
+ * bicho pareceria um limpador de para-brisa.
+ */
+const broodModel = (v, f) => {
+  // Comprimentos e ritmos primos entre si: as tres variantes nunca ficam em
+  // fase uma com a outra, entao mesmo tres vizinhas lado a lado nao se leem
+  // como copias.
+  const LINKS = [5, 7, 4][v];
+  const WAVES = [1, 0.7, 1.3][v];
+  // A AMPLITUDE E LIMITADA PELO PASSO, e a primeira versao ignorou isso.
+  //
+  // Os elos medem 0,5 e andam de 0,45 em 0,45. Dois vizinhos que se deslocam
+  // mais de ~0,3 um em relacao ao outro DESENCOSTAM, e a minhoquinha deixa de
+  // ser uma linha para virar um punhado de cubos soltos — foi exatamente o que
+  // a folha de contato mostrou nas duas variantes curtas (0,84 e 1,29 de
+  // desvio entre elos vizinhos, contra os 0,3 que a geometria permite).
+  //
+  // O deslocamento maximo entre vizinhos e `AMP * 2 * sin(WAVES * pi/4)`, entao
+  // quanto mais curta a onda, menor tem de ser a amplitude. Os tres pares abaixo
+  // saem dessa conta com 0,3 de teto — e por isso o de onda mais fechada (1,3) e
+  // tambem o de menor balanco.
+  const AMP = [0.2, 0.26, 0.17][v];
+  const STEP = 0.45;
+  const b = [];
+  /** O desvio lateral do elo `i` — a onda anda da frente para a cauda. */
+  const sway = (i) => Math.sin(((f / BROOD_PHASES) * 2 - i * WAVES * 0.5) * Math.PI) * AMP;
+  for (let i = 0; i < LINKS; i++) {
+    const y = sway(i);
+    // Afina para a ponta da cauda — um fio de espessura constante seria um
+    // cabo, e cabo nao e bicho.
+    const w = 0.5 * (1 - (i / LINKS) * 0.4);
+    const x = -LINKS * (STEP / 2) + i * STEP;
+    b.push(box(x, y - w / 2, 0, 0.5, w, w, 'silt'));
+  }
+  // UM unico elo de carne, logo atras da ponta da frente. E o unico contraste
+  // do bicho e a unica coisa que diz de que lado ele anda — sem ele a fila de
+  // cubos claros nao tem frente nem tras, e uma minhoca sem sentido de marcha
+  // le como detrito rolando.
+  //
+  // Atras da ponta e nao NA ponta: o focinho fica claro como o resto do corpo,
+  // e a faixa vermelha aparece como uma juntura de carne entre duas placas — a
+  // mesma leitura que a goela da mae tem, na escala de um filhote.
+  const neck = Math.max(0, LINKS - 2);
+  b.push(box(-LINKS * (STEP / 2) + neck * STEP, sway(neck) - 0.22, 0, 0.45, 0.44, 0.45, 'blood'));
+  return b;
+};
+
+const broodFrame = (dir, anim, f) =>
+  renderVoxels(
+    quarterTurn(broodModel(Math.floor(f / BROOD_PHASES), f % BROOD_PHASES)),
+    DIR_INDEX[dir],
+    28,
+    20,
+    14,
+    14
+  );
+
 
 // ---------------------------------------------------------------------------
 // enemy-archcantor — o Arquicantor da Catedral Prismatica.
@@ -2972,6 +3111,13 @@ export const ENTITY_SPECS = [
   base('part-white-devourer-coil', 68, 64, 32, 50, { w: 0.64, h: 0.64 }, { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 }, {
     idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
   }, devourerCoilFrame, 'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip', 1),
+  // A NINHADA do Devorador: uma linha de bloquinhos, tres variantes x seis
+  // fases num slot so. `part-` e nao `enemy-` pela mesma razao do anel de
+  // corpo: a validacao cobra de todo `enemy-` o conjunto de animacoes de uma
+  // criatura, e um filhote inofensivo nao tem ataque nem pose de morte.
+  base('part-devourer-brood', 28, 20, 12, 12, { w: 0.3, h: 0.16 }, { w: 0.3, h: 0.3, offsetX: 0, offsetY: 0 }, {
+    idle: { frames: BROOD_VARIANTS * BROOD_PHASES, fps: 1, loop: true },
+  }, broodFrame, 'voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths', 1),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

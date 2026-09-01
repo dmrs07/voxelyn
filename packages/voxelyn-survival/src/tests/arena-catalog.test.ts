@@ -97,10 +97,35 @@ describe('createArenaRun — o recorte da arena', () => {
   const arena = (boss: ArenaBossId) =>
     createArenaRun({ boss, maxHp: 200, ability: 'pulse', modules: [] });
 
-  it('deixa em campo o chefe, e SO o chefe', () => {
+  it('deixa em campo o chefe e o que E DELE, e mais nada', () => {
+    // A fauna comum do setor sai: a arena existe para testar UMA luta, e um
+    // stalker passando por ali e ruido de outra coisa.
+    //
+    // A ninhada do Devorador nao e fauna comum, e por isso ela fica. Ela nasce
+    // com a mae, existe so onde ela existe e some do mapa junto com ela —
+    // varre-la daqui tiraria da arena metade do encontro que a arena serve para
+    // testar, e a ferramenta passaria a mostrar uma luta que o jogo nao tem.
     for (const boss of ARENA_BOSS_ORDER) {
       const state = arena(boss);
-      expect(state.enemies.map((e) => e.archetype), `arena de ${boss}`).toEqual([boss]);
+      const kinds = new Set(state.enemies.map((e) => e.archetype));
+      kinds.delete(boss);
+      if (boss === 'white_devourer') kinds.delete('devourer_brood');
+      expect([...kinds], `arena de ${boss} tem bicho que nao e do chefe`).toEqual([]);
+      // O chefe continua sendo o PRIMEIRO corpo em campo: o teste abaixo (e o
+      // recorte da propria arena) leem `enemies[0]` como sendo ele.
+      expect(state.enemies[0].archetype, `arena de ${boss}`).toBe(boss);
+    }
+  });
+
+  it('a ninhada acompanha a mae na arena, e so ela tem uma', () => {
+    for (const boss of ARENA_BOSS_ORDER) {
+      const state = arena(boss);
+      const brood = state.enemies.filter((e) => e.archetype === 'devourer_brood').length;
+      if (boss === 'white_devourer') {
+        expect(brood, 'a arena do Devorador ficou sem ninhada').toBeGreaterThan(0);
+      } else {
+        expect(brood, `arena de ${boss} herdou ninhada`).toBe(0);
+      }
     }
   });
 

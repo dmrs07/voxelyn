@@ -45,6 +45,7 @@ import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-u
 import diamandisManifest from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
+import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
 import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
 import lungMatrixManifest from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.json';
@@ -111,6 +112,7 @@ import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undert
 import diamandisUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.png?url';
 import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
 import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.png?url';
+import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
 import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
 import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
 import lungMatrixUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.png?url';
@@ -157,6 +159,7 @@ import enemySulfurBomberNormalUrl from '@voxelyn/survival-content/assets/atlases
 import enemyUndertakerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.normal.png?url';
 import enemyWhiteDevourerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.normal.png?url';
 import partWhiteDevourerCoilNormalUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.normal.png?url';
+import partDevourerBroodNormalUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.normal.png?url';
 import layerPlayerProspectorGunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.normal.png?url';
 import layerPlayerProspectorLowerNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.normal.png?url';
 import layerPlayerProspectorUpperNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.normal.png?url';
@@ -196,6 +199,7 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
   'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
   'part-white-devourer-coil.normal.png': partWhiteDevourerCoilNormalUrl,
+  'part-devourer-brood.normal.png': partDevourerBroodNormalUrl,
   'layer-player-prospector-gun.normal.png': layerPlayerProspectorGunNormalUrl,
   'layer-player-prospector-lower.normal.png': layerPlayerProspectorLowerNormalUrl,
   'layer-player-prospector-upper.normal.png': layerPlayerProspectorUpperNormalUrl,
@@ -552,6 +556,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: diamandisManifest as unknown as SpriteManifestEntry, url: diamandisUrl },
   { manifest: devourerManifest as unknown as SpriteManifestEntry, url: devourerUrl },
   { manifest: devourerCoilManifest as unknown as SpriteManifestEntry, url: devourerCoilUrl },
+  { manifest: broodManifest as unknown as SpriteManifestEntry, url: broodUrl },
   { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
   { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
   { manifest: lungMatrixManifest as unknown as SpriteManifestEntry, url: lungMatrixUrl },
@@ -583,6 +588,19 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
  * que existe um bicho a mais no jogo.
  */
 export const DEVOURER_COIL_ATLAS = 'part-white-devourer-coil';
+
+/**
+ * O atlas da NINHADA do Devorador.
+ *
+ * Fora de `ARCHETYPE_SPRITE` embora `devourer_brood` SEJA um arquetipo da
+ * simulacao — e a excecao merece a explicacao. Os quadros deste atlas nao sao
+ * instantes de uma animacao: sao (variante x fase), e o cliente escolhe os dois
+ * eixos por conta propria (a variante pelo id do filhote, a fase pelo relogio).
+ * Posto no mapa, ele seria desenhado pelo caminho generico, que deriva o quadro
+ * so do tempo — e as tres variantes virariam uma unica minhoquinha que muda de
+ * corpo enquanto anda.
+ */
+export const DEVOURER_BROOD_ATLAS = 'part-devourer-brood';
 
 export const ARCHETYPE_SPRITE: Record<string, string> = {
   prospector: 'player-prospector',

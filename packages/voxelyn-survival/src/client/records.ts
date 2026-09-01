@@ -368,6 +368,10 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'undertaker',
   'diamandis',
   'white_devourer',
+  // Logo DEPOIS da mae, e nao entre as assinaturas de estrato: a ficha dela nao
+  // significa nada sozinha. O que o painel tem a dizer sobre uma minhoquinha e
+  // que existe uma coisa enorme da qual ela e filhote.
+  'devourer_brood',
   'archcantor',
   'sheet_leviathan',
   'lung_matrix',
@@ -395,6 +399,7 @@ export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
   undertaker: 'bestiary.name.undertaker',
   diamandis: 'bestiary.name.diamandis',
   white_devourer: 'bestiary.name.white_devourer',
+  devourer_brood: 'bestiary.name.devourer_brood',
   archcantor: 'bestiary.name.archcantor',
   sheet_leviathan: 'bestiary.name.sheet_leviathan',
   lung_matrix: 'bestiary.name.lung_matrix',
@@ -442,6 +447,7 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
   undertaker: { code: 'bestiary.code.undertaker', note: 'bestiary.note.undertaker' },
   diamandis: { code: 'bestiary.code.diamandis', note: 'bestiary.note.diamandis' },
   white_devourer: { code: 'bestiary.code.white_devourer', note: 'bestiary.note.white_devourer' },
+  devourer_brood: { code: 'bestiary.code.devourer_brood', note: 'bestiary.note.devourer_brood' },
   archcantor: { code: 'bestiary.code.archcantor', note: 'bestiary.note.archcantor' },
   sheet_leviathan: { code: 'bestiary.code.sheet_leviathan', note: 'bestiary.note.sheet_leviathan' },
   lung_matrix: { code: 'bestiary.code.lung_matrix', note: 'bestiary.note.lung_matrix' },

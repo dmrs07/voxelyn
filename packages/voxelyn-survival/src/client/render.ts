@@ -120,7 +120,7 @@ import {
   type Bounce,
   type WorldLight,
 } from './lighting';
-import { DEVOURER_COIL_ATLAS, type FaceLighting, type Tint } from './sprites';
+import { DEVOURER_BROOD_ATLAS, DEVOURER_COIL_ATLAS, type FaceLighting, type Tint } from './sprites';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -415,6 +415,21 @@ const CLOUD_LOBES = [1, 0.68, 0.36] as const;
  * a virada do Coracao 7, o desabamento da Ruptura 9. O pouso do chefe entra
  * entre a virada e o desabamento; a decolagem, logo abaixo da detonacao.
  */
+/**
+ * Os dois eixos dos quadros da ninhada, e a cadencia da ondulacao dela.
+ *
+ * Duplicados do gerador de atlas (`entities.mjs`) porque o manifest publica a
+ * CONTAGEM total de quadros e nao como ela se fatora — 18 quadros nao dizem
+ * sozinhos se sao tres variantes de seis fases ou seis de tres. Ha um teste que
+ * cobra a igualdade dos dois lados.
+ *
+ * 110 ms por fase da uma volta em 0,66 s: rapido o bastante para o bicho parecer
+ * nervoso, devagar o bastante para nao virar cintilacao num sprite de 12 px.
+ */
+export const BROOD_VARIANTS = 3;
+export const BROOD_PHASES = 6;
+const BROOD_FRAME_MS = 110;
+
 const DEVOURER_DIVE_SHAKE = { power: 8, ms: 360 } as const;
 const DEVOURER_BREACH_SHAKE = { power: 4, ms: 240 } as const;
 
@@ -3406,6 +3421,45 @@ export class SurvivalRenderer {
               ),
           });
         }
+      }
+
+      // A NINHADA. Caminho proprio e curto, porque tudo o que o caminho comum
+      // faz por um inimigo esta errado para ela: nao ha barra de vida (um
+      // bicho de um ponto de vida com barra seria uma piada de interface), nao
+      // ha sombra (ela mede um terco de tile e a sombra ficaria maior que o
+      // corpo), nao ha indicador de atordoamento e nao ha tint de elite.
+      //
+      // E o quadro nao vem do relogio sozinho: os quadros deste atlas sao
+      // (variante x fase), e a variante sai do ID do bicho. Pelo caminho comum
+      // as tres variantes viravam uma minhoquinha so, trocando de corpo
+      // enquanto anda.
+      if (enemy.archetype === 'devourer_brood') {
+        items.push({
+          depth: enemy.x + enemy.y,
+          draw: () => {
+            const [bx, by] = toScreen(enemy.x, enemy.y);
+            const variant = ((enemy.id % BROOD_VARIANTS) + BROOD_VARIANTS) % BROOD_VARIANTS;
+            // A fase corre pelo relogio com um desvio POR BICHO. Sem o desvio,
+            // catorze filhotes ondulariam em unissono — que e a leitura de
+            // engrenagem, o oposto exato de um bando.
+            const phase = Math.floor(nowMs / BROOD_FRAME_MS + enemy.id * 2.7) % BROOD_PHASES;
+            this.sprites.drawPiece(
+              ctx,
+              DEVOURER_BROOD_ATLAS,
+              'idle',
+              variant * BROOD_PHASES + phase,
+              presented.facingX,
+              presented.facingY,
+              bx,
+              by,
+              spriteZoom,
+              undefined,
+              bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+              bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+            );
+          },
+        });
+        continue;
       }
 
       items.push({

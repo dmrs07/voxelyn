@@ -1,14 +1,14 @@
 {
-  "id": "part-white-devourer-coil",
+  "id": "part-devourer-brood",
   "version": 1,
-  "atlas": "part-white-devourer-coil.png",
-  "normalAtlas": "part-white-devourer-coil.normal.png",
+  "atlas": "part-devourer-brood.png",
+  "normalAtlas": "part-devourer-brood.normal.png",
   "normalScale": 2,
-  "frameWidth": 68,
-  "frameHeight": 64,
-  "columns": 40,
-  "anchorX": 32,
-  "anchorY": 50,
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "columns": 72,
+  "anchorX": 12,
+  "anchorY": 12,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -18,28 +18,28 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.64,
-    "h": 0.64
+    "w": 0.3,
+    "h": 0.16
   },
   "footprint": {
-    "w": 0.6,
-    "h": 0.6,
+    "w": 0.3,
+    "h": 0.3,
     "offsetX": 0,
     "offsetY": 0
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
     "#0b0e14",
-    "#1d2430",
-    "#6e4a33",
+    "#3d2a22",
     "#8a7154",
     "#b8a98f",
     "#d5cdba",
+    "#d93b4c",
     "#e8f1ff"
   ],
   "animations": {
     "idle": {
-      "frames": 10,
+      "frames": 18,
       "fps": 1,
       "loop": true
     }
@@ -49,18 +49,18 @@
       "idle": 0
     },
     "dl": {
-      "idle": 10
+      "idle": 18
     },
     "ur": {
-      "idle": 20
+      "idle": 36
     },
     "ul": {
-      "idle": 30
+      "idle": 54
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip",
+    "prompt": "voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths",
     "seedOrRef": "deterministic-code-v2"
   }
 }

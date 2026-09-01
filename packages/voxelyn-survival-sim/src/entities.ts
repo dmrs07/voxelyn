@@ -95,6 +95,9 @@ import {
   MAGNETARCH_TETHER_DAMAGE,
   MAGNETARCH_TETHER_RANGE,
   MAX_ENEMIES,
+  DEVOURER_BROOD_RING,
+  DEVOURER_BROOD_SHY,
+  DEVOURER_BROOD_SPREAD,
   DEVOURER_BURROWED_ARMOR,
   DEVOURER_BURROW_MIN_TICKS,
   DEVOURER_BURROW_SPEED,
@@ -452,6 +455,22 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     contactDamage: 16,
     contactCooldown: 14,
     aggroRange: 11,
+  },
+  // A NINHADA do Devorador. Todos os numeros de ameaca sao zero, e isso e o
+  // desenho e nao um esboco por preencher: um ponto de vida (qualquer coisa
+  // mata), dano de contato zero (ele nao pode machucar nem por acidente) e
+  // alcance de aggro zero (ele nao persegue ninguem — ele segue a mae).
+  //
+  // O raio e o menor do jogo de proposito. Ele decide duas coisas alem do
+  // desenho: o quanto o filhote se afasta dos irmaos, e o quao facil e pisar
+  // nele. As duas querem o mesmo numero pequeno.
+  devourer_brood: {
+    hp: 1,
+    speed: 3.2,
+    radius: 0.17,
+    contactDamage: 0,
+    contactCooldown: 999,
+    aggroRange: 0,
   },
   // Corpo largo, quase parado: ele e um orgao do bioma, nao um cacador. O
   // perigo dele e ONDE o gas passa a estar, nunca a perseguicao.
@@ -922,7 +941,12 @@ export const damageEntity = (
     state.bossRuntime.leviathanShockAt = -1;
     ent.action = undefined;
   }
-  recordKill(state.stats, ent.archetype as EnemyArchetype);
+  // A NINHADA nao entra na contagem de abates. O total alimenta o PLACAR, e
+  // catorze filhotes inofensivos por camara seriam pontos de graca para quem
+  // pisasse neles — um placar em que esmagar filhote rende mais que enfrentar o
+  // chefe esta medindo a coisa errada. O evento de morte continua indo; o que
+  // nao vai e o credito.
+  if (ent.archetype !== 'devourer_brood') recordKill(state.stats, ent.archetype as EnemyArchetype);
   // O chefe deste setor CAIU — e cai uma vez so na run.
   //
   // A marca vive no estado (e nao na entidade, que o repovoamento descarta)
@@ -2523,6 +2547,165 @@ const diverEngaged = (
   enemy.nextActionAt = Math.max(enemy.nextActionAt, state.tick + leadTicks);
   events.push({ t: 'boss_awake' });
   return true;
+};
+
+/**
+ * O passo de UMA MINHOQUINHA.
+ *
+ * Ela nao ataca, nao persegue e nao tem acao nenhuma no repertorio. O que ela
+ * faz sao tres coisas, nesta ordem de prioridade: fugir do Prospector, nao
+ * encostar nos irmaos, e voltar para perto da mae.
+ *
+ * A ordem e o comportamento inteiro. Com a mae primeiro, o bando atravessaria o
+ * jogador para chegar nela; com a separacao primeiro, ela se espalharia em vez
+ * de fugir. Fuga na frente e o que faz o chao ABRIR na frente de quem anda e
+ * fechar atras — que e a unica coisa que um bicho inofensivo pode fazer para
+ * parecer vivo.
+ *
+ * Nada disto usa `moveEntity`: parede nao vale para eles pelo mesmo motivo que
+ * nao vale para a mae — eles vivem NA areia, nao sobre ela. O que os limita e a
+ * moldura do mapa.
+ */
+const broodStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+): void => {
+  let mx = 0;
+  let my = 0;
+
+  // 1. FUGIR. O peso cresce quanto mais perto o Prospector esta, entao um
+  //    filhote encurralado corre mais que um que so viu o vulto passar.
+  if (player && player.alive) {
+    const d = distTo(enemy, player);
+    if (d < DEVOURER_BROOD_SHY && d > 0.0001) {
+      const away = normalized(enemy.x - player.x, enemy.y - player.y);
+      const urge = 1 - d / DEVOURER_BROOD_SHY;
+      mx += away.x * urge * 2.2;
+      my += away.y * urge * 2.2;
+    }
+  }
+
+  // 2. NAO ENCOSTAR NO IRMAO. E o "sem overlap": catorze corpos mirando o mesmo
+  //    anel se amontoariam num arco so, e um cordao de contas nao e um bando.
+  //
+  //    O laco e sobre TODA a fauna e nao so sobre a ninhada — um filhote
+  //    tambem nao tem por que ficar dentro de um stalker — mas o chefe fica de
+  //    fora: a mae e para onde eles vao, e empurra-los para longe dela
+  //    cancelaria o proprio comportamento que os define.
+  for (const other of state.enemies) {
+    if (other === enemy || !other.alive) continue;
+    if (isBossArchetype(other.archetype)) continue;
+    const dx = enemy.x - other.x;
+    const dy = enemy.y - other.y;
+    const d = Math.hypot(dx, dy);
+    if (d >= DEVOURER_BROOD_SPREAD || d <= 0.0001) continue;
+    const push = (DEVOURER_BROOD_SPREAD - d) / DEVOURER_BROOD_SPREAD;
+    mx += (dx / d) * push * 1.6;
+    my += (dy / d) * push * 1.6;
+  }
+
+  // 3. A MAE. Um ANEL e nao um ponto, pela mesma razao da espreita do chefe:
+  //    mirar o centro sem distancia de parada faz o corpo oscilar em cima do
+  //    alvo, e aqui seriam catorze corpos oscilando no mesmo ponto.
+  const mother = state.enemies.find((e) => e.alive && e.archetype === 'white_devourer');
+  if (mother) {
+    const span = distTo(enemy, mother);
+    if (span > 0.0001) {
+      const toward = normalized(mother.x - enemy.x, mother.y - enemy.y);
+      // Positivo puxa para dentro, negativo empurra para fora: um so numero
+      // resolve "longe demais" e "perto demais".
+      const gap = Math.max(-1, Math.min(1, (span - DEVOURER_BROOD_RING) * 0.6));
+      mx += toward.x * gap;
+      my += toward.y * gap;
+      // Uma volta lenta em torno dela, com o sentido saindo do id — a mesma
+      // regra da espreita, e pelo mesmo motivo: sorteio nao sobrevive a uma
+      // sala de co-op nem a uma re-simulacao de replay.
+      const spin = enemy.id % 2 === 0 ? 1 : -1;
+      mx += -toward.y * spin * 0.35;
+      my += toward.x * spin * 0.35;
+    }
+  }
+
+  const w = state.config.width;
+  const len = Math.hypot(mx, my);
+  if (len >= 0.0001) {
+    const step = ARCHETYPES.devourer_brood.speed * dt;
+    enemy.facing = { x: mx / len, y: my / len };
+    // COM COLISAO, ao contrario da mae. Ela atravessa solido porque esta por
+    // BAIXO dele — e o unico corpo do jogo que faz isso, e e por isso que
+    // persegui-la nao e uma resposta. Os filhotes estao na superficie: um
+    // filhote dentro da rocha e invisivel e nao pode ser pisado, e "podem ser
+    // esmagados" e metade do que eles sao.
+    moveEntity(state, enemy, (mx / len) * step, (my / len) * step);
+  }
+
+  // A SEPARACAO TEM DE SER UMA GARANTIA, e nao uma forca.
+  //
+  // O empurrao la em cima e uma das tres coisas que disputam o passo, e ele
+  // PERDE: medido, dois filhotes puxados para a mesma beirada do anel da mae
+  // ficavam a 0,3386 tile — dois raios sao 0,34, entao eles se encostavam. "Sem
+  // sobreposicao" era o pedido, e um pedido desses nao se cumpre por
+  // ponderacao de forcas: uma soma vetorial nunca promete nada sobre o
+  // resultado.
+  //
+  // Entao a forca continua fazendo o que ela faz bem (dar FORMA ao bando,
+  // espalhando-o antes de haver contato) e a garantia vem depois, resolvendo a
+  // posicao: quem ficou dentro de um irmao sai de dentro dele. Meia distancia
+  // para cada um, porque o mesmo laco visita o outro no mesmo tick e as duas
+  // metades somam a separacao inteira.
+  for (const other of state.enemies) {
+    if (other === enemy || !other.alive || other.archetype !== 'devourer_brood') continue;
+    const dx = enemy.x - other.x;
+    const dy = enemy.y - other.y;
+    const d = Math.hypot(dx, dy);
+    const min = enemy.radius + other.radius;
+    if (d >= min) continue;
+    // Coincidentes por completo (nasceram no mesmo ponto, ou um empurrao os
+    // alinhou): sem uma direcao para separar, a paridade do id decide — o mesmo
+    // recurso que o sentido da volta ja usa, e pela mesma razao de sala de
+    // co-op.
+    const nx = d > 0.0001 ? dx / d : (enemy.id % 2 === 0 ? 1 : -1);
+    const ny = d > 0.0001 ? dy / d : 0;
+    const half = (min - d) * 0.5;
+    enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + nx * half));
+    enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + ny * half));
+  }
+};
+
+/**
+ * PISADO. O filhote que ficou debaixo de um pe morre, e morre em silencio.
+ *
+ * Sem `damageEntity`: ele nao tem dano a receber, nao ha numero para mostrar e
+ * — sobretudo — isto NAO E UMA MORTE CONTABILIZAVEL. `recordKill` alimenta o
+ * total de abates, e o total de abates alimenta o placar; catorze bichinhos
+ * inofensivos por camara virariam pontos de graca para quem pisasse neles, e um
+ * placar em que esmagar filhote rende mais que enfrentar o chefe esta medindo a
+ * coisa errada.
+ *
+ * O evento de morte continua indo: e dele que sai o punhado de particulas, e o
+ * jogador precisa VER que pisou em alguma coisa.
+ */
+const crushBrood = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): boolean => {
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > enemy.radius + player.radius) continue;
+    enemy.hp = 0;
+    enemy.alive = false;
+    events.push({
+      t: 'death',
+      x: enemy.x,
+      y: enemy.y,
+      entity: enemy.id,
+      archetype: enemy.archetype,
+      facingX: enemy.facing.x,
+      facingY: enemy.facing.y,
+      tick: state.tick,
+    });
+    return true;
+  }
+  return false;
 };
 
 /**
@@ -5050,6 +5233,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
     if (enemy.archetype === 'white_devourer') {
       devourerStep(state, enemy, player, dt, events);
+      continue;
+    }
+    // A NINHADA. Fluxo proprio como o Miner e o Fole, e por um motivo mais
+    // forte que o deles: o fluxo comum e "perseguir e bater", e este bicho nao
+    // faz nenhuma das duas. Passa-lo por la lhe daria uma acao de contato — ou
+    // seja, dano — que a definicao dele proibe.
+    if (enemy.archetype === 'devourer_brood') {
+      if (!crushBrood(state, enemy, events)) broodStep(state, enemy, player, dt);
       continue;
     }
     // Os chefes de estrato: cada um opera a alavanca do proprio bioma, e

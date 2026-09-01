@@ -689,7 +689,29 @@ export const PROTOCOL_VERSION = 28;
 // `leapsLeft` ganha o valor DEVOURER_BURST_SPENT (-1) para dizer "a rajada
 // acabou". Zero nao servia: zero e o que um chefe recem-nascido tem, e a
 // decolagem ja o le como "comece uma rajada inteira".
-export const SIMULATION_VERSION = 48;
+//
+// 49: a NINHADA. `devourer_brood` — catorze filhotes na camara do Devorador,
+// e o unico corpo do bestiario cuja definicao e nao fazer nada: dano de contato
+// zero, um ponto de vida, alcance de aggro zero e NENHUMA acao no repertorio
+// (fluxo proprio, justamente para nunca passar pela acao `contact` de onde todo
+// dano de corpo a corpo deste jogo sai).
+//
+// Eles estao na simulacao e nao no cliente por uma razao de mecanica: sao
+// MATERIA no disco da boca. A sucao ja arrasta todo corpo que nao seja chefe,
+// entao a ninhada e arrastada e devorada junto — e ver dez filhotes sumindo
+// garganta abaixo ensina o raio da coisa melhor que o anel desenhado no chao.
+//
+// O passo deles e fugir > nao encostar no irmao > voltar para a mae, nessa
+// ordem. A separacao tem duas metades: uma FORCA que da forma ao bando antes de
+// haver contato, e uma resolucao de POSICAO depois do passo — medido, so a
+// forca deixava dois filhotes a 0,3386 tile quando dois raios sao 0,34, e "sem
+// sobreposicao" nao se cumpre por ponderacao de vetores.
+//
+// Pisar neles mata, e NAO conta no placar: o total de abates alimenta o
+// leaderboard, e catorze bichinhos inofensivos por camara seriam pontos de
+// graca. O evento de morte continua indo (o jogador precisa ver que pisou em
+// alguma coisa); o que nao vai e o credito.
+export const SIMULATION_VERSION = 49;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -810,7 +832,33 @@ export const SIMULATION_VERSION = 48;
 // (`devourerMaw(f, open)`) porque os dois slots sao a MESMA geometria em dois
 // pontos da mesma rampa; autorar a abertura em separado daria duas bocas
 // parecidas que divergiriam no primeiro ajuste de raio.
-export const CONTENT_VERSION = 29;
+// 30: `part-devourer-brood`, as minhoquinhas — 28x20, uma linha de bloquinhos
+// com um unico elo de carne atras da ponta (o unico contraste do bicho, e a
+// unica coisa que diz de que lado ele anda). Tres variantes x seis fases num
+// slot so, como os postos do anel de corpo: o cliente escolhe a variante pelo
+// id do filhote e a fase pelo relogio.
+//
+// Tres e nao uma porque um enxame de coisas identicas le como textura animada —
+// o olho junta tudo num tapete que se mexe. Comprimentos e ritmos primos entre
+// si (5/7/4 elos, ondas de 1/0,7/1,3) fazem com que nem tres vizinhas fiquem em
+// fase.
+//
+// A amplitude do balanco e LIMITADA PELO PASSO, e a primeira versao ignorou
+// isso: os elos medem 0,5 e andam de 0,45, entao dois vizinhos que se deslocam
+// mais de ~0,3 um em relacao ao outro desencostam. A folha de contato mostrou
+// 0,84 e 1,29 de desvio nas duas variantes curtas — a minhoquinha deixava de ser
+// uma linha e virava um punhado de cubos soltos.
+//
+// Junto vai a SECAO do anel de corpo, refeita. A captura do jogo mostrou o que
+// nenhum teste pegaria: uma caixa de lado `d` por altura `d * 1,05` e um CUBO, e
+// dez cubos bege em fila leem como entulho empilhado. Agora sao cinco degraus de
+// largura desigual (estreito no chao, largo na barriga, afinando para o dorso),
+// uma crista dorsal correndo o comprimento inteiro — a linha que costura dez
+// sprites soltos num corpo so — e o sulco escuro trocado por um colar de silica,
+// porque o sulco virava um VAO PRETO sempre que dois vizinhos estavam em alturas
+// diferentes no arco do salto. O anel tambem cresceu de 5,2 para 6,6 unidades,
+// que e a sobreposicao que o degrau do arco come.
+export const CONTENT_VERSION = 30;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -262,6 +262,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.sulfur_bomber': 'Sulfur Bearer',
   'enemy.diamandis': 'Diamandis',
   'enemy.white_devourer': 'White Devourer',
+  'enemy.devourer_brood': 'Brood',
   'enemy.archcantor': 'Archcantor',
   'enemy.sheet_leviathan': 'Sheet Leviathan',
   'enemy.lung_matrix': 'Lung Matrix',
@@ -284,6 +285,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.sulfur_bomber': 'Sulfur Bomber',
   'bestiary.name.diamandis': 'Diamandis',
   'bestiary.name.white_devourer': 'White Devourer',
+  'bestiary.name.devourer_brood': 'Hatchling',
   'bestiary.name.archcantor': 'Archcantor',
   'bestiary.name.sheet_leviathan': 'Sheet Leviathan',
   'bestiary.name.lung_matrix': 'Lung Matrix',
@@ -332,6 +334,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
   'bestiary.code.diamandis': 'CAPITAL ASSET DX-001',
   'bestiary.code.white_devourer': 'MOVEMENT PATTERN SIL-00',
+  'bestiary.code.devourer_brood': 'MOVEMENT PATTERN SIL-00b',
   'bestiary.code.archcantor': 'PIEZOELECTRIC ARRAY PRZ-00',
   'bestiary.note.archcantor':
     'The company classifies it as a "natural piezoelectric array". Later reports record that the crystals reproduce frequencies of the transmission — and that some respond BEFORE receiving the pulse.',
@@ -350,6 +353,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.code.magnetarch': 'MAGNETIC ANOMALY MGN-00',
   'bestiary.note.magnetarch':
     'The company states the field was created by decades of mining. Records predating the operation already show the same magnetic pattern. Perhaps the company chose that place because the field was already carrying data through the ore.',
+  'bestiary.note.devourer_brood':
+    'Same signature as SIL-00, at centimetre scale and in numbers. They do not attack, do not avoid heat, and have nothing resembling a mouth. The field report appends the one observation the team considered relevant and the company cited nowhere: they keep to the adult. Something down there is looking after something.',
   'bestiary.note.white_devourer':
     'Estimated mass exceeds, by several orders, the organic matter the entire stratum could sustain. The hypothesis later reports formulate, and none of them sign: the body does not move through the silica — the silica temporarily takes the shape of the body.',
   'bestiary.code.undertaker': 'UNIT EX-041',

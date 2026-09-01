@@ -11,7 +11,9 @@ import {
   DEVOURER_MAW_BURY_TICKS,
   TICK_HZ,
 } from '@voxelyn/survival-sim';
+import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import { LEAP_PEAK_PX } from './leap-arc';
+import { BROOD_PHASES, BROOD_VARIANTS } from './render';
 import {
   DEVOURER_HEAD_OFFSET,
   DEVOURER_SEGMENTS,
@@ -193,5 +195,27 @@ describe('coluna do Devorador — o contrato com a simulacao', () => {
       DEVOURER_HEAD_OFFSET + (DEVOURER_SEGMENTS - 1) * DEVOURER_SEGMENT_GAP + DEVOURER_TAIL_TILES;
     const ticks = Math.round((corpo / DEVOURER_BURROW_SPEED) * TICK_HZ);
     expect(ticks, `o corpo mede ${corpo.toFixed(2)} tiles`).toBe(DEVOURER_MAW_BURY_TICKS);
+  });
+});
+
+describe('a ninhada — o contrato com o atlas', () => {
+  it('as duas fatias dos quadros batem com o que o gerador autorou', () => {
+    // O manifest publica a CONTAGEM de quadros e nao como ela se fatora: 18
+    // quadros nao dizem sozinhos se sao tres variantes de seis fases ou seis de
+    // tres. O cliente precisa dos dois numeros para escolher o quadro
+    // (`variante * FASES + fase`), entao ele os repete — e uma troca no gerador
+    // sem uma troca aqui nao quebraria nada: as minhoquinhas simplesmente
+    // passariam a desenhar o corpo errado na fase errada, calada.
+    const m = broodManifest as unknown as { animations: Record<string, { frames: number }> };
+    expect(m.animations.idle.frames).toBe(BROOD_VARIANTS * BROOD_PHASES);
+  });
+
+  it('cada variante tem o ciclo inteiro dentro do atlas', () => {
+    const m = broodManifest as unknown as { animations: Record<string, { frames: number }> };
+    for (let v = 0; v < BROOD_VARIANTS; v++) {
+      for (let f = 0; f < BROOD_PHASES; f++) {
+        expect(v * BROOD_PHASES + f).toBeLessThan(m.animations.idle.frames);
+      }
+    }
   });
 });

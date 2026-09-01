@@ -38,6 +38,7 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   undertaker: 'enemy.undertaker',
   diamandis: 'enemy.diamandis',
   white_devourer: 'enemy.white_devourer',
+  devourer_brood: 'enemy.devourer_brood',
   archcantor: 'enemy.archcantor',
   sheet_leviathan: 'enemy.sheet_leviathan',
   lung_matrix: 'enemy.lung_matrix',
