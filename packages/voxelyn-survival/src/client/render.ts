@@ -6171,14 +6171,15 @@ export class SurvivalRenderer {
       // O nivel: recorta pelo card, para o preenchimento herdar os cantos.
       ctx.clip();
       const levelH = (drawSize - 2) * Math.min(1, Math.max(0, fraction));
-      ctx.fillStyle = low ? 'rgba(255,209,102,0.34)' : 'rgba(89,242,194,0.22)';
-      ctx.fillRect(cx - half + 1, cy + half - 1 - levelH, drawSize - 2, levelH);
+      const levelTop = cy + half - 1 - levelH;
+      ctx.fillStyle = low ? 'rgba(255,209,102,0.62)' : 'rgba(89,242,194,0.5)';
+      ctx.fillRect(cx - half + 1, levelTop, drawSize - 2, levelH);
       // A linha d'agua: um fio mais claro na borda do nivel, para o olho ler a
       // altura sem comparar dois tons de verde.
       if (fraction > 0 && fraction < 1) {
         ctx.fillStyle = low ? PAL.loot : PAL.biolum;
-        ctx.globalAlpha = 0.7;
-        ctx.fillRect(cx - half + 1, cy + half - 1 - levelH, drawSize - 2, 1);
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(cx - half + 1, levelTop, drawSize - 2, 1);
         ctx.globalAlpha = 1;
       }
       ctx.restore();
@@ -6201,23 +6202,36 @@ export class SurvivalRenderer {
       ctx.stroke();
 
       // O glifo, um pouco acima do centro para deixar o canto de baixo ao
-      // numero.
+      // numero — e pintado em DUAS passagens, recortadas pela linha d'agua.
+      // Acima do nivel ele e claro sobre o fundo escuro; abaixo, escuro sobre
+      // a carga. Com a carga pela metade, metade do icone e de cada cor, e
+      // ele continua legivel em qualquer fracao — um icone de uma cor so
+      // sumiria justamente na faixa em que se confunde com o preenchimento.
       const glyphY = cy - Math.round(size * 0.06);
-      if (module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion()) {
-        // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
-        // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
-        // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
-        // angulo deixaria o icone parado no pico —, e um relogio proprio
-        // faria o icone girar durante o travamento, que e exatamente o
-        // instante em que ele tem de estar parando.
+      const spinning = module.id === 'minigun' && minigunPhase > 0 && !prefersReducedMotion();
+      const paintGlyph = (color: string, clipTop: number, clipBottom: number): void => {
+        if (clipBottom <= clipTop) return;
         ctx.save();
-        ctx.translate(cx, glyphY);
-        ctx.rotate(minigunPhase * Math.PI * 2);
-        drawModuleGlyph(ctx, module.id, 0, 0, size * 0.4, PAL.biolum);
+        ctx.beginPath();
+        ctx.rect(cx - half, clipTop, drawSize, clipBottom - clipTop);
+        ctx.clip();
+        if (spinning) {
+          // Gira em torno do proprio centro. O angulo e INTEGRADO a partir da
+          // rotacao autoritativa (`minigun-view.ts`), e nao lido dela nem de
+          // `nowMs`: a rotacao satura em 1 durante a rajada — usa-la como
+          // angulo deixaria o icone parado no pico —, e um relogio proprio
+          // faria o icone girar durante o travamento, que e exatamente o
+          // instante em que ele tem de estar parando.
+          ctx.translate(cx, glyphY);
+          ctx.rotate(minigunPhase * Math.PI * 2);
+          drawModuleGlyph(ctx, module.id, 0, 0, size * 0.4, color);
+        } else {
+          drawModuleGlyph(ctx, module.id, cx, glyphY, size * 0.4, color);
+        }
         ctx.restore();
-      } else {
-        drawModuleGlyph(ctx, module.id, cx, glyphY, size * 0.4, PAL.biolum);
-      }
+      };
+      paintGlyph(low ? PAL.loot : PAL.biolum, cy - half, levelTop);
+      paintGlyph(PAL.dark, levelTop, cy + half);
 
       // O numero no canto de baixo, com fundo: o glifo e o nivel passam por
       // tras dele, e "80" sobre um arco fosforo nao se le.
