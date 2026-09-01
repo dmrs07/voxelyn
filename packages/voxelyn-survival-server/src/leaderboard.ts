@@ -17,6 +17,7 @@ import {
   type RunDepthConfig,
   type RunSummary,
 } from '@voxelyn/survival-sim';
+import { SIMULATION_VERSION } from '@voxelyn/survival-protocol';
 
 export type LeaderboardMode = 'solo' | 'coop';
 
@@ -55,12 +56,17 @@ export type LeaderboardEntry = {
   ore: number;
   createdAt: string;
   /**
-   * Ha um replay guardado para esta linha?
+   * Ha um replay guardado para esta linha, E esta simulacao ainda o reproduz?
    *
    * So runs solo verificadas por `verifySoloRun` carregam o log canonico — ver
    * `getReplay`. Fica na linha, e nao numa segunda consulta, pelo mesmo motivo
    * de `sectorCount`: um botao de replay que so descobre depois de clicado que
    * nao ha nada a mostrar e pior que um botao ausente.
+   *
+   * A VERSAO entra na conta pela mesma razao que `ws.ts` recusa um ticket de
+   * outra `SIMULATION_VERSION`: um log so significa alguma coisa contra a
+   * simulacao que o produziu. Alimentado a outra, ele nao "quebra" — ele conta
+   * uma run diferente, com outro fim, e a tela chamaria isso de replay.
    */
   replayAvailable: boolean;
 };
@@ -95,6 +101,14 @@ export type SubmitInput = {
   /** A configuracao sob a qual o log foi verificado — necessaria para replaya-lo. */
   tuning?: PlayerTuning;
   depth?: RunDepthConfig;
+  /**
+   * A simulacao que verificou este log. Default: a que este processo roda.
+   *
+   * Explicito no tipo, e nao so carimbado la dentro, porque e o que permite a um
+   * teste gravar uma linha "de outra versao" — o caso que o proximo deploy cria
+   * sozinho e que ninguem consegue reproduzir de outro jeito.
+   */
+  simulationVersion?: number;
 };
 
 export type LeaderboardQuery = {
@@ -185,7 +199,7 @@ const clampLimit = (limit: number | undefined): number =>
 export class MemoryLeaderboard implements LeaderboardStore {
   private readonly rows: LeaderboardEntry[] = [];
   private readonly digests = new Set<string>();
-  private readonly replays = new Map<number, ReplayRecord>();
+  private readonly replays = new Map<number, ReplayRecord & { simulationVersion: number }>();
   private nextId = 1;
 
   async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {
@@ -193,6 +207,7 @@ export class MemoryLeaderboard implements LeaderboardStore {
     if (input.digest && this.digests.has(input.digest)) return null;
     if (input.digest) this.digests.add(input.digest);
     const id = this.nextId++;
+    const simulationVersion = input.simulationVersion ?? SIMULATION_VERSION;
     const entry: LeaderboardEntry = {
       id,
       name: input.name,
@@ -206,7 +221,7 @@ export class MemoryLeaderboard implements LeaderboardStore {
       sectorCount: input.summary.sectorCount,
       ore: input.summary.stats.oreCollected,
       createdAt: new Date().toISOString(),
-      replayAvailable: input.replayLog !== undefined,
+      replayAvailable: input.replayLog !== undefined && simulationVersion === SIMULATION_VERSION,
     };
     this.rows.push(entry);
     if (input.replayLog !== undefined) {
@@ -215,13 +230,17 @@ export class MemoryLeaderboard implements LeaderboardStore {
         log: input.replayLog,
         tuning: input.tuning,
         depth: input.depth,
+        simulationVersion,
       });
     }
     return entry;
   }
 
   async getReplay(id: number): Promise<ReplayRecord | null> {
-    return this.replays.get(id) ?? null;
+    const stored = this.replays.get(id);
+    if (!stored || stored.simulationVersion !== SIMULATION_VERSION) return null;
+    const { simulationVersion: _version, ...replay } = stored;
+    return replay;
   }
 
   async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {
@@ -337,6 +356,10 @@ create index if not exists leaderboard_seed_class_idx
 alter table leaderboard_entries add column if not exists replay_log text;
 alter table leaderboard_entries add column if not exists tuning jsonb;
 alter table leaderboard_entries add column if not exists depth jsonb;
+-- A simulacao que verificou o log. Sem ela um deploy que mude
+-- SIMULATION_VERSION continuaria oferecendo os replays antigos, e cada um
+-- deles contaria uma run diferente da que entrou no livro.
+alter table leaderboard_entries add column if not exists sim_version integer;
 `;
 
 /**
@@ -349,7 +372,7 @@ alter table leaderboard_entries add column if not exists depth jsonb;
  */
 const LIST_COLUMNS = `
   id, name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count,
-  created_at, (replay_log is not null) as replay_available
+  created_at, (replay_log is not null) as has_replay, sim_version
 `;
 
 const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
@@ -367,7 +390,10 @@ const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
   sectorCount: Number(row.sector_count ?? LEGACY_SECTOR_COUNT),
   ore: Number(row.ore ?? 0),
   createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
-  replayAvailable: row.replay_available === true,
+  // A comparacao de versao mora AQUI, e nao no SQL, para ser a mesma conta que
+  // `getReplay` faz: a linha oferecer o botao e o endpoint entregar o log tem
+  // de ser a mesma pergunta, respondida num lugar so.
+  replayAvailable: row.has_replay === true && Number(row.sim_version) === SIMULATION_VERSION,
 });
 
 /**
@@ -424,8 +450,8 @@ export class PostgresLeaderboard implements LeaderboardStore {
     const result = await this.pool.query(
       `insert into leaderboard_entries
          (name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count, digest,
-          replay_log, tuning, depth)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          replay_log, tuning, depth, sim_version)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        on conflict (digest) do nothing
        returning ${LIST_COLUMNS}`,
       [
@@ -443,6 +469,9 @@ export class PostgresLeaderboard implements LeaderboardStore {
         input.replayLog ?? null,
         input.tuning ? JSON.stringify(input.tuning) : null,
         input.depth ? JSON.stringify(input.depth) : null,
+        // Nula sem log: gravar a versao de uma run que nao tem replay diria que
+        // esta linha tem um, e `has_replay` e `sim_version` sao lidos juntos.
+        input.replayLog === undefined ? null : (input.simulationVersion ?? SIMULATION_VERSION),
       ],
     );
     const row = result.rows[0];
@@ -462,10 +491,12 @@ export class PostgresLeaderboard implements LeaderboardStore {
   }
 
   async getReplay(id: number): Promise<ReplayRecord | null> {
+    // A versao entra no WHERE, e nao numa checagem depois: um log de outra
+    // simulacao nao e um replay meio certo, e nao existe para esta consulta.
     const result = await this.pool.query(
       `select seed, replay_log, tuning, depth from leaderboard_entries
-       where id = $1 and replay_log is not null`,
-      [id],
+       where id = $1 and replay_log is not null and sim_version = $2`,
+      [id, SIMULATION_VERSION],
     );
     const row = result.rows[0];
     if (!row) return null;

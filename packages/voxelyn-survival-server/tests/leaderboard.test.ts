@@ -7,7 +7,12 @@ import {
   type PlayerCommand,
   type RunSummary,
 } from '@voxelyn/survival-sim';
-import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
+import {
+  SIMULATION_VERSION,
+  encodeCommandLog,
+  quantizeCommand,
+  toBase64,
+} from '@voxelyn/survival-protocol';
 import { runDepthForGeneration, type RunDepthConfig } from '@voxelyn/survival-sim';
 import type { SoloRunSubmission } from '@voxelyn/survival-protocol';
 import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from '../src/replay';
@@ -451,5 +456,41 @@ describe('replay', () => {
   it('getReplay de um id inexistente devolve null', async () => {
     const store = new MemoryLeaderboard();
     expect(await store.getReplay(999)).toBeNull();
+  });
+
+  /**
+   * O caso que o PROXIMO deploy cria sozinho.
+   *
+   * Um log so significa alguma coisa contra a simulacao que o produziu — e a
+   * mesma regra que `ws.ts` ja aplica ao ticket ("run jogada em outra versao da
+   * simulacao"). Alimentado a outra, ele nao quebra: ele conta uma run
+   * DIFERENTE, com outro fim, sob o nome de quem jogou a original.
+   */
+  it('log de outra versao da simulacao nao e oferecido nem entregue', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await store.submit({
+      name: 'de outra era',
+      mode: 'solo',
+      summary: summary(),
+      digest: 'antigo',
+      replayLog: 'QQ==',
+      simulationVersion: SIMULATION_VERSION - 1,
+    });
+    expect(entry?.replayAvailable).toBe(false);
+    expect(await store.getReplay(entry!.id)).toBeNull();
+  });
+
+  it('log da versao corrente continua sendo oferecido e entregue', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await store.submit({
+      name: 'desta era',
+      mode: 'solo',
+      summary: summary(),
+      digest: 'atual',
+      replayLog: 'QQ==',
+      simulationVersion: SIMULATION_VERSION,
+    });
+    expect(entry?.replayAvailable).toBe(true);
+    expect(await store.getReplay(entry!.id)).not.toBeNull();
   });
 });

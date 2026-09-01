@@ -108,6 +108,11 @@ const runReplay = (
   const renderer = new SurvivalRenderer(canvas);
   renderer.setLocalPlayerId(1);
   renderer.setQuality(loadQuality());
+  // O chassi e da GERACAO que jogou, e nao da geracao de quem assiste — nem do
+  // G-00 default. A profundidade congelada da run carrega esse dado (ver
+  // `RunDepthConfig.generation`), e sem esta linha toda descida de G-01 para
+  // cima seria replayada com as marcas do chassi errado.
+  if (depth) renderer.setProspectorGeneration(depth.generation);
   // Nunca `attach()`: o replay nao le teclado nem toque — o unico "input" dele
   // e o log. A instancia serve so para dar a `render()` o `InputState` default
   // que o desenho do HUD de toque espera.
@@ -125,10 +130,10 @@ const runReplay = (
   clockEl.textContent = formatDuration(0);
 
   let state = createRun({ seed, playerCount: 1, tuning, depth });
-  let playout = new LocalPlayout();
+  const playout = new LocalPlayout();
   playout.capture(state);
   let frameNow = performance.now();
-  let eventQueue = new TickEventQueue<SemanticEvent>((events) => {
+  const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
     renderer.ingestEvents(events, frameNow);
   });
 
@@ -137,25 +142,35 @@ const runReplay = (
   let accumulator = 0;
   let lastTime = performance.now();
 
-  /** Reconstroi a run do zero — usado pelo reinicio e pelo arrasto da barra. */
+  /**
+   * Leva a run ate `targetTick`, re-simulando o que faltar.
+   *
+   * Do ZERO so quando o alvo esta ATRAS de onde a run ja chegou: a simulacao
+   * nao anda para tras, mas para frente ela ja esta no meio do caminho.
+   * Reconstruir sempre desde o tick zero fazia o pulo mais comum — arrastar a
+   * barra um pouco para a frente — pagar a run inteira de novo.
+   *
+   * Nenhum evento semantico e enfileirado aqui, e isso NAO e economia: os
+   * eventos do caminho pertencem a minutos que ninguem vai ver. Enfileirados,
+   * `TickEventQueue` despacharia os mais velhos assim que passassem do teto
+   * (ver `MAX_PENDING_TICKS`) e o resto no primeiro quadro — explosao, tremor e
+   * clarao de minutos atras chegariam todos juntos no destino do pulo.
+   */
   const seekTo = (targetTick: number): void => {
-    state = createRun({ seed, playerCount: 1, tuning, depth });
-    playout = new LocalPlayout();
-    playout.capture(state);
-    eventQueue = new TickEventQueue<SemanticEvent>((events) => {
-      renderer.ingestEvents(events, frameNow);
-    });
-    tickIndex = 0;
-    // Avanca em bloco ate o alvo, sem desenhar quadro nenhum: e a MESMA
-    // re-simulacao que o servidor faz para verificar a run inteira, so que
-    // parada no meio — nao ha estado intermediario que valha a pena mostrar
-    // quando o pedido e "pule para o minuto 8".
+    if (targetTick < tickIndex || state.phase !== 'running') {
+      state = createRun({ seed, playerCount: 1, tuning, depth });
+      tickIndex = 0;
+    }
+    playout.reset();
     while (tickIndex < targetTick && tickIndex < commands.length && state.phase === 'running') {
-      const result = stepRun(state, [commands[tickIndex]]);
-      playout.capture(state);
-      eventQueue.push(state.tick, result.events);
+      stepRun(state, [commands[tickIndex]]);
       tickIndex++;
     }
+    // O retrato so e colhido no FIM: `LocalPlayout` interpola entre os dois
+    // ultimos, e alimenta-lo com o caminho inteiro daria uma interpolacao
+    // saindo de onde o Prospector estava antes do pulo.
+    playout.capture(state);
+    eventQueue.clear();
     accumulator = 0;
     scrub.value = String(tickIndex);
     clockEl.textContent = formatDuration(state.tick);
@@ -170,13 +185,20 @@ const runReplay = (
     playing = true;
     btnToggle.textContent = t('replay.pause');
   });
-  // `input` (e nao `change`): arrastar a barra realimenta a cada passo, do
-  // jeito que um controle de video normal se comporta.
+  // Arrastar so PAUSA e mostra o relogio do alvo; quem re-simula e o `change`,
+  // que chega quando o polegar solta.
+  //
+  // Um pulo custa ate uma run inteira de `stepRun` sincrono, e `input` dispara
+  // a cada pixel do arrasto: re-simular ali travava a aba a cada passo do
+  // polegar, e o unico pulo que interessava — o do lugar onde ele parou — era o
+  // ultimo de dezenas. Mover a barra continua respondendo na hora porque o
+  // relogio nao precisa da simulacao para dizer que horas sao naquele tick.
   scrub.addEventListener('input', () => {
     playing = false;
     btnToggle.textContent = t('replay.resume');
-    seekTo(Number(scrub.value));
+    clockEl.textContent = formatDuration(Number(scrub.value));
   });
+  scrub.addEventListener('change', () => seekTo(Number(scrub.value)));
 
   const frame = (now: number): void => {
     frameNow = now;
