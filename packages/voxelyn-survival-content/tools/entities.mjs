@@ -1801,19 +1801,36 @@ const devourerBody = (anim, f) => {
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   const b = [];
 
-  // Oito aneis SOBREPOSTOS (passo 1,6 para largura 2,2), afinando para tras.
-  // Sobrepostos e o ponto: com passo igual a largura a primeira versao saiu
-  // como uma fila de caixas separadas por vazio, e um verme com vao entre os
-  // segmentos e um trenzinho.
-  for (let s = 0; s < 8; s++) {
-    const x = -10 + s * 1.9;
-    const d = 2.2 + s * 0.42;
-    // ARCO: o dorso sobe no meio e volta a descer. Um verme que sai do chao nao
-    // deita reto — e a curva que diz que o resto dele continua LA EMBAIXO. Sem
-    // ela o corpo projetava como uma prancha comprida, que foi o defeito da
-    // primeira versao mesmo depois de os segmentos passarem a se sobrepor.
-    const arch = Math.sin(((s + 1) / 9) * Math.PI) * 1.4;
-    const lift = arch + (s >= 5 ? rear * (s - 4) * 0.45 : 0);
+  // O PESCOCO — tres aneis, e nao mais oito.
+  //
+  // O bicho inteiro cabia neste sprite, e era esse o defeito: um verme desenhado
+  // num quadro so e um verme do tamanho do quadro. Ele media 3,1 tiles de ponta
+  // a ponta e nao havia numero de escala que resolvesse isso, porque o que
+  // faltava nao era area — era COMPRIMENTO, e comprimento num sprite unico custa
+  // largura de atlas ao quadrado.
+  //
+  // Entao o corpo saiu daqui. O que este atlas desenha agora e a CABECA e o
+  // colar de aneis imediatamente atras dela; o resto do animal e desenhado pelo
+  // cliente, anel a anel, sobre o rastro que a propria cabeca deixou (ver
+  // `devourer-spine.ts` e `part-white-devourer-coil`). O verme passou de 3,1
+  // para ~6 tiles sem um pixel a mais de textura, e ganhou a coisa que um sprite
+  // rigido nunca ia dar: ele MERGULHA — a cabeca entra na areia e a cauda ainda
+  // esta no ar, no arco que o salto descreveu.
+  //
+  // Tres aneis, e nao zero: uma cabeca solta boiando na frente do primeiro anel
+  // do cliente mostraria a juntura entre os dois desenhos. O colar e o que cobre
+  // a costura, e a serie de espessuras dele CONTINUA na do anel de posto 0
+  // (4,3 -> 5,14 aqui, 5,1 la) para que a passagem de um desenho ao outro nao
+  // tenha degrau.
+  //
+  // O ARCO saiu junto com os aneis traseiros. Ele existia para dizer "o resto
+  // dele continua la embaixo" num corpo que nao tinha resto; agora o resto
+  // existe de fato, e a elevacao dele vem do arco do salto — que e o mesmo arco,
+  // so que verdadeiro.
+  for (let s = 0; s < 3; s++) {
+    const x = -5.4 + s * 1.9;
+    const d = 4.3 + s * 0.42;
+    const lift = s >= 1 ? rear * (s - 0.5) * 0.45 : 0;
     const y = -d / 2 + wave(s);
     b.push(box(x, y, 0.4 + lift + flinch * 0.3, 2.2, d, d * 1.05, 'silt'));
     // Cume mais estreito: o anel deixa de ser um cubo e passa a ler como tubo.
@@ -1826,8 +1843,14 @@ const devourerBody = (anim, f) => {
 
   // A CABECA: anel de dentes em volta de um vazio, no plano y-z. Doze lascas
   // de osso num circulo, a goela escura ao fundo e NENHUMA placa na frente.
-  const hx = 5.4 + rear * 0.5;
-  const hz = 2.6 + rear * 1.6;
+  //
+  // Ela recuou de x = 5,4 para perto da origem quando os cinco aneis traseiros
+  // sairam. A ancora do sprite E o ponto que a simulacao move, e o ponto que a
+  // simulacao move e a cabeca — com o corpo antigo a ancora caia no meio do
+  // tronco, o que era invisivel enquanto o tronco vinha junto e passaria a ser
+  // meio corpo de deslocamento agora que ele nao vem.
+  const hx = 0.7 + rear * 0.5;
+  const hz = 3 + rear * 1.6;
   b.push(box(hx - 1.6, -1.6, hz - 1.6, 1.4, 3.2, 3.2, 'blood')); // a goela, ao fundo
   for (let i = 0; i < 12; i++) {
     const a = (i * Math.PI) / 6;
@@ -1841,11 +1864,96 @@ const devourerBody = (anim, f) => {
   // nao ha sprite, e parado ele ja assentou.
   if (rear > 0) {
     for (let i = 0; i < 4; i++) {
-      b.push(box(-5 + i * 2.6, (i % 2 ? 1.9 : -2.6), 0.4 + (3 - i) * 0.6, 0.6, 0.6, 0.6, 'silt'));
+      b.push(box(-4.6 + i * 1.7, (i % 2 ? 2.4 : -3), 0.4 + (3 - i) * 0.6, 0.6, 0.6, 0.6, 'silt'));
     }
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
+
+// ---------------------------------------------------------------------------
+// part-white-devourer-coil — UM anel do corpo do Devorador.
+//
+// Este atlas nao desenha uma criatura: desenha uma PECA, e o cliente monta o
+// animal com dez delas sobre o rastro da cabeca (`devourer-spine.ts`).
+//
+// Por que a peca e um atlas separado e nao mais quadros do atlas do chefe: o
+// enquadramento (`fitSpriteToMargin`) deriva UM deslocamento e UMA ancora da
+// uniao de todos os quadros do sprite, e a uniao la e dominada pela boca, que
+// tem 16 unidades de vao. Um anel de tres unidades entrando naquele quadro de
+// 156x152 pagaria 23 KB por quadro para desenhar um tubo, e — pior — qualquer
+// mexida no anel reenquadraria a boca e a cabeca junto.
+//
+// OS QUADROS SAO POSTOS, e nao tempo. O quadro `k` e o anel de indice `k` na
+// fila, do mais grosso (colado no pescoco) ao mais fino (a ponta da cauda). Sao
+// dez, e o cliente escolhe qual desenhar por indice — nunca pelo relogio.
+// A ondulacao nao mora aqui: ela e o caminho que a cabeca percorreu, e um anel
+// que tambem ondulasse por conta propria brigaria com ele.
+//
+// O COMPRIMENTO E O PONTO. O chefe media 3,1 tiles e o relato de playtest foi
+// "nem parece um Boss". Um verme nao compete por altura — a silhueta dele e
+// baixa por definicao —, entao ele compete por comprimento: dez aneis a 0,52
+// tile de passo somam 5,2 tiles, e com a cabeca o bicho passa de 6. E o dobro
+// do vao que ele ocupava, e nenhum pixel de textura a mais que estes 64x64.
+// ---------------------------------------------------------------------------
+
+/** Quantos aneis o corpo tem. E tambem a contagem de quadros do atlas. */
+export const DEVOURER_COIL_RANKS = 10;
+
+/**
+ * A espessura do anel de posto `k`, em unidades autoradas.
+ *
+ * ATENCAO A ESCALA, porque foi aqui que a primeira versao errou. O corpo do
+ * chefe e autorado pequeno e multiplicado por `DEVOURER_SCALE` no fim
+ * (`devourerModel`); este atlas nao passa por aquela funcao e portanto e
+ * autorado JA na escala final. Escrever 5,14 aqui — o numero do ultimo anel do
+ * pescoco — produziu um corpo 40% mais fino que a cabeca a que ele se prende: o
+ * verme saia com um degrau atras do colar, como se a cabeca fosse de outro
+ * bicho. O posto 0 nasce em 7,2, que e 5,14 x 1,4, o mesmo anel DEPOIS da
+ * escala.
+ *
+ * O afinamento e uma POTENCIA e nao uma reta. Reta daria um cone, e cone e uma
+ * forma de objeto; bicho afina devagar no tronco e depressa na ponta. Com
+ * expoente 1,5 os cinco primeiros aneis ficam acima de 6 — o corpo continua
+ * grosso na metade que a silhueta mostra — e os tres ultimos desabam para a
+ * ponta.
+ */
+const coilDepth = (k) => {
+  const t = k / (DEVOURER_COIL_RANKS - 1);
+  return 7.2 - Math.pow(t, 1.5) * 4.8;
+};
+
+const devourerCoilModel = (k) => {
+  const d = coilDepth(k);
+  const b = [];
+  // O TUBO. Ancorado no chao (z = 0) porque e assim que o cliente o posiciona:
+  // a elevacao que ele passa e a do CONTATO com a areia, e nao a da linha de
+  // centro — um anel de elevacao zero esta pousado, e um de elevacao negativa
+  // esta enterrado ate a linha que o recorte corta.
+  b.push(box(-2.6, -d / 2, 0, 5.2, d, d * 1.05, 'silt'));
+  // Cume mais estreito: o anel deixa de ser um cubo e passa a ler como tubo.
+  b.push(box(-2.6, -d * 0.3, d * 1.05, 5.2, d * 0.6, 0.7, 'silt'));
+  // O SULCO da juntura, na traseira: uma fatia estreita e escura, recuada nos
+  // dois eixos. Sem ela dez aneis de silica em fila viram um tubo liso e o
+  // corpo perde a contagem — e a contagem e o que diz que ele e segmentado.
+  b.push(box(2.1, -d / 2 + 0.35, 0.1, 0.6, d - 0.7, d * 0.95, 'rockDeep'));
+  // AS PLACAS LATERAIS: duas cristas de silica saindo dos flancos, inclinadas
+  // para tras. Elas nao sao enfeite — sao o que da ao corpo uma silhueta que
+  // nao e um cilindro, e sao tambem por onde ele agarra a areia quando cava.
+  //
+  // Encolhem mais rapido que o corpo (potencia sobre a razao de espessura), de
+  // modo que os tres ultimos aneis ficam lisos: uma cauda ainda cravejada de
+  // placas leria como uma segunda cabeca.
+  const plate = Math.max(0, (d - 3.9) * 0.42);
+  if (plate > 0.3) {
+    for (const s of [-1, 1]) {
+      b.push(box(-1.8, s * (d / 2) - (s < 0 ? plate : 0), d * 0.3, 2, plate, 1.5, 'bone'));
+    }
+  }
+  return b;
+};
+
+const devourerCoilFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(devourerCoilModel(f)), DIR_INDEX[dir], 68, 64, 34, 52);
 
 // ---------------------------------------------------------------------------
 // enemy-archcantor — o Arquicantor da Catedral Prismatica.
@@ -2727,6 +2835,18 @@ export const ENTITY_SPECS = [
     // dela, sem repetir nem sobrar.
     downed: { frames: 6, fps: 11, loop: true },
   }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 3),
+  // O CORPO do Devorador, uma peca por quadro. Nao e uma criatura e nao entra
+  // em `ARCHETYPE_SPRITE`: a simulacao nao tem entidade nenhuma para ele — os
+  // dez aneis sao posicao derivada do rastro da cabeca, no cliente, e a colisao
+  // continua sendo so a da cabeca.
+  //
+  // `idle` com dez quadros e o unico slot, e os quadros sao POSTOS na fila e nao
+  // instantes: o cliente pede o quadro `k` por indice. A cadencia declarada
+  // existe so porque o contrato de atlas exige uma, e nenhum caminho de desenho
+  // a consulta.
+  base('part-white-devourer-coil', 68, 64, 32, 50, { w: 0.64, h: 0.64 }, { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 }, {
+    idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
+  }, devourerCoilFrame, 'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip', 1),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

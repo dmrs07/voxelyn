@@ -653,7 +653,22 @@ export const PROTOCOL_VERSION = 28;
 // entao a decolagem podia cair a 1,4 tile da queda — arco de comprimento zero,
 // e um furo no vidro, porque com o disco inteiro vitrificado ele ainda achava a
 // areia colada no alvo e saltava dali.
-export const SIMULATION_VERSION = 46;
+//
+// 47: a ONDA DE CHOQUE do pouso. O corpo do Devorador passou de 3,1 para quase
+// 6 tiles (ver CONTENT 28) e a cratera continuava do tamanho da cabeca: o que
+// desaba no fim do arco nao e mais uma cabeca. Um anel externo entre
+// DEVOURER_ERUPT_RADIUS (2,8) e DEVOURER_SLAM_RADIUS (3,9) cobra
+// DEVOURER_SLAM_DAMAGE (10) de quem esta fora da cratera e dentro dele.
+//
+// Os dois raios sao um par derivado, e o que eles separam e o RECURSO que
+// resolve cada um: o arco mais curto voa 0,55 s, uma corrida cobre 2,5 tiles
+// nesse tempo e a esquiva acrescenta 1,3. A cratera e o que a corrida resolve;
+// o anel e o que so a esquiva resolve. Quem leva a cratera nao leva o anel — e
+// o degrau de fora do mesmo golpe, e nao um segundo golpe no mesmo tick.
+//
+// So no POUSO: a decolagem continua com a cratera sozinha. O jogador ve o arco
+// chegando e nao ve o chao abrindo sob ele.
+export const SIMULATION_VERSION = 47;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -737,7 +752,25 @@ export const SIMULATION_VERSION = 46;
 // A boca escala junto porque e a metade dianteira deste mesmo animal aberta —
 // escalar uma sem a outra encolheria a cabeca em relacao ao tronco no meio do
 // proprio ciclo.
-export const CONTENT_VERSION = 27;
+// 28: o CORPO do Devorador sai do sprite. O atlas do chefe passa a desenhar so
+// a cabeca e tres aneis de pescoco (os cinco aneis traseiros e o arco saem, e a
+// cabeca recua de x=5,4 para x=0,7 — a ancora do sprite tem de ser o ponto que
+// a simulacao move, e com o corpo antigo ela caia no meio do tronco), e nasce
+// `part-white-devourer-coil`: 68x64, dez quadros que sao POSTOS na fila do
+// mais grosso ao mais fino, quatro direcoes.
+//
+// O cliente pendura os dez aneis no rastro da propria cabeca
+// (`devourer-spine.ts`), amostrado por comprimento de arco. O verme passou de
+// 3,1 para ~6 tiles sem um pixel a mais no atlas do chefe, e ganhou o que um
+// sprite rigido nao da: ele MERGULHA — a elevacao viaja no rastro junto com a
+// posicao, entao a cabeca crava na areia enquanto a cauda ainda esta no meio do
+// arco.
+//
+// A espessura do posto 0 e 7,2 e nao 5,14: este atlas nao passa por
+// `DEVOURER_SCALE`, entao ele e autorado ja na escala final e o numero do
+// pescoco tem de vir multiplicado. Sem isso o corpo saia 40% mais fino que a
+// cabeca a que ele se prende.
+export const CONTENT_VERSION = 28;
 
 export type VersionTriple = {
   protocolVersion: number;

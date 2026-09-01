@@ -1065,6 +1065,49 @@ export const DEVOURER_ERUPT_DAMAGE = 30;
 export const DEVOURER_ERUPT_SEARCH = 6;
 
 /**
+ * A ONDA DE CHOQUE DO POUSO: um anel de dano em volta da cratera.
+ *
+ * Ela existe porque o corpo passou a ter tamanho. O chefe media 3,1 tiles e
+ * agora mede quase 6 — o que cai na areia no fim do arco nao e mais uma cabeca,
+ * e um animal de seis tiles inteiro —, e a cratera de 2,8 continuava do tamanho
+ * da cabeca. O dano tinha de crescer com o bicho, senao o corpo novo seria
+ * enfeite: uma coisa enorme desabando sem consequencia nenhuma fora do ponto
+ * exato do impacto.
+ *
+ * SO NO POUSO, e nao na decolagem. Sair da areia e um movimento de baixo para
+ * cima que empurra o chao para os lados; desabar de dez tiles de altura com o
+ * corpo todo e outra coisa, e e a unica das duas que o jogador ve chegando.
+ *
+ * -----------------------------------------------------------------------
+ * O RAIO E DERIVADO, E O QUE ELE PROTEGE E A ESQUIVA
+ * -----------------------------------------------------------------------
+ * O arco mais curto da rajada tem `DEVOURER_LEAP_MIN_RANGE` (5) tiles a
+ * `DEVOURER_LEAP_SPEED` (9) tiles/s: 0,55 s de voo. Nesse tempo o jogador anda
+ * `PLAYER_SPEED` x 0,55 = 2,5 tiles, e a esquiva (`DODGE_SPEED` 11 por
+ * `DODGE_TICKS` 4 = 0,2 s) acrescenta 1,3 — 3,8 no total.
+ *
+ * E por isso que sao DOIS aneis e nao um maior. A cratera de 2,8 e o que uma
+ * CORRIDA resolve; o anel de 3,8 e o que so a ESQUIVA resolve. Um anel unico a
+ * 3,8 com o dano cheio apagaria a diferenca entre os dois recursos, e a esquiva
+ * e a unica coisa que o jogador tem para gastar aqui.
+ *
+ * O numero e o teto da conta e nao um arredondamento para cima dela: 3,8355 e
+ * exatamente ate onde a esquiva chega, e o teste que guarda isso recusou 3,9.
+ * Alem dai nao ha resposta nenhuma, e a onda deixaria de ser um ataque para ser
+ * um imposto.
+ */
+export const DEVOURER_SLAM_RADIUS = 3.8;
+/**
+ * O dano do anel externo.
+ *
+ * Um terco do da cratera. Ele nao e "quase morrer" — e o preco de ter lido o
+ * arco tarde demais, e a diferenca entre os dois numeros e o que ensina onde
+ * fica a borda: quem toma 10 sabe que estava perto, quem toma 30 sabe que
+ * estava dentro.
+ */
+export const DEVOURER_SLAM_DAMAGE = 10;
+
+/**
  * O SALTO. A emergencia nao e um ponto, e um ARCO.
  *
  * Ele nao sobe onde esta: recua por baixo ate um ponto de DECOLAGEM, rompe o

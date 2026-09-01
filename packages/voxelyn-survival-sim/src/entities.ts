@@ -114,6 +114,8 @@ import {
   DEVOURER_SURFACE_SPEED,
   DEVOURER_HOP_GAP_TICKS,
   DEVOURER_REPEAT_MIN_GAP,
+  DEVOURER_SLAM_DAMAGE,
+  DEVOURER_SLAM_RADIUS,
   DEVOURER_LEAPS_PER_CYCLE,
   DEVOURER_MAW_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
@@ -2795,6 +2797,7 @@ const devourerLeapStride = (
 const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   enemy.action = undefined;
   devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
+  devourerSlam(state, enemy, events);
   // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
   // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: a BOCA abre.
   //
@@ -3107,6 +3110,44 @@ const devourerCrater = (
     });
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+};
+
+/**
+ * A ONDA DE CHOQUE do pouso: o anel de fora da cratera.
+ *
+ * Separada de `devourerCrater` por duas razoes, e as duas sao de comportamento.
+ *
+ * Ela e SO do pouso. A decolagem chama a cratera e nao chama esta: sair da
+ * areia empurra o chao para os lados, desabar com seis tiles de corpo e outra
+ * coisa — e e a unica das duas que o jogador ve chegando, entao e a unica que
+ * pode cobrar mais caro sem virar dano nao anunciado.
+ *
+ * E ela nao toca no CHAO. A cratera revira a superficie (fragil que cede, areia
+ * onde havia rocha limpa) e isso e mecanica, nao enfeite: cada tile que ela
+ * transforma em areia e um tile onde a boca vai agarrar de verdade mais tarde,
+ * porque o vidro e que solta. Espalhar essa transformacao por um anel 40% maior
+ * mudaria o contra-jogo da janela inteira de lado. O que a onda faz e o que uma
+ * onda faz: bate em quem esta em pe perto dela.
+ *
+ * Quem ja levou a cratera nao leva esta. Nao e um segundo golpe empilhado no
+ * mesmo tick — e o degrau de FORA do mesmo golpe, e um jogador tem de sair
+ * daqui com um numero na tela, nao com dois.
+ */
+const devourerSlam = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    const d = distTo(enemy, player);
+    if (d <= DEVOURER_ERUPT_RADIUS || d > DEVOURER_SLAM_RADIUS) continue;
+    damageEntity(state, player, DEVOURER_SLAM_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'white_devourer',
+      elite: enemy.elite,
+    });
+  }
+  // O pulso largo, para o cliente desenhar o alcance de verdade. A cratera ja
+  // empurrou o dela; este e o anel de fora, e sem ele o efeito na tela ficaria
+  // menor que a area que machucou — que e a pior forma de um ataque mentir.
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_SLAM_RADIUS });
 };
 
 /**

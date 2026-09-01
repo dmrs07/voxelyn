@@ -16,7 +16,14 @@ import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import {
   DEVOURER_BURROWED_ARMOR,
+  DEVOURER_ERUPT_DAMAGE,
+  DEVOURER_ERUPT_RADIUS,
   DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_LEAP_SPEED,
+  DEVOURER_SLAM_RADIUS,
+  DODGE_SPEED,
+  DODGE_TICKS,
+  PLAYER_SPEED,
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
   DEVOURER_LEAPS_PER_CYCLE,
@@ -383,6 +390,87 @@ describe('Devorador Branco — o arco', () => {
     }
     expect(craters, 'o ciclo nao teve duas pontas').toBe(2);
     expect(countSurface(state, SURF_SILT, px, py, 20)).toBeGreaterThan(before);
+  });
+});
+
+describe('Devorador Branco — a onda de choque do pouso', () => {
+  /**
+   * Roda o ciclo de verdade e devolve o que o jogador levou NO TICK DO POUSO,
+   * parado a `d` tiles do ponto onde o corpo bateu.
+   *
+   * O arco nao e forcado, e a primeira versao deste ajudante errou justamente
+   * ai: por o humor em `airborne` na mao nao poe o chefe em voo — quem conduz o
+   * corpo e a ACAO de salto, e sem ela nada pousa e a medida saia zero em todo
+   * raio, inclusive dentro da cratera. Aqui o ciclo corre sozinho e o teste so
+   * escolhe onde o jogador esta quando ele chega.
+   *
+   * A distancia e do PONTO DE QUEDA (`leapToX/Y`, que a simulacao ja carrega
+   * durante o voo) e nao da posicao do chefe: o que a onda mede e onde o corpo
+   * bateu, e o corpo so esta la no ultimo tick.
+   */
+  const hitAt = (d: number): number => {
+    const { state, worm } = arena(910);
+    for (let t = 0; t < 600; t++) {
+      const flying = worm.mood === DEVOURER_AIRBORNE;
+      if (flying) {
+        state.player.x = state.bossRuntime.leapToX + d;
+        state.player.y = state.bossRuntime.leapToY;
+      }
+      const hp = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      // O tick em que ele deixou de voar E o tick do pouso: e ali que a cratera
+      // e a onda cobram, e so ali.
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) return hp - state.player.hp;
+      state.player.hp = state.player.maxHp;
+    }
+    throw new Error('o ciclo nao chegou a pousar');
+  };
+
+  it('cobra do anel de FORA da cratera: o corpo e maior que a cabeca', () => {
+    // A razao de a onda existir. O chefe passou de 3,1 para quase 6 tiles de
+    // corpo e a cratera continuava do tamanho da cabeca — sem isto, o corpo
+    // novo seria enfeite: uma coisa enorme desabando sem consequencia nenhuma
+    // fora do ponto exato do impacto.
+    const meio = (DEVOURER_ERUPT_RADIUS + DEVOURER_SLAM_RADIUS) / 2;
+    expect(hitAt(meio), `a ${meio.toFixed(1)} tiles o pouso nao cobrou nada`).toBeGreaterThan(0);
+  });
+
+  it('cobra MENOS ali do que na cratera: e um degrau, e nao um raio maior', () => {
+    // Se os dois aneis cobrassem igual, o par de raios nao ensinaria nada — o
+    // jogador nao teria como saber que estava perto da borda em vez de dentro.
+    const dentro = hitAt(DEVOURER_ERUPT_RADIUS * 0.5);
+    const borda = hitAt((DEVOURER_ERUPT_RADIUS + DEVOURER_SLAM_RADIUS) / 2);
+    expect(borda).toBeLessThan(dentro);
+  });
+
+  it('NAO empilha: quem levou a cratera nao leva a onda tambem', () => {
+    // Um jogador tem de sair daqui com UM numero na tela. Empilhados, a cratera
+    // de 30 e a onda de 10 sairiam como 40 num tick, e nenhum dos dois raios
+    // seria legivel no que aconteceu.
+    expect(hitAt(DEVOURER_ERUPT_RADIUS * 0.5)).toBe(DEVOURER_ERUPT_DAMAGE);
+  });
+
+  it('acaba: fora do raio da onda o pouso nao alcanca', () => {
+    expect(hitAt(DEVOURER_SLAM_RADIUS + 1.5), 'a onda nao tem borda').toBe(0);
+  });
+
+  it('e ESCAPAVEL com a esquiva, e o raio nao pode crescer sem isso deixar de valer', () => {
+    // O par de raios e derivado, e e isto que ele protege. O arco mais curto
+    // voa `MIN_RANGE / LEAP_SPEED` segundos; nesse tempo uma corrida cobre
+    // `PLAYER_SPEED x voo` e a esquiva acrescenta o que ela ganha de velocidade
+    // no vao dela. A cratera e o que a corrida resolve; a onda e o que so a
+    // esquiva resolve. Sem esta conta, aumentar o raio um dia viraria um
+    // imposto em vez de um ataque.
+    const voo = DEVOURER_LEAP_MIN_RANGE / DEVOURER_LEAP_SPEED;
+    const corrida = PLAYER_SPEED * voo;
+    const esquiva = corrida + (DODGE_SPEED - PLAYER_SPEED) * (DODGE_TICKS / TICK_HZ);
+    expect(DEVOURER_ERUPT_RADIUS, 'a cratera saiu do alcance da corrida').toBeLessThanOrEqual(
+      corrida + 0.4
+    );
+    expect(DEVOURER_SLAM_RADIUS, 'a onda saiu do alcance da esquiva').toBeLessThanOrEqual(esquiva);
+    expect(DEVOURER_SLAM_RADIUS, 'a onda cabe na cratera: nao ha degrau').toBeGreaterThan(
+      DEVOURER_ERUPT_RADIUS
+    );
   });
 });
 
