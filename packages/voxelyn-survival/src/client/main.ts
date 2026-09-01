@@ -3,6 +3,7 @@ import { createRun, emptyCommand, runDepthForGeneration, stepRun } from '@voxely
 import type {
   PlayerTuning,
   RunDepthConfig,
+  RunSummary,
   SemanticEvent,
   SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -38,7 +39,14 @@ import {
   type QualityLevel,
 } from './settings';
 import { audio } from './audio';
-import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
+import {
+  applyRunOnce,
+  loadRecords,
+  runSummaryIdentity,
+  saveRecords,
+  type Records,
+} from './records';
+import { replayableIdentities, saveLocalReplay } from './local-replays';
 import {
   fetchCodex,
   markLoreRead,
@@ -696,6 +704,58 @@ const homologateRun = (state: SurvivalState): void => {
   settlementSent = true;
   transmitSettlement(url, expedition.runId, recorder.encode());
 };
+/**
+ * Sob qual configuracao a descida SOLO corrente esta rodando.
+ *
+ * Guardado no inicio da run porque e no FIM que ele faz falta: para rever a
+ * descida e preciso recria-la com o mesmo tuning e a mesma profundidade que o
+ * ticket autorizou, e a essa altura `prepareSolo` ja saiu de cena. Null fora de
+ * uma descida solo — o co-op nao passa por aqui.
+ */
+let soloRunConfig: { tuning?: PlayerTuning; depth?: RunDepthConfig } | null = null;
+
+/**
+ * Comeca a gravar uma descida solo: o log E a configuracao dele, JUNTOS.
+ *
+ * Os dois numa chamada so pela mesma razao que `capture` do `RunRecorder`
+ * devolve o comando que vai ser simulado: separados, um deles um dia deixa de
+ * ser atualizado. Foi o que aconteceu — o reinicio pela tela de resultado tira
+ * um ticket NOVO (tuning relido do perfil, profundidade possivelmente outra) e
+ * so trocava o recorder, deixando a run seguinte emparelhada com a
+ * configuracao da anterior. O replay local reproduzia outra descida.
+ */
+const beginSoloRecording = (auth: {
+  seed: number;
+  tuning?: PlayerTuning;
+  depth?: RunDepthConfig;
+}): void => {
+  recorder.start(auth.seed);
+  soloRunConfig = { tuning: auth.tuning, depth: auth.depth };
+};
+
+/**
+ * Guarda o log da descida que acabou, para o Registro poder reve-la.
+ *
+ * So SOLO: uma run de co-op e simulada pelo servidor, e o log deste cliente nao
+ * a reproduz sozinho — oferecer replay dela seria mostrar outra descida com o
+ * nome da que foi jogada. E so quando ha log inteiro (`submittable`): passando
+ * do teto de gravacao, o que sobrou nao e a run.
+ *
+ * A guarda de seed existe porque `recordRun` e chamado dos DOIS lacos: se o
+ * recorder for de outra descida, isto aqui nao tem nada a guardar.
+ */
+const keepLocalReplay = (state: SurvivalState, summary: RunSummary): void => {
+  if (state.config.playerCount !== 1) return;
+  if (!recorder.submittable || recorder.recordedSeed !== summary.seed) return;
+  saveLocalReplay({
+    identity: runSummaryIdentity(summary),
+    seed: recorder.recordedSeed,
+    log: recorder.encode(),
+    tuning: soloRunConfig?.tuning,
+    depth: soloRunConfig?.depth,
+  });
+};
+
 const recordRun = (state: SurvivalState): void => {
   if (!state.summary) return;
   const result = applyRunOnce(records, state.summary, recordedSummaryKey);
@@ -703,6 +763,9 @@ const recordRun = (state: SurvivalState): void => {
   if (!result.applied) return;
   records = result.records;
   saveRecords(records);
+  // Depois de `applied`: a mesma trava de idempotencia que impede o historico de
+  // receber a run sessenta vezes por segundo serve ao log.
+  keepLocalReplay(state, state.summary);
 };
 
 /**
@@ -1168,7 +1231,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   // mundo de nascer atras do menu.
   if (myDescent !== descentToken) return null;
   const seed = authorized.seed;
-  recorder.start(seed);
+  beginSoloRecording(authorized);
   resetRunTracking();
   telemetry.begin();
   let state: SurvivalState = createRun({
@@ -1272,7 +1335,10 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
         // desatualizado se ele tivesse comprado alguma coisa no intervalo.
         void authorizeExpedition(nextSeed(), myDescent).then((next) => {
           if (myDescent !== descentToken) return;
-          recorder.start(next.seed);
+          // O ticket e NOVO, e a configuracao dele tambem: gravar so a seed
+          // deixaria o log desta tentativa emparelhado com o tuning da
+          // anterior. Ver `beginSoloRecording`.
+          beginSoloRecording(next);
           telemetry.begin();
           state = createRun({ seed: next.seed, tuning: next.tuning, depth: next.depth });
           liveRun = state;
@@ -2250,7 +2316,13 @@ const contextDocIds = (context: CodexContext): string[] => {
 };
 
 const renderRecords = (): void =>
-  renderRecordsPanel(recordsBody, records, renderer.sprites, recordsCodexLink());
+  renderRecordsPanel(recordsBody, records, renderer.sprites, recordsCodexLink(), {
+    // Lido a cada abertura do painel, e nao uma vez no boot: a descida que
+    // acabou de terminar tem de aparecer replayavel na primeira vez que o
+    // jogador abrir o Registro depois dela.
+    replayable: replayableIdentities(),
+    onWatchReplay: (run) => openLocalReplay(runSummaryIdentity(run)),
+  });
 
 document.getElementById('btn-records')?.addEventListener('click', () => {
   renderRecords();
@@ -2700,6 +2772,18 @@ let rankClasses: RankClass[] = [];
  */
 const openReplay = (serverUrl: string, entry: RankEntry): void => {
   const params = new URLSearchParams({ id: String(entry.id), server: serverUrl });
+  window.open(`./replay.html?${params.toString()}`, '_blank');
+};
+
+/**
+ * Abre o replay de uma descida guardada NESTE APARELHO (Registro → Histórico).
+ *
+ * Nenhum servidor no caminho: a pagina le o log do proprio `localStorage`, que
+ * ela enxerga por ser a mesma origem. E o que permite rever a run em que se
+ * morreu — aquela nunca sobe para lugar nenhum.
+ */
+const openLocalReplay = (identity: string): void => {
+  const params = new URLSearchParams({ local: identity });
   window.open(`./replay.html?${params.toString()}`, '_blank');
 };
 

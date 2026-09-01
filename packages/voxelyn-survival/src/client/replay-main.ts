@@ -24,7 +24,8 @@ import { SurvivalRenderer } from './render';
 import { LocalPlayout } from './local-playout';
 import { TickEventQueue } from './playout';
 import { loadQuality } from './settings';
-import { MAX_RECORDED_TICKS, fetchReplay } from './run-recorder';
+import { MAX_RECORDED_TICKS, fetchReplay, type ReplayPayload } from './run-recorder';
+import { findLocalReplay } from './local-replays';
 import { formatDuration } from './run-summary';
 import { applyStaticTranslations, t } from './i18n';
 
@@ -70,17 +71,34 @@ const showStatus = (title: string, detail: string): void => {
 
 const params = new URLSearchParams(location.search);
 const id = Number(params.get('id'));
+const localIdentity = params.get('local');
 const serverUrl = params.get('server') || defaultServerUrl();
 
+/**
+ * De onde vem o log desta pagina — e as duas origens nao se anunciam igual.
+ *
+ * `?id=` e uma linha do livro do ranking: aquele log so esta la porque o
+ * servidor o re-simulou para aceitar a run, e o replay E autoritativo.
+ * `?local=` e uma descida guardada neste aparelho (ver `local-replays.ts`):
+ * mesma simulacao deterministica, log nenhum verificado por ninguem. Chamar as
+ * duas de autoritativas seria emprestar a segunda uma autoridade que ela nao
+ * tem — e a maioria das descidas locais e morte, que nunca sobe para servidor.
+ */
+const loadReplay = async (): Promise<ReplayPayload | null> =>
+  localIdentity !== null ? findLocalReplay(localIdentity) : fetchReplay(serverUrl, id);
+
 const boot = async (): Promise<void> => {
-  if (!Number.isInteger(id) || id <= 0) {
+  if (localIdentity === null && (!Number.isInteger(id) || id <= 0)) {
     showStatus(t('replay.invalid.title'), t('replay.invalid.detail'));
     return;
   }
 
-  const payload = await fetchReplay(serverUrl, id);
+  const payload = await loadReplay();
   if (!payload) {
-    showStatus(t('replay.unavailable.title'), t('replay.unavailable.detail'));
+    showStatus(
+      t('replay.unavailable.title'),
+      t(localIdentity !== null ? 'replay.unavailable.local' : 'replay.unavailable.detail'),
+    );
     return;
   }
 
@@ -93,6 +111,9 @@ const boot = async (): Promise<void> => {
 
   statusEl.classList.add('hidden');
   canvas.classList.remove('hidden');
+  // A tarja diz de ONDE veio o log, e nao so que ha um replay na tela. Ver
+  // `loadReplay`: so o do livro passou por re-simulacao no servidor.
+  hudNote.textContent = t(localIdentity !== null ? 'replay.badge.local' : 'replay.badge');
   hudNote.classList.remove('hidden');
   playbar.classList.remove('hidden');
 

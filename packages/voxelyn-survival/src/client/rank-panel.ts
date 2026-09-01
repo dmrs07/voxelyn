@@ -148,7 +148,7 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
       row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
       const replayCell = el('span', 'ax-rank-replay');
       if (entry.replayAvailable && view.onWatchReplay) {
-        const btn = el('button', 'ax-rank-replay-btn', '▶') as HTMLButtonElement;
+        const btn = el('button', 'ax-replay-btn', '▶') as HTMLButtonElement;
         btn.type = 'button';
         btn.title = t('rank.replay');
         btn.setAttribute('aria-label', t('rank.replay'));

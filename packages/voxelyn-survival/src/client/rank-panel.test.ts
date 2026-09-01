@@ -146,12 +146,12 @@ describe('botao de replay', () => {
       entries: [entry({ replayAvailable: false })],
       onWatchReplay: () => {},
     });
-    expect(host.querySelector('.ax-rank-replay-btn')).toBeNull();
+    expect(host.querySelector('.ax-replay-btn')).toBeNull();
   });
 
   it('nao aparece sem onWatchReplay, mesmo com replayAvailable', () => {
     renderRankPanel(host, { entries: [entry({ replayAvailable: true })] });
-    expect(host.querySelector('.ax-rank-replay-btn')).toBeNull();
+    expect(host.querySelector('.ax-replay-btn')).toBeNull();
   });
 
   it('aparece com as duas condicoes, e o clique leva a propria linha', () => {
@@ -160,7 +160,7 @@ describe('botao de replay', () => {
       entries: [entry({ id: 7, replayAvailable: true })],
       onWatchReplay: (entry) => watched.push(entry.id),
     });
-    const btn = host.querySelector<HTMLButtonElement>('.ax-rank-replay-btn');
+    const btn = host.querySelector<HTMLButtonElement>('.ax-replay-btn');
     expect(btn).not.toBeNull();
     btn?.click();
     expect(watched).toEqual([7]);
