@@ -32,13 +32,16 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SURF_FUNGAL,
+  DEVOURER_BROOD_COUNT,
+  DEVOURER_BROOD_RING,
+  DEVOURER_MAW_BITE_RADIUS,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
 import { resetMinigun } from './minigun.js';
 import { emptyBossRuntime } from './bosses.js';
 import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
-import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
+import { ARCHETYPES, SIGNATURE_OF_STRATUM, SIGNATURE_PACK, circleBlocked, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
@@ -291,9 +294,106 @@ export const populateSector = (
       // acontece de verdade quando um Bispo guarda uma camara micelial cheia de
       // fauna micelial.
       state.sectorBoss.entityId = body.id;
+      // A NINHADA nasce com a mae, e so com ela: catorze filhotes espalhados em
+      // volta da camara.
+      //
+      // Dentro da guarda de `defeated` de proposito. Chefe abatido nao volta na
+      // subida da extracao de retorno, e a ninhada dele nao pode voltar
+      // sozinha — um enxame de filhotes rondando o lugar onde a mae ja nao esta
+      // seria um bando orfao, e a leitura inteira deles (ELES SEGUEM ELA)
+      // desapareceria.
+      if (bossArchetype === 'white_devourer') spawnDevourerBrood(state, bossSpawn.x, bossSpawn.y);
     }
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
+};
+
+/** O passo da descida pelo raio. Meio tile nao pula celula nenhuma. */
+const BROOD_SPAWN_STEP = 0.5;
+
+/**
+ * Quantos raios do angulo aureo um filhote pode tentar antes de desistir.
+ *
+ * Oito e medido e nao escolhido: com um so raio sobravam ninhadas curtas
+ * (tres em dezoito camaras, a pior com doze de catorze) porque ha angulos em
+ * que a rocha vai da parede ate o raio da mordida sem uma celula livre. Com
+ * oito, nenhuma camara da amostra fica curta.
+ */
+const BROOD_RAY_TRIES = 8;
+
+/**
+ * Os filhotes do Devorador, espalhados em volta da camara.
+ *
+ * A distribuicao e uma espiral de ANGULO AUREO e nao um circulo, pela mesma
+ * razao que o vortice da boca ja usa para os graos: `i * 2pi/n` alinha tudo em
+ * raios e sai um pente — catorze bichos em fila reta lem como coisa colocada. O
+ * angulo aureo espalha sem repetir e sem padrao visivel.
+ *
+ * O raio cresce com a RAIZ do indice para a densidade ficar constante: sem ela
+ * os primeiros nascem amontoados no centro e os ultimos sozinhos na borda.
+ *
+ * Nenhum nasce colado na mae: o anel de partida comeca fora do raio da mordida,
+ * porque um filhote que nasce dentro da garganta e devorado no primeiro tick da
+ * primeira janela e ninguem chega a ve-lo.
+ */
+const spawnDevourerBrood = (state: SurvivalState, cx: number, cy: number): void => {
+  const w = state.config.width;
+  const radius = ARCHETYPES.devourer_brood.radius;
+  // O CORPO INTEIRO em chao aberto, e nao a celula do centro.
+  //
+  // A guarda de centro deixava 87 filhotes de 18 camaras nascerem com um canto
+  // do circulo dentro da pedra — e dali `moveEntity` nao os tira, porque todo
+  // passo que sairia ja comeca bloqueado. Pergunta-se agora com o mesmo
+  // `circleBlocked` que o movimento usa: a geracao e o passo tem de concordar
+  // sobre o que e um lugar onde este corpo cabe.
+  //
+  // AS COORDENADAS QUE O CORPO VAI OCUPAR, e nao as que o argumento aponta:
+  // `spawnEnemy` soma meio tile aos dois eixos (os chamadores passam coordenada
+  // de TILE, nao de mundo). A primeira versao desta guarda testava `floor(x)` e
+  // deixava passar todo caso em que o meio tile atravessava a fronteira — e o
+  // invariante do repositorio pegou exatamente esses.
+  const fits = (x: number, y: number): boolean => {
+    const wx = x + 0.5;
+    const wy = y + 0.5;
+    if (wx < 2 || wy < 2 || wx >= w - 2 || wy >= state.config.height - 2) return false;
+    return !circleBlocked(state, wx, wy, radius);
+  };
+  for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
+    const far =
+      DEVOURER_MAW_BITE_RADIUS + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
+    // QUEM CAI NA PEDRA DESCE O PROPRIO RAIO ate achar areia, em vez de sumir.
+    //
+    // A espiral e ideal e a camara e escavada: o anel de fora quase sempre
+    // encosta na parede, e a primeira versao simplesmente DESISTIA do filhote —
+    // medido, nenhuma camara gerada chegava aos catorze e uma delas nasceu com
+    // UM. Catorze e o numero que faz a succao da boca significar alguma coisa.
+    //
+    // Desce pelo raio e nao procura a celula livre mais proxima porque o ANGULO
+    // e o que o angulo aureo comprou: mexer nele devolve o pente que ele existe
+    // para desfazer. O raio o filhote cede; o angulo, nao. E descer garante que
+    // ele para DENTRO da camara — o raio ate a mae atravessa o vao aberto —, em
+    // vez de num bolso qualquer atras da parede.
+    //
+    // O piso e o raio da mordida: ninguem nasce dentro da garganta, senao e
+    // devorado no primeiro tick da primeira janela e ninguem chega a ve-lo.
+    //
+    // COM O RAIO INTEIRO NA ROCHA ele nao desiste: tenta o PROXIMO raio da mesma
+    // espiral, `i + k*n`. E deliberadamente a continuacao da sequencia e nao um
+    // angulo qualquer — todo angulo que a ninhada pode ocupar continua sendo um
+    // angulo aureo, entao a saida de emergencia nao pode alinhar dois filhotes.
+    let placed = false;
+    for (let k = 0; k < BROOD_RAY_TRIES && !placed; k++) {
+      const a = (i + k * DEVOURER_BROOD_COUNT) * 2.39996;
+      for (let r = far; r >= DEVOURER_MAW_BITE_RADIUS - 1e-6; r -= BROOD_SPAWN_STEP) {
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        if (!fits(x, y)) continue;
+        spawnEnemy(state, 'devourer_brood', x, y, false);
+        placed = true;
+        break;
+      }
+    }
+  }
 };
 
 /**

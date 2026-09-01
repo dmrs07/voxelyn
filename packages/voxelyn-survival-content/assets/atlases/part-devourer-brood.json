@@ -1,0 +1,66 @@
+{
+  "id": "part-devourer-brood",
+  "version": 1,
+  "atlas": "part-devourer-brood.png",
+  "normalAtlas": "part-devourer-brood.normal.png",
+  "normalScale": 2,
+  "frameWidth": 24,
+  "frameHeight": 16,
+  "columns": 72,
+  "anchorX": 10,
+  "anchorY": 10,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.3,
+    "h": 0.16
+  },
+  "footprint": {
+    "w": 0.3,
+    "h": 0.3,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#3d2a22",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 18,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0
+    },
+    "dl": {
+      "idle": 18
+    },
+    "ur": {
+      "idle": 36
+    },
+    "ul": {
+      "idle": 54
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

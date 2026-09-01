@@ -74,6 +74,27 @@ export const MAW_FALL_SECONDS = 0.9;
 export const MAW_SPIRAL_PITCH_RAD = (38 * Math.PI) / 180;
 
 /**
+ * O expoente da lei do raio: `r^Q` cai linear no tempo.
+ *
+ * Q = 2 e a fisica exata de um sumidouro plano (fluxo conservado: `r * v_r`
+ * constante). Foi a primeira tentativa, e ela distribui os graos uniformemente
+ * por AREA — o que, num disco, poe metade deles no terco externo do raio. Visto
+ * em tela: a borda cheia de riscos e o miolo vazio, que e a leitura oposta da
+ * que o efeito existe para dar.
+ *
+ * Q = 1 espalharia por RAIO (densidade perfeitamente uniforme), mas com
+ * velocidade radial constante — e ai o grao nao acelera, e a succao perde a
+ * urgencia.
+ *
+ * 1,2 fica entre os dois e paga os dois: a densidade por unidade de raio cresce
+ * so com `r^0,2` (praticamente plana, com o miolo tao povoado quanto a borda) e
+ * a velocidade radial ainda sobe da borda ate a garganta. O PASSO da espiral
+ * nao depende disto — ele e propriedade da curva, nao da velocidade com que ela
+ * e percorrida.
+ */
+const SINK_Q = 1.2;
+
+/**
  * A distancia em que a sucao iguala a caminhada — a LINHA DO SEM-VOLTA.
  *
  * Resolvida por busca e nao escrita a mao de proposito. Ela e consequencia de
@@ -166,6 +187,57 @@ const STREAK_SPAN = 0.11;
  * concorda pela FORMA e nao pelo numero: a forca exata continua sendo assunto de
  * `mawPull`, na simulacao.
  */
+/**
+ * UM PONTO do caminho da espiral, para o grao `i` no progresso `p`.
+ *
+ * Extraido porque a poeira e os graos andam pelo MESMO caminho — e se cada um
+ * tivesse a sua copia dele, a primeira mudanca de passo ou de lei do raio
+ * separaria os dois: a areia iria para um lado e a nuvem que deveria ser a
+ * mesma areia iria para outro.
+ */
+/**
+ * O RAIO no progresso `p`, pela lei de conservacao de fluxo.
+ *
+ * Separado do ponto porque a poeira precisa dele SOZINHO: ela nao fica sobre a
+ * espiral, ela rola em volta dela (ver `mawCloud`), e para isso tem de saber
+ * onde o eixo do rolo esta antes de se afastar dele.
+ */
+const mawCoreRadius = (p: number, outerQ: number, innerQ: number): number => {
+  const clamped = Math.max(0, Math.min(1, p));
+  return Math.pow(Math.max(innerQ, outerQ - clamped * (outerQ - innerQ)), 1 / SINK_Q);
+};
+
+/**
+ * O ANGULO da espiral num dado raio.
+ *
+ * Ele segue o log do raio, e essa e a definicao de espiral de passo constante:
+ * `theta = tan(passo) * ln(R / r)`. Com ela, a razao entre o que o grao anda
+ * para o lado e o que ele anda para dentro e a MESMA em todo raio — o vortice
+ * tem uma forma so, da borda a garganta, em vez de virar uma orbita longe e um
+ * mergulho perto.
+ *
+ * O termo do indice usa o angulo aureo para os graos nao se alinharem em raios:
+ * `i * 2pi/count` daria um pente girando, que le como roda dentada.
+ */
+const mawSpiralAngle = (i: number, r: number, reach: number): number =>
+  i * 2.39996 + Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
+
+const mawPathPoint = (
+  i: number,
+  p: number,
+  reach: number,
+  outerQ: number,
+  innerQ: number
+): { dx: number; dy: number } => {
+  const r = mawCoreRadius(p, outerQ, innerQ);
+  const theta = mawSpiralAngle(i, r, reach);
+  return { dx: Math.cos(theta) * r, dy: Math.sin(theta) * r };
+};
+
+/** Onde o grao morre: a garganta, ou um terco do alcance enquanto ela nao existe. */
+export const mawInnerRadius = (reach: number): number =>
+  Math.min(DEVOURER_MAW_BITE_RADIUS, reach * 0.34);
+
 export const mawStreak = (
   i: number,
   seconds: number,
@@ -179,50 +251,12 @@ export const mawStreak = (
   // segundo da janela o alcance ainda e menor que ela. Interpolar direto para
   // DEVOURER_MAW_BITE_RADIUS invertia o caminho nesse trecho — o grao nascia no
   // alcance (pequeno) e voava para FORA, ate um raio que a simulacao ainda nao
-  // tocava. O telegrafo de abertura desenhava o sentido errado, em cima de chao
-  // que nao estava sendo puxado, e sentido e a unica coisa que este efeito
-  // precisa dizer sem ambiguidade.
-  //
-  // O `min` cobre isso sem apagar o efeito: antes de a garganta existir os graos
-  // continuam caindo, so que para dentro do vao que ha. E o mesmo recorte que a
-  // simulacao faz — ela tambem so cobra a mordida quando `reach` alcanca o raio
-  // da garganta.
-  const inner = Math.min(DEVOURER_MAW_BITE_RADIUS, reach * 0.34);
-  // O RAIO cai com `r^Q` linear no tempo, e o expoente e um compromisso medido.
-  //
-  // Q = 2 e a fisica exata de um sumidouro plano (fluxo conservado: `r * v_r`
-  // constante). Foi a primeira tentativa, e ela distribui os graos
-  // uniformemente por AREA — o que, num disco, poe metade deles no terco
-  // externo do raio. Visto em tela: a borda cheia de riscos e o miolo vazio,
-  // que e a leitura oposta da que o efeito existe para dar. Convergencia so se
-  // le se houver o que ver convergindo perto do centro.
-  //
-  // Q = 1 espalharia por RAIO (densidade perfeitamente uniforme), mas com
-  // velocidade radial constante — e ai o grao nao acelera, e a succao perde a
-  // urgencia.
-  //
-  // 1,35 fica entre os dois e paga os dois: a densidade por unidade de raio
-  // cresce so com `r^0,35` (praticamente plana) e a velocidade radial ainda
-  // sobe 50% da borda ate a garganta. O PASSO da espiral nao depende disto —
-  // ele e propriedade da curva (ver o angulo abaixo), nao da velocidade com que
-  // ela e percorrida —, entao a razao radial/tangencial continua a mesma.
-  const Q = 1.2;
-  const outerQ = Math.pow(reach, Q);
-  const innerQ = Math.pow(inner, Q);
-  const at = (p: number): { dx: number; dy: number } => {
-    const clamped = Math.max(0, Math.min(1, p));
-    const r = Math.pow(Math.max(innerQ, outerQ - clamped * (outerQ - innerQ)), 1 / Q);
-    // O ANGULO segue o log do raio, e essa e a definicao de espiral de passo
-    // constante: `theta = tan(passo) * ln(R / r)`. Com ela, a razao entre o que
-    // o grao anda para o lado e o que ele anda para dentro e a MESMA em todo
-    // raio — o vortice tem uma forma so, da borda a garganta, em vez de virar
-    // uma orbita longe e um mergulho perto.
-    //
-    // O termo do indice usa o angulo aureo para os graos nao se alinharem em
-    // raios: `i * 2pi/count` daria um pente girando, que le como roda dentada.
-    const theta = i * 2.39996 + Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
-    return { dx: Math.cos(theta) * r, dy: Math.sin(theta) * r };
-  };
+  // tocava.
+  const inner = mawInnerRadius(reach);
+  const outerQ = Math.pow(reach, SINK_Q);
+  const innerQ = Math.pow(inner, SINK_Q);
+  const at = (p: number): { dx: number; dy: number } =>
+    mawPathPoint(i, p, reach, outerQ, innerQ);
   const raw = seconds / MAW_FALL_SECONDS + i / count;
   const p = raw - Math.floor(raw);
   const path: Array<{ dx: number; dy: number }> = [];
@@ -241,4 +275,191 @@ export const mawStreak = (
   // esta sendo engolido, e engolido acontece de uma vez.
   const fade = Math.min(1, p / 0.14, (1 - p) / 0.05);
   return { path, alpha: Math.max(0, fade) };
+};
+
+/**
+ * As NUVENS DE SILICA: a poeira que a boca levanta enquanto puxa.
+ *
+ * Os riscos dizem o CAMINHO da areia; eles nao dizem que ha ar sujo ali. Um
+ * vortice de verdade nao move so grao — ele levanta uma cortina, e e a cortina
+ * que da volume ao efeito e peso ao chao que esta sendo comido. Sem ela o disco
+ * fica com a aparencia de riscos desenhados sobre um piso limpo, que e
+ * exatamente o que ele e.
+ *
+ * A poeira anda pelo MESMO caminho dos graos (`mawPathPoint`), e nao por um
+ * paralelo: e a mesma materia indo para o mesmo lugar, e duas geometrias
+ * separadas divergiriam na primeira mudanca de passo. O que muda e a escala do
+ * tempo — a nuvem desce mais devagar que o grao, porque poeira em suspensao nao
+ * cai na mesma velocidade que o que ela deixou para tras.
+ */
+export type MawCloud = {
+  dx: number;
+  dy: number;
+  /**
+   * Altura acima do chao, em TILES — a metade de cima do rolo do toro.
+   *
+   * Em tiles e nao em pixels porque quem sabe converter altura de mundo em
+   * deslocamento de tela e o renderer; este arquivo nao conhece o zoom. Zero
+   * significa "rente ao chao", que e onde a nuvem passa metade do ciclo: a
+   * metade de BAIXO do rolo esta dentro do buraco, e la ela nao e desenhada
+   * mais fundo — ela e desenhada mais apagada.
+   */
+  liftTiles: number;
+  /** Raio da mancha, em tiles. */
+  radius: number;
+  alpha: number;
+};
+
+/** Quantas nuvens o vortice carrega, na qualidade alta. Escaladas pelo preset. */
+export const MAW_CLOUDS = 22;
+/**
+ * Quanto mais devagar a poeira desce, contra o grao.
+ *
+ * Ela nao pode acompanhar: duas coisas na mesma velocidade pelo mesmo caminho
+ * viram uma so, e a nuvem deixaria de ser um segundo plano para virar um risco
+ * gordo. A 2,4 ela atravessa o disco em pouco mais de dois segundos enquanto o
+ * grao leva 0,9 — o bastante para o olho separar as duas camadas e ler
+ * profundidade em vez de repeticao.
+ */
+export const MAW_CLOUD_DRAG = 2.4;
+
+/**
+ * Quantas voltas POLOIDAIS a poeira da no caminho da borda ate a garganta.
+ *
+ * "Poloidal" e a volta em torno do proprio tubo do anel — a que faz a nuvem
+ * subir por fora, tombar por cima e mergulhar por dentro. E o eixo que faltava:
+ * a poeira andava pela mesma espiral dos graos, so mais devagar, e por isso ela
+ * era um grao gordo e nao uma segunda camada. Um vortice de verdade nao e um
+ * disco de coisas girando; e um ANEL que rola sobre si mesmo enquanto encolhe.
+ *
+ * 1,5 volta na travessia inteira: pouco o bastante para o olho seguir UMA nuvem
+ * subindo e caindo (a mais de duas ela vira cintilacao), e mais que uma para o
+ * rolo aparecer como ciclo em vez de um arco unico.
+ */
+export const MAW_TORUS_TURNS = 1.5;
+/**
+ * A grossura do tubo, como fracao do raio do anel.
+ *
+ * E o quanto a nuvem se afasta do eixo do rolo para fora e para dentro. Com ele
+ * o caminho deixa de ser monotonico — ela chega a andar PARA FORA por um trecho
+ * —, e e exatamente isso que separa um toro de uma espiral.
+ *
+ * O numero saiu de uma MEDIDA, e a primeira tentativa (0,3 com 1,7 volta)
+ * falhou nela: contando passo a passo, 46 de cada 106 iam para fora — quase
+ * empate. Isso e o mesmo defeito que este vortice ja teve uma vez, so que na
+ * poeira em vez de nos graos: "parece que nao suga nada, sao particulas
+ * circulando". Com 0,22 e 1,5 volta a razao vai a 3,2 para 1 — o rolo continua
+ * visivel e a succao volta a ser a leitura dominante, que e a ordem certa das
+ * duas.
+ */
+export const MAW_TORUS_TUBE = 0.22;
+
+/**
+ * O quanto o tubo AFINA ate a garganta.
+ *
+ * O anel colapsa sobre o proprio eixo enquanto entra no sumidouro — e o que um
+ * vortice faz de verdade, e tambem o que garante que toda nuvem termine na
+ * garganta em vez de parar num anel a meio caminho. Sem ele, medido, uma nuvem
+ * em cada tres acabava a travessia do lado de FORA do rolo e nunca chegava ao
+ * centro: o efeito virava um anel parado no meio do disco.
+ *
+ * Nao vai a 1: um tubo de grossura zero na chegada apagaria o rolo justamente
+ * onde o vortice e mais forte.
+ */
+export const MAW_TORUS_TAPER = 0.85;
+/**
+ * A altura maxima do rolo, em tiles, com o alcance cheio.
+ *
+ * Nao e a grossura do tubo: um toro geometricamente redondo teria 2,2 tiles de
+ * altura no alcance cheio, e nessa projecao 2:1 isso poe a poeira 115 px acima
+ * do chao — uma coluna, e nao um vortice rente ao solo. O anel aqui e ACHATADO
+ * de proposito, e o achatamento e o que mantem a leitura no chao onde a mecanica
+ * acontece.
+ */
+export const MAW_TORUS_RISE = 0.62;
+
+/**
+ * A nuvem `i` no instante `seconds`.
+ *
+ * Ela nao segue a espiral dos graos: ela ROLA em volta dela. O eixo do rolo e o
+ * mesmo raio que os graos percorrem (`mawCoreRadius`, a mesma lei de fluxo) e a
+ * nuvem orbita esse eixo — para fora e para cima na crista, para dentro e para
+ * baixo no vale. E o corte de um vortice TOROIDAL: a materia nao so vai para o
+ * centro, ela tomba sobre si mesma enquanto vai.
+ *
+ * Foi a segunda correcao do mesmo relato de playtest. A primeira tirou a orbita
+ * dos graos ("parece que nao suga nada, sao particulas circulando"); esta tira
+ * a chatice da poeira, que era uma copia lenta dos graos e por isso nao
+ * acrescentava camada nenhuma — duas coisas no mesmo caminho leem como uma so.
+ *
+ * `lift` sai daqui em TILES de altura e nao em pixels: quem sabe converter
+ * altura de mundo em deslocamento de tela e o renderer, e este arquivo nao pode
+ * saber o zoom. Ela ENCOLHE e escurece no mergulho porque esta entrando no
+ * buraco — a garganta a comprime e a borda a esconde.
+ */
+export const mawCloud = (i: number, seconds: number, reach: number): MawCloud => {
+  const inner = mawInnerRadius(reach);
+  const outerQ = Math.pow(reach, SINK_Q);
+  const innerQ = Math.pow(inner, SINK_Q);
+  // O deslocamento por indice usa um IRRACIONAL, e nao `i / contagem` como os
+  // graos. A diferenca importa porque a contagem muda com o preset de
+  // qualidade: `i / contagem` so espalha bem quando quem desenha passa a
+  // contagem certa junto (foi um defeito real do lado dos graos), enquanto uma
+  // sequencia de baixa discrepancia se espalha sozinha para QUALQUER numero de
+  // nuvens. Por isso esta funcao nao precisa saber quantas existem.
+  //
+  // E e um irracional diferente do angulo aureo dos graos de proposito: com o
+  // mesmo, cada nuvem nasceria exatamente sobre um grao e as duas camadas
+  // andariam coladas.
+  const phase = (i * 0.7548776662) % 1;
+  const raw = seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG) + phase;
+  const p = raw - Math.floor(raw);
+
+  // O EIXO do rolo: onde a nuvem estaria se ela fosse um grao.
+  const core = mawCoreRadius(p, outerQ, innerQ);
+  // A volta em torno desse eixo. A fase de partida vem do MESMO irracional que
+  // espalhou o nascimento, deslocada — sem isso todas as nuvens estariam na
+  // mesma altura ao mesmo tempo, e o anel inteiro subiria e desceria como um
+  // pistao em vez de rolar.
+  const phi = (p * MAW_TORUS_TURNS + phase * 3.3) * Math.PI * 2;
+  const swirl = Math.cos(phi);
+  const roll = Math.sin(phi);
+  // O tubo afina para a garganta: o anel colapsa sobre o proprio eixo enquanto
+  // entra no sumidouro.
+  const tube = MAW_TORUS_TUBE * (1 - p * MAW_TORUS_TAPER);
+  // Para fora na crista, para dentro no vale — e nunca alem de nenhuma das duas
+  // bordas do disco.
+  //
+  // O piso na GARGANTA e uma escolha e nao uma consequencia. Um toro honesto
+  // mandaria a poeira para dentro do buraco no vale do rolo, e fisicamente e
+  // exatamente para la que ela vai. Mas a garganta e onde a boca mata na hora
+  // (`DEVOURER_MAW_BITE_RADIUS`), e ela e a unica coisa deste efeito que o
+  // jogador NAO pode ler errado: cobri-la de poeira para ganhar um detalhe de
+  // movimento trocaria a leitura que decide a vida do jogador por realismo.
+  // Quem conta o mergulho aqui e o tamanho e o alfa da mancha, que despencam no
+  // vale — nao a posicao dela.
+  const r = Math.min(reach, Math.max(inner, core * (1 + tube * swirl)));
+  const theta = mawSpiralAngle(i * 3 + 1, core, reach);
+  // O raio base sai do ALCANCE, e nao de um numero fixo: a boca abre de zero, e
+  // uma nuvem de tamanho constante seria maior que o proprio vortice no comeco
+  // da janela.
+  //
+  // 0,135 e pequeno de proposito. A primeira versao usava 0,26 — quase dois
+  // tiles por mancha — e o resultado, visto em captura, foram bolhas chapadas
+  // espalhadas pelo disco: cada uma lia como uma SOMBRA no chao, nao como
+  // poeira. Poeira nao tem contorno; ela e feita de muitas coisas pequenas se
+  // sobrepondo, e e por isso que sao vinte e duas menores em vez de dezesseis
+  // grandes.
+  const base = reach * 0.135;
+  const fade = Math.min(1, p / 0.18, (1 - p) / 0.12);
+  // Alta e cheia na crista, rasa e apagada no mergulho: e o unico jeito de uma
+  // elipse chapada no chao contar de que lado do rolo ela esta.
+  const up = 0.5 + 0.5 * roll;
+  return {
+    dx: Math.cos(theta) * r,
+    dy: Math.sin(theta) * r,
+    liftTiles: MAW_TORUS_RISE * (reach / DEVOURER_MAW_RADIUS) * Math.max(0, roll),
+    radius: base * (0.62 + 0.5 * up) * (1 - 0.45 * p),
+    alpha: Math.max(0, fade) * (0.4 + 0.6 * up),
+  };
 };

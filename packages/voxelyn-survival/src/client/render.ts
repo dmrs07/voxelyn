@@ -29,6 +29,7 @@ import {
   SURF_RAIL,
   SURF_SILT,
   SURF_RAIL_V,
+  DEVOURER_AIRBORNE,
   DEVOURER_MAW,
   DEVOURER_MAW_BITE_RADIUS,
   mawReach,
@@ -78,7 +79,13 @@ import {
   type EntityAnimState,
   PropBank,
 } from './sprites';
-import { MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawStreak } from './maw-vortex';
+import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
+import {
+  DEVOURER_SUBMERGED_PX,
+  DevourerSpines,
+  devourerHeadLiftPx,
+  type SpineNode,
+} from './devourer-spine';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
 import { ProjectileView, SMALL_PROJECTILE_RADIUS } from './projectiles';
@@ -113,7 +120,7 @@ import {
   type Bounce,
   type WorldLight,
 } from './lighting';
-import type { FaceLighting } from './sprites';
+import { DEVOURER_BROOD_ATLAS, DEVOURER_COIL_ATLAS, type FaceLighting, type Tint } from './sprites';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -383,6 +390,48 @@ const drawBiomeVeil = (
   ctx.fillRect(0, 0, vw, vh);
   ctx.restore();
 };
+
+/**
+ * Os raios dos lobos de uma nuvem de silica, como fracao do raio dela.
+ *
+ * Tres passos e o minimo para a mancha perder o contorno; mais que isso custa
+ * um `fill` por nuvem sem mudar a leitura, e as nuvens ja escalam com o preset
+ * de qualidade junto com os riscos.
+ */
+const CLOUD_LOBES = [1, 0.68, 0.36] as const;
+
+/**
+ * O TREMOR das duas travessias do Devorador: a areia se abrindo e a areia se
+ * fechando.
+ *
+ * As duas nao pesam igual, e por isso sao dois numeros. Sair e um movimento de
+ * BAIXO PARA CIMA — o chao cede e ele passa — e o jogador ja tem 1,2 s de
+ * telegrafo antes dele. Entrar e seis tiles de corpo desabando de um arco de um
+ * tile de altura, e e a unica das duas que cobra dano num raio maior que a
+ * cabeca (ver DEVOURER_SLAM_RADIUS). O tremor conta essa diferenca sem uma
+ * linha de interface.
+ *
+ * Medidos contra os que ja existem nesta lamina: a detonacao do jogador tem 5,
+ * a virada do Coracao 7, o desabamento da Ruptura 9. O pouso do chefe entra
+ * entre a virada e o desabamento; a decolagem, logo abaixo da detonacao.
+ */
+/**
+ * Os dois eixos dos quadros da ninhada, e a cadencia da ondulacao dela.
+ *
+ * Duplicados do gerador de atlas (`entities.mjs`) porque o manifest publica a
+ * CONTAGEM total de quadros e nao como ela se fatora — 18 quadros nao dizem
+ * sozinhos se sao tres variantes de seis fases ou seis de tres. Ha um teste que
+ * cobra a igualdade dos dois lados.
+ *
+ * 110 ms por fase da uma volta em 0,66 s: rapido o bastante para o bicho parecer
+ * nervoso, devagar o bastante para nao virar cintilacao num sprite de 12 px.
+ */
+export const BROOD_VARIANTS = 3;
+export const BROOD_PHASES = 6;
+const BROOD_FRAME_MS = 110;
+
+const DEVOURER_DIVE_SHAKE = { power: 8, ms: 360 } as const;
+const DEVOURER_BREACH_SHAKE = { power: 4, ms: 240 } as const;
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -1291,6 +1340,27 @@ export class SurvivalRenderer {
   private decorKey = '';
   /** Rastro dos espreitadores ocultos, por id. Ver lurker-trail.ts. */
   private readonly lurkerTrails = new Map<number, LurkerTrail>();
+  /**
+   * O CORPO do Devorador, por id: dez aneis pendurados no rastro da cabeca.
+   *
+   * Estado de desenho e nao de jogo — a simulacao move so a cabeca e so ela
+   * colide. Vive aqui pela mesma razao dos rastros acima: a forma do corpo AGORA
+   * depende de por onde a cabeca andou, e isso e uma coisa que so quem viu os
+   * quadros anteriores sabe. Ver devourer-spine.ts.
+   */
+  private readonly devourerSpines = new DevourerSpines();
+  /**
+   * Se o Devorador estava NO AR no ultimo quadro, por id.
+   *
+   * O tremor das travessias sai daqui e nao de um evento, e a escolha e de
+   * camada: uma sacudida de camera e apresentacao pura, e a transicao que a
+   * dispara ja e observavel no humor que o snapshot carrega. Um evento novo so
+   * para isso engordaria o fio com um dado que o cliente ja tem.
+   *
+   * `undefined` significa "primeiro quadro deste chefe": nao ha transicao a
+   * anunciar, e sem esta distincao o chefe sacudiria a tela ao aparecer.
+   */
+  private readonly devourerAloft = new Map<number, boolean>();
   /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
   private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
@@ -1503,6 +1573,8 @@ export class SurvivalRenderer {
     // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
+    this.devourerSpines.reset();
+    this.devourerAloft.clear();
     this.bossModuleMarks.clear();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -1650,7 +1722,13 @@ export class SurvivalRenderer {
         case 'pulse':
           // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
           // sem tingir nada, que e a diferenca visivel entre ele e uma detonacao.
-          this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
+          //
+          // O raio vem do EVENTO. Ele sempre veio junto e este ramo o ignorava,
+          // desenhando todo pulso do tamanho do do jogador — o que passou a
+          // mentir quando a onda de choque do Devorador chegou, com quase o
+          // dobro do alcance dela. Um efeito menor que a area que machucou e a
+          // pior forma de um ataque enganar.
+          this.addFlash(ev.x, ev.y, Math.max(ABILITY_RADIUS, ev.radius) * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
           break;
         case 'flame_cone': {
           // Cada emissao do canal ja chega com o jato pronto: as brasas nascem
@@ -2569,6 +2647,9 @@ export class SurvivalRenderer {
         //
         // Um anel que promete um raio diferente do raio que agarra e pior que
         // anel nenhum, porque o jogador confia nele para decidir onde ficar.
+        // A fracao com que TODO efeito deste cliente segue o preset de qualidade.
+        // As duas camadas do vortice — a poeira e os riscos — a usam.
+        const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
         const ISO = Math.SQRT2;
         const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
         const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
@@ -2628,7 +2709,50 @@ export class SurvivalRenderer {
           ctx.stroke();
         }
 
-        // 4. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
+        // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a
+        //    cortina que a boca levanta, com os graos passando por cima. Ela
+        //    anda pelo MESMO caminho e mais devagar, e e o que da volume ao
+        //    disco — sem ela o efeito e um punhado de riscos sobre chao limpo.
+        {
+          const clouds = Math.max(4, Math.round(MAW_CLOUDS * fxScale));
+          ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
+          for (let i = 0; i < clouds; i++) {
+            const puff = mawCloud(i, seconds, reach);
+            if (puff.alpha <= 0.01) continue;
+            const [cxp, cyGround] = toScreen(maw.x + puff.dx, maw.y + puff.dy);
+            // A ALTURA do rolo vira deslocamento de tela aqui, e nao em
+            // `maw-vortex.ts`: aquele arquivo e geometria de mundo e nao
+            // conhece o zoom. `LEAP_PEAK_PX` e a mesma escala com que o arco do
+            // chefe converte altura nesta lamina — um tile de altura, um tile
+            // de subida na tela —, e usar duas escalas de altura no mesmo
+            // encontro faria a poeira e o corpo dele discordarem do que e alto.
+            const cyp = cyGround - puff.liftTiles * LEAP_PEAK_PX * z;
+            // TRES LOBOS CONCENTRICOS por nuvem, e nao uma elipse.
+            //
+            // Uma elipse unica tem CONTORNO, e contorno e a unica coisa que
+            // poeira nao tem: na primeira captura cada nuvem lia como uma
+            // sombra chapada no chao. Empilhando tres discos que encolhem com o
+            // mesmo alfa baixo, a opacidade cresce para o centro e a borda
+            // desaparece — o mesmo que um gradiente radial daria, sem alocar um
+            // por nuvem a cada quadro.
+            for (const lobe of CLOUD_LOBES) {
+              ctx.globalAlpha = puff.alpha * 0.075;
+              ctx.beginPath();
+              ctx.ellipse(
+                cxp,
+                cyp,
+                ringX(puff.radius * lobe),
+                ringY(puff.radius * lobe),
+                0,
+                0,
+                Math.PI * 2,
+              );
+              ctx.fill();
+            }
+          }
+        }
+
+        // 5. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
         //    celula e o chao limpo chega pelo diff de chunks; o que falta, e o
         //    que estes riscos entregam, e o CAMINHO — a materia indo para
         //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
@@ -2648,10 +2772,7 @@ export class SurvivalRenderer {
         // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
         // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
         // nao um fluxo.
-        const streaks = Math.max(
-          12,
-          Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)),
-        );
+        const streaks = Math.max(12, Math.round(MAW_STREAKS * fxScale));
         for (let i = 0; i < streaks; i++) {
           const grain = mawStreak(i, seconds, reach, streaks);
           if (grain.alpha <= 0.01) continue;
@@ -3093,6 +3214,8 @@ export class SurvivalRenderer {
       // Mundo novo, lamina nova: rastros do setor anterior morreriam como
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
+      this.devourerSpines.reset();
+      this.devourerAloft.clear();
       this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
@@ -3159,11 +3282,41 @@ export class SurvivalRenderer {
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
     const trailUpdated = new Set<number>();
+    /** Quais Devoradores tiveram corpo montado neste quadro. Ver `keepOnly`. */
+    const wormsDrawn = new Set<number>();
     for (const enemy of state.enemies) {
       this.archetypeById.set(enemy.id, enemy.archetype);
       if (!enemy.alive) continue;
+
+      // A AREIA SE ABRINDO E SE FECHANDO. Vem ANTES do corte de luz de
+      // proposito: um verme de seis tiles atravessando o chao no escuro
+      // continua sacudindo a sala. O tremor e a unica coisa que este chefe
+      // entrega quando nao da para ve-lo, e apaga-lo junto com o sprite seria
+      // apagar o unico aviso que sobra.
+      if (enemy.archetype === 'white_devourer') {
+        const aloft = enemy.mood === DEVOURER_AIRBORNE;
+        const was = this.devourerAloft.get(enemy.id);
+        if (was !== undefined && was !== aloft) {
+          const jolt = aloft ? DEVOURER_BREACH_SHAKE : DEVOURER_DIVE_SHAKE;
+          this.shake = { power: jolt.power, until: nowMs + jolt.ms };
+        }
+        this.devourerAloft.set(enemy.id, aloft);
+      }
+
       const b = brightness(enemy.x, enemy.y);
-      if (b <= 0.05) continue;
+      // O CORTE DE LUZ E DA CABECA, e a cabeca do Devorador nao e o corpo dele.
+      //
+      // Sair da iteracao aqui apagava os dez aneis inteiros no instante em que a
+      // CABECA entrava numa celula escura — um corpo de seis tiles some porque
+      // uma ponta dele atravessou uma sombra, com o resto ainda iluminado. Pior
+      // que o sumico: sem passar pelo `wormsDrawn` deste quadro, `keepOnly`
+      // jogava fora o rastro, e o corpo voltava RETO quando a cabeca reaparecia.
+      //
+      // Entao o corte espera: o corpo e montado e enfileirado antes dele, e quem
+      // decide anel por anel e a luz de cada anel, que ja e conferida no laco de
+      // baixo. Todo o resto (sprite da cabeca, barra, sombra) continua cortado.
+      const headDark = b <= 0.05;
+      if (headDark && enemy.archetype !== 'white_devourer') continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // Espreitador DENTRO do elemento: o corpo nao aparece. A simulacao ja
@@ -3206,20 +3359,129 @@ export class SurvivalRenderer {
           });
         }
       }
+      // O ARCO do Devorador. A simulacao nao tem altura — nao ha colisao em z —
+      // entao ela viaja como TEMPO, no vao da acao de salto, e vira pixel aqui.
+      // `sy` continua sendo o chao (e onde a sombra e a profundidade da fila
+      // moram); so o corpo sobe.
+      //
+      // Sai da closure de desenho porque o CORPO do Devorador tambem precisa
+      // dele, e precisa antes: os dez aneis entram na fila ordenada um a um, com
+      // profundidade propria, e a fila e montada aqui fora.
+      const leap =
+        enemy.action?.kind === 'leap'
+          ? leapHeight(leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt))
+          : 0;
+
+      // O CORPO SEGMENTADO DO DEVORADOR.
+      //
+      // O chefe media 3,1 tiles e o relato de playtest foi "nem parece um Boss".
+      // O que faltava nao era area: era COMPRIMENTO, e comprimento num sprite
+      // unico custa largura de atlas ao quadrado. Entao o corpo saiu do sprite —
+      // o atlas do chefe desenha so a cabeca e o colar — e virou dez aneis
+      // pendurados no rastro que a propria cabeca deixou (devourer-spine.ts).
+      //
+      // O que isso compra alem do tamanho: o MERGULHO. A elevacao viaja no
+      // rastro junto com a posicao, entao quando a cabeca crava na areia no fim
+      // do salto os aneis atras dela ainda estao lendo a altura que ela tinha no
+      // meio do arco — o bicho entra no chao com a cauda no ar, que e o que uma
+      // parabola faz e que nenhum sprite rigido consegue desenhar.
+      //
+      // A COLISAO NAO MUDA: a simulacao continua movendo e testando um ponto so,
+      // a cabeca. Os aneis nao machucam, nao bloqueiam e nao existem fora daqui.
+      const wormBody =
+        enemy.archetype === 'white_devourer' && enemy.mood !== DEVOURER_MAW && !lurkerHidden
+          ? this.devourerSpines.follow(
+              enemy.id,
+              {
+                x: enemy.x,
+                y: enemy.y,
+                liftPx: devourerHeadLiftPx(enemy.mood, leap),
+                dirX: presented.facingX,
+                dirY: presented.facingY,
+              },
+              nowMs,
+            )
+          : null;
+      // A cabeca sobe pelo MESMO numero que alimenta o rastro. Derivar as duas
+      // alturas em separado abriria a porta para a cabeca e o primeiro anel
+      // discordarem por um pixel — e e exatamente ali que fica a costura entre
+      // os dois atlas.
+      const headLiftPx = wormBody ? devourerHeadLiftPx(enemy.mood, leap) : leap * LEAP_PEAK_PX;
+      if (wormBody) {
+        wormsDrawn.add(enemy.id);
+        for (const node of wormBody) {
+          // Cada anel entra na fila com a PROFUNDIDADE DELE, e nao com a da
+          // cabeca. Um corpo de seis tiles empilhado numa profundidade so
+          // passaria inteiro na frente (ou inteiro atras) de tudo o que ele
+          // atravessa — e ele atravessa muito, porque e comprido.
+          const nb = brightness(node.x, node.y);
+          if (nb <= 0.05) continue;
+          const [nsx, nsy] = toScreen(node.x, node.y);
+          if (nsx < -90 || nsx > vw + 90 || nsy < -90 || nsy > vh + 90) continue;
+          items.push({
+            depth: node.x + node.y,
+            draw: () =>
+              this.drawDevourerRing(
+                ctx,
+                node,
+                nsx,
+                nsy,
+                z,
+                spriteZoom,
+                bodyLight(node.x, node.y, CREATURE_RESPONSE),
+                bodyFaceLight(node.x, node.y, CREATURE_RESPONSE),
+              ),
+          });
+        }
+      }
+      // Montado o corpo (e preservado o rastro), a cabeca no escuro para aqui.
+      if (headDark) continue;
+
+      // A NINHADA. Caminho proprio e curto, porque tudo o que o caminho comum
+      // faz por um inimigo esta errado para ela: nao ha barra de vida (um
+      // bicho de um ponto de vida com barra seria uma piada de interface), nao
+      // ha sombra (ela mede um terco de tile e a sombra ficaria maior que o
+      // corpo), nao ha indicador de atordoamento e nao ha tint de elite.
+      //
+      // E o quadro nao vem do relogio sozinho: os quadros deste atlas sao
+      // (variante x fase), e a variante sai do ID do bicho. Pelo caminho comum
+      // as tres variantes viravam uma minhoquinha so, trocando de corpo
+      // enquanto anda.
+      if (enemy.archetype === 'devourer_brood') {
+        items.push({
+          depth: enemy.x + enemy.y,
+          draw: () => {
+            const [bx, by] = toScreen(enemy.x, enemy.y);
+            const variant = ((enemy.id % BROOD_VARIANTS) + BROOD_VARIANTS) % BROOD_VARIANTS;
+            // A fase corre pelo relogio com um desvio POR BICHO. Sem o desvio,
+            // catorze filhotes ondulariam em unissono — que e a leitura de
+            // engrenagem, o oposto exato de um bando.
+            const phase = Math.floor(nowMs / BROOD_FRAME_MS + enemy.id * 2.7) % BROOD_PHASES;
+            this.sprites.drawPiece(
+              ctx,
+              DEVOURER_BROOD_ATLAS,
+              'idle',
+              variant * BROOD_PHASES + phase,
+              presented.facingX,
+              presented.facingY,
+              bx,
+              by,
+              spriteZoom,
+              undefined,
+              bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+              bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+            );
+          },
+        });
+        continue;
+      }
+
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
-          // O ARCO do Devorador. A simulacao nao tem altura — nao ha colisao em
-          // z — entao ela viaja como TEMPO, no vao da acao de salto, e vira
-          // pixel aqui. `sy` continua sendo o chao (e onde a sombra e a
-          // profundidade da fila moram); so o corpo sobe.
-          const leap =
-            enemy.action?.kind === 'leap'
-              ? leapHeight(leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt))
-              : 0;
-          const bodyY = sy - leap * LEAP_PEAK_PX * z;
+          const bodyY = sy - headLiftPx * z;
           if (lurkerHidden) {
             drawLurkerDisturbance(
               ctx,
@@ -3315,6 +3577,18 @@ export class SurvivalRenderer {
         },
       });
     }
+
+    // O rastro de um Devorador que saiu de cena e jogado fora na hora, e nao
+    // desbotado como os dos espreitadores: ele nao e uma marca no chao que o
+    // jogador ainda esta lendo, e a memoria de uma FORMA.
+    //
+    // "Saiu de cena" inclui a boca aberta, e e ai que isso importa. A janela
+    // dura 7,5 s com a cabeca parada, e nada alimenta o rastro nesse tempo:
+    // guarda-lo faria o corpo reaparecer com a forma que tinha antes da boca
+    // abrir, oito segundos velha. Descartado, ele renasce reto atras da cabeca
+    // no primeiro quadro depois que a boca fecha — que e a pose de quem acabou
+    // de se enfiar na areia.
+    this.devourerSpines.keepOnly(wormsDrawn);
 
     // Rastros orfaos (o bicho emergiu, morreu ou apagou): desbotam ate o fim
     // e a entrada some — a lamina esquece no proprio ritmo, nunca de supetao.
@@ -4329,6 +4603,102 @@ export class SurvivalRenderer {
       ctx.fillRect(jx + 0.8 * z, jy - hop * 2.2 * z - z, z, z);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * UM anel do corpo do Devorador, recortado na linha da areia.
+   *
+   * O recorte e o que faz o corpo ENTRAR no chao em vez de deslizar por cima
+   * dele. Sem ele um anel de elevacao negativa continuaria desenhado inteiro,
+   * so mais baixo na tela — o que na projecao isometrica e indistinguivel de um
+   * anel que andou para o fundo. E a mesma ambiguidade que a sombra resolve para
+   * o salto (ver `leapShadowScale`), pelo lado oposto.
+   *
+   * A linha nao e `sy`. A saia de baixo do tubo projeta ABAIXO da ancora — e o
+   * canto de perto do cilindro, que numa vista 2:1 desce ate a metade da
+   * espessura —, e cortar em `sy` comeria essa saia em TODO anel, inclusive nos
+   * que estao pousados na superficie. O corte fica onde o sprite pousado
+   * termina, e esse numero vem do proprio manifest (`frameHeight - anchorY`), de
+   * modo que reautorar o anel nao deixa o recorte para tras.
+   */
+  private drawDevourerRing(
+    ctx: CanvasRenderingContext2D,
+    node: SpineNode,
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    light: Tint | undefined,
+    faces: FaceLighting | undefined,
+  ): void {
+    const loaded = this.sprites.get(DEVOURER_COIL_ATLAS);
+    // Sem atlas nao ha corpo, e nao ha recuo: a cabeca sozinha e o chefe que o
+    // jogo tinha ate ontem, e um losango de recuo repetido dez vezes seria pior
+    // que a ausencia.
+    if (!loaded) return;
+    const bodyY = sy - node.liftPx * z;
+    if (node.liftPx >= 0) {
+      this.sprites.drawPiece(
+        ctx,
+        DEVOURER_COIL_ATLAS,
+        'idle',
+        node.rank,
+        node.dirX,
+        node.dirY,
+        sx,
+        bodyY,
+        spriteZoom,
+        undefined,
+        light,
+        faces,
+      );
+      return;
+    }
+
+    const sand = sy + (loaded.manifest.frameHeight - loaded.manifest.anchorY) * spriteZoom;
+    // Enterrado a ponto de a linha da areia sair da tela por cima: nao ha um
+    // pixel deste anel para desenhar, e um retangulo de recorte de altura
+    // negativa e comportamento indefinido em canvas.
+    if (sand <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, ctx.canvas.width, sand);
+    ctx.clip();
+    this.sprites.drawPiece(
+      ctx,
+      DEVOURER_COIL_ATLAS,
+      'idle',
+      node.rank,
+      node.dirX,
+      node.dirY,
+      sx,
+      bodyY,
+      spriteZoom,
+      undefined,
+      light,
+      faces,
+    );
+    ctx.restore();
+
+    // O COLAR de silica revirada onde o corpo atravessa a superficie.
+    //
+    // Ele existe por causa do corte: sem nada em cima, o recorte e uma linha
+    // reta atravessando um corpo redondo, e uma linha reta e a assinatura de um
+    // recorte. Com a areia amontoada por cima dela a mesma aresta le como o
+    // lugar onde a duna cede — a informacao passa a ser "ele esta enfiado ali"
+    // em vez de "este sprite foi cortado".
+    //
+    // Larga e baixa na razao 2:1 do mundo, e opaca no comeco da descida e
+    // sumindo conforme ele afunda: uma vez enterrado nao ha o que revirar.
+    const buried = Math.min(1, -node.liftPx / DEVOURER_SUBMERGED_PX);
+    const width = TILE_W * 0.5 * z * (0.9 - node.rank * 0.045);
+    ctx.save();
+    ctx.globalAlpha = 0.5 * (1 - buried * 0.7);
+    ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
+    ctx.beginPath();
+    ctx.ellipse(sx, sand - 1.5 * z, width, width * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   private drawDeathEchoBody(

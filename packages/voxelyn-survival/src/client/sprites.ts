@@ -44,6 +44,8 @@ import sulfurBomberManifest from '@voxelyn/survival-content/assets/atlases/enemy
 import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
 import diamandisManifest from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
+import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
+import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
 import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
 import lungMatrixManifest from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.json';
@@ -109,6 +111,8 @@ import sulfurBomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulf
 import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.png?url';
 import diamandisUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.png?url';
 import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
+import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.png?url';
+import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
 import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
 import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
 import lungMatrixUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.png?url';
@@ -154,6 +158,8 @@ import enemyStalkerNormalUrl from '@voxelyn/survival-content/assets/atlases/enem
 import enemySulfurBomberNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.normal.png?url';
 import enemyUndertakerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.normal.png?url';
 import enemyWhiteDevourerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.normal.png?url';
+import partWhiteDevourerCoilNormalUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.normal.png?url';
+import partDevourerBroodNormalUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.normal.png?url';
 import layerPlayerProspectorGunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.normal.png?url';
 import layerPlayerProspectorLowerNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.normal.png?url';
 import layerPlayerProspectorUpperNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.normal.png?url';
@@ -192,6 +198,8 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-sulfur-bomber.normal.png': enemySulfurBomberNormalUrl,
   'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
   'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
+  'part-white-devourer-coil.normal.png': partWhiteDevourerCoilNormalUrl,
+  'part-devourer-brood.normal.png': partDevourerBroodNormalUrl,
   'layer-player-prospector-gun.normal.png': layerPlayerProspectorGunNormalUrl,
   'layer-player-prospector-lower.normal.png': layerPlayerProspectorLowerNormalUrl,
   'layer-player-prospector-upper.normal.png': layerPlayerProspectorUpperNormalUrl,
@@ -547,6 +555,8 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: undertakerManifest as unknown as SpriteManifestEntry, url: undertakerUrl },
   { manifest: diamandisManifest as unknown as SpriteManifestEntry, url: diamandisUrl },
   { manifest: devourerManifest as unknown as SpriteManifestEntry, url: devourerUrl },
+  { manifest: devourerCoilManifest as unknown as SpriteManifestEntry, url: devourerCoilUrl },
+  { manifest: broodManifest as unknown as SpriteManifestEntry, url: broodUrl },
   { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
   { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
   { manifest: lungMatrixManifest as unknown as SpriteManifestEntry, url: lungMatrixUrl },
@@ -567,6 +577,31 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
  * apareciam no setor final como um losango de cor. Nada quebrava, e por isso o
  * defeito sobreviveu a varias rodadas de teste verde.
  */
+/**
+ * O atlas dos ANEIS do corpo do Devorador.
+ *
+ * Fora de `ARCHETYPE_SPRITE` de proposito, e nao por esquecimento: o mapa
+ * abaixo liga ARQUETIPOS DA SIMULACAO a atlas, e nao existe arquetipo nenhum
+ * para um anel. Eles sao posicao derivada no cliente (ver `devourer-spine.ts`),
+ * a simulacao nao os conhece e a colisao continua sendo so a da cabeca — por-los
+ * ali seria afirmar, no lugar exato onde o teste procura por chefes sem sprite,
+ * que existe um bicho a mais no jogo.
+ */
+export const DEVOURER_COIL_ATLAS = 'part-white-devourer-coil';
+
+/**
+ * O atlas da NINHADA do Devorador.
+ *
+ * Fora de `ARCHETYPE_SPRITE` embora `devourer_brood` SEJA um arquetipo da
+ * simulacao — e a excecao merece a explicacao. Os quadros deste atlas nao sao
+ * instantes de uma animacao: sao (variante x fase), e o cliente escolhe os dois
+ * eixos por conta propria (a variante pelo id do filhote, a fase pelo relogio).
+ * Posto no mapa, ele seria desenhado pelo caminho generico, que deriva o quadro
+ * so do tempo — e as tres variantes virariam uma unica minhoquinha que muda de
+ * corpo enquanto anda.
+ */
+export const DEVOURER_BROOD_ATLAS = 'part-devourer-brood';
+
 export const ARCHETYPE_SPRITE: Record<string, string> = {
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',
@@ -1218,6 +1253,39 @@ export class SpriteBank {
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
     this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint, light, faces);
+    return true;
+  }
+
+  /**
+   * Uma PECA de um corpo composto, escolhida por INDICE e ancorada no mundo.
+   *
+   * Distinta de `drawEntity` em duas coisas, e as duas sao a razao de ela
+   * existir. A peca nao tem arquetipo — a simulacao nao tem entidade nenhuma
+   * para ela, e por isso `ARCHETYPE_SPRITE` nao a conhece nem deveria. E o
+   * quadro nao vem do relogio: nos aneis do Devorador o quadro E o posto na
+   * fila (o mais grosso, o seguinte, ...), entao derivar do tempo decorrido
+   * faria o corpo inteiro mudar de espessura sozinho.
+   *
+   * Devolve `false` enquanto o atlas nao carregou, para o chamador poder
+   * desistir do corpo inteiro em vez de desenhar meio bicho.
+   */
+  drawPiece(
+    ctx: CanvasRenderingContext2D,
+    id: string,
+    animation: string,
+    frame: number,
+    facingX: number,
+    facingY: number,
+    footX: number,
+    footY: number,
+    zoom: number,
+    tint?: Tint,
+    light?: Tint,
+    faces?: FaceLighting
+  ): boolean {
+    const loaded = this.get(id);
+    if (!loaded) return false;
+    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, 0, footX, footY, zoom, tint, light, faces, frame);
     return true;
   }
 

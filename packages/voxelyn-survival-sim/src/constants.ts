@@ -825,7 +825,26 @@ export const DEVOURER_BURROW_SPEED = 4.6;
  * arquetipo, e um zero ali diria "fixo como o Pulmao", que e outra coisa.
  */
 export const DEVOURER_SURFACE_SPEED = 1.6;
-export const DEVOURER_RADIUS = 0.8;
+/**
+ * O raio de COLISAO do corpo. Subiu de 0,8 junto com a escala do atlas.
+ *
+ * O sprite cresceu 40% (ver DEVOURER_SCALE no gerador) porque o Devorador
+ * ocupava pouco mais da metade da tela dos outros chefes e nao lia como um. Um
+ * corpo 40% maior com o mesmo raio de colisao seria uma mentira que ja existia
+ * e teria piorado: o desenho e comprido e o colisor e redondo, entao o sprite
+ * sempre passou da circunferencia. Nao da para casar os dois num verme, mas da
+ * para o vao nao crescer.
+ *
+ * 0,95 e menos que os 1,12 que a escala pediria, e a diferenca e deliberada: o
+ * raio decide o tamanho do ALVO, e este chefe passa a janela de dano parado.
+ * Um alvo 40% mais largo transformaria a abertura num acerto garantido. Acima
+ * do Diamandis (0,9), abaixo do que o desenho sugere.
+ *
+ * Na pratica ele quase nao colide: mergulhado atravessa tudo, no ar nao encosta
+ * em nada e de boca aberta nao sai do lugar. O que este numero de fato governa
+ * e o tamanho do alvo durante a janela — e e por isso que ele foi conservador.
+ */
+export const DEVOURER_RADIUS = 0.95;
 /**
  * Quanto do dano a areia absorve enquanto ele esta por baixo.
  *
@@ -866,6 +885,65 @@ export const DEVOURER_LEAPS_PER_CYCLE = 3;
  * legiveis em vez de um borrao. A janela final continua pagando os tres.
  */
 export const DEVOURER_HOP_GAP_TICKS = 45;
+
+/**
+ * O CORPO ENTERRANDO, em ticks: quanto o resto dele leva para seguir a cabeca
+ * para dentro do buraco depois do ultimo arco da rajada.
+ *
+ * O corpo mede 5,75 tiles da ponta do focinho a da cauda (ver
+ * `devourer-spine.ts` no cliente: 0,5 de encaixe + nove passos de 0,52 + meio
+ * anel + o focinho) e ele cava a `DEVOURER_BURROW_SPEED` = 4,6 tiles/s. A cauda
+ * chega onde a cabeca entrou em 5,75 / 4,6 = 1,25 s, que sao 25 ticks.
+ *
+ * A simulacao nao tem corpo — ela move e testa um ponto so — e este numero e a
+ * unica coisa que ela sabe sobre ele. Isso e frágil por natureza: reautorar o
+ * corpo no cliente mudaria o comprimento sem tocar aqui, e o ritmo do encontro
+ * sairia de sincronia com o desenho em silencio. Ha um teste no cliente que
+ * mede a coluna de verdade e cobra este numero — e ele que segura as duas
+ * pontas juntas.
+ */
+export const DEVOURER_MAW_BURY_TICKS = 25;
+
+/**
+ * O valor de `leapsLeft` que significa "a rajada ACABOU".
+ *
+ * Nao pode ser zero, e a razao e uma linha que ja existia: a decolagem
+ * RECOMPOE a conta quando encontra zero ou menos ("um Devorador que chegue aqui
+ * com a rajada zerada comeca uma rajada inteira em vez de saltar uma vez e ir
+ * direto para a janela"). Zero significa "nunca comecou", e um chefe recem-nascido
+ * tem exatamente zero.
+ *
+ * Enquanto a boca abria no proprio tick do pouso, os dois sentidos nunca se
+ * encontravam — o pouso ja tinha trocado o humor antes de alguem perguntar. Com
+ * a espera, o ramo mergulhado passa a ler a conta, e ai a diferenca entre
+ * "acabou" e "nunca comecou" vira a diferenca entre a janela e o primeiro arco
+ * do encontro.
+ */
+export const DEVOURER_BURST_SPENT = -1;
+
+/**
+ * O SUSPENSE: o vao entre o corpo sumir de todo e o chao se abrir.
+ *
+ * 1,2 s de nada. E o unico momento do encontro em que o chefe nao esta na tela
+ * — sem rastro fresco, sem corpo, sem arco — e o silencio e o telegrafo: a
+ * unica coisa que pode vir depois de o Devorador desaparecer inteiro e a boca.
+ *
+ * Antes ela abria no TICK do terceiro pouso, e a transicao era um estalo: o
+ * corpo caia e a cratera dentada ja estava la, no mesmo quadro. O jogador nao
+ * tinha como separar "ele pousou" de "a janela abriu", e as duas coisas pedem
+ * respostas opostas — sair de perto, e chegar perto.
+ *
+ * 1,2 s e o mesmo vao do telegrafo da emergencia (`DEVOURER_ERUPT_WINDUP_TICKS`
+ * = 24 ticks), e a igualdade e de proposito: o encontro passa a ter UM tempo de
+ * aviso, e o jogador aprende uma vez so.
+ */
+export const DEVOURER_MAW_OPEN_DELAY_TICKS = 24;
+
+/**
+ * Do terceiro pouso ate a boca: o corpo enterra, e entao o chao espera.
+ */
+export const DEVOURER_MAW_SETTLE_TICKS =
+  DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS;
 /**
  * A BOCA: a janela de dano do encontro inteiro, e o unico momento em que ele
  * puxa.
@@ -1046,6 +1124,101 @@ export const DEVOURER_ERUPT_DAMAGE = 30;
 export const DEVOURER_ERUPT_SEARCH = 6;
 
 /**
+ * A ONDA DE CHOQUE DO POUSO: um anel de dano em volta da cratera.
+ *
+ * Ela existe porque o corpo passou a ter tamanho. O chefe media 3,1 tiles e
+ * agora mede quase 6 — o que cai na areia no fim do arco nao e mais uma cabeca,
+ * e um animal de seis tiles inteiro —, e a cratera de 2,8 continuava do tamanho
+ * da cabeca. O dano tinha de crescer com o bicho, senao o corpo novo seria
+ * enfeite: uma coisa enorme desabando sem consequencia nenhuma fora do ponto
+ * exato do impacto.
+ *
+ * SO NO POUSO, e nao na decolagem. Sair da areia e um movimento de baixo para
+ * cima que empurra o chao para os lados; desabar de dez tiles de altura com o
+ * corpo todo e outra coisa, e e a unica das duas que o jogador ve chegando.
+ *
+ * -----------------------------------------------------------------------
+ * O RAIO E DERIVADO, E O QUE ELE PROTEGE E A ESQUIVA
+ * -----------------------------------------------------------------------
+ * O arco mais curto da rajada tem `DEVOURER_LEAP_MIN_RANGE` (5) tiles a
+ * `DEVOURER_LEAP_SPEED` (9) tiles/s: 0,55 s de voo. Nesse tempo o jogador anda
+ * `PLAYER_SPEED` x 0,55 = 2,5 tiles, e a esquiva (`DODGE_SPEED` 11 por
+ * `DODGE_TICKS` 4 = 0,2 s) acrescenta 1,3 — 3,8 no total.
+ *
+ * E por isso que sao DOIS aneis e nao um maior. A cratera de 2,8 e o que uma
+ * CORRIDA resolve; o anel de 3,8 e o que so a ESQUIVA resolve. Um anel unico a
+ * 3,8 com o dano cheio apagaria a diferenca entre os dois recursos, e a esquiva
+ * e a unica coisa que o jogador tem para gastar aqui.
+ *
+ * O numero e o teto da conta e nao um arredondamento para cima dela: 3,8355 e
+ * exatamente ate onde a esquiva chega, e o teste que guarda isso recusou 3,9.
+ * Alem dai nao ha resposta nenhuma, e a onda deixaria de ser um ataque para ser
+ * um imposto.
+ */
+export const DEVOURER_SLAM_RADIUS = 3.8;
+/**
+ * O dano do anel externo.
+ *
+ * Um terco do da cratera. Ele nao e "quase morrer" — e o preco de ter lido o
+ * arco tarde demais, e a diferenca entre os dois numeros e o que ensina onde
+ * fica a borda: quem toma 10 sabe que estava perto, quem toma 30 sabe que
+ * estava dentro.
+ */
+export const DEVOURER_SLAM_DAMAGE = 10;
+
+// ---------------------------------------------------------------------------
+// A NINHADA — as minhoquinhas.
+// ---------------------------------------------------------------------------
+/**
+ * Quantos filhotes a camara do Devorador tem.
+ *
+ * Um enxame, e o numero e alto de proposito: dois ou tres seriam um DETALHE, e
+ * detalhe se lê como coisa que o jogador tem de investigar. Quatorze sao
+ * populacao — o olho para de contar e passa a ver "o chao daqui e assim".
+ *
+ * O teto e o custo deles, e ele e real: cada um e um corpo no snapshot e no
+ * hash. Quatorze cabem no que a camara ja gasta com fauna comum; cinquenta
+ * fariam a sala inteira pagar por um enfeite.
+ */
+export const DEVOURER_BROOD_COUNT = 14;
+/**
+ * A que distancia da mae eles ficam, em tiles.
+ *
+ * Nao e um raio de perseguicao — e um ANEL, como o da espreita do chefe
+ * (`DEVOURER_STALK_RANGE`), e pela mesma razao: mirar o centro sem distancia de
+ * parada faz o corpo oscilar em cima do alvo. Aqui seriam catorze corpos
+ * oscilando em cima do mesmo ponto, o que le como um monte tremendo.
+ *
+ * Cinco tiles poe a ninhada em volta da mae sem entrar no raio da mordida
+ * (`DEVOURER_MAW_BITE_RADIUS` = 1,6): eles rondam a boca, e a sucao pega os que
+ * se aproximam demais. E o que se quer ver.
+ */
+export const DEVOURER_BROOD_RING = 5;
+/**
+ * A que distancia um filhote comeca a empurrar o irmao, em tiles.
+ *
+ * "Sem overlap" era o pedido, e um anel comum nao basta: catorze corpos mirando
+ * o mesmo circulo se amontoam num arco so. A separacao e o que transforma um
+ * cordao de contas num BANDO — cada um com o seu lugar, todos indo para o mesmo
+ * sitio.
+ *
+ * Vale pouco mais que dois diametros (o raio deles e 0,17): perto o bastante
+ * para eles se tocarem quase, longe o bastante para nunca se sobreporem.
+ */
+export const DEVOURER_BROOD_SPREAD = 0.75;
+/**
+ * O quanto eles fogem de um Prospector que chega perto, em tiles.
+ *
+ * Eles nao atacam e nao podem: o unico jeito de um bicho inofensivo REAGIR ao
+ * jogador e recuar. E o que faz o enxame parecer vivo em vez de decorativo — o
+ * chao se abre na frente de quem anda, e volta a fechar atras.
+ *
+ * Menor que a distancia em que ele os esmaga: quem anda devagar os espanta,
+ * quem corre passa por cima. E a diferenca inteira entre os dois desfechos.
+ */
+export const DEVOURER_BROOD_SHY = 2.2;
+
+/**
  * O SALTO. A emergencia nao e um ponto, e um ARCO.
  *
  * Ele nao sobe onde esta: recua por baixo ate um ponto de DECOLAGEM, rompe o
@@ -1105,6 +1278,35 @@ export const DEVOURER_LEAP_TURN = 2.1;
 export const DEVOURER_LAUNCH_DAMAGE = 18;
 /** Quanto a mira antecipa o movimento do alvo, em segundos. */
 export const DEVOURER_LEAD_SECONDS = 0.9;
+/**
+ * A DISTANCIA DE ESPREITA: a que raio ele circula enquanto esta por baixo.
+ *
+ * Nao existia, e a ausencia dela era um defeito visivel. O mergulho mirava a
+ * posicao do jogador sem distancia de parada, entao ele convergia para cima
+ * dela — medido, a distancia estabilizava em 0,10 tile e oscilava entre 0,10 e
+ * 0,13 a cada tick. O chefe passava o mergulho inteiro vibrando em cima dos pes
+ * do Prospector, que foi exatamente o relato: "fica dancando ao redor dele".
+ *
+ * O ciclo dele ja pedia o contrario. Um verme que vem de BAIXO precisa de
+ * distancia para ter de onde vir: o arco so le como arco a partir de
+ * DEVOURER_LEAP_MIN_RANGE (5), e colado no alvo a decolagem tem de recuar por
+ * baixo antes de subir. Ficar em cima do jogador brigava com o proprio salto.
+ *
+ * 5,6 fica logo acima do minimo do arco: perto o bastante para a ameaca ser
+ * constante, longe o bastante para a faixa de silica ser uma LINHA que aponta
+ * de onde ele vem — e o rastro e o unico aviso que este chefe da.
+ */
+export const DEVOURER_STALK_RANGE = 5.6;
+/**
+ * Quanto do passo submerso ele gasta CIRCULANDO, quando ja esta na distancia.
+ *
+ * Sem isto, chegar na distancia certa significaria parar — e um verme parado
+ * embaixo da areia nao deixa rastro, que e o mesmo que desaparecer. Gastando o
+ * resto do passo de lado, ele ORBITA: a faixa de silica vira um anel se
+ * fechando em volta do jogador, e a ameaca continua sendo desenhada no chao
+ * enquanto ele decide de onde sair.
+ */
+export const DEVOURER_STALK_CIRCLE = 0.85;
 /** Meia-largura da faixa de silica que o mergulho deixa. */
 export const DEVOURER_TRAIL_WIDTH = 1;
 

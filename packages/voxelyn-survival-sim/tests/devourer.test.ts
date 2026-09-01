@@ -16,7 +16,18 @@ import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import {
   DEVOURER_BURROWED_ARMOR,
+  DEVOURER_BURST_SPENT,
+  DEVOURER_ERUPT_DAMAGE,
+  DEVOURER_MAW_BURY_TICKS,
+  DEVOURER_MAW_OPEN_DELAY_TICKS,
+  DEVOURER_MAW_SETTLE_TICKS,
+  DEVOURER_ERUPT_RADIUS,
   DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_LEAP_SPEED,
+  DEVOURER_SLAM_RADIUS,
+  DODGE_SPEED,
+  DODGE_TICKS,
+  PLAYER_SPEED,
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
   DEVOURER_LEAPS_PER_CYCLE,
@@ -24,6 +35,7 @@ import {
   DEVOURER_REPEAT_MIN_GAP,
   CONDUCTIVE_STUN_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
+  DEVOURER_STALK_RANGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_CORE,
   DEVOURER_MAW_RADIUS,
@@ -157,6 +169,66 @@ describe('Devorador Branco — o rastro', () => {
     const before = worm.x;
     for (let t = 0; t < 40; t++) stepRun(state, [emptyCommand()]);
     expect(worm.x, 'a parede segurou quem anda por baixo dela').toBeLessThan(before - 2);
+  });
+});
+
+describe('Devorador Branco — a espreita', () => {
+  it('mergulhado ele CIRCULA a distancia, e nao gruda no jogador', () => {
+    // Regressao de um defeito relatado em playtest: "quando encosta no
+    // prospector fica tentando achar um ponto pra bater e fica dancando ao
+    // redor dele". Era o mergulho sem distancia de parada — medido, a distancia
+    // estabilizava em 0,10 tile e oscilava entre 0,10 e 0,13 a cada tick, com o
+    // chefe vibrando em cima dos pes do alvo.
+    //
+    // O ciclo dele ja pedia o contrario: o arco so le como arco a partir de
+    // DEVOURER_LEAP_MIN_RANGE, e colado no alvo a decolagem tem de recuar por
+    // baixo antes de subir.
+    const { state, worm, px, py } = arena(731);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    let burrowed = 0;
+    let closest = Infinity;
+    for (let t = 0; t < 400; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (worm.mood !== DEVOURER_BURROWED) {
+        burrowed = 0;
+        continue;
+      }
+      burrowed++;
+      // So depois de o mergulho ASSENTAR. O tick logo apos o pouso tem o corpo
+      // em cima do jogador por construcao — a queda e mirada nele —, e cobrar
+      // distancia ali mediria o arco, nao a espreita.
+      if (burrowed > 25) {
+        closest = Math.min(closest, Math.hypot(worm.x - state.player.x, worm.y - state.player.y));
+      }
+    }
+    expect(closest, 'nunca chegou a mergulhar tempo bastante').toBeLessThan(Infinity);
+    expect(closest, `grudou no jogador a ${closest.toFixed(2)} tiles`).toBeGreaterThan(
+      DEVOURER_STALK_RANGE * 0.5,
+    );
+  });
+
+  it('espreitando ele nao PARA: o rastro continua sendo desenhado', () => {
+    // A outra metade da regra. Chegar na distancia certa nao pode virar ficar
+    // parado: um verme imovel embaixo da areia nao deixa faixa nenhuma, e a
+    // faixa e o unico aviso que este chefe da de onde ele vem.
+    const { state, worm, px, py } = arena(732);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    // Posto ja na distancia de espreita: se ele fosse parar, e aqui.
+    worm.x = px + 0.5 + DEVOURER_STALK_RANGE;
+    worm.y = py + 0.5;
+    let travelled = 0;
+    for (let t = 0; t < 60; t++) {
+      const from = { x: worm.x, y: worm.y };
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (worm.mood === DEVOURER_BURROWED) {
+        travelled += Math.hypot(worm.x - from.x, worm.y - from.y);
+      }
+    }
+    expect(travelled, 'ele parou no anel em vez de circular').toBeGreaterThan(4);
   });
 });
 
@@ -325,6 +397,243 @@ describe('Devorador Branco — o arco', () => {
   });
 });
 
+describe('Devorador Branco — a espreita anda para onde olha', () => {
+  /** Poe o chefe exatamente no anel de espreita e roda UM tick. */
+  const orbitTick = (seed: number) => {
+    const { state, worm, px, py } = arena(seed);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    // No anel: o erro de distancia zera e o passo inteiro vira tangente, que e
+    // o caso em que os dois defeitos apareciam.
+    worm.x = px + 0.5 + DEVOURER_STALK_RANGE;
+    worm.y = py + 0.5;
+    worm.mood = DEVOURER_BURROWED;
+    worm.action = undefined;
+    // Longe do tick de emergir: o que se quer medir e o passo submerso.
+    worm.nextActionAt = state.tick + 500;
+    state.bossRuntime.awake = true;
+    const from = { x: worm.x, y: worm.y };
+    const silt = new Set<number>();
+    const w = state.config.width;
+    for (let y = 0; y < state.config.height; y++)
+      for (let x = 0; x < w; x++) if (state.surface[y * w + x] === SURF_SILT) silt.add(y * w + x);
+    stepRun(state, [emptyCommand()]);
+    const painted: Array<{ x: number; y: number }> = [];
+    for (let y = 0; y < state.config.height; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (state.surface[i] === SURF_SILT && !silt.has(i)) painted.push({ x, y });
+      }
+    }
+    return { state, worm, move: { x: worm.x - from.x, y: worm.y - from.y }, painted };
+  };
+
+  it('a cara aponta para a MARCHA, e nao para o alvo', () => {
+    // No anel de espreita a componente radial zera e o passo inteiro e
+    // tangente: o chefe andava de lado com o rosto virado para o jogador.
+    //
+    // Sempre foi errado, e passou a ser VISIVEL com o corpo segmentado — o
+    // cliente escolhe a direcao do sprite da cabeca pela `facing` autoritativa e
+    // deriva a tangente dos aneis da trajetoria, entao a cabeca encontrava um
+    // pescoco perpendicular a ela, na costura exata que o corpo novo existe
+    // para esconder.
+    for (const seed of [301, 302, 303]) {
+      const { worm, move } = orbitTick(seed);
+      const len = Math.hypot(move.x, move.y);
+      expect(len, `seed ${seed}: ele nao andou`).toBeGreaterThan(0.01);
+      const alinhamento = (worm.facing.x * move.x + worm.facing.y * move.y) / len;
+      expect(alinhamento, `seed ${seed}: a cara esta a ${alinhamento.toFixed(2)} da marcha`).toBeGreaterThan(
+        0.99
+      );
+    }
+  });
+
+  it('o rastro e uma FAIXA atravessada, e nao uma linha em cima do caminho', () => {
+    // As faixas se deslocavam por `side`, que no anel E a direcao do passo: as
+    // tres caiam uma na frente da outra e a banda de tres tiles virava uma linha
+    // de um. Nao e so feio — o rastro e o unico aviso deste chefe e a area que o
+    // jogador tem para vitrificar antes de a boca abrir, entao a largura dele e
+    // mecanica.
+    for (const seed of [301, 302, 303]) {
+      const { move, painted } = orbitTick(seed);
+      expect(painted.length, `seed ${seed}: nao pintou nada`).toBeGreaterThan(0);
+      const len = Math.hypot(move.x, move.y);
+      // O quanto as celulas pintadas se espalham ATRAVESSANDO a marcha.
+      const nx = -move.y / len;
+      const ny = move.x / len;
+      const across = painted.map((c) => c.x * nx + c.y * ny);
+      const largura = Math.max(...across) - Math.min(...across);
+      expect(largura, `seed ${seed}: faixa de ${largura.toFixed(2)} tile de largura`).toBeGreaterThan(
+        1
+      );
+    }
+  });
+});
+
+describe('Devorador Branco — o silencio antes da boca', () => {
+  /** Roda o ciclo e devolve o vao, em ticks, entre o ultimo pouso e a boca. */
+  const gap = (seed: number): number => {
+    const { state, worm } = arena(seed);
+    let lastLanding = -1;
+    let flying = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) lastLanding = state.tick;
+      flying = worm.mood === DEVOURER_AIRBORNE;
+      if (worm.mood === DEVOURER_MAW) {
+        expect(lastLanding, 'a boca abriu sem nenhum pouso antes').toBeGreaterThanOrEqual(0);
+        return state.tick - lastLanding;
+      }
+    }
+    throw new Error('a boca nunca abriu');
+  };
+
+  it('a boca NAO abre no tick do pouso: ha um vao, e ele e o declarado', () => {
+    // Antes ela abria no mesmo quadro em que o corpo caia, e o jogador nao
+    // tinha como separar "ele pousou" de "a janela abriu" — duas coisas que
+    // pedem respostas opostas: sair de perto, e chegar perto.
+    expect(gap(701)).toBe(DEVOURER_MAW_SETTLE_TICKS);
+    expect(gap(802)).toBe(DEVOURER_MAW_SETTLE_TICKS);
+  });
+
+  it('o vao e o corpo ENTERRANDO mais o silencio, e nao um numero solto', () => {
+    // As duas metades tem sentidos diferentes e por isso sao dois numeros: a
+    // primeira e fisica (o corpo seguindo a cabeca para dentro do buraco, a
+    // velocidade de escavacao), a segunda e ritmo (o unico momento do encontro
+    // em que ele nao esta na tela). Somar as duas numa constante so apagaria a
+    // unica das duas que um teste do CLIENTE consegue conferir.
+    expect(DEVOURER_MAW_SETTLE_TICKS).toBe(
+      DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS
+    );
+    // O silencio usa o MESMO vao do telegrafo da emergencia: o encontro tem um
+    // tempo de aviso so, e o jogador aprende uma vez.
+    expect(DEVOURER_MAW_OPEN_DELAY_TICKS).toBe(DEVOURER_ERUPT_WINDUP_TICKS);
+  });
+
+  it('durante a espera ele continua ESPREITANDO: a boca abre onde ele chegou', () => {
+    // Se ela abrisse sempre na ultima cratera, os dois ultimos segundos de
+    // rastro nao diriam nada — e o rastro e o unico aviso que este chefe da.
+    const { state, worm } = arena(701);
+    let landed: { x: number; y: number } | null = null;
+    let flying = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) landed = { x: worm.x, y: worm.y };
+      flying = worm.mood === DEVOURER_AIRBORNE;
+      if (worm.mood === DEVOURER_MAW) break;
+    }
+    expect(worm.mood).toBe(DEVOURER_MAW);
+    expect(landed).not.toBeNull();
+    expect(
+      Math.hypot(worm.x - landed!.x, worm.y - landed!.y),
+      'ele ficou parado esperando'
+    ).toBeGreaterThan(1);
+  });
+
+  it('a rajada gasta se DECLARA, em vez de se confundir com a que nunca comecou', () => {
+    // Zero e o que um chefe recem-nascido tem, e a decolagem ja o le como
+    // "comece uma rajada inteira". A primeira versao desta espera usou zero
+    // para dizer "acabou" e o chefe abria a boca antes do primeiro arco do
+    // encontro — a luta inteira sumia.
+    expect(DEVOURER_BURST_SPENT).toBeLessThan(0);
+    const { state, worm } = arena(701);
+    expect(state.bossRuntime.leapsLeft, 'um chefe novo ja nasce com a rajada gasta').not.toBe(
+      DEVOURER_BURST_SPENT
+    );
+    let sawSpent = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (state.bossRuntime.leapsLeft === DEVOURER_BURST_SPENT) sawSpent = true;
+      if (worm.mood === DEVOURER_MAW) break;
+    }
+    expect(sawSpent, 'a rajada nunca chegou a se declarar gasta').toBe(true);
+  });
+});
+
+describe('Devorador Branco — a onda de choque do pouso', () => {
+  /**
+   * Roda o ciclo de verdade e devolve o que o jogador levou NO TICK DO POUSO,
+   * parado a `d` tiles do ponto onde o corpo bateu.
+   *
+   * O arco nao e forcado, e a primeira versao deste ajudante errou justamente
+   * ai: por o humor em `airborne` na mao nao poe o chefe em voo — quem conduz o
+   * corpo e a ACAO de salto, e sem ela nada pousa e a medida saia zero em todo
+   * raio, inclusive dentro da cratera. Aqui o ciclo corre sozinho e o teste so
+   * escolhe onde o jogador esta quando ele chega.
+   *
+   * A distancia e do PONTO DE QUEDA (`leapToX/Y`, que a simulacao ja carrega
+   * durante o voo) e nao da posicao do chefe: o que a onda mede e onde o corpo
+   * bateu, e o corpo so esta la no ultimo tick.
+   */
+  const hitAt = (d: number): number => {
+    const { state, worm } = arena(910);
+    for (let t = 0; t < 600; t++) {
+      const flying = worm.mood === DEVOURER_AIRBORNE;
+      if (flying) {
+        state.player.x = state.bossRuntime.leapToX + d;
+        state.player.y = state.bossRuntime.leapToY;
+      }
+      const hp = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      // O tick em que ele deixou de voar E o tick do pouso: e ali que a cratera
+      // e a onda cobram, e so ali.
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) return hp - state.player.hp;
+      state.player.hp = state.player.maxHp;
+    }
+    throw new Error('o ciclo nao chegou a pousar');
+  };
+
+  it('cobra do anel de FORA da cratera: o corpo e maior que a cabeca', () => {
+    // A razao de a onda existir. O chefe passou de 3,1 para quase 6 tiles de
+    // corpo e a cratera continuava do tamanho da cabeca — sem isto, o corpo
+    // novo seria enfeite: uma coisa enorme desabando sem consequencia nenhuma
+    // fora do ponto exato do impacto.
+    const meio = (DEVOURER_ERUPT_RADIUS + DEVOURER_SLAM_RADIUS) / 2;
+    expect(hitAt(meio), `a ${meio.toFixed(1)} tiles o pouso nao cobrou nada`).toBeGreaterThan(0);
+  });
+
+  it('cobra MENOS ali do que na cratera: e um degrau, e nao um raio maior', () => {
+    // Se os dois aneis cobrassem igual, o par de raios nao ensinaria nada — o
+    // jogador nao teria como saber que estava perto da borda em vez de dentro.
+    const dentro = hitAt(DEVOURER_ERUPT_RADIUS * 0.5);
+    const borda = hitAt((DEVOURER_ERUPT_RADIUS + DEVOURER_SLAM_RADIUS) / 2);
+    expect(borda).toBeLessThan(dentro);
+  });
+
+  it('NAO empilha: quem levou a cratera nao leva a onda tambem', () => {
+    // Um jogador tem de sair daqui com UM numero na tela. Empilhados, a cratera
+    // de 30 e a onda de 10 sairiam como 40 num tick, e nenhum dos dois raios
+    // seria legivel no que aconteceu.
+    expect(hitAt(DEVOURER_ERUPT_RADIUS * 0.5)).toBe(DEVOURER_ERUPT_DAMAGE);
+  });
+
+  it('acaba: fora do raio da onda o pouso nao alcanca', () => {
+    expect(hitAt(DEVOURER_SLAM_RADIUS + 1.5), 'a onda nao tem borda').toBe(0);
+  });
+
+  it('e ESCAPAVEL com a esquiva, e o raio nao pode crescer sem isso deixar de valer', () => {
+    // O par de raios e derivado, e e isto que ele protege. O arco mais curto
+    // voa `MIN_RANGE / LEAP_SPEED` segundos; nesse tempo uma corrida cobre
+    // `PLAYER_SPEED x voo` e a esquiva acrescenta o que ela ganha de velocidade
+    // no vao dela. A cratera e o que a corrida resolve; a onda e o que so a
+    // esquiva resolve. Sem esta conta, aumentar o raio um dia viraria um
+    // imposto em vez de um ataque.
+    const voo = DEVOURER_LEAP_MIN_RANGE / DEVOURER_LEAP_SPEED;
+    const corrida = PLAYER_SPEED * voo;
+    const esquiva = corrida + (DODGE_SPEED - PLAYER_SPEED) * (DODGE_TICKS / TICK_HZ);
+    expect(DEVOURER_ERUPT_RADIUS, 'a cratera saiu do alcance da corrida').toBeLessThanOrEqual(
+      corrida + 0.4
+    );
+    expect(DEVOURER_SLAM_RADIUS, 'a onda saiu do alcance da esquiva').toBeLessThanOrEqual(esquiva);
+    expect(DEVOURER_SLAM_RADIUS, 'a onda cabe na cratera: nao ha degrau').toBeGreaterThan(
+      DEVOURER_ERUPT_RADIUS
+    );
+  });
+});
+
 describe('Devorador Branco — a rajada e a janela', () => {
   /** Percorre o ciclo contando arcos ate a primeira vez que ele entala. */
   const burst = (seed: number) => {
@@ -371,6 +680,48 @@ describe('Devorador Branco — a rajada e a janela', () => {
     // O numero e a mecanica: um arco por ciclo dava pressao constante, e
     // pressao constante nao obriga o jogador a errar. A janela paga tres.
     expect(burst(621).arcsBeforeStuck).toBe(DEVOURER_LEAPS_PER_CYCLE);
+  });
+
+  it('a DECOLAGEM nunca cai perto da queda, mesmo com pouca areia', () => {
+    // O defeito que a espreita revelou: a busca da decolagem aceita qualquer
+    // celula ate tres ANEIS do ponto ideal, e anel e distancia de Chebyshev —
+    // o anel 3 tem canto a 4,24 tiles. Com o ideal no minimo (5), a decolagem
+    // podia cair a menos de um tile da queda; medido em playtest, 1,41.
+    //
+    // Era furo no contra-jogo antes de ser feio: com o disco inteiro
+    // vitrificado, ele ainda achava a nadinha de areia colada no alvo e saltava
+    // dali. O teste poe exatamente essa cena — vidro em tudo menos numa janela
+    // pequena junto do jogador — e cobra que todo arco nascido dela respeite o
+    // comprimento minimo.
+    const { state, px, py } = arena(733);
+    const w = state.config.width;
+    for (let y = py - 16; y <= py + 16; y++) {
+      for (let x = px - 16; x <= px + 16; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        const d = Math.hypot(x - px, y - py);
+        if (d > 16 || d <= 1.5) continue;
+        state.surface[y * w + x] = SURF_GLASS;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+    let arcs = 0;
+    for (let t = 0; t < 900; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'action_start' || ev.action !== 'erupt') continue;
+        arcs++;
+        const span = Math.hypot(
+          ev.x - state.bossRuntime.leapToX,
+          ev.y - state.bossRuntime.leapToY,
+        );
+        expect(span, `arco de ${span.toFixed(2)} tiles`).toBeGreaterThanOrEqual(
+          DEVOURER_LEAP_MIN_RANGE - 1.5,
+        );
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    // O teste vale mesmo com zero arcos (vidro negando tudo e o desfecho
+    // correto desta cena), mas o que ele NAO pode e ver um arco curto.
+    expect(arcs, `${arcs} arcos, todos validos`).toBeGreaterThanOrEqual(0);
   });
 
   it('nenhum arco da rajada tem comprimento zero', () => {

@@ -95,6 +95,9 @@ import {
   MAGNETARCH_TETHER_DAMAGE,
   MAGNETARCH_TETHER_RANGE,
   MAX_ENEMIES,
+  DEVOURER_BROOD_RING,
+  DEVOURER_BROOD_SHY,
+  DEVOURER_BROOD_SPREAD,
   DEVOURER_BURROWED_ARMOR,
   DEVOURER_BURROW_MIN_TICKS,
   DEVOURER_BURROW_SPEED,
@@ -114,11 +117,17 @@ import {
   DEVOURER_SURFACE_SPEED,
   DEVOURER_HOP_GAP_TICKS,
   DEVOURER_REPEAT_MIN_GAP,
+  DEVOURER_SLAM_DAMAGE,
+  DEVOURER_SLAM_RADIUS,
   DEVOURER_LEAPS_PER_CYCLE,
+  DEVOURER_BURST_SPENT,
+  DEVOURER_MAW_SETTLE_TICKS,
   DEVOURER_MAW_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_STEP,
+  DEVOURER_STALK_CIRCLE,
+  DEVOURER_STALK_RANGE,
   DEVOURER_TRAIL_WIDTH,
   SURF_GLASS,
   SURF_SCORCHED,
@@ -447,6 +456,22 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     contactCooldown: 14,
     aggroRange: 11,
   },
+  // A NINHADA do Devorador. Todos os numeros de ameaca sao zero, e isso e o
+  // desenho e nao um esboco por preencher: um ponto de vida (qualquer coisa
+  // mata), dano de contato zero (ele nao pode machucar nem por acidente) e
+  // alcance de aggro zero (ele nao persegue ninguem — ele segue a mae).
+  //
+  // O raio e o menor do jogo de proposito. Ele decide duas coisas alem do
+  // desenho: o quanto o filhote se afasta dos irmaos, e o quao facil e pisar
+  // nele. As duas querem o mesmo numero pequeno.
+  devourer_brood: {
+    hp: 1,
+    speed: 3.2,
+    radius: 0.17,
+    contactDamage: 0,
+    contactCooldown: 999,
+    aggroRange: 0,
+  },
   // Corpo largo, quase parado: ele e um orgao do bioma, nao um cacador. O
   // perigo dele e ONDE o gas passa a estar, nunca a perseguicao.
   bellows: {
@@ -638,7 +663,15 @@ export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean =
   return state.solid[cy * state.config.width + cx] !== SOLID_NONE;
 };
 
-const circleBlocked = (state: SurvivalState, x: number, y: number, r: number): boolean =>
+/**
+ * O CORPO cabe aqui? Nao a celula do centro — o circulo inteiro.
+ *
+ * Exportada porque a geracao de mundo precisa da MESMA pergunta que o
+ * movimento faz. Um nascimento conferido so pela celula do centro pode por
+ * um canto do circulo dentro da pedra, e dali `moveEntity` nao tira mais:
+ * todo passo que sairia ja comeca bloqueado.
+ */
+export const circleBlocked = (state: SurvivalState, x: number, y: number, r: number): boolean =>
   isSolidAt(state, x - r, y - r) ||
   isSolidAt(state, x + r, y - r) ||
   isSolidAt(state, x - r, y + r) ||
@@ -916,7 +949,12 @@ export const damageEntity = (
     state.bossRuntime.leviathanShockAt = -1;
     ent.action = undefined;
   }
-  recordKill(state.stats, ent.archetype as EnemyArchetype);
+  // A NINHADA nao entra na contagem de abates. O total alimenta o PLACAR, e
+  // catorze filhotes inofensivos por camara seriam pontos de graca para quem
+  // pisasse neles — um placar em que esmagar filhote rende mais que enfrentar o
+  // chefe esta medindo a coisa errada. O evento de morte continua indo; o que
+  // nao vai e o credito.
+  if (ent.archetype !== 'devourer_brood') recordKill(state.stats, ent.archetype as EnemyArchetype);
   // O chefe deste setor CAIU — e cai uma vez so na run.
   //
   // A marca vive no estado (e nao na entidade, que o repovoamento descarta)
@@ -935,6 +973,10 @@ export const damageEntity = (
   // alivio depender de ele ser o dono do setor — o que ele sempre e hoje, e o
   // "hoje" e exatamente o tipo de coisa que envelhece calado.
   if (ent.archetype === 'furnace_heart') furnaceHeartCooldown(state, ent, events);
+  // A MAE CAIU: a ninhada vai junto. Ver `devourerBroodEnds` — sem isto, o que
+  // sobra na camara limpa sao catorze filhotes orfaos ocupando vaga do teto de
+  // inimigos e parando bala.
+  if (ent.archetype === 'white_devourer') devourerBroodEnds(state, events);
   if (state.sectorBoss.entityId === ent.id && isBossArchetype(ent.archetype)) {
     markSectorBossDown(state, state.sector);
     // O SELO CEDEU. Evento proprio, e nao o `death` reinterpretado: o cliente
@@ -2520,6 +2562,257 @@ const diverEngaged = (
 };
 
 /**
+ * O passo de UMA MINHOQUINHA.
+ *
+ * Ela nao ataca, nao persegue e nao tem acao nenhuma no repertorio. O que ela
+ * faz sao tres coisas, nesta ordem de prioridade: fugir do Prospector, nao
+ * encostar nos irmaos, e voltar para perto da mae.
+ *
+ * A ordem e o comportamento inteiro. Com a mae primeiro, o bando atravessaria o
+ * jogador para chegar nela; com a separacao primeiro, ela se espalharia em vez
+ * de fugir. Fuga na frente e o que faz o chao ABRIR na frente de quem anda e
+ * fechar atras — que e a unica coisa que um bicho inofensivo pode fazer para
+ * parecer vivo.
+ *
+ * Nada disto usa `moveEntity`: parede nao vale para eles pelo mesmo motivo que
+ * nao vale para a mae — eles vivem NA areia, nao sobre ela. O que os limita e a
+ * moldura do mapa.
+ */
+const broodStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+): void => {
+  let mx = 0;
+  let my = 0;
+
+  // 1. FUGIR. O peso cresce quanto mais perto o Prospector esta, entao um
+  //    filhote encurralado corre mais que um que so viu o vulto passar.
+  if (player && player.alive) {
+    const d = distTo(enemy, player);
+    if (d < DEVOURER_BROOD_SHY && d > 0.0001) {
+      const away = normalized(enemy.x - player.x, enemy.y - player.y);
+      const urge = 1 - d / DEVOURER_BROOD_SHY;
+      mx += away.x * urge * 2.2;
+      my += away.y * urge * 2.2;
+    }
+  }
+
+  // 2. NAO ENCOSTAR NO IRMAO. E o "sem overlap": catorze corpos mirando o mesmo
+  //    anel se amontoariam num arco so, e um cordao de contas nao e um bando.
+  //
+  //    O laco e sobre TODA a fauna e nao so sobre a ninhada — um filhote
+  //    tambem nao tem por que ficar dentro de um stalker — mas o chefe fica de
+  //    fora: a mae e para onde eles vao, e empurra-los para longe dela
+  //    cancelaria o proprio comportamento que os define.
+  for (const other of state.enemies) {
+    if (other === enemy || !other.alive) continue;
+    if (isBossArchetype(other.archetype)) continue;
+    const dx = enemy.x - other.x;
+    const dy = enemy.y - other.y;
+    const d = Math.hypot(dx, dy);
+    if (d >= DEVOURER_BROOD_SPREAD || d <= 0.0001) continue;
+    const push = (DEVOURER_BROOD_SPREAD - d) / DEVOURER_BROOD_SPREAD;
+    mx += (dx / d) * push * 1.6;
+    my += (dy / d) * push * 1.6;
+  }
+
+  // 3. A MAE. Um ANEL e nao um ponto, pela mesma razao da espreita do chefe:
+  //    mirar o centro sem distancia de parada faz o corpo oscilar em cima do
+  //    alvo, e aqui seriam catorze corpos oscilando no mesmo ponto.
+  const mother = state.enemies.find((e) => e.alive && e.archetype === 'white_devourer');
+  if (mother) {
+    const span = distTo(enemy, mother);
+    if (span > 0.0001) {
+      const toward = normalized(mother.x - enemy.x, mother.y - enemy.y);
+      // Positivo puxa para dentro, negativo empurra para fora: um so numero
+      // resolve "longe demais" e "perto demais".
+      const gap = Math.max(-1, Math.min(1, (span - DEVOURER_BROOD_RING) * 0.6));
+      mx += toward.x * gap;
+      my += toward.y * gap;
+      // Uma volta lenta em torno dela, com o sentido saindo do id — a mesma
+      // regra da espreita, e pelo mesmo motivo: sorteio nao sobrevive a uma
+      // sala de co-op nem a uma re-simulacao de replay.
+      const spin = enemy.id % 2 === 0 ? 1 : -1;
+      mx += -toward.y * spin * 0.35;
+      my += toward.x * spin * 0.35;
+    }
+  }
+
+  const w = state.config.width;
+  const len = Math.hypot(mx, my);
+  if (len >= 0.0001) {
+    const step = ARCHETYPES.devourer_brood.speed * dt;
+    enemy.facing = { x: mx / len, y: my / len };
+    // COM COLISAO, ao contrario da mae. Ela atravessa solido porque esta por
+    // BAIXO dele — e o unico corpo do jogo que faz isso, e e por isso que
+    // persegui-la nao e uma resposta. Os filhotes estao na superficie: um
+    // filhote dentro da rocha e invisivel e nao pode ser pisado, e "podem ser
+    // esmagados" e metade do que eles sao.
+    moveEntity(state, enemy, (mx / len) * step, (my / len) * step);
+  }
+
+};
+
+/**
+ * Quantas vezes a separacao varre os pares por tick.
+ *
+ * Uma varredura resolve cada par que ela visita, mas nao o CONJUNTO: separar A
+ * de B pode empurrar A para dentro de C, e C ja foi visitado. Duas varreduras a
+ * mais desfazem o que a primeira criou, e a partir da terceira nao ha mais o que
+ * desfazer nas densidades que este bando alcanca — medido em duzentos ticks do
+ * ninho de verdade, com a mae puxando todos para o mesmo anel.
+ *
+ * Nao e um laco ate convergir: um monte suficientemente denso nao TEM solucao
+ * (catorze corpos nao cabem num circulo de 0,34), e um laco assim gastaria o
+ * tick inteiro tentando. Tres passadas e o que resolve o caso real; o
+ * patologico nao acontece porque o nascimento espalha os corpos em espiral.
+ */
+const BROOD_SEPARATION_PASSES = 3;
+
+/**
+ * A NINHADA ACABA COM A MAE.
+ *
+ * Nao e zelo de limpeza: e a frase que a propria ninhada ja dizia e que o
+ * codigo nao cumpria. O comentario do nascimento afirma "ela nasce com a mae,
+ * existe so onde ela existe e some do mapa junto com ela", e a segunda metade
+ * era falsa — morto o Devorador, catorze filhotes ficavam orfaos numa camara
+ * limpa, ocupando vaga do teto de inimigos e parando bala, sem nada para
+ * seguir.
+ *
+ * Eles MORREM, e nao desaparecem. O evento de morte de cada um vira o punhado
+ * de particulas de sempre, e o que o jogador ve no instante em que o chefe cai
+ * e a ninhada inteira se desfazendo junto — que e a unica leitura possivel de
+ * uma coisa que so existia porque ela existia.
+ *
+ * Sem `damageEntity` pela mesma razao do pisao: isto nao e um abate. Nenhum
+ * deles entra na contagem, aqui como la.
+ */
+const devourerBroodEnds = (state: SurvivalState, events: SemanticEvent[]): void => {
+  for (const b of state.enemies) {
+    if (!b.alive || b.archetype !== 'devourer_brood') continue;
+    b.hp = 0;
+    b.alive = false;
+    events.push({
+      t: 'death',
+      x: b.x,
+      y: b.y,
+      entity: b.id,
+      archetype: b.archetype,
+      facingX: b.facing.x,
+      facingY: b.facing.y,
+      tick: state.tick,
+    });
+  }
+};
+
+/**
+ * SEPARA A NINHADA, depois que todos ja andaram.
+ *
+ * Roda no fim de `updateEnemies` e nao dentro do passo de cada filhote, e a
+ * diferenca e o que faz a promessa valer. Dentro do passo, quem anda DEPOIS
+ * volta a entrar no irmao que ja tinha sido resolvido — medido no ninho de
+ * verdade, dois filhotes terminavam o tick 105 a 0,306 de uma distancia minima
+ * de 0,34. Nao adianta corrigir a aritmetica de um par se o par pode ser
+ * desfeito no mesmo tick por um terceiro que ainda nem se mexeu.
+ *
+ * Cada par e visitado UMA vez (`b.id > a.id`) e os DOIS corpos se movem meia
+ * penetracao a partir da mesma medida. A versao anterior movia so um deles,
+ * contando com a visita reciproca para a outra metade, e a conta nao fecha: na
+ * segunda visita a penetracao ja encolheu para p/2 e o segundo corpo move p/4,
+ * sobrando p/4.
+ */
+/** O corpo cabe nesse ponto? (dentro da moldura e fora da rocha) */
+const free = (state: SurvivalState, ent: Entity, x: number, y: number): boolean =>
+  x >= 1.5 &&
+  y >= 1.5 &&
+  x <= state.config.width - 1.5 &&
+  y <= state.config.height - 1.5 &&
+  !circleBlocked(state, x, y, ent.radius);
+
+const separateBrood = (state: SurvivalState): void => {
+  const nest = state.enemies.filter((e) => e.alive && e.archetype === 'devourer_brood');
+  if (nest.length < 2) return;
+  for (let pass = 0; pass < BROOD_SEPARATION_PASSES; pass++) {
+    for (let i = 0; i < nest.length; i++) {
+      for (let j = i + 1; j < nest.length; j++) {
+        const a = nest[i];
+        const b = nest[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d = Math.hypot(dx, dy);
+        const min = a.radius + b.radius;
+        if (d >= min) continue;
+        // Coincidentes por completo (o mesmo ponto de partida, ou um empurrao
+        // que os alinhou): sem direcao para separar, a paridade do id decide —
+        // o mesmo recurso que o sentido da volta ja usa, e pela mesma razao de
+        // sala de co-op.
+        const nx = d > 0.0001 ? dx / d : a.id % 2 === 0 ? 1 : -1;
+        const ny = d > 0.0001 ? dy / d : 0;
+        const half = (min - d) * 0.5;
+        // O EMPURRAO RESPEITA A ROCHA. Estas atribuicoes sao diretas — nao
+        // passam por `moveEntity` — e sem a checagem elas desfaziam a garantia
+        // que o passo tinha acabado de dar: encostado numa quina, um filhote
+        // separado do irmao ia parar DENTRO da parede, onde ninguem pode pisar
+        // nele. "Podem ser esmagados" e metade do que eles sao.
+        //
+        // Quando um dos lados esbarra, o outro leva o deslocamento INTEIRO: a
+        // separacao continua acontecendo, so que toda para o lado que tem
+        // espaco. Com os dois presos nao ha para onde ir, e um tick sobreposto
+        // encostado na parede e melhor que um corpo enterrado nela.
+        const aFree = free(state, a, a.x + nx * half, a.y + ny * half);
+        const bFree = free(state, b, b.x - nx * half, b.y - ny * half);
+        const aStep = aFree ? (bFree ? half : min - d) : 0;
+        const bStep = bFree ? (aFree ? half : min - d) : 0;
+        if (aStep > 0 && free(state, a, a.x + nx * aStep, a.y + ny * aStep)) {
+          a.x = a.x + nx * aStep;
+          a.y = a.y + ny * aStep;
+        }
+        if (bStep > 0 && free(state, b, b.x - nx * bStep, b.y - ny * bStep)) {
+          b.x = b.x - nx * bStep;
+          b.y = b.y - ny * bStep;
+        }
+      }
+    }
+  }
+};
+
+/**
+ * PISADO. O filhote que ficou debaixo de um pe morre, e morre em silencio.
+ *
+ * Sem `damageEntity`: ele nao tem dano a receber, nao ha numero para mostrar e
+ * — sobretudo — isto NAO E UMA MORTE CONTABILIZAVEL. `recordKill` alimenta o
+ * total de abates, e o total de abates alimenta o placar; catorze bichinhos
+ * inofensivos por camara virariam pontos de graca para quem pisasse neles, e um
+ * placar em que esmagar filhote rende mais que enfrentar o chefe esta medindo a
+ * coisa errada.
+ *
+ * O evento de morte continua indo: e dele que sai o punhado de particulas, e o
+ * jogador precisa VER que pisou em alguma coisa.
+ */
+const crushBrood = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): boolean => {
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > enemy.radius + player.radius) continue;
+    enemy.hp = 0;
+    enemy.alive = false;
+    events.push({
+      t: 'death',
+      x: enemy.x,
+      y: enemy.y,
+      entity: enemy.id,
+      archetype: enemy.archetype,
+      facingX: enemy.facing.x,
+      facingY: enemy.facing.y,
+      tick: state.tick,
+    });
+    return true;
+  }
+  return false;
+};
+
+/**
  * O passo do DEVORADOR BRANCO: mergulhado, ele anda por baixo e deixa rastro;
  * exposto, e um corpo lento que pode ser cobrado.
  *
@@ -2561,22 +2854,96 @@ const devourerStep = (
   // onde ele anda, e ao mesmo tempo a materia que o contra-jogo consome.
   if (!player) return;
   if (!diverEngaged(state, enemy, player, DEVOURER_BURROW_MIN_TICKS, events)) return;
-  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
-  enemy.facing = { ...toward };
+  const span = distTo(enemy, player);
+  // A DIRECAO DEGENERA quando ele pousa em cima do alvo, e isso nao e hipotese:
+  // a queda do arco e MIRADA no jogador, entao o corpo comeca o mergulho
+  // seguinte a distancia zero dele com alguma regularidade. Ali
+  // `normalized(0, 0)` devolve (0, 0), e um passo multiplicado por (0, 0) e
+  // parado — o chefe ficaria plantado dentro do jogador para sempre, sem rastro
+  // e sem nunca voltar a sair.
+  //
+  // E o mesmo defeito que o arco ja teve (ver DEVOURER_LEAP_TURN) e a mesma
+  // cura: quando nao ha de onde tirar uma direcao, usar a ultima valida.
+  const toward =
+    span > 0.0001
+      ? normalized(player.x - enemy.x, player.y - enemy.y)
+      : normalized(enemy.facing.x, enemy.facing.y);
   const step = DEVOURER_BURROW_SPEED * dt;
+
+  // ELE ESPREITA, e nao persegue ate encostar.
+  //
+  // A versao anterior mirava a posicao do jogador sem distancia de parada, e o
+  // resultado era medivel: a distancia estabilizava em 0,10 tile e oscilava
+  // entre 0,10 e 0,13 a cada tick, com o chefe vibrando em cima dos pes do
+  // Prospector. O relato de playtest foi exatamente isso — "fica dancando ao
+  // redor dele".
+  //
+  // O ciclo dele ja pedia o contrario: o arco so le como arco a partir de
+  // DEVOURER_LEAP_MIN_RANGE, e colado no alvo a decolagem tem de recuar por
+  // baixo antes de subir. Perseguir ate zero brigava com o proprio salto.
+  //
+  // Agora o passo se divide em duas partes. A RADIAL corrige o erro de
+  // distancia ate DEVOURER_STALK_RANGE — aproxima quando esta longe, afasta
+  // quando esta perto demais — e nunca gasta mais que o proprio erro, senao ele
+  // ultrapassaria o anel e voltaria a oscilar, so que num raio maior. O que
+  // sobra do passo vai para a TANGENTE, e e ela que o mantem circulando: um
+  // verme parado embaixo da areia nao deixa rastro, e o rastro e o unico aviso
+  // que este chefe da.
+  const gap = span - DEVOURER_STALK_RANGE;
+  const radial = Math.max(-step, Math.min(step, gap));
+  // O que sobrou do passo depois de corrigir a distancia, com teto: perto do
+  // anel quase tudo vira volta, longe dele quase tudo vira aproximacao.
+  const orbit = Math.sqrt(Math.max(0, step * step - radial * radial)) * DEVOURER_STALK_CIRCLE;
+  // O SENTIDO da volta sai do id do corpo, e nao de um sorteio: ele tem de ser
+  // o mesmo nas duas pontas de uma sala de co-op, e o mesmo em toda re-simulacao
+  // de um replay.
+  const spin = enemy.id % 2 === 0 ? 1 : -1;
+  const side = { x: -toward.y * spin, y: toward.x * spin };
+  const moveX = toward.x * radial + side.x * orbit;
+  const moveY = toward.y * radial + side.y * orbit;
+  const travel = Math.hypot(moveX, moveY);
+
+  // A CARA SEGUE O MOVIMENTO, e nao o alvo.
+  //
+  // Ela apontava para o jogador (`toward`), e no anel de espreita isso e quase
+  // perpendicular a marcha: chegando a `DEVOURER_STALK_RANGE` o erro de
+  // distancia zera, a componente radial some e o passo inteiro vira tangente.
+  // O chefe andava de lado com o rosto virado para o alvo.
+  //
+  // Isso sempre foi errado e passou a ser VISIVEL com o corpo segmentado. O
+  // cliente escolhe a direcao do sprite da cabeca pela `facing` autoritativa e
+  // deriva a tangente dos aneis da TRAJETORIA — quer dizer que a cabeca
+  // encontrava um pescoco perpendicular a ela, exatamente na costura que o
+  // corpo novo existe para esconder.
+  //
+  // O recuo continua sendo `toward`, e so quando nao ha marcha de onde tirar
+  // uma direcao: um corpo parado precisa continuar olhando para algum lugar.
+  const heading = travel > 0.0001 ? { x: moveX / travel, y: moveY / travel } : toward;
+  enemy.facing = { ...heading };
+
   // Sem `moveEntity`: parede nao vale por baixo. Ele e o unico corpo do jogo
   // que atravessa solido, e e por isso que perseguir nao e uma resposta a ele.
-  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + toward.x * step));
-  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + toward.y * step));
+  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + moveX));
+  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + moveY));
 
   // O RASTRO: silica solta na faixa por onde passou, so em chao aberto e limpo.
   // Nao pinta por cima de nada — nem de fogo, nem de agua, nem do proprio
   // vidro: sobrescrever o vidro apagaria o contra-jogo do jogador com o
   // proprio corpo do chefe.
-  const side = { x: -toward.y, y: toward.x };
-  for (let lane = -DEVOURER_TRAIL_WIDTH; lane <= DEVOURER_TRAIL_WIDTH; lane++) {
-    const tx = Math.floor(enemy.x + side.x * lane);
-    const ty = Math.floor(enemy.y + side.y * lane);
+  //
+  // A FAIXA E PERPENDICULAR A MARCHA, e nao a `side`.
+  //
+  // `side` e a tangente da orbita, e no anel de espreita ela E a direcao do
+  // passo — as tres faixas caiam uma na frente da outra, em cima do proprio
+  // caminho, e a banda de tres tiles que este rastro promete virava uma linha
+  // de um. Nao e so feio: o rastro e o unico aviso deste chefe e a area que o
+  // jogador tem para vitrificar antes de a boca abrir, entao a largura dele e
+  // mecanica.
+  const lane =
+    travel > 0.0001 ? { x: -moveY / travel, y: moveX / travel } : { x: -toward.y, y: toward.x };
+  for (let l = -DEVOURER_TRAIL_WIDTH; l <= DEVOURER_TRAIL_WIDTH; l++) {
+    const tx = Math.floor(enemy.x + lane.x * l);
+    const ty = Math.floor(enemy.y + lane.y * l);
     if (tx < 1 || ty < 1 || tx >= w - 1 || ty >= state.config.height - 1) continue;
     const i = ty * w + tx;
     if (state.solid[i] !== SOLID_NONE) continue;
@@ -2585,6 +2952,16 @@ const devourerStep = (
   }
 
   if (state.tick < enemy.nextActionAt) return;
+
+  // A RAJADA ACABOU: o que vem depois da espera nao e outro arco, e a BOCA.
+  //
+  // A conta de arcos e o unico estado que separa os dois desfechos, e ela ja
+  // existia: `devourerLand` a decrementa no POUSO, e um relogio mais longo
+  // quando ela zera. Aqui so se le o que ela diz.
+  if (state.bossRuntime.leapsLeft === DEVOURER_BURST_SPENT) {
+    devourerOpenMaw(state, enemy, events);
+    return;
+  }
 
   // A EMERGENCIA. Ele mira onde o jogador VAI estar, e nao onde esta: o alvo
   // parado e o unico que a antecipacao erra, e isso e de proposito — quem le o
@@ -2685,6 +3062,24 @@ const devourerLaunchSpot = (
     Math.floor(landX + dir.x * reach),
     Math.floor(landY + dir.y * reach),
     DEVOURER_LAUNCH_SEARCH,
+    // A DECOLAGEM NAO PODE CAIR PERTO DA QUEDA, e sem esta recusa ela caía.
+    //
+    // A busca aceita qualquer celula ate `DEVOURER_LAUNCH_SEARCH` aneis do ponto
+    // ideal, e anel e distancia de Chebyshev: o anel 3 tem canto a 4,24 tiles.
+    // Com o ideal no minimo (5), isso deixava a decolagem chegar a 0,76 do
+    // ponto de queda — medido em playtest a 1,41 tile. Um arco desse tamanho e
+    // o "salto de comprimento zero" que este chefe ja teve uma vez, e o
+    // DEVOURER_LEAP_TURN foi posto justamente para ele nao voltar.
+    //
+    // Pior que feio: era um furo no contra-jogo. Vitrificar em volta empurra a
+    // decolagem para longe — e essa e a segunda alavanca do vidro —, mas a
+    // busca podia recuar para uma nadinha de areia colada no alvo e saltar dali
+    // mesmo assim, com o disco inteiro vitrificado em volta.
+    //
+    // A recusa e a MESMA que separa as crateras de uma rajada, com outro raio:
+    // o anel seguinte continua sendo consultado, entao ele acha uma decolagem
+    // valida mais longe em vez de cancelar o arco.
+    { x: landX, y: landY, gap: DEVOURER_LEAP_MIN_RANGE },
   );
 };
 
@@ -2731,6 +3126,7 @@ const devourerLeapStride = (
 const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   enemy.action = undefined;
   devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
+  devourerSlam(state, enemy, events);
   // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
   // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: a BOCA abre.
   //
@@ -2738,11 +3134,37 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
   // vidro negou nunca chegou a ser um ataque, e cobrar da conta um salto que
   // nao aconteceu deixaria o jogador ganhar a janela sem ter esquivado nada.
   state.bossRuntime.leapsLeft -= 1;
+  // Em todo caso ele volta para BAIXO. O que muda e quanto tempo ele fica la:
+  // com arco na conta, o vao entre os golpes; sem arco nenhum, o tempo de o
+  // corpo inteiro entrar na areia mais o silencio antes de o chao abrir.
+  //
+  // A boca NAO abre mais aqui, e essa e a mudanca. Ela abria no tick do
+  // terceiro pouso — o corpo caia e a cratera dentada ja estava no mesmo quadro
+  // —, e o jogador nao tinha como separar "ele pousou" de "a janela abriu",
+  // duas coisas que pedem respostas opostas: sair de perto, e chegar perto.
+  // Agora quem a abre e o ramo mergulhado, quando o relogio abaixo vence.
+  enemy.mood = DEVOURER_BURROWED;
   if (state.bossRuntime.leapsLeft > 0) {
-    enemy.mood = DEVOURER_BURROWED;
     enemy.nextActionAt = state.tick + DEVOURER_HOP_GAP_TICKS;
     return;
   }
+  // A rajada acabou, e a conta passa a DIZER isso — ver DEVOURER_BURST_SPENT.
+  // Zero nao serviria: zero e o que um chefe recem-nascido tem, e a decolagem
+  // ja o trata como "comece uma rajada inteira".
+  state.bossRuntime.leapsLeft = DEVOURER_BURST_SPENT;
+  enemy.nextActionAt = state.tick + DEVOURER_MAW_SETTLE_TICKS;
+};
+
+/**
+ * O CHAO SE ABRE. Chamada de um so lugar: o fim da espera do ramo mergulhado.
+ *
+ * Ele nao para de espreitar durante a espera, e isso e deliberado — a boca abre
+ * onde ele CHEGOU, e nao onde o terceiro arco caiu. O que a faixa de silica
+ * conta enquanto ele cava e exatamente a pergunta que a janela vai cobrar:
+ * "onde ele esta agora?". Se ela abrisse sempre na ultima cratera, o rastro dos
+ * ultimos dois segundos nao diria nada.
+ */
+const devourerOpenMaw = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   enemy.mood = DEVOURER_MAW;
   enemy.nextActionAt = state.tick + DEVOURER_MAW_TICKS;
   // O instante em que a boca abriu. Dele saem o alcance da sucao, a areia ja
@@ -3043,6 +3465,44 @@ const devourerCrater = (
     });
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+};
+
+/**
+ * A ONDA DE CHOQUE do pouso: o anel de fora da cratera.
+ *
+ * Separada de `devourerCrater` por duas razoes, e as duas sao de comportamento.
+ *
+ * Ela e SO do pouso. A decolagem chama a cratera e nao chama esta: sair da
+ * areia empurra o chao para os lados, desabar com seis tiles de corpo e outra
+ * coisa — e e a unica das duas que o jogador ve chegando, entao e a unica que
+ * pode cobrar mais caro sem virar dano nao anunciado.
+ *
+ * E ela nao toca no CHAO. A cratera revira a superficie (fragil que cede, areia
+ * onde havia rocha limpa) e isso e mecanica, nao enfeite: cada tile que ela
+ * transforma em areia e um tile onde a boca vai agarrar de verdade mais tarde,
+ * porque o vidro e que solta. Espalhar essa transformacao por um anel 40% maior
+ * mudaria o contra-jogo da janela inteira de lado. O que a onda faz e o que uma
+ * onda faz: bate em quem esta em pe perto dela.
+ *
+ * Quem ja levou a cratera nao leva esta. Nao e um segundo golpe empilhado no
+ * mesmo tick — e o degrau de FORA do mesmo golpe, e um jogador tem de sair
+ * daqui com um numero na tela, nao com dois.
+ */
+const devourerSlam = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    const d = distTo(enemy, player);
+    if (d <= DEVOURER_ERUPT_RADIUS || d > DEVOURER_SLAM_RADIUS) continue;
+    damageEntity(state, player, DEVOURER_SLAM_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'white_devourer',
+      elite: enemy.elite,
+    });
+  }
+  // O pulso largo, para o cliente desenhar o alcance de verdade. A cratera ja
+  // empurrou o dela; este e o anel de fora, e sem ele o efeito na tela ficaria
+  // menor que a area que machucou — que e a pior forma de um ataque mentir.
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_SLAM_RADIUS });
 };
 
 /**
@@ -4909,6 +5369,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       devourerStep(state, enemy, player, dt, events);
       continue;
     }
+    // A NINHADA. Fluxo proprio como o Miner e o Fole, e por um motivo mais
+    // forte que o deles: o fluxo comum e "perseguir e bater", e este bicho nao
+    // faz nenhuma das duas. Passa-lo por la lhe daria uma acao de contato — ou
+    // seja, dano — que a definicao dele proibe.
+    if (enemy.archetype === 'devourer_brood') {
+      if (!crushBrood(state, enemy, events)) broodStep(state, enemy, player, dt);
+      continue;
+    }
     // Os chefes de estrato: cada um opera a alavanca do proprio bioma, e
     // nenhum deles e "perseguir e bater" — mesmo motivo do Miner e do Fole.
     if (enemy.archetype === 'sheet_leviathan') {
@@ -5450,6 +5918,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
   }
 
+  // A NINHADA SE DESEMBARALHA aqui, com todo mundo ja parado no lugar deste
+  // tick. Ver `separateBrood`: dentro do passo individual nao ha como garantir
+  // nada, porque quem anda depois desfaz o que foi resolvido antes.
+  //
+  // E AQUI, logo depois do laco, e nao no fim da funcao: o que vem abaixo sao as
+  // fases do Diamandis e do Guardiao, e a do Guardiao SAI DA FUNCAO quando nao
+  // ha Guardiao vivo (`if (!guardian || !guardian.alive) return`). Posta la, a
+  // separacao nunca rodava na camara do Devorador — que e a unica onde existe
+  // ninhada. O teste continuou reprovando com o mesmo numero, no mesmo tick, e
+  // foi isso que denunciou.
+  separateBrood(state);
+
   // O DIAMANDIS tem a propria fase de uma vez: o reator vaza abaixo da metade.
   const diamandis = state.enemies.find((e) => e.archetype === 'diamandis');
   if (diamandis && diamandis.alive) diamandisShedModules(state, diamandis, events);
@@ -5509,6 +5989,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
   }
+
 };
 
 export const applyExplosionDamage = (

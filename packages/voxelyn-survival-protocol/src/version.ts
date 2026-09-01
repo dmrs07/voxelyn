@@ -630,7 +630,150 @@ export const PROTOCOL_VERSION = 28;
 // com o jogador parado onde ele estava, a outra com ele meio tile mais perto —
 // e a distancia entre elas so cresce dali em diante.
 // 45: Diluvio ganha profundidade e descarga massiva evitavel por bolha de ar.
-export const SIMULATION_VERSION = 45;
+// 46: O DEVORADOR CRESCE e para de dancar. `DEVOURER_RADIUS` sobe de 0,8 para
+// 0,95, junto com a escala 1,4 do atlas (ver CONTENT_VERSION): ele ocupava
+// pouco mais da metade da tela dos outros chefes e nao lia como um. Raio decide
+// colisao e tamanho de ALVO, entao duas simulacoes em versoes diferentes
+// discordam de quais tiros acertam durante a janela de dano.
+//
+// E o MERGULHO ganha distancia de espreita. Ele perseguia o jogador sem parada
+// — medido, a distancia estabilizava em 0,10 tile e oscilava a cada tick, com o
+// chefe vibrando em cima dos pes do alvo ("fica dancando ao redor dele"). Agora
+// o passo submerso se divide em radial (corrige ate DEVOURER_STALK_RANGE) e
+// tangencial (circula com o que sobra), com o sentido da volta saindo da
+// paridade do id para ser igual nas duas pontas de uma sala. A posicao dele
+// diverge no primeiro tick de mergulho.
+//
+// Junto vao duas correcoes que a espreita revelou. A direcao do mergulho
+// DEGENERA quando o arco pousa em cima do alvo (`normalized(0,0)` e um passo
+// nulo, e o corpo ficava plantado dentro do jogador para sempre); passa a cair
+// no rumo do corpo, como o arco ja fazia. E a busca da DECOLAGEM passa a
+// recusar celulas a menos de DEVOURER_LEAP_MIN_RANGE da queda: ela aceita ate
+// tres aneis do ponto ideal e anel e distancia de Chebyshev (canto a 4,24),
+// entao a decolagem podia cair a 1,4 tile da queda — arco de comprimento zero,
+// e um furo no vidro, porque com o disco inteiro vitrificado ele ainda achava a
+// areia colada no alvo e saltava dali.
+//
+// 47: a ONDA DE CHOQUE do pouso. O corpo do Devorador passou de 3,1 para quase
+// 6 tiles (ver CONTENT 28) e a cratera continuava do tamanho da cabeca: o que
+// desaba no fim do arco nao e mais uma cabeca. Um anel externo entre
+// DEVOURER_ERUPT_RADIUS (2,8) e DEVOURER_SLAM_RADIUS (3,9) cobra
+// DEVOURER_SLAM_DAMAGE (10) de quem esta fora da cratera e dentro dele.
+//
+// Os dois raios sao um par derivado, e o que eles separam e o RECURSO que
+// resolve cada um: o arco mais curto voa 0,55 s, uma corrida cobre 2,5 tiles
+// nesse tempo e a esquiva acrescenta 1,3. A cratera e o que a corrida resolve;
+// o anel e o que so a esquiva resolve. Quem leva a cratera nao leva o anel — e
+// o degrau de fora do mesmo golpe, e nao um segundo golpe no mesmo tick.
+//
+// So no POUSO: a decolagem continua com a cratera sozinha. O jogador ve o arco
+// chegando e nao ve o chao abrindo sob ele.
+//
+// 48: a boca deixa de abrir no TICK do terceiro pouso. Ela abria no mesmo
+// quadro em que o corpo caia, e o jogador nao tinha como separar "ele pousou"
+// de "a janela abriu" — duas coisas que pedem respostas opostas: sair de perto,
+// e chegar perto.
+//
+// Agora ha DEVOURER_MAW_SETTLE_TICKS (49) entre as duas, e o numero e a soma de
+// duas coisas com sentidos diferentes: DEVOURER_MAW_BURY_TICKS (25) e o corpo
+// de 5,75 tiles seguindo a cabeca para dentro do buraco a DEVOURER_BURROW_SPEED,
+// e DEVOURER_MAW_OPEN_DELAY_TICKS (24) e o silencio depois disso — o unico
+// momento do encontro em que ele nao esta na tela, no mesmo vao do telegrafo da
+// emergencia.
+//
+// Ele continua ESPREITANDO durante a espera: a boca abre onde ele chegou, e nao
+// onde o terceiro arco caiu. Se abrisse sempre na ultima cratera, os dois
+// ultimos segundos de rastro nao diriam nada — e o rastro e o unico aviso que
+// este chefe da.
+//
+// `leapsLeft` ganha o valor DEVOURER_BURST_SPENT (-1) para dizer "a rajada
+// acabou". Zero nao servia: zero e o que um chefe recem-nascido tem, e a
+// decolagem ja o le como "comece uma rajada inteira".
+//
+// 49: a NINHADA. `devourer_brood` — catorze filhotes na camara do Devorador,
+// e o unico corpo do bestiario cuja definicao e nao fazer nada: dano de contato
+// zero, um ponto de vida, alcance de aggro zero e NENHUMA acao no repertorio
+// (fluxo proprio, justamente para nunca passar pela acao `contact` de onde todo
+// dano de corpo a corpo deste jogo sai).
+//
+// Eles estao na simulacao e nao no cliente por uma razao de mecanica: sao
+// MATERIA no disco da boca. A sucao ja arrasta todo corpo que nao seja chefe,
+// entao a ninhada e arrastada e devorada junto — e ver dez filhotes sumindo
+// garganta abaixo ensina o raio da coisa melhor que o anel desenhado no chao.
+//
+// O passo deles e fugir > nao encostar no irmao > voltar para a mae, nessa
+// ordem. A separacao tem duas metades: uma FORCA que da forma ao bando antes de
+// haver contato, e uma resolucao de POSICAO depois do passo — medido, so a
+// forca deixava dois filhotes a 0,3386 tile quando dois raios sao 0,34, e "sem
+// sobreposicao" nao se cumpre por ponderacao de vetores.
+//
+// Pisar neles mata, e NAO conta no placar: o total de abates alimenta o
+// leaderboard, e catorze bichinhos inofensivos por camara seriam pontos de
+// graca. O evento de morte continua indo (o jogador precisa ver que pisou em
+// alguma coisa); o que nao vai e o credito.
+//
+// 50: a ESPREITA passa a andar para onde olha, e a pintar atravessado.
+//
+// Dois defeitos no mesmo passo submerso, os dois medidos em zero — o pior caso
+// possivel, nao um desvio de borda.
+//
+// A CARA apontava para o jogador (`toward`). No anel de espreita o erro de
+// distancia zera, a componente radial some e o passo inteiro vira tangente:
+// alinhamento entre a `facing` e a marcha medido em 0,00, quer dizer
+// perpendicular exata. Sempre foi errado e passou a ser VISIVEL com o corpo
+// segmentado — o cliente escolhe a direcao do sprite da cabeca pela `facing` e
+// deriva a tangente dos aneis da trajetoria, entao a cabeca encontrava um
+// pescoco perpendicular a ela, na costura exata que o corpo novo existe para
+// esconder. Agora ela sai da marcha, com `toward` de recuo quando nao ha passo.
+//
+// O RASTRO se deslocava por `side`, que no anel E a direcao do passo: as tres
+// faixas caiam uma na frente da outra, em cima do proprio caminho, e a largura
+// atravessada media 0,00 tile — a banda de tres tiles virava uma linha de um.
+// Nao e so feio: o rastro e o unico aviso deste chefe e a area que o jogador
+// tem para vitrificar antes de a boca abrir, entao a largura dele e mecanica.
+// A faixa agora e perpendicular a marcha.
+//
+// 51: a ninhada para de ser ENGOLIDA PELA PAREDE no nascimento.
+//
+// A espiral de angulo aureo e ideal e a camara e escavada: o anel de fora
+// encosta na rocha quase sempre, e a guarda de chao aberto simplesmente
+// DESISTIA do filhote que caia nela. Medido em 13 camaras geradas: media de
+// 5,5 filhotes de catorze, nenhuma camara completa, e uma que nascia com UM.
+// Catorze e o numero que faz a succao significar alguma coisa — sao eles
+// sumindo garganta abaixo que ensinam o raio da boca, e um filhote so nao
+// ensina nada.
+//
+// Agora quem cai na pedra DESCE O PROPRIO RAIO ate achar areia, com piso no
+// raio da mordida (ninguem nasce dentro da garganta). Desce pelo raio e nao
+// procura a celula livre mais proxima porque o ANGULO e o que o angulo aureo
+// comprou: empurrar dois filhotes para o mesmo lado da parede devolve, pela
+// porta dos fundos, o pente que ele existe para desfazer. O raio o filhote
+// cede; o angulo, nao. E descer garante que ele para DENTRO da camara — o raio
+// ate a mae atravessa o vao aberto — em vez de num bolso atras da parede.
+//
+// Nas mesmas 13 camaras: media 13,8, minimo 12, nenhum filhote na pedra.
+//
+// 52: a ninhada nasce COM O CORPO INTEIRO em chao aberto, e ninguem fica de
+// fora.
+//
+// Dois defeitos que a versao 51 nao resolveu, os dois medidos aqui:
+//
+// A guarda olhava a CELULA DO CENTRO e nao o circulo do corpo — 87 filhotes em
+// 18 camaras nasciam com um canto dentro da pedra, e dali `moveEntity` nao tira
+// ninguem: todo passo que sairia ja comeca bloqueado. Agora a pergunta e o
+// mesmo `circleBlocked` que o movimento usa, exportado para isso. A geracao e o
+// passo tem de concordar sobre o que e um lugar onde este corpo cabe.
+//
+// E a descida pelo raio ainda desistia quando a rocha ia da parede ate o raio
+// da mordida sem uma celula livre: tres ninhadas curtas em 18 camaras, a pior
+// com doze de catorze. Agora o filhote tenta ate oito raios, e o raio seguinte
+// e `i + k*n` — a CONTINUACAO da mesma espiral aurea, nao um angulo qualquer.
+// A saida de emergencia nao pode alinhar dois filhotes, que e exatamente o que
+// procurar a celula livre mais proxima faria.
+//
+// Medido em 44 camaras geradas: catorze filhotes em todas, nenhum com o corpo
+// encostado na pedra.
+export const SIMULATION_VERSION = 52;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -699,7 +842,102 @@ export const SIMULATION_VERSION = 45;
 // Um cliente com o atlas antigo continua desenhando o tronco erguido enquanto a
 // simulacao arrasta corpos para dentro de um buraco que ele nao mostra: a pose
 // e o unico sinal de que a janela virou uma boca, e ela e o telegrafo do golpe.
-export const CONTENT_VERSION = 26;
+// 27: o atlas do Devorador sobe para v3 e o modelo inteiro e multiplicado por
+// 1,4 (`DEVOURER_SCALE`), com o canvas indo de 112x110 para 156x152 e a ancora
+// de (54,74) para (76,104) — o mesmo fator, para o corpo nao deslocar no chao.
+//
+// Medido antes da mudanca, na mesma projecao e no mesmo repouso: Guardiao
+// 100x113, Diamandis 92x134, Devorador 92x61. Pouco mais da METADE da presenca
+// de tela dos companheiros de hierarquia, e o relato de playtest foi direto —
+// "nem parece um Boss". Um verme nao compete por altura (a silhueta dele e
+// baixa por definicao, e erguer o corpo foi exatamente a ideia que a boca
+// substituiu), entao ele compete por comprimento: agora 114x76, na mesma faixa
+// de area dos outros dois e o mais largo dos tres.
+//
+// A boca escala junto porque e a metade dianteira deste mesmo animal aberta —
+// escalar uma sem a outra encolheria a cabeca em relacao ao tronco no meio do
+// proprio ciclo.
+// 28: o CORPO do Devorador sai do sprite. O atlas do chefe passa a desenhar so
+// a cabeca e tres aneis de pescoco (os cinco aneis traseiros e o arco saem, e a
+// cabeca recua de x=5,4 para x=0,7 — a ancora do sprite tem de ser o ponto que
+// a simulacao move, e com o corpo antigo ela caia no meio do tronco), e nasce
+// `part-white-devourer-coil`: 68x64, dez quadros que sao POSTOS na fila do
+// mais grosso ao mais fino, quatro direcoes.
+//
+// O cliente pendura os dez aneis no rastro da propria cabeca
+// (`devourer-spine.ts`), amostrado por comprimento de arco. O verme passou de
+// 3,1 para ~6 tiles sem um pixel a mais no atlas do chefe, e ganhou o que um
+// sprite rigido nao da: ele MERGULHA — a elevacao viaja no rastro junto com a
+// posicao, entao a cabeca crava na areia enquanto a cauda ainda esta no meio do
+// arco.
+//
+// A espessura do posto 0 e 7,2 e nao 5,14: este atlas nao passa por
+// `DEVOURER_SCALE`, entao ele e autorado ja na escala final e o numero do
+// pescoco tem de vir multiplicado. Sem isso o corpo saia 40% mais fino que a
+// cabeca a que ele se prende.
+// 29: a ABERTURA da boca. `enemy-white-devourer` ganha o slot `burst` — dez
+// quadros a 10 fps, uma vez so — que vai do chao intacto ate a cratera dentada
+// de `downed`.
+//
+// As pecas nao entram juntas: a areia afunda, a carne aflora no fundo do poco,
+// a arcada sobe, as abas descascam para fora e por ultimo os fios atravessam o
+// vao. Escalar o modelo inteiro por um fator daria uma boca completa e pequena
+// crescendo, que le como um bicho se aproximando — e o chao nao encolhe, ele
+// CEDE.
+//
+// A duracao e derivada e nao escolhida: a garganta so passa a engolir quando o
+// alcance da sucao chega a DEVOURER_MAW_BITE_RADIUS, no tick 19,2 da rampa. A
+// cratera termina de se escancarar no instante em que ela passa a poder matar
+// alguem, e nem um quadro depois.
+//
+// O ramo `downed` saiu de `devourerBody` para uma funcao propria
+// (`devourerMaw(f, open)`) porque os dois slots sao a MESMA geometria em dois
+// pontos da mesma rampa; autorar a abertura em separado daria duas bocas
+// parecidas que divergiriam no primeiro ajuste de raio.
+// 30: `part-devourer-brood`, as minhoquinhas — 28x20, uma linha de bloquinhos
+// com um unico elo de carne atras da ponta (o unico contraste do bicho, e a
+// unica coisa que diz de que lado ele anda). Tres variantes x seis fases num
+// slot so, como os postos do anel de corpo: o cliente escolhe a variante pelo
+// id do filhote e a fase pelo relogio.
+//
+// Tres e nao uma porque um enxame de coisas identicas le como textura animada —
+// o olho junta tudo num tapete que se mexe. Comprimentos e ritmos primos entre
+// si (5/7/4 elos, ondas de 1/0,7/1,3) fazem com que nem tres vizinhas fiquem em
+// fase.
+//
+// A amplitude do balanco e LIMITADA PELO PASSO, e a primeira versao ignorou
+// isso: os elos medem 0,5 e andam de 0,45, entao dois vizinhos que se deslocam
+// mais de ~0,3 um em relacao ao outro desencostam. A folha de contato mostrou
+// 0,84 e 1,29 de desvio nas duas variantes curtas — a minhoquinha deixava de ser
+// uma linha e virava um punhado de cubos soltos.
+//
+// Junto vai a SECAO do anel de corpo, refeita. A captura do jogo mostrou o que
+// nenhum teste pegaria: uma caixa de lado `d` por altura `d * 1,05` e um CUBO, e
+// dez cubos bege em fila leem como entulho empilhado. Agora sao cinco degraus de
+// largura desigual (estreito no chao, largo na barriga, afinando para o dorso),
+// uma crista dorsal correndo o comprimento inteiro — a linha que costura dez
+// sprites soltos num corpo so — e o sulco escuro trocado por um colar de silica,
+// porque o sulco virava um VAO PRETO sempre que dois vizinhos estavam em alturas
+// diferentes no arco do salto. O anel tambem cresceu de 5,2 para 6,6 unidades,
+// que e a sobreposicao que o degrau do arco come.
+// 31: o ORCAMENTO DE MEMORIA cobrou o preco do que a v29/v30 acrescentou. O
+// teto de RGBA no boot (160 MiB, em `validate.mjs`) reprovou por 1,1 MiB, e a
+// regra escrita la e explicita: peso novo nao se paga com teto maior.
+//
+// A abertura da boca cai de dez quadros para SEIS. Cada quadro de animacao
+// deste atlas custa 156x152x4 nas quatro direcoes — 371 KiB —, entao quatro
+// quadros a menos devolvem 1,5 MiB. A derivacao da duracao fica intacta: 6
+// quadros a 6,25 fps cobrem os mesmos 0,96 s em que a garganta passa a morder.
+// O que muda e a cadencia, nao o instante em que ela acaba. E seis e a mesma
+// contagem do espasmo, entao a abertura entrega para o ciclo no mesmo passo.
+//
+// E os dois atlas `part-` passam a ser dimensionados pela caixa MEDIDA, que e a
+// pratica que o proprio validador manda seguir ("nunca um numero redondo"): o
+// anel vai de 68x64 para 64x58 e a minhoquinha de 28x20 para 24x16. Eram
+// numeros redondos com folga, exatamente o que aquele comentario avisa.
+//
+// Boot fecha em 166,3 MiB, com 1,4 MiB de folga.
+export const CONTENT_VERSION = 31;
 
 export type VersionTriple = {
   protocolVersion: number;

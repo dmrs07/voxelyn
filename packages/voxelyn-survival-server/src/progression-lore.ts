@@ -283,6 +283,22 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   guardian: 'AX-EXE-039',
   diamandis: 'AX-PUB-010',
   white_devourer: 'AX-ENG-030',
+  // A NINHADA aponta para o documento DA MAE, e nao para um proprio.
+  //
+  // Ela nao e um Ativo: nao esta em `ASSET_ARCHETYPES`, que e a lista curada do
+  // que tem ficha, e nada nunca vai consultar esta linha. Ela existe porque o
+  // mapa e `Record<EnemyArchetype, ...>` e o tipo cobra a uniao inteira — o
+  // build do servidor reprovou exatamente por isto faltar.
+  //
+  // Um id PROPRIO seria pior de duas formas: criaria um documento que ninguem
+  // pode abrir (um documento so se libera pelo primeiro abate, e os filhotes
+  // ficam fora da contagem de abates de proposito), e quebraria a checagem de
+  // unicidade, que compara os valores distintos com o tamanho de
+  // `ASSET_ARCHETYPES`. Apontando para AX-ENG-030 as duas coisas se resolvem, e
+  // a leitura continua verdadeira: o que a empresa arquivou sobre a especie e
+  // um arquivo so — os filhotes sao a mesma assinatura em escala de
+  // centimetros.
+  devourer_brood: 'AX-ENG-030',
   archcantor: 'AX-ENG-031',
   sheet_leviathan: 'AX-ENG-032',
   lung_matrix: 'AX-ENG-033',

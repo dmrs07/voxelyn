@@ -6,6 +6,7 @@ import {
   BESTIARY_FILES,
   BESTIARY_NAME_KEYS,
   BESTIARY_ORDER,
+  CODEX_EXCLUDED,
   HISTORY_LIMIT,
   applyRun,
   applyRunOnce,
@@ -198,7 +199,26 @@ describe('registro de ativos', () => {
       expect(t(BESTIARY_FILES[archetype].code).length).toBeGreaterThan(0);
       expect(t(BESTIARY_FILES[archetype].note).length).toBeGreaterThan(0);
     }
-    expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAME_KEYS).sort());
+    // O painel mostra tudo o que tem texto, MENOS o que estiver declarado sem
+    // ficha. Os dois sentidos importam: nada entra no painel sem texto (ficha em
+    // branco na tela) e nada sai do painel sem estar em `CODEX_EXCLUDED` (uma
+    // carta que desaparece do Codex porque alguem esqueceu de a listar).
+    const esperado = (Object.keys(BESTIARY_NAME_KEYS) as EnemyArchetype[])
+      .filter((a) => !CODEX_EXCLUDED.includes(a))
+      .sort();
+    expect([...BESTIARY_ORDER].sort()).toEqual(esperado);
+  });
+
+  it('quem nao tem ficha no Codex nao PODE ter: a exclusao e derivada, nao gosto', () => {
+    // A guarda da propria lista de excecoes. Uma ficha so nasce com o primeiro
+    // abate, entao so pode ficar de fora do painel quem nunca entra na contagem
+    // de abates — e isso e verificavel: `emptyStats().kills` tem a chave, e a
+    // simulacao nunca a incrementa (ver a guarda em `damageEntity`). Sem este
+    // teste, `CODEX_EXCLUDED` viraria um lugar para esconder ficha inacabada.
+    for (const archetype of CODEX_EXCLUDED) {
+      expect(BESTIARY_NAME_KEYS[archetype], `${archetype} sem texto`).toBeDefined();
+      expect(BESTIARY_ORDER, `${archetype} esta nos dois lugares`).not.toContain(archetype);
+    }
   });
 
   // A voz e a da EMPRESA, e a empresa nao assume o que abandonou: ela registra

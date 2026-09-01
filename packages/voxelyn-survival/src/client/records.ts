@@ -351,6 +351,33 @@ export const hasDiscovery = (records: Records, bit: number): boolean =>
   (records.discoveries & bit) !== 0;
 
 /** Arquetipos na ordem em que o bestiario os apresenta. */
+/**
+ * Os arquetipos que NAO tem ficha no Codex, e por que.
+ *
+ * `BESTIARY_NAME_KEYS` e `BESTIARY_FILES` sao `Record<EnemyArchetype, ...>`: o
+ * tipo cobra o mapa completo, e cobra com razao — texto faltando vira ficha em
+ * branco na tela. Mas ter TEXTO nao e a mesma coisa que ter LUGAR no painel, e
+ * esta lista e onde a diferenca fica escrita.
+ *
+ * A ninhada do Devorador esta aqui porque duas decisoes certas em separado sao
+ * incompativeis juntas: uma ficha so nasce com o primeiro abate (`count <= 0`
+ * em `absorbRun`), e os filhotes ficam fora da contagem de abates de proposito
+ * (o total alimenta o placar, e catorze bichinhos inofensivos por camara seriam
+ * pontos de graca). Posta na ordem, a ficha deles seria uma carta "?" trancada
+ * PARA SEMPRE — conteudo morto no meio do Codex. E nem chegaria a desenhar: o
+ * painel pede o sprite por arquetipo em `manifestForArchetype`, e a ninhada nao
+ * esta em `ARCHETYPE_SPRITE`.
+ *
+ * A lista e explicita e testada nos dois sentidos: nada entra no painel sem
+ * texto, e nada sai do painel sem estar declarado aqui.
+ */
+export const CODEX_EXCLUDED: readonly EnemyArchetype[] = ['devourer_brood'];
+
+/**
+ * A ordem do painel — e a lista do que o Codex chega a MOSTRAR.
+ *
+ * Quem NAO aparece esta declarado em `CODEX_EXCLUDED`, com o motivo.
+ */
 export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'stalker',
   'spitter',
@@ -395,6 +422,7 @@ export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
   undertaker: 'bestiary.name.undertaker',
   diamandis: 'bestiary.name.diamandis',
   white_devourer: 'bestiary.name.white_devourer',
+  devourer_brood: 'bestiary.name.devourer_brood',
   archcantor: 'bestiary.name.archcantor',
   sheet_leviathan: 'bestiary.name.sheet_leviathan',
   lung_matrix: 'bestiary.name.lung_matrix',
@@ -442,6 +470,7 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
   undertaker: { code: 'bestiary.code.undertaker', note: 'bestiary.note.undertaker' },
   diamandis: { code: 'bestiary.code.diamandis', note: 'bestiary.note.diamandis' },
   white_devourer: { code: 'bestiary.code.white_devourer', note: 'bestiary.note.white_devourer' },
+  devourer_brood: { code: 'bestiary.code.devourer_brood', note: 'bestiary.note.devourer_brood' },
   archcantor: { code: 'bestiary.code.archcantor', note: 'bestiary.note.archcantor' },
   sheet_leviathan: { code: 'bestiary.code.sheet_leviathan', note: 'bestiary.note.sheet_leviathan' },
   lung_matrix: { code: 'bestiary.code.lung_matrix', note: 'bestiary.note.lung_matrix' },

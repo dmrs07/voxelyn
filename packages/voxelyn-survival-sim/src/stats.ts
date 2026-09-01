@@ -51,7 +51,7 @@ export const emptyStats = (): RunStats => ({
   kills: {
     stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0,
     resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0,
-    sulfur_bomber: 0, undertaker: 0, diamandis: 0, white_devourer: 0,
+    sulfur_bomber: 0, undertaker: 0, diamandis: 0, white_devourer: 0, devourer_brood: 0,
     archcantor: 0, sheet_leviathan: 0, lung_matrix: 0,
     furnace_heart: 0, frost_queen: 0, magnetarch: 0,
   },

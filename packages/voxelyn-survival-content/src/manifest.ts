@@ -135,6 +135,21 @@ export const CHARACTER_SPRITE_IDS = [
   // recuo do cliente, ou seja, chegavam ao setor final como um losango de cor.
   'enemy-diamandis',
   'enemy-white-devourer',
+  // O CORPO do Devorador, uma peca por quadro.
+  //
+  // O prefixo `part-` e a razao de ele nao ser `enemy-`, e nao e cosmetica: a
+  // validacao cobra de todo `enemy-`/`player-` o conjunto de animacoes de uma
+  // CRIATURA (walk, attack, hit, die), e este atlas nao tem nenhuma delas nem
+  // deveria. Ele nao e um bicho — sao os dez aneis que o cliente pendura no
+  // rastro da cabeca (ver `devourer-spine.ts`), a simulacao nao tem entidade
+  // nenhuma para eles, e a colisao continua sendo so a da cabeca. Os quadros
+  // sao POSTOS na fila, do mais grosso ao mais fino, e nao instantes.
+  'part-white-devourer-coil',
+  // A NINHADA do Devorador. Mesmo prefixo e mesma razao: nao e um bicho com
+  // repertorio, e uma peca com variantes. Os quadros sao (variante x fase) e o
+  // cliente escolhe os dois eixos — a variante pelo id do filhote, a fase pelo
+  // relogio.
+  'part-devourer-brood',
   'enemy-archcantor',
   'enemy-sheet-leviathan',
   'enemy-lung-matrix',

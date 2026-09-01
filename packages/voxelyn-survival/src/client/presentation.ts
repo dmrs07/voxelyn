@@ -1,5 +1,8 @@
 import {
   DEVOURER_MAW,
+  DEVOURER_MAW_BITE_RADIUS,
+  DEVOURER_MAW_RADIUS,
+  DEVOURER_MAW_SPOOL_TICKS,
   HEAT_MAX,
   TICK_HZ,
   moduleHasCapacity,
@@ -281,11 +284,29 @@ export const mountedModules = (
     ? [...modules, 'minigun']
     : modules;
 
+/**
+ * Quanto dura a ABERTURA da boca, em ticks.
+ *
+ * Derivado e nao escolhido, e o que ele deriva de e a propria mecanica: a
+ * garganta so passa a engolir quando o alcance da sucao chega a
+ * `DEVOURER_MAW_BITE_RADIUS`, e esse alcance sobe linearmente de 0 a
+ * `DEVOURER_MAW_RADIUS` ao longo de `DEVOURER_MAW_SPOOL_TICKS` (ver `mawReach`
+ * na simulacao). A cratera termina de se escancarar no instante EXATO em que
+ * ela passa a poder matar alguem.
+ *
+ * Escrever "1 segundo" aqui daria o mesmo numero hoje (19,2 ticks) e deixaria
+ * de dar no dia em que alguem afinasse o raio da mordida ou a rampa — e o
+ * desalinhamento seria de um tipo que ninguem reporta: uma boca que morde meio
+ * quadro antes de estar aberta.
+ */
+const MAW_OPEN_TICKS = DEVOURER_MAW_SPOOL_TICKS * (DEVOURER_MAW_BITE_RADIUS / DEVOURER_MAW_RADIUS);
+
 /** Client-side visual state that never feeds back into the authoritative simulation. */
 export class EntityPresentation {
   private readonly actions = new Map<number, ActionIntent>();
   private readonly actionVisualClocks = new Map<number, ActionVisualClock>();
   private readonly downedAt = new Map<number, number>();
+
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
   private readonly facingHysteresis = new FacingHysteresis();
@@ -462,10 +483,44 @@ export class EntityPresentation {
     //
     // O Devorador continua sendo o unico inimigo que usa este slot em vida.
     if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_MAW) {
-      const start = this.downedAt.get(entity.id) ?? nowMs;
-      this.downedAt.set(entity.id, start);
+      // O RELOGIO DA BOCA E O TICK, e nao o relogio de tela.
+      //
+      // Uma versao anterior guardava "quando a boca abriu" num mapa alimentado
+      // por `nowMs` no primeiro quadro em que o cliente via o humor. Isso ja
+      // custou um defeito (o mapa era limpo pelo ramo de `downed`, que
+      // compartilha o slot de atlas, e o espasmo congelava no primeiro quadro)
+      // e carregava outro por nascer: quem entrasse na sala no MEIO da janela
+      // comecaria a contar do zero e veria a boca se abrir de novo, com a sucao
+      // ja em alcance quase cheio.
+      //
+      // `mawOpenedAt` e um tick autoritativo que ja viaja no snapshot
+      // exatamente para este caso — dele saem o alcance da sucao e a areia ja
+      // engolida. Derivar a pose do MESMO numero e o que garante que o desenho
+      // e a mecanica contem a mesma historia, inclusive para quem reconectou.
+      const opened = state.bossRuntime?.mawOpenedAt ?? -1;
+      const elapsed = opened >= 0 ? Math.max(0, state.tick - opened) : 0;
       const aim = bodyFacing();
-      return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
+      // A ABERTURA acaba quando a garganta comeca a morder, e nao um quadro
+      // depois: a rampa da sucao chega a `DEVOURER_MAW_BITE_RADIUS` neste tick
+      // (ver `mawReach`), e ate ali a cratera ainda esta se rasgando. Uma boca
+      // que engolisse antes de estar aberta seria um golpe sem aviso.
+      if (elapsed < MAW_OPEN_TICKS) {
+        return {
+          anim: 'burst',
+          elapsedMs: (elapsed / TICK_HZ) * 1000,
+          facingX: aim.x,
+          facingY: aim.y,
+        };
+      }
+      // O espasmo comeca do PRIMEIRO quadro dele, e nao de onde a abertura
+      // parou: os dois slots tem contagens diferentes, e emendar os relogios
+      // faria a boca pular meia volta de gole na entrega.
+      return {
+        anim: 'downed',
+        elapsedMs: ((elapsed - MAW_OPEN_TICKS) / TICK_HZ) * 1000,
+        facingX: aim.x,
+        facingY: aim.y,
+      };
     }
 
     // Morte sempre substitui a silhueta inteira. Hit só interrompe a composição

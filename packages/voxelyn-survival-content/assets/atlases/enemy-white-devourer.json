@@ -1,14 +1,14 @@
 {
   "id": "enemy-white-devourer",
-  "version": 2,
+  "version": 3,
   "atlas": "enemy-white-devourer.png",
   "normalAtlas": "enemy-white-devourer.normal.png",
   "normalScale": 2,
-  "frameWidth": 112,
-  "frameHeight": 110,
-  "columns": 36,
-  "anchorX": 54,
-  "anchorY": 74,
+  "frameWidth": 156,
+  "frameHeight": 152,
+  "columns": 26,
+  "anchorX": 76,
+  "anchorY": 104,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -18,12 +18,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 2.2,
-    "h": 1.2
+    "w": 3.1,
+    "h": 1.7
   },
   "footprint": {
-    "w": 2,
-    "h": 1.6,
+    "w": 2.8,
+    "h": 2.2,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -76,6 +76,11 @@
       "frames": 6,
       "fps": 11,
       "loop": true
+    },
+    "burst": {
+      "frames": 6,
+      "fps": 6.25,
+      "loop": false
     }
   },
   "frameMap": {
@@ -86,34 +91,38 @@
       "special": 14,
       "hit": 18,
       "downed": 20,
-      "die": 26
+      "die": 26,
+      "burst": 31
     },
     "dl": {
-      "idle": 31,
-      "walk": 35,
-      "attack": 41,
-      "special": 45,
-      "hit": 49,
-      "downed": 51,
-      "die": 57
+      "idle": 37,
+      "walk": 41,
+      "attack": 47,
+      "special": 51,
+      "hit": 55,
+      "downed": 57,
+      "die": 63,
+      "burst": 68
     },
     "ur": {
-      "idle": 62,
-      "walk": 66,
-      "attack": 72,
-      "special": 76,
-      "hit": 80,
-      "downed": 82,
-      "die": 88
+      "idle": 74,
+      "walk": 78,
+      "attack": 84,
+      "special": 88,
+      "hit": 92,
+      "downed": 94,
+      "die": 100,
+      "burst": 105
     },
     "ul": {
-      "idle": 93,
-      "walk": 97,
-      "attack": 103,
-      "special": 107,
-      "hit": 111,
-      "downed": 113,
-      "die": 119
+      "idle": 111,
+      "walk": 115,
+      "attack": 121,
+      "special": 125,
+      "hit": 129,
+      "downed": 131,
+      "die": 137,
+      "burst": 142
     }
   },
   "generation": {

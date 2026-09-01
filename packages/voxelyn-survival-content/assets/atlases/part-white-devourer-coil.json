@@ -1,0 +1,66 @@
+{
+  "id": "part-white-devourer-coil",
+  "version": 1,
+  "atlas": "part-white-devourer-coil.png",
+  "normalAtlas": "part-white-devourer-coil.normal.png",
+  "normalScale": 2,
+  "frameWidth": 64,
+  "frameHeight": 58,
+  "columns": 40,
+  "anchorX": 30,
+  "anchorY": 47,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.64,
+    "h": 0.64
+  },
+  "footprint": {
+    "w": 0.6,
+    "h": 0.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 10,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0
+    },
+    "dl": {
+      "idle": 10
+    },
+    "ur": {
+      "idle": 20
+    },
+    "ul": {
+      "idle": 30
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}
