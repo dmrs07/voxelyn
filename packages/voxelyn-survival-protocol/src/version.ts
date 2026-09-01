@@ -668,7 +668,28 @@ export const PROTOCOL_VERSION = 28;
 //
 // So no POUSO: a decolagem continua com a cratera sozinha. O jogador ve o arco
 // chegando e nao ve o chao abrindo sob ele.
-export const SIMULATION_VERSION = 47;
+//
+// 48: a boca deixa de abrir no TICK do terceiro pouso. Ela abria no mesmo
+// quadro em que o corpo caia, e o jogador nao tinha como separar "ele pousou"
+// de "a janela abriu" — duas coisas que pedem respostas opostas: sair de perto,
+// e chegar perto.
+//
+// Agora ha DEVOURER_MAW_SETTLE_TICKS (49) entre as duas, e o numero e a soma de
+// duas coisas com sentidos diferentes: DEVOURER_MAW_BURY_TICKS (25) e o corpo
+// de 5,75 tiles seguindo a cabeca para dentro do buraco a DEVOURER_BURROW_SPEED,
+// e DEVOURER_MAW_OPEN_DELAY_TICKS (24) e o silencio depois disso — o unico
+// momento do encontro em que ele nao esta na tela, no mesmo vao do telegrafo da
+// emergencia.
+//
+// Ele continua ESPREITANDO durante a espera: a boca abre onde ele chegou, e nao
+// onde o terceiro arco caiu. Se abrisse sempre na ultima cratera, os dois
+// ultimos segundos de rastro nao diriam nada — e o rastro e o unico aviso que
+// este chefe da.
+//
+// `leapsLeft` ganha o valor DEVOURER_BURST_SPENT (-1) para dizer "a rajada
+// acabou". Zero nao servia: zero e o que um chefe recem-nascido tem, e a
+// decolagem ja o le como "comece uma rajada inteira".
+export const SIMULATION_VERSION = 48;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -770,7 +791,26 @@ export const SIMULATION_VERSION = 47;
 // `DEVOURER_SCALE`, entao ele e autorado ja na escala final e o numero do
 // pescoco tem de vir multiplicado. Sem isso o corpo saia 40% mais fino que a
 // cabeca a que ele se prende.
-export const CONTENT_VERSION = 28;
+// 29: a ABERTURA da boca. `enemy-white-devourer` ganha o slot `burst` — dez
+// quadros a 10 fps, uma vez so — que vai do chao intacto ate a cratera dentada
+// de `downed`.
+//
+// As pecas nao entram juntas: a areia afunda, a carne aflora no fundo do poco,
+// a arcada sobe, as abas descascam para fora e por ultimo os fios atravessam o
+// vao. Escalar o modelo inteiro por um fator daria uma boca completa e pequena
+// crescendo, que le como um bicho se aproximando — e o chao nao encolhe, ele
+// CEDE.
+//
+// A duracao e derivada e nao escolhida: a garganta so passa a engolir quando o
+// alcance da sucao chega a DEVOURER_MAW_BITE_RADIUS, no tick 19,2 da rampa. A
+// cratera termina de se escancarar no instante em que ela passa a poder matar
+// alguem, e nem um quadro depois.
+//
+// O ramo `downed` saiu de `devourerBody` para uma funcao propria
+// (`devourerMaw(f, open)`) porque os dois slots sao a MESMA geometria em dois
+// pontos da mesma rampa; autorar a abertura em separado daria duas bocas
+// parecidas que divergiriam no primeiro ajuste de raio.
+export const CONTENT_VERSION = 29;
 
 export type VersionTriple = {
   protocolVersion: number;

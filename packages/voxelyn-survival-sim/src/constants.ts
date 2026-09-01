@@ -885,6 +885,65 @@ export const DEVOURER_LEAPS_PER_CYCLE = 3;
  * legiveis em vez de um borrao. A janela final continua pagando os tres.
  */
 export const DEVOURER_HOP_GAP_TICKS = 45;
+
+/**
+ * O CORPO ENTERRANDO, em ticks: quanto o resto dele leva para seguir a cabeca
+ * para dentro do buraco depois do ultimo arco da rajada.
+ *
+ * O corpo mede 5,75 tiles da ponta do focinho a da cauda (ver
+ * `devourer-spine.ts` no cliente: 0,5 de encaixe + nove passos de 0,52 + meio
+ * anel + o focinho) e ele cava a `DEVOURER_BURROW_SPEED` = 4,6 tiles/s. A cauda
+ * chega onde a cabeca entrou em 5,75 / 4,6 = 1,25 s, que sao 25 ticks.
+ *
+ * A simulacao nao tem corpo — ela move e testa um ponto so — e este numero e a
+ * unica coisa que ela sabe sobre ele. Isso e frágil por natureza: reautorar o
+ * corpo no cliente mudaria o comprimento sem tocar aqui, e o ritmo do encontro
+ * sairia de sincronia com o desenho em silencio. Ha um teste no cliente que
+ * mede a coluna de verdade e cobra este numero — e ele que segura as duas
+ * pontas juntas.
+ */
+export const DEVOURER_MAW_BURY_TICKS = 25;
+
+/**
+ * O valor de `leapsLeft` que significa "a rajada ACABOU".
+ *
+ * Nao pode ser zero, e a razao e uma linha que ja existia: a decolagem
+ * RECOMPOE a conta quando encontra zero ou menos ("um Devorador que chegue aqui
+ * com a rajada zerada comeca uma rajada inteira em vez de saltar uma vez e ir
+ * direto para a janela"). Zero significa "nunca comecou", e um chefe recem-nascido
+ * tem exatamente zero.
+ *
+ * Enquanto a boca abria no proprio tick do pouso, os dois sentidos nunca se
+ * encontravam — o pouso ja tinha trocado o humor antes de alguem perguntar. Com
+ * a espera, o ramo mergulhado passa a ler a conta, e ai a diferenca entre
+ * "acabou" e "nunca comecou" vira a diferenca entre a janela e o primeiro arco
+ * do encontro.
+ */
+export const DEVOURER_BURST_SPENT = -1;
+
+/**
+ * O SUSPENSE: o vao entre o corpo sumir de todo e o chao se abrir.
+ *
+ * 1,2 s de nada. E o unico momento do encontro em que o chefe nao esta na tela
+ * — sem rastro fresco, sem corpo, sem arco — e o silencio e o telegrafo: a
+ * unica coisa que pode vir depois de o Devorador desaparecer inteiro e a boca.
+ *
+ * Antes ela abria no TICK do terceiro pouso, e a transicao era um estalo: o
+ * corpo caia e a cratera dentada ja estava la, no mesmo quadro. O jogador nao
+ * tinha como separar "ele pousou" de "a janela abriu", e as duas coisas pedem
+ * respostas opostas — sair de perto, e chegar perto.
+ *
+ * 1,2 s e o mesmo vao do telegrafo da emergencia (`DEVOURER_ERUPT_WINDUP_TICKS`
+ * = 24 ticks), e a igualdade e de proposito: o encontro passa a ter UM tempo de
+ * aviso, e o jogador aprende uma vez so.
+ */
+export const DEVOURER_MAW_OPEN_DELAY_TICKS = 24;
+
+/**
+ * Do terceiro pouso ate a boca: o corpo enterra, e entao o chao espera.
+ */
+export const DEVOURER_MAW_SETTLE_TICKS =
+  DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS;
 /**
  * A BOCA: a janela de dano do encontro inteiro, e o unico momento em que ele
  * puxa.

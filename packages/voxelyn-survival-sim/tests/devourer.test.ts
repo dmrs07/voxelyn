@@ -16,7 +16,11 @@ import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import {
   DEVOURER_BURROWED_ARMOR,
+  DEVOURER_BURST_SPENT,
   DEVOURER_ERUPT_DAMAGE,
+  DEVOURER_MAW_BURY_TICKS,
+  DEVOURER_MAW_OPEN_DELAY_TICKS,
+  DEVOURER_MAW_SETTLE_TICKS,
   DEVOURER_ERUPT_RADIUS,
   DEVOURER_ERUPT_WINDUP_TICKS,
   DEVOURER_LEAP_SPEED,
@@ -390,6 +394,89 @@ describe('Devorador Branco — o arco', () => {
     }
     expect(craters, 'o ciclo nao teve duas pontas').toBe(2);
     expect(countSurface(state, SURF_SILT, px, py, 20)).toBeGreaterThan(before);
+  });
+});
+
+describe('Devorador Branco — o silencio antes da boca', () => {
+  /** Roda o ciclo e devolve o vao, em ticks, entre o ultimo pouso e a boca. */
+  const gap = (seed: number): number => {
+    const { state, worm } = arena(seed);
+    let lastLanding = -1;
+    let flying = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) lastLanding = state.tick;
+      flying = worm.mood === DEVOURER_AIRBORNE;
+      if (worm.mood === DEVOURER_MAW) {
+        expect(lastLanding, 'a boca abriu sem nenhum pouso antes').toBeGreaterThanOrEqual(0);
+        return state.tick - lastLanding;
+      }
+    }
+    throw new Error('a boca nunca abriu');
+  };
+
+  it('a boca NAO abre no tick do pouso: ha um vao, e ele e o declarado', () => {
+    // Antes ela abria no mesmo quadro em que o corpo caia, e o jogador nao
+    // tinha como separar "ele pousou" de "a janela abriu" — duas coisas que
+    // pedem respostas opostas: sair de perto, e chegar perto.
+    expect(gap(701)).toBe(DEVOURER_MAW_SETTLE_TICKS);
+    expect(gap(802)).toBe(DEVOURER_MAW_SETTLE_TICKS);
+  });
+
+  it('o vao e o corpo ENTERRANDO mais o silencio, e nao um numero solto', () => {
+    // As duas metades tem sentidos diferentes e por isso sao dois numeros: a
+    // primeira e fisica (o corpo seguindo a cabeca para dentro do buraco, a
+    // velocidade de escavacao), a segunda e ritmo (o unico momento do encontro
+    // em que ele nao esta na tela). Somar as duas numa constante so apagaria a
+    // unica das duas que um teste do CLIENTE consegue conferir.
+    expect(DEVOURER_MAW_SETTLE_TICKS).toBe(
+      DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS
+    );
+    // O silencio usa o MESMO vao do telegrafo da emergencia: o encontro tem um
+    // tempo de aviso so, e o jogador aprende uma vez.
+    expect(DEVOURER_MAW_OPEN_DELAY_TICKS).toBe(DEVOURER_ERUPT_WINDUP_TICKS);
+  });
+
+  it('durante a espera ele continua ESPREITANDO: a boca abre onde ele chegou', () => {
+    // Se ela abrisse sempre na ultima cratera, os dois ultimos segundos de
+    // rastro nao diriam nada — e o rastro e o unico aviso que este chefe da.
+    const { state, worm } = arena(701);
+    let landed: { x: number; y: number } | null = null;
+    let flying = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (flying && worm.mood !== DEVOURER_AIRBORNE) landed = { x: worm.x, y: worm.y };
+      flying = worm.mood === DEVOURER_AIRBORNE;
+      if (worm.mood === DEVOURER_MAW) break;
+    }
+    expect(worm.mood).toBe(DEVOURER_MAW);
+    expect(landed).not.toBeNull();
+    expect(
+      Math.hypot(worm.x - landed!.x, worm.y - landed!.y),
+      'ele ficou parado esperando'
+    ).toBeGreaterThan(1);
+  });
+
+  it('a rajada gasta se DECLARA, em vez de se confundir com a que nunca comecou', () => {
+    // Zero e o que um chefe recem-nascido tem, e a decolagem ja o le como
+    // "comece uma rajada inteira". A primeira versao desta espera usou zero
+    // para dizer "acabou" e o chefe abria a boca antes do primeiro arco do
+    // encontro — a luta inteira sumia.
+    expect(DEVOURER_BURST_SPENT).toBeLessThan(0);
+    const { state, worm } = arena(701);
+    expect(state.bossRuntime.leapsLeft, 'um chefe novo ja nasce com a rajada gasta').not.toBe(
+      DEVOURER_BURST_SPENT
+    );
+    let sawSpent = false;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (state.bossRuntime.leapsLeft === DEVOURER_BURST_SPENT) sawSpent = true;
+      if (worm.mood === DEVOURER_MAW) break;
+    }
+    expect(sawSpent, 'a rajada nunca chegou a se declarar gasta').toBe(true);
   });
 });
 

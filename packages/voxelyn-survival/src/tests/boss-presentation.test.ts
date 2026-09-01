@@ -30,7 +30,16 @@ import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-ti
 import { ARCHETYPE_SPRITE } from '../client/sprites';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import { EntityPresentation } from '../client/presentation';
-import { DEVOURER_AIRBORNE, DEVOURER_BURROWED, DEVOURER_MAW } from '@voxelyn/survival-sim';
+import {
+  DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
+  DEVOURER_MAW,
+  DEVOURER_MAW_BITE_RADIUS,
+  DEVOURER_MAW_RADIUS,
+  DEVOURER_MAW_SPOOL_TICKS,
+  TICK_HZ,
+  mawReach,
+} from '@voxelyn/survival-sim';
 import { SURFACE_FALLBACK, SURFACE_KIND_INDEX } from '../client/render';
 import {
   applyBossModuleMark,
@@ -177,18 +186,50 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     hitUntilMs: 0, movingUntilMs: 0, moveFacingX: 1, moveFacingY: 0,
   };
 
+  /**
+   * O estado que a boca precisa: um tick e o instante em que ela abriu.
+   *
+   * Os dois numeros sao autoritativos e ja viajam no snapshot — a pose sai do
+   * MESMO `mawOpenedAt` de que saem o alcance da sucao e a areia engolida.
+   */
+  const room = (tick: number, mawOpenedAt = 0) =>
+    ({ tick, bossRuntime: { mawOpenedAt } }) as never;
+
+  /** Quantos ticks a abertura leva, pela mesma conta que a pose usa. */
+  const OPEN = DEVOURER_MAW_SPOOL_TICKS * (DEVOURER_MAW_BITE_RADIUS / DEVOURER_MAW_RADIUS);
+
   it('preso desenha a pose erguida; mergulhado e no ar, nao', () => {
     const p = new EntityPresentation();
-    const stuck = p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_000);
+    const stuck = p.animationFor(worm(DEVOURER_MAW) as never, room(200), base as never, 1_000);
     expect(stuck.anim).toBe('downed');
 
     for (const mood of [DEVOURER_BURROWED, DEVOURER_AIRBORNE]) {
-      const other = p.animationFor(worm(mood) as never, { tick: 5 } as never, base as never, 1_000);
+      const other = p.animationFor(worm(mood) as never, room(200), base as never, 1_000);
       expect(other.anim, `humor ${mood}`).not.toBe('downed');
     }
   });
 
-  it('o ESPASMO anda: o relogio da pose avanca entre quadros', () => {
+  it('ABRE antes de espasmar: o chao se rasga, e so entao a boca engasga', () => {
+    // A ordem que o jogador precisa ver. Antes a cratera dentada aparecia
+    // inteira no tick do terceiro pouso — um estalo — e a unica coisa que
+    // separava "ele pousou" de "a janela abriu" era o jogador ja saber.
+    const p = new EntityPresentation();
+    const at = (tick: number) =>
+      p.animationFor(worm(DEVOURER_MAW) as never, room(tick), base as never, 1_000).anim;
+    expect(at(0), 'a boca nasceu escancarada').toBe('burst');
+    expect(at(Math.floor(OPEN) - 1)).toBe('burst');
+    expect(at(Math.ceil(OPEN))).toBe('downed');
+  });
+
+  it('a abertura acaba quando a garganta comeca a MORDER, e nao depois', () => {
+    // Uma cratera que engolisse antes de estar aberta seria um golpe sem aviso,
+    // e uma que continuasse abrindo depois de ja matar seria um aviso que
+    // chega tarde. O mesmo numero decide as duas coisas — aqui e na simulacao.
+    expect(mawReach(Math.floor(OPEN), 0)).toBeLessThan(DEVOURER_MAW_BITE_RADIUS);
+    expect(mawReach(Math.ceil(OPEN), 0)).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS);
+  });
+
+  it('o ESPASMO anda: o relogio da pose avanca entre ticks', () => {
     // Regressao de um defeito real, e o pior tipo de defeito de animacao:
     // silencioso. A boca e a pose de jogador CAIDO usam o mesmo slot de atlas
     // (`downed`), e a boca reaproveitava o mapa `downedAt` — que o ramo logo
@@ -198,27 +239,62 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     //
     // Nada quebrava, nada avisava: a pose certa, parada.
     const p = new EntityPresentation();
-    const at = (ms: number) =>
-      p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, ms);
-    expect(at(1_000).elapsedMs).toBe(0);
-    expect(at(1_200).elapsedMs, 'o relogio da boca nao avancou').toBe(200);
-    expect(at(1_500).elapsedMs).toBe(500);
+    const at = (tick: number) =>
+      p.animationFor(worm(DEVOURER_MAW) as never, room(tick), base as never, 1_000);
+    // A abertura acaba a 19,2 ticks — no MEIO de um tick —, entao o primeiro
+    // quadro de espasmo ja nasce com a fracao que sobrou. O que este teste
+    // guarda e o AVANCO, e nao um zero exato: e o avanco que faltava quando o
+    // relogio da pose estava travado.
+    const t0 = Math.ceil(OPEN);
+    expect(at(t0).elapsedMs).toBeLessThan(1000 / TICK_HZ);
+    expect(at(t0 + 4).elapsedMs - at(t0).elapsedMs, 'o relogio da boca nao avancou').toBeCloseTo(
+      200,
+      6
+    );
+    expect(at(t0 + 10).elapsedMs - at(t0).elapsedMs).toBeCloseTo(500, 6);
   });
 
-  it('a boca fechando REARMA o espasmo para o ciclo seguinte', () => {
+  it('quem RECONECTA no meio da janela nao ve a boca abrir de novo', () => {
+    // O defeito por nascer que tirou o relogio de tela daqui. Guardando "quando
+    // a boca abriu" no primeiro quadro em que o cliente ve o humor, um jogador
+    // que entra na sala com a janela ja correndo comeca a contar do zero: ele
+    // veria a cratera se rasgando enquanto a sucao ja o arrasta em alcance
+    // quase cheio. O tick e autoritativo e nao tem essa fraqueza.
     const p = new EntityPresentation();
-    p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_000);
-    p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_400);
+    const meio = p.animationFor(worm(DEVOURER_MAW) as never, room(120), base as never, 9_999);
+    expect(meio.anim).toBe('downed');
+    expect(meio.elapsedMs).toBeGreaterThan(0);
+  });
+
+  it('a boca fechando REARMA a abertura para o ciclo seguinte', () => {
+    const p = new EntityPresentation();
+    p.animationFor(worm(DEVOURER_MAW) as never, room(200), base as never, 1_000);
     // Ele volta para baixo...
-    p.animationFor(worm(DEVOURER_BURROWED) as never, { tick: 5 } as never, base as never, 1_500);
-    // ...e a boca seguinte comeca do primeiro quadro, e nao de onde parou.
+    p.animationFor(worm(DEVOURER_BURROWED) as never, room(260), base as never, 1_500);
+    // ...e a boca seguinte se rasga de novo do chao intacto, porque a
+    // simulacao carimba um `mawOpenedAt` novo.
     const reopened = p.animationFor(
       worm(DEVOURER_MAW) as never,
-      { tick: 5 } as never,
+      room(400, 400),
       base as never,
       2_000,
     );
-    expect(reopened.elapsedMs, 'o espasmo continuou de onde a boca anterior parou').toBe(0);
+    expect(reopened.anim, 'a boca seguinte nasceu escancarada').toBe('burst');
+    expect(reopened.elapsedMs).toBe(0);
+  });
+
+  it('o atlas tem a ABERTURA, nas quatro direcoes', () => {
+    // O mesmo contrato que a pose de boca aberta ja tinha: sem o slot, o
+    // cliente cai em `idle` calado — o corpo deitado passeando pelo chao no
+    // lugar da unica janela de dano do encontro.
+    const m = devourerManifest as unknown as {
+      animations: Record<string, { frames: number }>;
+      frameMap: Record<string, Record<string, number>>;
+    };
+    expect(m.animations.burst?.frames).toBeGreaterThan(1);
+    for (const dir of ['dr', 'dl', 'ur', 'ul']) {
+      expect(m.frameMap[dir].burst, `direcao ${dir} sem a abertura`).toBeTypeOf('number');
+    }
   });
 
   it('o atlas realmente tem a pose, e ela e a mais ALTA do bicho', () => {

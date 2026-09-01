@@ -117,6 +117,8 @@ import {
   DEVOURER_SLAM_DAMAGE,
   DEVOURER_SLAM_RADIUS,
   DEVOURER_LEAPS_PER_CYCLE,
+  DEVOURER_BURST_SPENT,
+  DEVOURER_MAW_SETTLE_TICKS,
   DEVOURER_MAW_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
   DEVOURER_MAW_BITE_RADIUS,
@@ -2634,6 +2636,16 @@ const devourerStep = (
 
   if (state.tick < enemy.nextActionAt) return;
 
+  // A RAJADA ACABOU: o que vem depois da espera nao e outro arco, e a BOCA.
+  //
+  // A conta de arcos e o unico estado que separa os dois desfechos, e ela ja
+  // existia: `devourerLand` a decrementa no POUSO, e um relogio mais longo
+  // quando ela zera. Aqui so se le o que ela diz.
+  if (state.bossRuntime.leapsLeft === DEVOURER_BURST_SPENT) {
+    devourerOpenMaw(state, enemy, events);
+    return;
+  }
+
   // A EMERGENCIA. Ele mira onde o jogador VAI estar, e nao onde esta: o alvo
   // parado e o unico que a antecipacao erra, e isso e de proposito — quem le o
   // rastro e para de correr em linha reta ja esta jogando contra ele.
@@ -2805,11 +2817,37 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
   // vidro negou nunca chegou a ser um ataque, e cobrar da conta um salto que
   // nao aconteceu deixaria o jogador ganhar a janela sem ter esquivado nada.
   state.bossRuntime.leapsLeft -= 1;
+  // Em todo caso ele volta para BAIXO. O que muda e quanto tempo ele fica la:
+  // com arco na conta, o vao entre os golpes; sem arco nenhum, o tempo de o
+  // corpo inteiro entrar na areia mais o silencio antes de o chao abrir.
+  //
+  // A boca NAO abre mais aqui, e essa e a mudanca. Ela abria no tick do
+  // terceiro pouso — o corpo caia e a cratera dentada ja estava no mesmo quadro
+  // —, e o jogador nao tinha como separar "ele pousou" de "a janela abriu",
+  // duas coisas que pedem respostas opostas: sair de perto, e chegar perto.
+  // Agora quem a abre e o ramo mergulhado, quando o relogio abaixo vence.
+  enemy.mood = DEVOURER_BURROWED;
   if (state.bossRuntime.leapsLeft > 0) {
-    enemy.mood = DEVOURER_BURROWED;
     enemy.nextActionAt = state.tick + DEVOURER_HOP_GAP_TICKS;
     return;
   }
+  // A rajada acabou, e a conta passa a DIZER isso — ver DEVOURER_BURST_SPENT.
+  // Zero nao serviria: zero e o que um chefe recem-nascido tem, e a decolagem
+  // ja o trata como "comece uma rajada inteira".
+  state.bossRuntime.leapsLeft = DEVOURER_BURST_SPENT;
+  enemy.nextActionAt = state.tick + DEVOURER_MAW_SETTLE_TICKS;
+};
+
+/**
+ * O CHAO SE ABRE. Chamada de um so lugar: o fim da espera do ramo mergulhado.
+ *
+ * Ele nao para de espreitar durante a espera, e isso e deliberado — a boca abre
+ * onde ele CHEGOU, e nao onde o terceiro arco caiu. O que a faixa de silica
+ * conta enquanto ele cava e exatamente a pergunta que a janela vai cobrar:
+ * "onde ele esta agora?". Se ela abrisse sempre na ultima cratera, o rastro dos
+ * ultimos dois segundos nao diria nada.
+ */
+const devourerOpenMaw = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   enemy.mood = DEVOURER_MAW;
   enemy.nextActionAt = state.tick + DEVOURER_MAW_TICKS;
   // O instante em que a boca abriu. Dele saem o alcance da sucao, a areia ja

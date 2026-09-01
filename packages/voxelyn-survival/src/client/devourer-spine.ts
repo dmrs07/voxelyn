@@ -65,6 +65,19 @@ export const DEVOURER_SEGMENT_GAP = 0.52;
 export const DEVOURER_HEAD_OFFSET = 0.5;
 
 /**
+ * O que o corpo ocupa ALEM do ultimo anel, em tiles: meio anel de cauda para
+ * tras (a caixa mede 5,2 unidades autoradas, e 8 unidades sao um tile) mais o
+ * focinho para a frente da ancora.
+ *
+ * Existe como constante e nao como numero solto porque a SIMULACAO depende
+ * dele. Ela nao tem corpo — move e testa um ponto so — mas precisa saber quanto
+ * o corpo leva para seguir a cabeca para dentro do buraco, que e o vao entre o
+ * terceiro pouso e a boca abrir (`DEVOURER_MAW_BURY_TICKS`). O comprimento
+ * inteiro sai daqui, e ha um teste que cobra a igualdade dos dois lados.
+ */
+export const DEVOURER_TAIL_TILES = 0.325 + 0.24;
+
+/**
  * Distancia minima entre duas amostras do rastro, em tiles.
  *
  * E a resolucao da curva, e ela custa memoria por quadro: o rastro inteiro

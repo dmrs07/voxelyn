@@ -29,6 +29,7 @@ import {
   SURF_RAIL,
   SURF_SILT,
   SURF_RAIL_V,
+  DEVOURER_AIRBORNE,
   DEVOURER_MAW,
   DEVOURER_MAW_BITE_RADIUS,
   mawReach,
@@ -398,6 +399,24 @@ const drawBiomeVeil = (
  * de qualidade junto com os riscos.
  */
 const CLOUD_LOBES = [1, 0.68, 0.36] as const;
+
+/**
+ * O TREMOR das duas travessias do Devorador: a areia se abrindo e a areia se
+ * fechando.
+ *
+ * As duas nao pesam igual, e por isso sao dois numeros. Sair e um movimento de
+ * BAIXO PARA CIMA — o chao cede e ele passa — e o jogador ja tem 1,2 s de
+ * telegrafo antes dele. Entrar e seis tiles de corpo desabando de um arco de um
+ * tile de altura, e e a unica das duas que cobra dano num raio maior que a
+ * cabeca (ver DEVOURER_SLAM_RADIUS). O tremor conta essa diferenca sem uma
+ * linha de interface.
+ *
+ * Medidos contra os que ja existem nesta lamina: a detonacao do jogador tem 5,
+ * a virada do Coracao 7, o desabamento da Ruptura 9. O pouso do chefe entra
+ * entre a virada e o desabamento; a decolagem, logo abaixo da detonacao.
+ */
+const DEVOURER_DIVE_SHAKE = { power: 8, ms: 360 } as const;
+const DEVOURER_BREACH_SHAKE = { power: 4, ms: 240 } as const;
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -1315,6 +1334,18 @@ export class SurvivalRenderer {
    * quadros anteriores sabe. Ver devourer-spine.ts.
    */
   private readonly devourerSpines = new DevourerSpines();
+  /**
+   * Se o Devorador estava NO AR no ultimo quadro, por id.
+   *
+   * O tremor das travessias sai daqui e nao de um evento, e a escolha e de
+   * camada: uma sacudida de camera e apresentacao pura, e a transicao que a
+   * dispara ja e observavel no humor que o snapshot carrega. Um evento novo so
+   * para isso engordaria o fio com um dado que o cliente ja tem.
+   *
+   * `undefined` significa "primeiro quadro deste chefe": nao ha transicao a
+   * anunciar, e sem esta distincao o chefe sacudiria a tela ao aparecer.
+   */
+  private readonly devourerAloft = new Map<number, boolean>();
   /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
   private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
@@ -1528,6 +1559,7 @@ export class SurvivalRenderer {
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
     this.devourerSpines.reset();
+    this.devourerAloft.clear();
     this.bossModuleMarks.clear();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -1675,7 +1707,13 @@ export class SurvivalRenderer {
         case 'pulse':
           // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
           // sem tingir nada, que e a diferenca visivel entre ele e uma detonacao.
-          this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
+          //
+          // O raio vem do EVENTO. Ele sempre veio junto e este ramo o ignorava,
+          // desenhando todo pulso do tamanho do do jogador — o que passou a
+          // mentir quando a onda de choque do Devorador chegou, com quase o
+          // dobro do alcance dela. Um efeito menor que a area que machucou e a
+          // pior forma de um ataque enganar.
+          this.addFlash(ev.x, ev.y, Math.max(ABILITY_RADIUS, ev.radius) * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
           break;
         case 'flame_cone': {
           // Cada emissao do canal ja chega com o jato pronto: as brasas nascem
@@ -2666,7 +2704,14 @@ export class SurvivalRenderer {
           for (let i = 0; i < clouds; i++) {
             const puff = mawCloud(i, seconds, reach);
             if (puff.alpha <= 0.01) continue;
-            const [cxp, cyp] = toScreen(maw.x + puff.dx, maw.y + puff.dy);
+            const [cxp, cyGround] = toScreen(maw.x + puff.dx, maw.y + puff.dy);
+            // A ALTURA do rolo vira deslocamento de tela aqui, e nao em
+            // `maw-vortex.ts`: aquele arquivo e geometria de mundo e nao
+            // conhece o zoom. `LEAP_PEAK_PX` e a mesma escala com que o arco do
+            // chefe converte altura nesta lamina — um tile de altura, um tile
+            // de subida na tela —, e usar duas escalas de altura no mesmo
+            // encontro faria a poeira e o corpo dele discordarem do que e alto.
+            const cyp = cyGround - puff.liftTiles * LEAP_PEAK_PX * z;
             // TRES LOBOS CONCENTRICOS por nuvem, e nao uma elipse.
             //
             // Uma elipse unica tem CONTORNO, e contorno e a unica coisa que
@@ -3155,6 +3200,7 @@ export class SurvivalRenderer {
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
       this.devourerSpines.reset();
+      this.devourerAloft.clear();
       this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
@@ -3226,6 +3272,22 @@ export class SurvivalRenderer {
     for (const enemy of state.enemies) {
       this.archetypeById.set(enemy.id, enemy.archetype);
       if (!enemy.alive) continue;
+
+      // A AREIA SE ABRINDO E SE FECHANDO. Vem ANTES do corte de luz de
+      // proposito: um verme de seis tiles atravessando o chao no escuro
+      // continua sacudindo a sala. O tremor e a unica coisa que este chefe
+      // entrega quando nao da para ve-lo, e apaga-lo junto com o sprite seria
+      // apagar o unico aviso que sobra.
+      if (enemy.archetype === 'white_devourer') {
+        const aloft = enemy.mood === DEVOURER_AIRBORNE;
+        const was = this.devourerAloft.get(enemy.id);
+        if (was !== undefined && was !== aloft) {
+          const jolt = aloft ? DEVOURER_BREACH_SHAKE : DEVOURER_DIVE_SHAKE;
+          this.shake = { power: jolt.power, until: nowMs + jolt.ms };
+        }
+        this.devourerAloft.set(enemy.id, aloft);
+      }
+
       const b = brightness(enemy.x, enemy.y);
       if (b <= 0.05) continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);

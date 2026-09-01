@@ -3,7 +3,14 @@
 // tem sempre o mesmo comprimento, e que a cauda esta onde a cabeca esteve. As
 // tres se quebram em silencio — um verme errado continua sendo um verme.
 import { describe, expect, it } from 'vitest';
-import { DEVOURER_AIRBORNE, DEVOURER_BURROWED, DEVOURER_MAW } from '@voxelyn/survival-sim';
+import {
+  DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
+  DEVOURER_BURROW_SPEED,
+  DEVOURER_MAW,
+  DEVOURER_MAW_BURY_TICKS,
+  TICK_HZ,
+} from '@voxelyn/survival-sim';
 import { LEAP_PEAK_PX } from './leap-arc';
 import {
   DEVOURER_HEAD_OFFSET,
@@ -11,6 +18,7 @@ import {
   DEVOURER_SEGMENT_GAP,
   DEVOURER_SUBMERGED_PX,
   DEVOURER_SWAY,
+  DEVOURER_TAIL_TILES,
   DevourerSpines,
   devourerHeadLiftPx,
 } from './devourer-spine';
@@ -165,5 +173,25 @@ describe('coluna do Devorador — a memoria', () => {
       expect(Math.abs(node.x), `posto ${node.rank}`).toBeLessThanOrEqual(DEVOURER_SWAY);
       expect(node.y, `posto ${node.rank}`).toBeLessThan(0);
     }
+  });
+});
+
+describe('coluna do Devorador — o contrato com a simulacao', () => {
+  it('o corpo mede o que a simulacao supoe que ele mede', () => {
+    // A UNICA amarra entre os dois lados, e ela existe porque a simulacao NAO
+    // TEM corpo: ela move e testa um ponto so. Mesmo assim ela precisa saber
+    // quanto tempo o corpo leva para seguir a cabeca para dentro do buraco —
+    // e o vao entre o terceiro pouso e a boca abrir (`DEVOURER_MAW_BURY_TICKS`)
+    // e exatamente esse tempo.
+    //
+    // Sem este teste, reautorar a coluna aqui mudaria o comprimento sem tocar
+    // na constante de la, e o ritmo do encontro sairia de sincronia com o
+    // desenho EM SILENCIO: a boca abriria com meio corpo ainda de fora, ou o
+    // chao ficaria vazio um segundo alem do necessario. Nenhum dos dois quebra
+    // nada — so fica errado.
+    const corpo =
+      DEVOURER_HEAD_OFFSET + (DEVOURER_SEGMENTS - 1) * DEVOURER_SEGMENT_GAP + DEVOURER_TAIL_TILES;
+    const ticks = Math.round((corpo / DEVOURER_BURROW_SPEED) * TICK_HZ);
+    expect(ticks, `o corpo mede ${corpo.toFixed(2)} tiles`).toBe(DEVOURER_MAW_BURY_TICKS);
   });
 });
