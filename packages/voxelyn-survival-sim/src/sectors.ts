@@ -308,6 +308,9 @@ export const populateSector = (
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
 };
 
+/** O passo da descida pelo raio. Meio tile nao pula celula nenhuma. */
+const BROOD_SPAWN_STEP = 0.5;
+
 /**
  * Os filhotes do Devorador, espalhados em volta da camara.
  *
@@ -324,28 +327,51 @@ export const populateSector = (
  * primeira janela e ninguem chega a ve-lo.
  */
 const spawnDevourerBrood = (state: SurvivalState, cx: number, cy: number): void => {
-  for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
-    const a = i * 2.39996;
-    const r =
-      DEVOURER_MAW_BITE_RADIUS + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
-    const x = cx + Math.cos(a) * r;
-    const y = cy + Math.sin(a) * r;
-    // A CELULA QUE O CORPO VAI OCUPAR, e nao a que o argumento aponta:
-    // `spawnEnemy` soma meio tile aos dois eixos (os chamadores passam
-    // coordenada de TILE, nao de mundo). A primeira versao desta guarda testava
-    // `floor(x)` e deixava passar todo caso em que o meio tile atravessava a
-    // fronteira — e o invariante do repositorio pegou exatamente esses.
+  const w = state.config.width;
+  // CHAO ABERTO, e a guarda nao e zelo — e a promessa deles.
+  //
+  // A primeira versao nascia em qualquer lugar, no argumento de que eles vivem
+  // NA areia como a mae. A mae esta ENTERRADA; eles nao. Um filhote dentro da
+  // rocha e invisivel e nao pode ser pisado, e "podem ser esmagados" e metade
+  // do que eles sao.
+  //
+  // A CELULA QUE O CORPO VAI OCUPAR, e nao a que o argumento aponta:
+  // `spawnEnemy` soma meio tile aos dois eixos (os chamadores passam coordenada
+  // de TILE, nao de mundo). A primeira versao desta guarda testava `floor(x)` e
+  // deixava passar todo caso em que o meio tile atravessava a fronteira — e o
+  // invariante do repositorio pegou exatamente esses.
+  const open = (x: number, y: number): boolean => {
     const tx = Math.floor(x + 0.5);
     const ty = Math.floor(y + 0.5);
-    if (tx < 2 || ty < 2 || tx >= state.config.width - 2 || ty >= state.config.height - 2) continue;
-    // CHAO ABERTO, e a guarda nao e zelo — e a promessa deles.
+    if (tx < 2 || ty < 2 || tx >= w - 2 || ty >= state.config.height - 2) return false;
+    return state.solid[ty * w + tx] === SOLID_NONE;
+  };
+  for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
+    const a = i * 2.39996;
+    const far =
+      DEVOURER_MAW_BITE_RADIUS + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
+    // QUEM CAI NA PEDRA DESCE O PROPRIO RAIO ate achar areia, em vez de sumir.
     //
-    // A primeira versao nascia em qualquer lugar, no argumento de que eles vivem
-    // NA areia como a mae. A mae esta ENTERRADA; eles nao. Um filhote dentro da
-    // rocha e invisivel e nao pode ser pisado, e "podem ser esmagados" e metade
-    // do que eles sao.
-    if (state.solid[ty * state.config.width + tx] !== SOLID_NONE) continue;
-    spawnEnemy(state, 'devourer_brood', x, y, false);
+    // A espiral e ideal e a camara e escavada: o anel de fora quase sempre
+    // encosta na parede, e a versao anterior simplesmente DESISTIA do filhote —
+    // medido, nenhuma camara gerada chegava aos catorze e uma delas nasceu com
+    // UM. Catorze e o numero que faz a succao da boca significar alguma coisa.
+    //
+    // Desce pelo raio e nao procura a celula livre mais proxima porque o ANGULO
+    // e o que o angulo aureo comprou: mexer nele devolve o pente que ele existe
+    // para desfazer. O raio o filhote cede; o angulo, nao. E descer garante que
+    // ele para DENTRO da camara — o raio ate a mae atravessa o vao aberto —, em
+    // vez de num bolso qualquer atras da parede.
+    //
+    // O piso e o raio da mordida: ninguem nasce dentro da garganta, senao e
+    // devorado no primeiro tick da primeira janela e ninguem chega a ve-lo.
+    for (let r = far; r >= DEVOURER_MAW_BITE_RADIUS - 1e-6; r -= BROOD_SPAWN_STEP) {
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (!open(x, y)) continue;
+      spawnEnemy(state, 'devourer_brood', x, y, false);
+      break;
+    }
   }
 };
 

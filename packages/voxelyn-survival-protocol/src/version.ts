@@ -732,7 +732,27 @@ export const PROTOCOL_VERSION = 28;
 // Nao e so feio: o rastro e o unico aviso deste chefe e a area que o jogador
 // tem para vitrificar antes de a boca abrir, entao a largura dele e mecanica.
 // A faixa agora e perpendicular a marcha.
-export const SIMULATION_VERSION = 50;
+//
+// 51: a ninhada para de ser ENGOLIDA PELA PAREDE no nascimento.
+//
+// A espiral de angulo aureo e ideal e a camara e escavada: o anel de fora
+// encosta na rocha quase sempre, e a guarda de chao aberto simplesmente
+// DESISTIA do filhote que caia nela. Medido em 13 camaras geradas: media de
+// 5,5 filhotes de catorze, nenhuma camara completa, e uma que nascia com UM.
+// Catorze e o numero que faz a succao significar alguma coisa — sao eles
+// sumindo garganta abaixo que ensinam o raio da boca, e um filhote so nao
+// ensina nada.
+//
+// Agora quem cai na pedra DESCE O PROPRIO RAIO ate achar areia, com piso no
+// raio da mordida (ninguem nasce dentro da garganta). Desce pelo raio e nao
+// procura a celula livre mais proxima porque o ANGULO e o que o angulo aureo
+// comprou: empurrar dois filhotes para o mesmo lado da parede devolve, pela
+// porta dos fundos, o pente que ele existe para desfazer. O raio o filhote
+// cede; o angulo, nao. E descer garante que ele para DENTRO da camara — o raio
+// ate a mae atravessa o vao aberto — em vez de num bolso atras da parede.
+//
+// Nas mesmas 13 camaras: media 13,8, minimo 12, nenhum filhote na pedra.
+export const SIMULATION_VERSION = 51;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

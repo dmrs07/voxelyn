@@ -7,6 +7,7 @@ import { createRun, emptyCommand, stepRun } from '../src/run';
 import { damageEntity, spawnEnemy } from '../src/entities';
 import {
   DEVOURER_BROOD_COUNT,
+  DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_BROOD_RING,
   DEVOURER_BROOD_SHY,
   DEVOURER_BROOD_SPREAD,
@@ -262,6 +263,70 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
           state.solid[cy * w + cx],
           `tick ${t}: filhote ${b.id} dentro da pedra em ${cx},${cy}`
         ).toBe(SOLID_NONE);
+      }
+    }
+  });
+  // As sete camaras de Devorador que as sementes 1..60 geram. Ficam escritas
+  // porque varrer sessenta sementes x tres setores custa oito segundos e o que
+  // importa aqui nao e a varredura: e que camara GERADA de verdade, com a
+  // parede onde o gerador a pos, nasca com o enxame inteiro.
+  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60];
+
+  it('camara gerada nasce com o enxame inteiro, e nenhum filhote dentro da pedra', () => {
+    // O ANGULO AUREO e ideal e a camara e escavada: o anel de fora encosta na
+    // parede quase sempre. A versao anterior desistia do filhote que caia na
+    // pedra e o resultado medido era um enxame que nunca existia — media 5,5 de
+    // catorze nestas mesmas camaras, e a semente 60 nascia com UM.
+    //
+    // Catorze e o numero que faz a succao valer: sao eles sumindo garganta
+    // abaixo que ensinam o raio da boca. Um filhote so nao ensina nada.
+    for (const seed of DEVOURER_SEEDS) {
+      const state = createRun({ seed, sector: 3 });
+      const w = state.config.width;
+      const mother = state.enemies.find((e) => e.archetype === 'white_devourer');
+      expect(mother, `semente ${seed} deveria ter Devorador`).toBeDefined();
+      const litter = brood(state);
+
+      expect(
+        litter.length,
+        `semente ${seed}: ${litter.length} filhotes de ${DEVOURER_BROOD_COUNT}`
+      ).toBeGreaterThanOrEqual(DEVOURER_BROOD_COUNT - 2);
+
+      for (const b of litter) {
+        const tx = Math.floor(b.x);
+        const ty = Math.floor(b.y);
+        expect(
+          state.solid[ty * w + tx],
+          `semente ${seed}: filhote ${b.id} dentro da pedra em ${tx},${ty}`
+        ).toBe(SOLID_NONE);
+        // Ninguem nasce dentro da garganta: quem desce o raio para no raio da
+        // mordida e nao um passo alem dele.
+        expect(
+          Math.hypot(b.x - mother!.x, b.y - mother!.y),
+          `semente ${seed}: filhote ${b.id} nasceu dentro da boca`
+        ).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS - 1e-6);
+      }
+    }
+  });
+
+  it('quem desce o raio cede o raio e NAO o angulo', () => {
+    // O que o angulo aureo compra e a ausencia de pente. Procurar a celula livre
+    // mais proxima devolveria o pente pela porta dos fundos: dois filhotes
+    // empurrados para o mesmo lado da parede saem alinhados. Descer o proprio
+    // raio nao mexe no angulo — e e isso que esta prova cobra.
+    for (const seed of DEVOURER_SEEDS) {
+      const state = createRun({ seed, sector: 3 });
+      const mother = state.enemies.find((e) => e.archetype === 'white_devourer')!;
+      const ideais = Array.from({ length: DEVOURER_BROOD_COUNT }, (_, i) => i * 2.39996);
+      for (const b of brood(state)) {
+        const a = Math.atan2(b.y - mother.y, b.x - mother.x);
+        const perto = ideais.some((ideal) => {
+          // Diferenca angular mais curta, com as voltas do angulo aureo (ele
+          // passa de 2pi a partir do terceiro filhote) dobradas de volta.
+          const d = (((a - ideal + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          return Math.abs(d) < 1e-6;
+        });
+        expect(perto, `semente ${seed}: filhote ${b.id} saiu do proprio raio`).toBe(true);
       }
     }
   });
