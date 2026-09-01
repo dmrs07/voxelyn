@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { DEVOURER_HEAD_GONE_AT } from './devourer-spine';
 import {
   BOLT_SPEED,
   DEFAULT_PLAYER_TUNING,
+  DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
+  DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_MAW,
   LURKER_EXPOSED,
   LURKER_HIDDEN,
   MINER_MOOD_ENRAGED,
@@ -131,6 +136,71 @@ describe('validade de alvo (as regras do capstone)', () => {
     const exposed = enemy(44, 40, { archetype: 'mud_lamprey', mood: LURKER_EXPOSED });
     expect(isAcquirableTarget(state, state.player, hidden)).toBe(false);
     expect(isAcquirableTarget(state, state.player, exposed)).toBe(true);
+  });
+
+  // O DEVORADOR ENTERRADO. Entre um arco e o seguinte ele some na areia — nao
+  // ha crista, nao ha barra, nao ha sombra — e uma mira que grudasse sozinha
+  // naquele ponto entregaria a posicao que o intervalo existe para esconder.
+  //
+  // Esta prova e o par da profundidade em `devourer-spine.ts`: as duas metades
+  // da mesma decisao moram em arquivos diferentes, e separadas elas divergem no
+  // primeiro ajuste — some o desenho e fica a mira, ou o contrario.
+  it('Devorador sumido na areia nao e alvo; emergindo, de boca aberta e no ar e', () => {
+    const state = openState();
+    const sumido = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_BURROWED });
+    // Ja FORA da areia: o windup terminou, e e o corpo que esta a mostra.
+    state.tick = DEVOURER_ERUPT_WINDUP_TICKS;
+    const emergindo = enemy(44, 40, {
+      archetype: 'white_devourer',
+      mood: DEVOURER_BURROWED,
+      action: {
+        kind: 'erupt',
+        phase: 'windup',
+        startedAt: 0,
+        releaseAt: DEVOURER_ERUPT_WINDUP_TICKS,
+        endsAt: DEVOURER_ERUPT_WINDUP_TICKS + 6,
+        direction: { x: 1, y: 0 },
+      },
+    });
+    const boca = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_MAW });
+    const noAr = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_AIRBORNE });
+    expect(isAcquirableTarget(state, state.player, sumido)).toBe(false);
+    expect(isAcquirableTarget(state, state.player, emergindo)).toBe(true);
+    expect(isAcquirableTarget(state, state.player, boca)).toBe(true);
+    expect(isAcquirableTarget(state, state.player, noAr)).toBe(true);
+  });
+
+  // A mira nao pode CORRER NA FRENTE do corpo. A erupcao dura 24 ticks e o
+  // bicho comeca ela em 1,00 de afundamento: nos primeiros ~9 nao ha um pixel
+  // acima da areia, e um auto-aim grudando ali e o proprio assistente contando
+  // ao jogador onde o chefe vai sair — meio segundo antes de haver o que ver.
+  it('durante a erupcao ele so vira alvo depois de romper a areia', () => {
+    const state = openState();
+    const emAlgumTick = (tick: number) => {
+      state.tick = tick;
+      return isAcquirableTarget(
+        state,
+        state.player,
+        enemy(44, 40, {
+          archetype: 'white_devourer',
+          mood: DEVOURER_BURROWED,
+          action: {
+            kind: 'erupt',
+            phase: 'windup',
+            startedAt: 0,
+            releaseAt: DEVOURER_ERUPT_WINDUP_TICKS,
+            endsAt: DEVOURER_ERUPT_WINDUP_TICKS + 6,
+            direction: { x: 1, y: 0 },
+          },
+        })
+      );
+    };
+    // O tick em que a rampa cruza o limiar: afundamento = 1 - progresso.
+    const cruza = Math.ceil((1 - DEVOURER_HEAD_GONE_AT) * DEVOURER_ERUPT_WINDUP_TICKS);
+    expect(cruza, 'a espera tem de ser varios ticks, nao um').toBeGreaterThan(4);
+    expect(emAlgumTick(0), 'no primeiro tick nao ha corpo nenhum fora').toBe(false);
+    expect(emAlgumTick(cruza - 2)).toBe(false);
+    expect(emAlgumTick(DEVOURER_ERUPT_WINDUP_TICKS), 'no fim do windup ele esta fora').toBe(true);
   });
 });
 

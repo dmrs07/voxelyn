@@ -30,6 +30,7 @@ import {
   SURF_SILT,
   SURF_RAIL_V,
   DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
   DEVOURER_MAW,
   DEVOURER_MAW_BITE_RADIUS,
   mawReach,
@@ -83,7 +84,11 @@ import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } fr
 import {
   DEVOURER_SUBMERGED_PX,
   DevourerSpines,
+  DEVOURER_BELOW_ANCHOR_PX,
+  DEVOURER_HIDDEN_PX,
   devourerHeadLiftPx,
+  devourerHeadShows,
+  devourerSubmergence,
   type SpineNode,
 } from './devourer-spine';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
@@ -426,6 +431,17 @@ const CLOUD_LOBES = [1, 0.68, 0.36] as const;
  * 110 ms por fase da uma volta em 0,66 s: rapido o bastante para o bicho parecer
  * nervoso, devagar o bastante para nao virar cintilacao num sprite de 12 px.
  */
+/**
+ * Quantos ticks desde o pouso, ou `null` se este cliente nao viu o pouso.
+ *
+ * A distincao entre "zero ticks" e "nao vi" e a razao de existir: as duas viram
+ * profundidades opostas (`0` = ainda na superficie, `null` = sumido), e um
+ * `?? 0` no lugar disto desenharia meio verme boiando para todo mundo que
+ * entrasse na sala com o chefe ja enterrado.
+ */
+const landedAgo = (landedAt: number | undefined, tick: number): number | null =>
+  landedAt === undefined ? null : tick - landedAt;
+
 export const BROOD_VARIANTS = 3;
 export const BROOD_PHASES = 6;
 const BROOD_FRAME_MS = 110;
@@ -1361,6 +1377,18 @@ export class SurvivalRenderer {
    * anunciar, e sem esta distincao o chefe sacudiria a tela ao aparecer.
    */
   private readonly devourerAloft = new Map<number, boolean>();
+  /**
+   * O TICK EM QUE CADA DEVORADOR POUSOU, para medir a descida dele.
+   *
+   * E a unica peca do mergulho que nao viaja no snapshot, e nao ha o que
+   * mandar: o pouso e a AUSENCIA da acao de salto, e o instante em que ela
+   * some ja e visivel dos dois lados. Guardar aqui e o mesmo que `devourerAloft`
+   * ja faz para o tremor — o cliente olha a mesma transicao uma vez so.
+   *
+   * Quem entra na sala com o chefe ja enterrado nao tem entrada aqui, e o recuo
+   * de `devourerSubmergence` e SUMIDO: ver o porque la.
+   */
+  private readonly devourerLandedAt = new Map<number, number>();
   /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
   private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
@@ -1575,6 +1603,7 @@ export class SurvivalRenderer {
     this.lurkerTrails.clear();
     this.devourerSpines.reset();
     this.devourerAloft.clear();
+    this.devourerLandedAt.clear();
     this.bossModuleMarks.clear();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -3216,6 +3245,7 @@ export class SurvivalRenderer {
       this.lurkerTrails.clear();
       this.devourerSpines.reset();
       this.devourerAloft.clear();
+    this.devourerLandedAt.clear();
       this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
@@ -3299,6 +3329,8 @@ export class SurvivalRenderer {
         if (was !== undefined && was !== aloft) {
           const jolt = aloft ? DEVOURER_BREACH_SHAKE : DEVOURER_DIVE_SHAKE;
           this.shake = { power: jolt.power, until: nowMs + jolt.ms };
+          // Descer do ar E o pouso: e daqui que a descida comeca a contar.
+          if (!aloft) this.devourerLandedAt.set(enemy.id, state.tick);
         }
         this.devourerAloft.set(enemy.id, aloft);
       }
@@ -3372,6 +3404,29 @@ export class SurvivalRenderer {
           ? leapHeight(leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt))
           : 0;
 
+      // O MERGULHO E A EMERGENCIA.
+      //
+      // Ele pousa, ENTRA na areia e sai em outro lugar. A simulacao ja fazia a
+      // metade que importa — no instante em que arma a erupcao ela realoca o
+      // corpo para o ponto de decolagem, a 5..11 tiles dali — mas com o bicho a
+      // 11 px de profundidade aquilo era um teleporte a vista, e o intervalo
+      // inteiro era uma lombada passeando pela areia. Escondido, a mesma
+      // realocacao vira o que ela sempre quis dizer.
+      //
+      // As duas pontas sao telegrafos que ja existiam e ninguem estava usando: a
+      // descida comeca no pouso (a cratera e o tremor ja avisam) e a subida corre
+      // pelo windup da erupcao, que existe exatamente para prometer "vou sair
+      // aqui". O aviso agora e o proprio corpo saindo.
+      const submerged01 =
+        enemy.archetype === 'white_devourer'
+          ? devourerSubmergence(
+              enemy.mood,
+              landedAgo(this.devourerLandedAt.get(enemy.id), state.tick),
+              enemy.action?.kind === 'erupt'
+                ? leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt)
+                : null,
+            )
+          : 0;
       // O CORPO SEGMENTADO DO DEVORADOR.
       //
       // O chefe media 3,1 tiles e o relato de playtest foi "nem parece um Boss".
@@ -3395,7 +3450,7 @@ export class SurvivalRenderer {
               {
                 x: enemy.x,
                 y: enemy.y,
-                liftPx: devourerHeadLiftPx(enemy.mood, leap),
+                liftPx: devourerHeadLiftPx(enemy.mood, leap, submerged01),
                 dirX: presented.facingX,
                 dirY: presented.facingY,
               },
@@ -3406,7 +3461,9 @@ export class SurvivalRenderer {
       // alturas em separado abriria a porta para a cabeca e o primeiro anel
       // discordarem por um pixel — e e exatamente ali que fica a costura entre
       // os dois atlas.
-      const headLiftPx = wormBody ? devourerHeadLiftPx(enemy.mood, leap) : leap * LEAP_PEAK_PX;
+      const headLiftPx = wormBody
+        ? devourerHeadLiftPx(enemy.mood, leap, submerged01)
+        : leap * LEAP_PEAK_PX;
       if (wormBody) {
         wormsDrawn.add(enemy.id);
         for (const node of wormBody) {
@@ -3436,6 +3493,33 @@ export class SurvivalRenderer {
       }
       // Montado o corpo (e preservado o rastro), a cabeca no escuro para aqui.
       if (headDark) continue;
+
+      // SUMIDO NA AREIA: nao ha cabeca, e nao ha nada em volta dela.
+      //
+      // O `continue` leva junto a sombra, a barra de vida, o anel de elite e o
+      // indicador de atordoamento, e e por isso que ele fica aqui e nao dentro
+      // do desenho do sprite: uma barra de vida boiando sobre areia lisa
+      // entregaria a posicao exata de um bicho que acabou de sumir, e o
+      // intervalo enterrado existe justamente para o jogador NAO saber onde ele
+      // esta — o rastro de silica e a unica resposta que esse intervalo da.
+      //
+      // A PERGUNTA E A DO RECORTE, e nao "o afundamento chegou a 1". A primeira
+      // versao comparava com 1 e estava errada nas duas pontas da rampa: a
+      // cabeca some do recorte com 0,605 de afundamento (zoom largo), entao
+      // sobravam nove ticks de descida e nove de subida com a sombra e a barra
+      // desenhadas sozinhas — no ponto de emergencia, que e o que este mergulho
+      // existe para nao entregar.
+      //
+      // Os aneis ja passaram: eles saem por conta propria, porque a elevacao
+      // deles vem do rastro e a cauda ainda esta entrando quando a cabeca ja
+      // sumiu. O corpo termina de entrar depois da cabeca, que e o que um verme
+      // faz.
+      if (
+        enemy.archetype === 'white_devourer' &&
+        !devourerHeadShows(headLiftPx, z, spriteZoom)
+      ) {
+        continue;
+      }
 
       // A NINHADA. Caminho proprio e curto, porque tudo o que o caminho comum
       // faz por um inimigo esta errado para ela: nao ha barra de vida (um
@@ -3499,6 +3583,29 @@ export class SurvivalRenderer {
             return;
           }
           drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
+          // O RECORTE NA LINHA DA AREIA, so para quem esta atravessando ela.
+          //
+          // O anel do corpo ja fazia isso; a cabeca nunca fez, e enquanto o
+          // afundamento era de 11 px ninguem reparou — o sprite descia um
+          // dedo e pronto. Descendo 95 px ela apareceria inteira, desenhada
+          // sobre o terreno de baixo, boiando: um verme flutuando no ar por
+          // fora da duna. O recorte e o que transforma "desenhado mais para
+          // baixo" em "enfiado na areia".
+          // Recorta so na TRAVESSIA. De boca aberta ele tambem esta abaixo do
+          // chao, mas ali o sprite e a cratera — autorada para ficar na areia, e
+          // descendo 40 px abaixo da ancora. Cortar aquilo na linha de 11
+          // decapitaria a propria janela de dano do encontro.
+          const sand =
+            enemy.mood === DEVOURER_BURROWED && submerged01 > 0
+              ? this.devourerSandLine(sy, spriteZoom)
+              : null;
+          if (sand !== null) {
+            if (sand <= 0) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, ctx.canvas.width, sand);
+            ctx.clip();
+          }
           const drew = this.sprites.drawEntity(
             ctx,
             enemy.archetype,
@@ -3560,6 +3667,7 @@ export class SurvivalRenderer {
                 (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED),
             });
           }
+          if (sand !== null) ctx.restore();
           if (enemy.stunnedUntil > state.tick) {
             drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
           }
@@ -4621,6 +4729,18 @@ export class SurvivalRenderer {
    * termina, e esse numero vem do proprio manifest (`frameHeight - anchorY`), de
    * modo que reautorar o anel nao deixa o recorte para tras.
    */
+  /**
+   * A LINHA DA AREIA da cabeca, em pixels de tela.
+   *
+   * Nao e o fundo do QUADRO: o quadro da cabeca tem 48 px abaixo da ancora e
+   * quase todos sao folga da pose de boca aberta. Cortar por ele deixava a
+   * linha 37 px baixa demais, e o verme aparecia inteiro, de pe, desenhado por
+   * cima do chao a frente dele. Ver `DEVOURER_BELOW_ANCHOR_PX`.
+   */
+  private devourerSandLine(sy: number, spriteZoom: number): number {
+    return sy + DEVOURER_BELOW_ANCHOR_PX * spriteZoom;
+  }
+
   private drawDevourerRing(
     ctx: CanvasRenderingContext2D,
     node: SpineNode,
@@ -4654,6 +4774,13 @@ export class SurvivalRenderer {
       );
       return;
     }
+
+    // FUNDO DEMAIS PARA DEIXAR MARCA. Sem esta saida o colar de silica
+    // continuava sendo pintado por cima de cada anel ja sumido — dez elipses
+    // claras desenhando na areia lisa exatamente a linha do bicho que o
+    // mergulho acabou de esconder. O recorte tira o corpo; a marca do corpo
+    // tinha de sair junto.
+    if (node.liftPx <= -DEVOURER_HIDDEN_PX) return;
 
     const sand = sy + (loaded.manifest.frameHeight - loaded.manifest.anchorY) * spriteZoom;
     // Enterrado a ponto de a linha da areia sair da tela por cima: nao ha um
@@ -4690,10 +4817,18 @@ export class SurvivalRenderer {
     //
     // Larga e baixa na razao 2:1 do mundo, e opaca no comeco da descida e
     // sumindo conforme ele afunda: uma vez enterrado nao ha o que revirar.
-    const buried = Math.min(1, -node.liftPx / DEVOURER_SUBMERGED_PX);
+    // A escala do desbotamento e a do MERGULHO INTEIRO, e nao a da crista.
+    //
+    // Enquanto ele afundava so 11 px as duas eram a mesma coisa. Agora ele
+    // atravessa 95, e medir o desbotamento pelos 11 saturava no primeiro
+    // decimo do caminho: o colar chegava em 0,15 de opacidade e ficava la,
+    // aceso, por toda a travessia. Medido pelo caminho inteiro ele apaga junto
+    // com o corpo, que e o que "uma vez enterrado nao ha o que revirar" sempre
+    // quis dizer.
+    const buried = Math.min(1, -node.liftPx / DEVOURER_HIDDEN_PX);
     const width = TILE_W * 0.5 * z * (0.9 - node.rank * 0.045);
     ctx.save();
-    ctx.globalAlpha = 0.5 * (1 - buried * 0.7);
+    ctx.globalAlpha = 0.5 * (1 - buried);
     ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
     ctx.beginPath();
     ctx.ellipse(sx, sand - 1.5 * z, width, width * 0.5, 0, 0, Math.PI * 2);

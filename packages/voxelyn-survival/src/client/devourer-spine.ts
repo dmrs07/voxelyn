@@ -35,10 +35,18 @@
 //
 // Nao ha nada de especial no codigo para isso: e so a consequencia de a
 // elevacao ser amostrada pelo mesmo arco que a posicao.
-import { DEVOURER_SURFACED } from '@voxelyn/survival-sim';
+import {
+  DEVOURER_AIRBORNE,
+  DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_MAW,
+  DEVOURER_SURFACED,
+} from '@voxelyn/survival-sim';
 import { LEAP_PEAK_PX } from './leap-arc';
 
 /** Quantos aneis o corpo tem. Igual a contagem de quadros do atlas do anel. */
+/** Prende um numero em 0..1. */
+const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
+
 export const DEVOURER_SEGMENTS = 10;
 
 /**
@@ -103,11 +111,109 @@ export const DEVOURER_TRAIL_STEP = 0.12;
  * para tras, que e a leitura que o humor `burrowed` sempre prometeu e nunca
  * teve: ate aqui ele passeava pelo chao com o corpo inteiro de fora.
  *
- * Afundar mais esconderia o chefe por completo, e isso nao e uma escolha de
- * desenho — e uma mudanca de mecanica. Enterrado ele tem 12% de armadura e
- * continua sendo alvo legitimo; um alvo invisivel nao e.
+ * ESTA E A PROFUNDIDADE DE CRISTA, e nao a de sumico. Ela vale enquanto ele
+ * espera de boca aberta — a cratera dentada precisa ficar na superficie, porque
+ * ELA e a janela. Entre um arco e o seguinte ele vai fundo, ate
+ * `DEVOURER_HIDDEN_PX`, e ai nao sobra crista nenhuma: ver `devourerSubmergence`.
  */
 export const DEVOURER_SUBMERGED_PX = 11;
+
+/**
+ * A profundidade em que ele SOME, em pixels logicos.
+ *
+ * Um verme de areia que pousa e fica deslizando com a crista de fora nao entrou
+ * em lugar nenhum: o pouso e o mergulho, e o proximo arco e uma emergencia em
+ * OUTRO lugar. A simulacao ja fazia a metade disso — ela realoca o corpo para o
+ * ponto de decolagem no instante em que arma a erupcao — mas com o bicho a 11 px
+ * de profundidade aquela realocacao era um TELEPORTE a vista, e o resto do
+ * intervalo era uma lombada passeando pela areia.
+ *
+ * O numero e medido e nao escolhido: para nao sobrar um pixel, a ancora tem de
+ * afundar a altura inteira do quadro. A cabeca mede 152 px de quadro contra 58
+ * do anel, entao e ela quem manda; e como o desenho multiplica por `z` enquanto
+ * o sprite escala por `spriteZoom`, o pior caso e o zoom estreito (z = 1,6 com
+ * `spriteZoom` = 1): 152 / 1,6 = 95. `hidden-depth` guarda essa conta contra os
+ * dois manifestos.
+ *
+ * O que isso CUSTA esta dito de proposito: enterrado ele tem 12% de armadura, e
+ * enquanto estiver sumido ele nao e alvo de mira nenhuma (ver `hasVisibleBody`
+ * em `combat-assist.ts`). O contra-jogo do intervalo enterrado nunca foi
+ * atirar — e vitrificar a areia por onde o rastro passa, para que ele nao possa
+ * emergir. Sumir torna esse recado mais claro, nao menos.
+ */
+export const DEVOURER_HIDDEN_PX = 95;
+
+/**
+ * Quanto o CORPO VIVO desce abaixo da propria ancora, em pixels de atlas.
+ *
+ * E onde a linha da areia passa: afundado `d`, o que fica visivel e o que esta
+ * acima de `ancora + isto`. O numero e medido nos quadros, e nao no tamanho do
+ * quadro — e a diferenca importa, porque o quadro da cabeca tem 48 px abaixo da
+ * ancora e quase todos sao FOLGA. Quem os ocupa e a pose de boca aberta (a
+ * cratera desce 40), e ela e autorada para ficar no chao; as poses vivas
+ * (parado, andando, atacando, apanhando, morrendo) descem no maximo 11.
+ *
+ * Cortar pelo tamanho do quadro punha a linha 37 px baixa demais, e o resultado
+ * era um verme desenhado por cima do chao a frente dele — de pe, boiando, em vez
+ * de saindo da areia.
+ *
+ * O anel do corpo chega ao mesmo 11 por outro caminho (`frameHeight - anchorY`
+ * do atlas dele), e os dois usarem o mesmo numero nao e coincidencia: e a mesma
+ * pergunta — onde este bicho encosta no chao.
+ */
+export const DEVOURER_BELOW_ANCHOR_PX = 11;
+
+/**
+ * Quanto a cabeca sobe ACIMA da propria ancora, em pixels de atlas.
+ *
+ * E o `anchorY` do atlas dela. Junto com `DEVOURER_BELOW_ANCHOR_PX` fecha a
+ * altura util do sprite — o pedaco que o recorte tem de engolir para nao sobrar
+ * um pixel.
+ */
+export const DEVOURER_HEAD_ABOVE_ANCHOR_PX = 104;
+
+/**
+ * A cabeca ainda mostra algum pixel acima da areia?
+ *
+ * A conta e a do proprio recorte, com `sy` cancelado dos dois lados: o topo do
+ * sprite esta em `sy - liftPx*z - ancoraAcima*zoom` e a areia em
+ * `sy + ancoraAbaixo*zoom`, entao sobra pixel enquanto
+ * `liftPx*z + (acima + abaixo)*zoom > 0`. Sai daqui e nao de um limiar escrito
+ * porque quem decide o que aparece e o recorte, e um segundo criterio ao lado
+ * dele divergiria — que e exatamente o defeito que esta funcao conserta.
+ */
+export const devourerHeadShows = (liftPx: number, z: number, spriteZoom: number): boolean =>
+  liftPx * z + (DEVOURER_HEAD_ABOVE_ANCHOR_PX + DEVOURER_BELOW_ANCHOR_PX) * spriteZoom > 0;
+
+/**
+ * O afundamento em que a cabeca PODE ja ter sumido, no zoom em que ela some
+ * primeiro.
+ *
+ * Existe porque a mira nao tem zoom: `combat-assist` decide sobre estado
+ * autoritativo, sem saber a que escala aquele cliente esta desenhando. Entao ela
+ * usa o limiar mais CONSERVADOR dos dois — o do zoom largo, onde `spriteZoom`
+ * fica em 1 enquanto `z` vai a 2 e a cabeca desaparece com 0,605 de
+ * afundamento; no zoom estreito ela ainda apareceria ate 0,756.
+ *
+ * O erro que sobra e o inofensivo: num quadro estreito a mira solta o alvo com
+ * uma lasca de crista ainda na tela. O erro contrario — mirar sozinho num ponto
+ * de areia lisa — e o que entrega a emergencia antes de ela acontecer.
+ */
+export const DEVOURER_HEAD_GONE_AT =
+  (DEVOURER_HEAD_ABOVE_ANCHOR_PX + DEVOURER_BELOW_ANCHOR_PX) / (DEVOURER_HIDDEN_PX * 2);
+
+/**
+ * Quantos ticks a cabeca leva para sumir depois do pouso.
+ *
+ * Igual ao windup da erupcao de proposito: ele entra na areia com a mesma
+ * pressa com que sai dela. A simetria nao e enfeite — e o que faz o intervalo
+ * enterrado ter um comeco e um fim legiveis, com o mesmo peso nos dois. E o
+ * numero nao e inventado aqui: e o vao do telegrafo que a simulacao ja usa.
+ *
+ * Cabe no intervalo: 24 ticks de descida + 21 sumido + 24 de subida, contra os
+ * 45 de `DEVOURER_HOP_GAP_TICKS` mais os 24 do proprio windup.
+ */
+export const DEVOURER_DIVE_TICKS = DEVOURER_ERUPT_WINDUP_TICKS;
 
 /**
  * Amplitude da ondulacao lateral, em tiles, e quantas ondas cabem no corpo.
@@ -306,32 +412,73 @@ export const sampleAt = (
 };
 
 /**
+ * QUANTO DELE ESTA ABAIXO DA AREIA: 0 na superficie, 1 sumido de vez.
+ *
+ * Uma fracao e nao pixels porque quem a le sao duas coisas com escalas
+ * diferentes — a altura da cabeca e a decisao de continuar sendo alvo — e as
+ * duas tem de mudar juntas. Um pixel a mais de afundamento sem tirar a mira
+ * deixaria o auto-alvo grudado num bicho que ninguem ve.
+ *
+ * As tres entradas sao AUTORITATIVAS ou derivadas de estado autoritativo:
+ *
+ * - `mood` viaja no snapshot;
+ * - `eruptProgress01` sai da acao de erupcao, que tambem viaja (o cliente ja lia
+ *   `startedAt`/`releaseAt` dela para o arco);
+ * - `sinceLandingTicks` e a unica coisa contada no cliente, e por isso o unico
+ *   caso que pede um recuo: quem entra na sala com o chefe ja enterrado nao viu
+ *   o pouso, e o recuo e SUMIDO. Errar para o lado de escondido e o certo — o
+ *   erro contrario e desenhar meio verme boiando na areia por um segundo.
+ */
+export const devourerSubmergence = (
+  mood: number | undefined,
+  sinceLandingTicks: number | null,
+  eruptProgress01: number | null,
+): number => {
+  // Sem humor ele nao e o Devorador: o recuo nao inventa postura, e o resto do
+  // bestiario anda na superficie. `DEVOURER_SURFACED` e do LEVIATA — as
+  // constantes de humor sao uma numeracao so, compartilhada entre os chefes que
+  // mergulham, e o Devorador nunca assume esse.
+  if (mood === undefined || mood === DEVOURER_SURFACED) return 0;
+  // NO AR o corpo esta fora da areia por definicao, e o arco cuida da altura.
+  if (mood === DEVOURER_AIRBORNE) return 0;
+  // DE BOCA ABERTA ele volta a profundidade de crista, e nao ao sumico: a
+  // cratera dentada E a janela de dano, e uma janela que ninguem ve nao e uma
+  // janela. E o desenho dela ja e o do sprite, que so funciona nessa altura.
+  if (mood === DEVOURER_MAW) return DEVOURER_SUBMERGED_PX / DEVOURER_HIDDEN_PX;
+  // ENTERRADO, e as duas metades do intervalo:
+  //
+  // A ERUPCAO ARMADA tem prioridade porque ela e o que vem depois — enquanto o
+  // telegrafo corre, ele esta SUBINDO, e continuar a contar a descida do pouso
+  // desenharia um bicho afundando enquanto o aviso promete que ele vai sair.
+  if (eruptProgress01 !== null) return 1 - clamp01(eruptProgress01);
+  if (sinceLandingTicks === null) return 1;
+  return clamp01(sinceLandingTicks / DEVOURER_DIVE_TICKS);
+};
+
+/**
  * A elevacao da CABECA, em pixels logicos. E a unica entrada de altura do corpo
  * inteiro: os aneis nao consultam humor nenhum, eles herdam esta mesma medida
  * pelo rastro, atrasada pelo arco que ja percorreram.
  *
  * `leapHeight01` e o que `leap-arc.ts` devolve — 0 nas duas pontas do arco, 1
- * no apice — e a interpolacao parte do CHAO ENTERRADO em vez de zero. Sem isso
- * a altura pularia 11 px no tick em que a acao de salto comeca e nos 11 de volta
- * no tick em que ela acaba: dois estalos por salto, nas duas pontas, que e onde
- * o olho esta justamente olhando (a cratera acontece ali).
+ * no apice — e a interpolacao parte do CHAO EM QUE ELE ESTA, e nao de zero.
  *
- * `mood` chega opcional porque no estado ele e opcional — a maioria dos bichos
- * nao tem humor nenhum. Sem humor o bicho fica na superficie, que e onde o
- * Devorador ficava antes de este arquivo existir: o recuo nao inventa postura.
+ * `submerged01` nao tem valor padrao de proposito. Um padrao aqui seria uma
+ * quarta resposta para "onde ele esta", concorrendo com `devourerSubmergence`,
+ * e a errada em metade dos casos: 0 desenharia o chefe boiando entre os arcos e
+ * 1 enterraria todo bicho sem humor que passasse por esta funcao.
+ *
+ * As duas pontas do arco FECHAM sozinhas, e e por isso que nao ha estalo em
+ * lugar nenhum do ciclo: o windup da erupcao termina com `submerged01` em 0, que
+ * e onde o arco comeca; e o arco termina em 0, que e onde a descida do pouso
+ * comeca. Cada transicao encontra a anterior no mesmo pixel.
  */
-export const devourerHeadLiftPx = (mood: number | undefined, leapHeight01: number): number => {
-  // O CHAO DELE E A AREIA, em todo humor que ele tem. Enterrado e obvio; de boca
-  // aberta o corpo continua embaixo (o sprite da cratera desenha a parte que
-  // aparece); e NO AR o arco comeca e termina cravado nela — que e o caso que a
-  // primeira versao errou, porque durante o voo o humor e `airborne` e a conta
-  // caia no ramo do chao limpo. O estalo que este comentario promete evitar
-  // acontecia exatamente assim, e o teste o pegou.
-  //
-  // `DEVOURER_SURFACED` fica de fora, e nao por descuido: aquele valor e do
-  // LEVIATA. As tres constantes de humor sao uma numeracao so, compartilhada
-  // entre os chefes que mergulham, e o Devorador nunca assume esse.
-  const ground = mood === undefined || mood === DEVOURER_SURFACED ? 0 : -DEVOURER_SUBMERGED_PX;
-  const h = Math.max(0, Math.min(1, leapHeight01));
+export const devourerHeadLiftPx = (
+  mood: number | undefined,
+  leapHeight01: number,
+  submerged01: number,
+): number => {
+  const ground = -DEVOURER_HIDDEN_PX * clamp01(submerged01);
+  const h = clamp01(leapHeight01);
   return ground + (LEAP_PEAK_PX - ground) * h;
 };
