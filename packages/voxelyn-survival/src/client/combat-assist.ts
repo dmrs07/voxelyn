@@ -37,6 +37,7 @@
 import {
   BOLT_SPEED,
   DEFAULT_PLAYER_TUNING,
+  DEVOURER_BURROWED,
   LURKER_HIDDEN,
   MINER_MOOD_ENRAGED,
   MINER_MOOD_FLEEING,
@@ -90,12 +91,34 @@ export const threatPostureOf = (enemy: Entity): ThreatPosture => {
   return 'passive';
 };
 
-/** O corpo esta visivel? Espreitadores no proprio elemento nao estao. */
-const hasVisibleBody = (enemy: Entity): boolean =>
-  !(
+/**
+ * O corpo esta visivel? Espreitadores no proprio elemento nao estao.
+ *
+ * O DEVORADOR ENTERRADO entrou nesta lista quando o mergulho passou a esconde-lo
+ * de verdade. Enquanto ele afundava so 11 px a pergunta nao se colocava: havia
+ * uma crista na areia, e mirar nela era legitimo. Agora, entre um arco e o
+ * seguinte, nao ha o que ver — e uma mira que gruda sozinha num ponto de areia
+ * lisa entrega a posicao que o intervalo enterrado existe para esconder.
+ *
+ * A EXCECAO E A ERUPCAO ARMADA: durante o windup ele esta saindo, o corpo ja
+ * rompe a superficie e o telegrafo inteiro serve para dizer "e aqui". Ali ele
+ * volta a ser alvo, e e por isso que a pergunta olha a acao e nao so o humor.
+ *
+ * De boca aberta ele tambem continua alvo: a cratera esta na superficie, e ela
+ * E a janela de dano do encontro.
+ */
+const hasVisibleBody = (enemy: Entity): boolean => {
+  if (
     (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
     (enemy.mood ?? LURKER_HIDDEN) === LURKER_HIDDEN
-  );
+  ) {
+    return false;
+  }
+  if (enemy.archetype === 'white_devourer') {
+    return enemy.mood !== DEVOURER_BURROWED || enemy.action?.kind === 'erupt';
+  }
+  return true;
+};
 
 const distanceTo = (from: Vec2, enemy: Entity): number =>
   Math.hypot(enemy.x - from.x, enemy.y - from.y);

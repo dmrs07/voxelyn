@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BOLT_SPEED,
   DEFAULT_PLAYER_TUNING,
+  DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
+  DEVOURER_MAW,
   LURKER_EXPOSED,
   LURKER_HIDDEN,
   MINER_MOOD_ENRAGED,
@@ -131,6 +134,36 @@ describe('validade de alvo (as regras do capstone)', () => {
     const exposed = enemy(44, 40, { archetype: 'mud_lamprey', mood: LURKER_EXPOSED });
     expect(isAcquirableTarget(state, state.player, hidden)).toBe(false);
     expect(isAcquirableTarget(state, state.player, exposed)).toBe(true);
+  });
+
+  // O DEVORADOR ENTERRADO. Entre um arco e o seguinte ele some na areia — nao
+  // ha crista, nao ha barra, nao ha sombra — e uma mira que grudasse sozinha
+  // naquele ponto entregaria a posicao que o intervalo existe para esconder.
+  //
+  // Esta prova e o par da profundidade em `devourer-spine.ts`: as duas metades
+  // da mesma decisao moram em arquivos diferentes, e separadas elas divergem no
+  // primeiro ajuste — some o desenho e fica a mira, ou o contrario.
+  it('Devorador sumido na areia nao e alvo; emergindo, de boca aberta e no ar e', () => {
+    const state = openState();
+    const sumido = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_BURROWED });
+    const emergindo = enemy(44, 40, {
+      archetype: 'white_devourer',
+      mood: DEVOURER_BURROWED,
+      action: {
+        kind: 'erupt',
+        phase: 'windup',
+        startedAt: 0,
+        releaseAt: 24,
+        endsAt: 30,
+        direction: { x: 1, y: 0 },
+      },
+    });
+    const boca = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_MAW });
+    const noAr = enemy(44, 40, { archetype: 'white_devourer', mood: DEVOURER_AIRBORNE });
+    expect(isAcquirableTarget(state, state.player, sumido)).toBe(false);
+    expect(isAcquirableTarget(state, state.player, emergindo)).toBe(true);
+    expect(isAcquirableTarget(state, state.player, boca)).toBe(true);
+    expect(isAcquirableTarget(state, state.player, noAr)).toBe(true);
   });
 });
 
