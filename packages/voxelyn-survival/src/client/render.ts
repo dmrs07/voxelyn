@@ -151,7 +151,22 @@ import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
-import { RouteMemory, drawSurveyHud, drawSurveyWorld, hasSurvey } from './survey-overlay';
+import {
+  RouteMemory,
+  drawSurveyHud,
+  drawSurveyWorld,
+  hasSurvey,
+  surveyHudHeight,
+} from './survey-overlay';
+import {
+  HUD_OBJECTIVE_FONT,
+  HUD_OBJECTIVE_MAX_LINES,
+  hpGhostStep,
+  hudObjectiveMaxWidth,
+  hudPanelLayout,
+  wrapHudText,
+  type HudRect,
+} from './hud-layout';
 import {
   TargetMotion,
   combatTuningOf,
@@ -1415,6 +1430,26 @@ export class SurvivalRenderer {
    */
   private cargoCounterX = 0;
   /**
+   * A geometria do painel de status, do ULTIMO quadro desenhado. E dela que a
+   * caixa-preta reserva espaco e que os voos (lasca, Purga, cartucho) tiram o
+   * alvo — nenhum deles refaz a conta de `hud-layout.ts`.
+   */
+  private hudPanelRect: HudRect | null = null;
+  private hudPurgeGlyph = { x: 30, y: 68 };
+  private hudResourcesGlyphY = 68;
+  private hudModuleAnchor = { x: 39, y: 95 };
+  private hudLastMs = 0;
+  /** O rastro da barra de HP (ver `hpGhostStep`). Negativo = ainda nao viu HP. */
+  private hpGhost = 1;
+  private hpLastFrac = -1;
+  private hpHitAtMs = -1e9;
+  private hpHitStrength = 0;
+  /** A ultima diretiva desenhada, para o veu de "isto e novo" na troca. */
+  private objectiveKey: string | null = null;
+  private objectiveChangedAtMs = -1e9;
+  private coresTakenSeen = -1;
+  private coresChangedAtMs = -1e9;
+  /**
    * A geracao do Prospector LOCAL, para os marcos visuais.
    *
    * Vem do perfil autoritativo, e nao da run: a run nao carrega a arvore, so o
@@ -1583,6 +1618,15 @@ export class SurvivalRenderer {
     this.route.reset();
     this.lastSector = 0;
     this.sectorEnteredAtMs = 0;
+    // A memoria do painel e da RUN: o rastro de HP da run passada desceria
+    // sobre a barra cheia da nova, e a diretiva/Nucleos anunciariam "novo"
+    // para o que e so o comeco de sempre.
+    this.hpLastFrac = -1;
+    this.hpHitAtMs = -1e9;
+    this.objectiveKey = null;
+    this.objectiveChangedAtMs = -1e9;
+    this.coresTakenSeen = -1;
+    this.coresChangedAtMs = -1e9;
   }
 
   /**
@@ -5063,23 +5107,22 @@ export class SurvivalRenderer {
     if (!link) return;
     const echo = link.echo;
 
-    const extra = state.playerExtra;
-    const safeTop = this.safeArea.top + 10;
-    const safeLeft = this.safeArea.left + 12;
-    const hasModules = extra.activeModules.length > 0;
-    const panelW = Math.min(300, Math.max(230, vw * 0.34));
-    const sectorY = safeTop + (hasModules ? 112 : 84);
-    const biomeY = sectorY + 14;
-    const objectiveY = biomeY + 18;
-    // O painel nao reserva mais a linha do cofre: o localizador de cofre vive
-    // no topo-centro (ver renderHud), e a caixa-preta encosta mais alto.
-    const panelH = objectiveY - safeTop + 13;
-    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
-      x: safeLeft,
-      y: safeTop,
-      width: panelW,
-      height: panelH,
-    });
+    // O retangulo do painel e o que `renderHud` acabou de desenhar neste
+    // quadro — uma conta so, em hud-layout.ts. Antes do primeiro quadro, a
+    // geometria minima serve de reserva.
+    const hud =
+      this.hudPanelRect ??
+      (() => {
+        const layout = hudPanelLayout({
+          viewportWidth: vw,
+          safe: this.safeArea,
+          moduleCount: state.playerExtra.activeModules.length,
+          surveyHeight: 0,
+          objectiveLines: 1,
+        });
+        return { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
+      })();
+    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, hud);
     if (!region) return;
 
     const ctx = this.ctx;
@@ -5189,7 +5232,7 @@ export class SurvivalRenderer {
     // glifo de purga na esquerda, para onde o voo da recompensa vai. As duas
     // animacoes tem alvos diferentes porque sao coisas diferentes chegando; a
     // lasca que pousasse em cima da purga diria que minerar rende purga.
-    const target = { x: this.cargoCounterX, y: this.safeArea.top + 61 };
+    const target = { x: this.cargoCounterX, y: this.hudResourcesGlyphY };
     const alive: typeof this.cargoFlights = [];
     for (const flight of this.cargoFlights) {
       if (!flight.startScreen) {
@@ -5288,7 +5331,7 @@ export class SurvivalRenderer {
     nowMs: number,
   ): void {
     if (this.moduleProps.flightCount === 0) return;
-    const hudFallback = { x: this.safeArea.left + 30, y: this.safeArea.top + 80 };
+    const hudFallback = { x: this.hudModuleAnchor.x, y: this.hudModuleAnchor.y };
     // REDUCAO DE MOVIMENTO: quem pediu menos movimento nao recebe o arco, e
     // sim o clarao de encaixe direto sobre o proprio Prospector. Nao ha um
     // segundo caminho para manter — recusar a origem e exatamente o mesmo
@@ -5331,7 +5374,7 @@ export class SurvivalRenderer {
       const [x, y] = toScreen(flight.worldX, flight.worldY);
       flight.startScreen = { x, y };
     }
-    const target = { x: this.safeArea.left + 30, y: this.safeArea.top + 67 };
+    const target = { x: this.hudPurgeGlyph.x, y: this.hudPurgeGlyph.y };
     const sample = rewardFlightPosition(
       flight.startScreen,
       target,
@@ -5361,8 +5404,6 @@ export class SurvivalRenderer {
   ): void {
     const ctx = this.ctx;
     const extra = state.playerExtra;
-    const safeTop = this.safeArea.top + 10;
-    const safeLeft = this.safeArea.left + 12;
     ctx.textBaseline = 'alphabetic';
 
     // Contaminacao continua sendo a unica faixa presa ao topo inteiro.
@@ -5437,15 +5478,82 @@ export class SurvivalRenderer {
       this.locatorBearing = null;
     }
 
-    const hasModules = extra.activeModules.length > 0;
-    const panelW = Math.min(300, Math.max(230, vw * 0.34));
-    const moduleY = safeTop + 68;
-    const sectorY = safeTop + (hasModules ? 112 : 84);
-    const biomeY = sectorY + 14;
-    const objectiveY = biomeY + 18;
-    // O espaco vertical do antigo texto de cofre foi DEVOLVIDO ao painel: o
-    // localizador vive no topo-centro e nao ocupa mais uma linha aqui.
-    const panelH = objectiveY - safeTop + 13;
+    // ------------------------------------------------------------------
+    // O PAINEL DE STATUS. A geometria vem de hud-layout.ts; aqui e so tinta.
+    // ------------------------------------------------------------------
+    const reduced = prefersReducedMotion();
+    const hpFrac = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
+    const nav = state.config.tuning.navigation;
+    const surveyHeight =
+      nav.routeMemory || nav.contaminationForecast ? surveyHudHeight(state, nav, this.route) : 0;
+
+    // A diretiva, em ordem de urgencia:
+    //
+    // 1. o selo do setor, quando ha um — enquanto o dono esta de pe, nem o poco
+    //    nem o pedestal aceitam a mao, e mandar "desca pelo poco" apontaria
+    //    para uma interacao recusada;
+    // 2. o caminho de VOLTA, quando o Nucleo do fundo ja esta na mao: a
+    //    diretiva vira a mesma para os dois jogadores em qualquer setor — va a
+    //    ENTRADA, subir (setor > 1) ou fechar o contrato (setor 1);
+    // 3. o Nucleo deste setor, se houver um por recolher;
+    // 4. descer.
+    //
+    // Medida ANTES do painel: a diretiva mais longa nao cabe numa linha do
+    // painel compacto, e a altura do painel depende de em quantas ela quebrou.
+    const hudObjective = objectiveViewOf(state);
+    const objectiveKey = hudObjective.sealedByBoss
+      ? 'hud.objective.breakSeal'
+      : hudObjective.returning
+        ? state.sector > 1
+          ? 'hud.objective.ascend'
+          : 'hud.objective.extract'
+        : hudObjective.hasCore && !hudObjective.coreTakenHere
+          ? 'hud.objective.findCore'
+          : 'hud.objective.descend';
+    ctx.font = HUD_OBJECTIVE_FONT;
+    const objectiveLines = wrapHudText(
+      t(objectiveKey),
+      hudObjectiveMaxWidth(vw),
+      (text) => ctx.measureText(text).width,
+    ).slice(0, HUD_OBJECTIVE_MAX_LINES);
+    if (objectiveKey !== this.objectiveKey) {
+      // A diretiva TROCOU: e o unico momento em que ela precisa puxar o olho.
+      // Depois disso ela e a linha mais lenta do painel, e um texto que grita
+      // o tempo todo ensina a nao olhar.
+      this.objectiveChangedAtMs = this.objectiveKey === null ? -1e9 : nowMs;
+      this.objectiveKey = objectiveKey;
+    }
+
+    const layout = hudPanelLayout({
+      viewportWidth: vw,
+      safe: this.safeArea,
+      moduleCount: extra.activeModules.length,
+      surveyHeight,
+      objectiveLines: objectiveLines.length,
+    });
+    // Os leitores do retangulo (caixa-preta, voos) usam o do ULTIMO quadro.
+    this.hudPanelRect = { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
+    this.hudPurgeGlyph = { x: layout.resources.purgeGlyphX, y: layout.resources.glyphY };
+    this.hudResourcesGlyphY = layout.resources.glyphY;
+    this.hudModuleAnchor = layout.modules
+      ? { x: layout.modules.x + 15, y: layout.modules.y + 15 }
+      : { x: layout.innerLeft + 15, y: layout.resources.glyphY + 12 };
+
+    // O RASTRO da barra de HP: o preenchimento cai na hora, e um trilho palido
+    // segura o valor antigo por um instante antes de descer ate ele. O tamanho
+    // do rastro E o tamanho do golpe — sem numero flutuante nenhum.
+    const dtMs = Math.min(100, Math.max(0, nowMs - this.hudLastMs));
+    this.hudLastMs = nowMs;
+    if (this.hpLastFrac < 0) {
+      this.hpGhost = hpFrac;
+    } else if (hpFrac < this.hpLastFrac - 1e-6) {
+      this.hpHitAtMs = nowMs;
+      this.hpHitStrength = Math.min(1, 0.35 + (this.hpLastFrac - hpFrac) * 4);
+    }
+    this.hpLastFrac = hpFrac;
+    this.hpGhost = reduced
+      ? hpFrac
+      : hpGhostStep(this.hpGhost, hpFrac, nowMs - this.hpHitAtMs, dtMs);
 
     const roundedPanel = (x: number, y: number, w: number, h: number, radius: number): void => {
       const r = Math.min(radius, w / 2, h / 2);
@@ -5462,63 +5570,130 @@ export class SurvivalRenderer {
       ctx.closePath();
     };
 
-    roundedPanel(safeLeft, safeTop, panelW, panelH, 12);
-    ctx.fillStyle = 'rgba(11,14,20,0.78)';
+    // Um texto que ACABOU de mudar: a cor base, com um veu branco que se
+    // desfaz em `durationMs`. E a mesma linguagem para setor, Nucleos e
+    // diretiva — uma so forma de "isto e novo", e nao tres.
+    const flashText = (
+      text: string,
+      x: number,
+      y: number,
+      base: string,
+      elapsedMs: number,
+      durationMs: number,
+    ): void => {
+      ctx.fillStyle = base;
+      ctx.fillText(text, x, y);
+      if (reduced || elapsedMs < 0 || elapsedMs >= durationMs) return;
+      ctx.globalAlpha = 1 - elapsedMs / durationMs;
+      ctx.fillStyle = PAL.player;
+      ctx.fillText(text, x, y);
+      ctx.globalAlpha = 1;
+    };
+
+    // O vidro: um degrade curto de cima para baixo e um fio de luz na borda
+    // superior. Com HP baixo a moldura inteira respira em sangue — e o unico
+    // estado em que o painel, e nao so a barra, tem algo a dizer.
+    const lowHp = state.player.hp > 0 && hpFrac <= 0.35;
+    const lowPulse = lowHp && !reduced ? 0.5 + 0.5 * Math.sin(nowMs / 170) : lowHp ? 0.6 : 0;
+    roundedPanel(layout.x, layout.y, layout.width, layout.height, 10);
+    const glass = ctx.createLinearGradient(0, layout.y, 0, layout.y + layout.height);
+    glass.addColorStop(0, 'rgba(17,22,31,0.86)');
+    glass.addColorStop(1, 'rgba(9,12,18,0.82)');
+    ctx.fillStyle = glass;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(232,241,255,0.32)';
+    ctx.strokeStyle = lowHp ? `rgba(217,59,76,${0.4 + 0.45 * lowPulse})` : 'rgba(232,241,255,0.26)';
     ctx.lineWidth = 1.25;
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,241,255,0.09)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(layout.x + 10, layout.y + 1.5);
+    ctx.lineTo(layout.x + layout.width - 10, layout.y + 1.5);
+    ctx.stroke();
 
-    // Coracao voxel + HP numerico: a vida do jogador vive somente aqui.
-    const heartX = safeLeft + 20;
-    const heartY = safeTop + 21;
-    ctx.fillStyle = state.player.hp / state.player.maxHp > 0.35 ? PAL.fungusLight : PAL.blood;
-    ctx.fillRect(heartX - 8, heartY - 7, 6, 6);
-    ctx.fillRect(heartX + 2, heartY - 7, 6, 6);
-    ctx.fillRect(heartX - 10, heartY - 3, 20, 7);
-    ctx.fillRect(heartX - 6, heartY + 4, 12, 4);
-    ctx.fillRect(heartX - 2, heartY + 8, 4, 4);
-
-    const hpFrac = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
-    const hpBarX = safeLeft + 42;
-    const hpBarY = safeTop + 14;
-    const hpBarW = panelW - 54;
-    const hpBarH = 14;
-    ctx.fillStyle = 'rgba(0,0,0,0.62)';
-    ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    // Coracao voxel + HP numerico: a vida do jogador vive somente aqui. Com HP
+    // baixo o coracao BATE — a mesma batida da moldura.
+    const heartBeat = lowHp && !reduced ? 1 + 0.14 * Math.max(0, Math.sin(nowMs / 170)) ** 3 : 1;
+    ctx.save();
+    ctx.translate(layout.heart.x, layout.heart.y);
+    ctx.scale(heartBeat, heartBeat);
     ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
-    ctx.fillRect(hpBarX + 1, hpBarY + 1, (hpBarW - 2) * hpFrac, hpBarH - 2);
+    ctx.fillRect(-8, -7, 6, 6);
+    ctx.fillRect(2, -7, 6, 6);
+    ctx.fillRect(-10, -3, 20, 7);
+    ctx.fillRect(-6, 4, 12, 4);
+    ctx.fillRect(-2, 8, 4, 4);
+    ctx.restore();
+
+    const { hpBar } = layout;
+    const hpInnerW = hpBar.w - 2;
+    const hpFillW = hpInnerW * hpFrac;
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    if (this.hpGhost > hpFrac + 0.002) {
+      ctx.fillStyle = 'rgba(232,241,255,0.55)';
+      ctx.fillRect(
+        hpBar.x + 1 + hpFillW,
+        hpBar.y + 1,
+        hpInnerW * (this.hpGhost - hpFrac),
+        hpBar.h - 2,
+      );
+    }
+    ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
+    ctx.fillRect(hpBar.x + 1, hpBar.y + 1, hpFillW, hpBar.h - 2);
+    // Um fio de luz no topo do preenchimento e tres marcas de quarto: a barra
+    // passa a ter relevo e escala sem ganhar um numero a mais.
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(hpBar.x + 1, hpBar.y + 1, hpFillW, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let q = 1; q < 4; q++) {
+      ctx.fillRect(hpBar.x + Math.round((hpBar.w * q) / 4), hpBar.y + 1, 1, hpBar.h - 2);
+    }
+    const sinceHit = nowMs - this.hpHitAtMs;
+    if (!reduced && sinceHit >= 0 && sinceHit < 200) {
+      ctx.fillStyle = `rgba(255,255,255,${(1 - sinceHit / 200) * 0.5 * this.hpHitStrength})`;
+      ctx.fillRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    }
     ctx.strokeStyle = 'rgba(232,241,255,0.24)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(hpBarX, hpBarY, hpBarW, hpBarH);
-    ctx.fillStyle = PAL.player;
+    ctx.strokeRect(hpBar.x, hpBar.y, hpBar.w, hpBar.h);
+    const hpText = `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`;
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(
-      `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`,
-      hpBarX + hpBarW - 5,
-      hpBarY + 11,
-    );
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(hpText, hpBar.x + hpBar.w - 4, hpBar.y + 12);
+    ctx.fillStyle = PAL.player;
+    ctx.fillText(hpText, hpBar.x + hpBar.w - 5, hpBar.y + 11);
 
     // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
+    //
+    // Com a Minigun equipada os dois trilhos param antes da borda: a ponta
+    // direita e reservada a PALAVRA de estado do canhao ("GIRANDO", "CANO
+    // TRAVADO"), que antes era desenhada por cima do proprio trilho de calor.
+    const minigunEquipped = extra.activeModules.some((module) => module.id === 'minigun');
+    const spinFrac = extra.minigun.spin / MINIGUN_SPIN_MAX;
+    const showSpin = minigunEquipped || spinFrac > 0;
+    const railX = hpBar.x;
+    const railW = showSpin ? hpBar.w - 66 : hpBar.w;
     const heatFrac = Math.min(1, extra.heat / HEAT_MAX);
     const overheated = state.tick < extra.overheatedUntil;
+    const { heatRail, spinRail } = layout;
     ctx.fillStyle = 'rgba(0,0,0,0.58)';
-    ctx.fillRect(hpBarX, safeTop + 32, hpBarW, 4);
+    ctx.fillRect(railX, heatRail.y, railW, heatRail.h);
     // Acima do limiar a barra PULSA, na mesma fronteira em que o tique de aviso
     // comeca a soar. Sem isso as duas leituras contariam historias diferentes: o
     // audio calaria num ponto que a barra nao mostra, e o jogador atribuiria o
     // silencio a sorte em vez de a um limite que ele pode aprender.
     const warning = !overheated && heatFrac > HEAT_WARN_AT;
-    ctx.globalAlpha = warning ? 0.72 + 0.28 * Math.sin(nowMs / 90) : 1;
+    ctx.globalAlpha = warning && !reduced ? 0.72 + 0.28 * Math.sin(nowMs / 90) : 1;
     ctx.fillStyle = overheated ? PAL.blood : PAL.fire;
-    ctx.fillRect(hpBarX, safeTop + 32, hpBarW * heatFrac, 4);
+    ctx.fillRect(railX, heatRail.y, railW * heatFrac, heatRail.h);
     ctx.globalAlpha = 1;
     // A marca do limiar fica visivel com o trilho VAZIO. Ela e o que informa que
     // existe um ponto de virada antes de o jogador chegar nele — depois de
     // atingido, quem avisa ja e o tique.
     ctx.fillStyle = 'rgba(232,241,255,0.45)';
-    ctx.fillRect(hpBarX + Math.round(hpBarW * HEAT_WARN_AT), safeTop + 31, 1, 6);
+    ctx.fillRect(railX + Math.round(railW * HEAT_WARN_AT), heatRail.y - 1, 1, heatRail.h + 2);
 
     // ROTACAO DO CANHAO, colada ao trilho de calor.
     //
@@ -5530,12 +5705,9 @@ export class SurvivalRenderer {
     //
     // O trilho so aparece quando ha rotacao para mostrar: com a arma parada e
     // sem municao ele nao ocupa pixel nenhum.
-    const minigunEquipped = extra.activeModules.some((module) => module.id === 'minigun');
-    const spinFrac = extra.minigun.spin / MINIGUN_SPIN_MAX;
-    if (minigunEquipped || spinFrac > 0) {
-      const spinY = safeTop + 37;
+    if (showSpin) {
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(hpBarX, spinY, hpBarW, 2);
+      ctx.fillRect(railX, spinRail.y, railW, spinRail.h);
       // Verde enquanto sobe, BRANCO quando ja esta cuspindo: a cor troca no
       // MESMO ponto em que a arma comeca a atirar, entao a barra ensina o
       // limiar sem numero nenhum.
@@ -5548,14 +5720,14 @@ export class SurvivalRenderer {
       // usa, e nenhuma das duas colide com o calor.
       const firing = extra.minigun.phase === 'firing';
       ctx.fillStyle = firing ? PAL.player : PAL.biolum;
-      ctx.fillRect(hpBarX, spinY, hpBarW * spinFrac, 2);
+      ctx.fillRect(railX, spinRail.y, railW * spinFrac, spinRail.h);
       // A marca do limiar operacional: o ponto a partir do qual sai bala.
       ctx.fillStyle = 'rgba(232,241,255,0.5)';
       ctx.fillRect(
-        hpBarX + Math.round((hpBarW * MINIGUN_SPIN_FIRE_AT) / MINIGUN_SPIN_MAX),
-        spinY - 1,
+        railX + Math.round((railW * MINIGUN_SPIN_FIRE_AT) / MINIGUN_SPIN_MAX),
+        spinRail.y - 1,
         1,
-        4,
+        spinRail.h + 2,
       );
       // O ESTADO em palavra, so nos dois momentos em que ele nao e obvio pela
       // barra: girando sem atirar, e travado. "Atirando" nao precisa de
@@ -5570,127 +5742,179 @@ export class SurvivalRenderer {
         ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'right';
         ctx.fillStyle = extra.minigun.phase === 'overheated' ? PAL.blood : PAL.biolum;
-        ctx.fillText(label, hpBarX + hpBarW, spinY - 4);
+        ctx.fillText(label, hpBar.x + hpBar.w, heatRail.y + 6);
         ctx.textAlign = 'left';
       }
     }
 
-    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
-    ctx.beginPath();
-    ctx.moveTo(safeLeft + 12, safeTop + 43);
-    ctx.lineTo(safeLeft + panelW - 12, safeTop + 43);
-    ctx.stroke();
+    const divider = (y: number): void => {
+      ctx.strokeStyle = 'rgba(232,241,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(layout.innerLeft, y + 0.5);
+      ctx.lineTo(layout.innerRight, y + 0.5);
+      ctx.stroke();
+    };
+    divider(layout.dividerA);
 
     const purgePulse = nowMs < this.purgePulseUntil;
-    const purgeY = safeTop + 57;
-    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
+    const cargoPulse = nowMs < this.cargoPulseUntil;
+    const { resources } = layout;
+    const purgeLabel = t('hud.purgeCells', { count: extra.purgeCells });
+    const cargoLabel = t('hud.cargo', { count: this.cargoOre });
+    // Purga e carga dividem a linha, e no painel mais estreito (230 px) o
+    // portugues ("CÉLULA DE PURGA ×1" + "0 CARGA") nao cabe a 12 px. A fonte
+    // desce um ponto de cada vez ate os dois textos e o glifo da carga
+    // couberem — em vez de um por cima do outro, que foi como o playtest
+    // mobile os encontrou.
+    const purgeTextX = layout.x + 34;
+    let resourceSize = 12;
+    for (; resourceSize > 9; resourceSize--) {
+      ctx.font = `bold ${resourceSize}px monospace`;
+      const needed =
+        ctx.measureText(purgeLabel).width + ctx.measureText(cargoLabel).width + 9 + 15 + 8;
+      if (purgeTextX + needed <= layout.innerRight) break;
+    }
+    ctx.font = `bold ${purgePulse ? resourceSize + 1 : resourceSize}px monospace`;
     ctx.textAlign = 'left';
     ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
-    drawPurgeCellGlyph(ctx, safeLeft + 18, purgeY, purgePulse ? 15 : 13, ctx.fillStyle as string);
-    ctx.fillText(t('hud.purgeCells', { count: extra.purgeCells }), safeLeft + 34, purgeY + 4);
+    drawPurgeCellGlyph(
+      ctx,
+      resources.purgeGlyphX,
+      resources.glyphY,
+      purgePulse ? 15 : 13,
+      ctx.fillStyle as string,
+    );
+    ctx.fillText(purgeLabel, purgeTextX, resources.baseline);
 
     // A carga fica na MESMA linha da purga, encostada a direita do painel: os
     // dois sao recursos que o jogador carrega, e uma linha propria custaria
     // altura de HUD num painel que ja disputa espaco com os modulos.
-    const cargoPulse = nowMs < this.cargoPulseUntil;
-    const cargoRight = safeLeft + panelW - 12;
+    const cargoRight = layout.innerRight;
     ctx.textAlign = 'right';
-    ctx.font = `bold ${cargoPulse ? 13 : 12}px monospace`;
+    ctx.font = `bold ${cargoPulse ? resourceSize + 1 : resourceSize}px monospace`;
     ctx.fillStyle = cargoPulse ? PAL.bone : PAL.loot;
-    const cargoLabel = t('hud.cargo', { count: this.cargoOre });
-    ctx.fillText(cargoLabel, cargoRight, purgeY + 4);
+    ctx.fillText(cargoLabel, cargoRight, resources.baseline);
     this.cargoCounterX = cargoRight - ctx.measureText(cargoLabel).width - 9;
-    drawOreGlyph(ctx, this.cargoCounterX, purgeY, cargoPulse ? 15 : 13, ctx.fillStyle as string);
+    drawOreGlyph(
+      ctx,
+      this.cargoCounterX,
+      resources.glyphY,
+      cargoPulse ? 15 : 13,
+      ctx.fillStyle as string,
+    );
     ctx.textAlign = 'left';
 
-    if (hasModules) {
+    if (layout.modules) {
       this.renderModuleHud(
         extra.activeModules,
         state.tick,
         nowMs,
-        safeLeft + 12,
-        moduleY,
-        safeLeft + panelW,
+        layout.modules.x,
+        layout.modules.y,
+        layout.modules.right,
         this.minigunViews.get(this.localPlayerId - 1).barrelPhase,
       );
     }
 
-    const lowerDividerY = safeTop + (hasModules ? 104 : 75);
-    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
-    ctx.beginPath();
-    ctx.moveTo(safeLeft + 12, lowerDividerY);
-    ctx.lineTo(safeLeft + panelW - 12, lowerDividerY);
-    ctx.stroke();
+    divider(layout.dividerB);
 
-    ctx.textAlign = 'left';
-    ctx.fillStyle = PAL.rockLight;
-    ctx.font = '11px monospace';
+    // SETOR e NUCLEOS na mesma linha: sao a mesma pergunta ("onde estou na
+    // descida?"), e uma linha a menos aqui e uma linha a mais para a diretiva.
+    //
     // O denominador e o TOTAL ACESSIVEL desta run, e nunca o maximo potencial
     // da linhagem. Uma expedicao de G-01 mostra "SETOR 3/3" e le como completa;
     // mostrar "3/7" a faria parecer truncada por uma area perdida que ela nunca
     // teve autorizacao para ver.
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 10px monospace';
     const runSectors = state.config.depth.sectorCount;
-    ctx.fillText(
+    flashText(
       t('hud.sector', { sector: state.sector, total: runSectors }),
-      safeLeft + 12,
-      sectorY,
+      layout.innerLeft,
+      layout.sectorBaseline,
+      PAL.bone,
+      nowMs - this.sectorEnteredAtMs,
+      1200,
     );
-
-    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
-    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
-    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
-    ctx.fillStyle = PAL.bone;
-    ctx.font = '9px monospace';
-    ctx.fillText(biomeLabel(state.stratum, state.occupation), safeLeft + 12, biomeY);
-
-    // Instrumentacao de Levantamento: mapa de saloes visitados e previsao de
-    // onda. Depois do bioma porque sao a leitura MAIS lenta do painel — quem
-    // consulta um mapa nao esta no meio de uma luta.
-    const nav = state.config.tuning.navigation;
-    if (nav.routeMemory || nav.contaminationForecast) {
-      drawSurveyHud(ctx, state, nav, this.route, safeLeft + 12, biomeY + 6, nowMs);
-    }
 
     // NUCLEOS: so aparece quando a run tem mais de um, e ai ele e a informacao
     // que decide se vale continuar descendo. Numa run de um Nucleo a linha
     // seria ruido — o objetivo logo abaixo ja diz tudo.
     const coreSectors = state.config.depth.coreSectors;
-    const hudObjective = objectiveViewOf(state);
     if (coreSectors.length > 1) {
-      ctx.fillStyle = PAL.biolum;
-      ctx.font = '9px monospace';
-      ctx.fillText(
-        t('hud.cores', {
-          taken: countCoresTaken(state),
-          total: coreSectors.length,
-        }),
-        safeLeft + 12,
-        biomeY + 9,
+      const taken = countCoresTaken(state);
+      if (taken !== this.coresTakenSeen) {
+        this.coresChangedAtMs = this.coresTakenSeen < 0 ? -1e9 : nowMs;
+        this.coresTakenSeen = taken;
+      }
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 9px monospace';
+      flashText(
+        t('hud.cores', { taken, total: coreSectors.length }),
+        layout.innerRight,
+        layout.sectorBaseline,
+        PAL.biolum,
+        nowMs - this.coresChangedAtMs,
+        900,
       );
+      ctx.textAlign = 'left';
     }
 
-    ctx.fillStyle = PAL.loot;
-    ctx.font = 'bold 12px monospace';
-    // A diretiva, em ordem de urgencia:
-    //
-    // 1. o selo do setor, quando ha um — enquanto o dono esta de pe, nem o poco
-    //    nem o pedestal aceitam a mao, e mandar "desca pelo poco" apontaria
-    //    para uma interacao recusada;
-    // 2. o caminho de VOLTA, quando o Nucleo do fundo ja esta na mao: a
-    //    diretiva vira a mesma para os dois jogadores em qualquer setor — va a
-    //    ENTRADA, subir (setor > 1) ou fechar o contrato (setor 1);
-    // 3. o Nucleo deste setor, se houver um por recolher;
-    // 4. descer.
-    const objectiveKey = hudObjective.sealedByBoss
-      ? 'hud.objective.breakSeal'
+    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
+    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
+    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
+    ctx.fillStyle = 'rgba(184,169,143,0.78)';
+    ctx.font = '9px monospace';
+    ctx.fillText(
+      biomeLabel(state.stratum, state.occupation),
+      layout.innerLeft,
+      layout.biomeBaseline,
+    );
+
+    // Instrumentacao de Levantamento: mapa de saloes visitados e previsao de
+    // onda. Depois do bioma porque sao a leitura MAIS lenta do painel — quem
+    // consulta um mapa nao esta no meio de uma luta.
+    if (surveyHeight > 0) {
+      drawSurveyHud(ctx, state, nav, this.route, layout.innerLeft, layout.surveyTop, nowMs);
+    }
+
+    // A DIRETIVA. Uma barra de acento a esquerda diz de que TIPO ela e antes de
+    // o texto ser lido: sangue para um selo a derrubar, fosforo para o caminho
+    // de volta, ambar para o Nucleo a recolher, osso para a descida comum.
+    const { objective } = layout;
+    const accent = hudObjective.sealedByBoss
+      ? PAL.blood
       : hudObjective.returning
-        ? state.sector > 1
-          ? 'hud.objective.ascend'
-          : 'hud.objective.extract'
-        : hudObjective.hasCore && !hudObjective.coreTakenHere
-          ? 'hud.objective.findCore'
-          : 'hud.objective.descend';
-    ctx.fillText(t(objectiveKey), safeLeft + 12, objectiveY);
+        ? PAL.biolum
+        : objectiveKey === 'hud.objective.findCore'
+          ? PAL.loot
+          : PAL.bone;
+    const objectiveElapsed = nowMs - this.objectiveChangedAtMs;
+    const objectiveFresh = !reduced && objectiveElapsed >= 0 && objectiveElapsed < 900;
+    const lastBaseline =
+      objective.firstBaseline + (objectiveLines.length - 1) * objective.lineHeight;
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = objectiveFresh ? 1 : 0.85;
+    ctx.fillRect(
+      objective.accentX,
+      objective.firstBaseline - 9,
+      2,
+      lastBaseline + 2 - (objective.firstBaseline - 9),
+    );
+    ctx.globalAlpha = 1;
+    ctx.font = HUD_OBJECTIVE_FONT;
+    ctx.textAlign = 'left';
+    objectiveLines.forEach((line, index) => {
+      flashText(
+        line,
+        objective.x,
+        objective.firstBaseline + index * objective.lineHeight,
+        PAL.loot,
+        objectiveElapsed,
+        900,
+      );
+    });
 
     // mensagens centrais
     this.messages = this.messages.filter((m) => m.until > nowMs);
@@ -5699,12 +5923,21 @@ export class SurvivalRenderer {
     let my = Math.max(this.safeArea.top + 28, vh * 0.2);
     for (const m of visibleMessages.slice(-3)) {
       ctx.font = 'bold 14px monospace';
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
       const tw = ctx.measureText(m.text).width;
-      ctx.fillRect(vw / 2 - tw / 2 - 8, my - 14, tw + 16, 20);
+      // Some em vez de sumir: os ultimos 300 ms sao um desvanecimento, e nao
+      // um corte — uma mensagem que desaparece de uma vez puxa o olho para
+      // onde ja nao ha nada.
+      ctx.globalAlpha = reduced ? 1 : Math.max(0, Math.min(1, (m.until - nowMs) / 300));
+      roundedPanel(vw / 2 - tw / 2 - 10, my - 15, tw + 20, 22, 6);
+      ctx.fillStyle = 'rgba(11,14,20,0.7)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(232,241,255,0.18)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
       ctx.fillStyle = PAL.bone;
       ctx.fillText(m.text, vw / 2, my);
-      my += 26;
+      ctx.globalAlpha = 1;
+      my += 28;
     }
 
     // Controles touch: mesma pele nos dois lados; esquerda move, direita mira
@@ -5885,8 +6118,13 @@ export class SurvivalRenderer {
       ctx.beginPath();
       ctx.arc(cx, cy, size / 2 + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
       ctx.stroke();
-      ctx.fillStyle = PAL.bone;
+      // O numero ganha um fundo escuro: sem ele o anel de vida do card passa
+      // por tras dos algarismos, e "80" sobre um arco fosforo nao se le.
       ctx.font = `bold ${Math.max(8, Math.round(size * 0.3))}px monospace`;
+      const labelW = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(11,14,20,0.82)';
+      ctx.fillRect(cursor + size - 3 - labelW, y + size - 10, labelW + 2, 10);
+      ctx.fillStyle = PAL.bone;
       ctx.textAlign = 'right';
       ctx.fillText(label, cursor + size - 2, y + size - 2);
       cursor += size + gap;

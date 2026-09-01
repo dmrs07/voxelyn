@@ -72,16 +72,30 @@
       #status a {
         color: #59f2c2;
       }
+      /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo. */
       #hud-note {
         position: fixed;
         top: calc(8px + var(--safe-area-inset-top));
-        left: calc(8px + var(--safe-area-inset-left));
+        right: calc(10px + var(--safe-area-inset-right));
+        text-align: right;
         font-size: 11px;
         color: #7c8290cc;
         z-index: 5;
         pointer-events: none;
         letter-spacing: 0.06em;
         text-transform: uppercase;
+      }
+      /* Tela estreita: nao ha lado direito livre ao lado do painel, e a nota
+         sobe para junto da barra de reproducao, onde nada e lido na luta. */
+      @media (max-width: 640px) {
+        #hud-note {
+          top: auto;
+          right: calc(8px + var(--safe-area-inset-right));
+          left: calc(8px + var(--safe-area-inset-left));
+          bottom: calc(52px + var(--safe-area-inset-bottom));
+          text-align: center;
+          font-size: 10px;
+        }
       }
       #playbar {
         position: fixed;
