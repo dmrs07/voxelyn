@@ -188,6 +188,39 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     }
   });
 
+  it('o ESPASMO anda: o relogio da pose avanca entre quadros', () => {
+    // Regressao de um defeito real, e o pior tipo de defeito de animacao:
+    // silencioso. A boca e a pose de jogador CAIDO usam o mesmo slot de atlas
+    // (`downed`), e a boca reaproveitava o mapa `downedAt` — que o ramo logo
+    // acima limpa a cada quadro para quem nao esta caido. O registro era
+    // apagado no quadro seguinte ao que o escrevia, `elapsedMs` nascia zero
+    // sempre, e o espasmo de seis quadros ficava travado no primeiro.
+    //
+    // Nada quebrava, nada avisava: a pose certa, parada.
+    const p = new EntityPresentation();
+    const at = (ms: number) =>
+      p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, ms);
+    expect(at(1_000).elapsedMs).toBe(0);
+    expect(at(1_200).elapsedMs, 'o relogio da boca nao avancou').toBe(200);
+    expect(at(1_500).elapsedMs).toBe(500);
+  });
+
+  it('a boca fechando REARMA o espasmo para o ciclo seguinte', () => {
+    const p = new EntityPresentation();
+    p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_000);
+    p.animationFor(worm(DEVOURER_MAW) as never, { tick: 5 } as never, base as never, 1_400);
+    // Ele volta para baixo...
+    p.animationFor(worm(DEVOURER_BURROWED) as never, { tick: 5 } as never, base as never, 1_500);
+    // ...e a boca seguinte comeca do primeiro quadro, e nao de onde parou.
+    const reopened = p.animationFor(
+      worm(DEVOURER_MAW) as never,
+      { tick: 5 } as never,
+      base as never,
+      2_000,
+    );
+    expect(reopened.elapsedMs, 'o espasmo continuou de onde a boca anterior parou').toBe(0);
+  });
+
   it('o atlas realmente tem a pose, e ela e a mais ALTA do bicho', () => {
     // O contrato com o gerador: `downed` existe e e uma pose de pe. Se alguem
     // regerar o atlas sem ela, o cliente cai em `idle` calado — que e como o

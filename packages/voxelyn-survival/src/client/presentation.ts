@@ -286,6 +286,21 @@ export class EntityPresentation {
   private readonly actions = new Map<number, ActionIntent>();
   private readonly actionVisualClocks = new Map<number, ActionVisualClock>();
   private readonly downedAt = new Map<number, number>();
+  /**
+   * Quando a BOCA do Devorador abriu, em relogio de tela.
+   *
+   * Mapa proprio, e nao o `downedAt`, e a separacao e a correcao de um defeito
+   * real: as duas poses usam o mesmo slot de atlas (`downed`), entao a boca
+   * reaproveitava aquele mapa — e o ramo dela roda DEPOIS do
+   * `downedAt.delete()` que limpa o slot para quem nao esta caido. O registro
+   * era apagado no quadro seguinte ao que o escrevia, `elapsedMs` nascia zero
+   * toda vez, e o espasmo de seis quadros ficava congelado no primeiro.
+   *
+   * Compartilhar um mapa entre duas poses que compartilham um slot de atlas e
+   * uma armadilha que ja disparou uma vez; um mapa por pose nao tem como
+   * disparar de novo.
+   */
+  private readonly mawAt = new Map<number, number>();
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
   private readonly facingHysteresis = new FacingHysteresis();
@@ -294,6 +309,7 @@ export class EntityPresentation {
     this.actions.clear();
     this.actionVisualClocks.clear();
     this.downedAt.clear();
+    this.mawAt.clear();
     this.reviveUntil.clear();
     this.tombstonesById.clear();
     this.facingHysteresis.clear();
@@ -461,9 +477,14 @@ export class EntityPresentation {
     // volta (ver `maw-vortex.ts`) e quem completa a moldura.
     //
     // O Devorador continua sendo o unico inimigo que usa este slot em vida.
+    if (entity.archetype === 'white_devourer' && entity.mood !== DEVOURER_MAW) {
+      // A boca fechou (ou nunca abriu): o proximo ciclo recomeca o espasmo do
+      // primeiro quadro em vez de continuar de onde o anterior parou.
+      this.mawAt.delete(entity.id);
+    }
     if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_MAW) {
-      const start = this.downedAt.get(entity.id) ?? nowMs;
-      this.downedAt.set(entity.id, start);
+      const start = this.mawAt.get(entity.id) ?? nowMs;
+      this.mawAt.set(entity.id, start);
       const aim = bodyFacing();
       return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
     }

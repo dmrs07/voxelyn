@@ -1527,7 +1527,32 @@ const twitch = (i, f) => {
   return ((h >>> 0) % 1024) / 1024;
 };
 
-const devourerModel = (anim, f) => {
+/**
+ * A ESCALA DO DEVORADOR. Ele e um chefe e precisava parecer um.
+ *
+ * Medido contra os outros dois chefes que ja tinham corpo, na mesma projecao e
+ * no mesmo repouso: o Guardiao ocupa 100x113 px, o Diamandis 92x134, e o
+ * Devorador ocupava 92x61 — pouco mais da METADE da presenca de tela dos
+ * companheiros de hierarquia. O relato de playtest foi direto ao ponto: "nem
+ * parece um Boss".
+ *
+ * Um verme nao tem como competir por ALTURA — a silhueta dele e baixa por
+ * definicao, e erguer o corpo foi justamente a ideia que a boca substituiu.
+ * Entao ele compete por COMPRIMENTO e massa: a 1,4 o corpo vai a 129x85, que
+ * poe a area dele na mesma faixa dos outros sem tirar o bicho do chao.
+ *
+ * O fator multiplica o modelo INTEIRO, e nao so o corpo: a boca e a metade
+ * dianteira deste mesmo animal aberta, e escalar uma sem a outra faria a
+ * cabeca encolher em relacao ao tronco no meio do proprio ciclo.
+ */
+const DEVOURER_SCALE = 1.4;
+
+const scaleBoxes = (boxes, k) =>
+  boxes.map((b) => ({ ...b, x: b.x * k, y: b.y * k, z: b.z * k, w: b.w * k, d: b.d * k, h: b.h * k }));
+
+const devourerModel = (anim, f) => scaleBoxes(devourerBody(anim, f), DEVOURER_SCALE);
+
+const devourerBody = (anim, f) => {
   // PRESO NO PROPRIO BURACO — a janela de dano do encontro, e a unica pose em
   // que o corpo sai do plano do chao.
   //
@@ -2406,7 +2431,7 @@ const magnetarchModel = (anim, f) => {
 const diamandisFrame = (dir, anim, f) =>
   renderVoxels(diamandisModel(anim, f), DIR_INDEX[dir], 120, 138, 58, 114);
 const devourerFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 112, 110, 54, 74);
+  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 152, 76, 104);
 const archcantorFrame = (dir, anim, f) =>
   renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
 const leviathanFrame = (dir, anim, f) =>
@@ -2688,7 +2713,7 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 4, fps: 8, loop: false },
   }, diamandisFrame, 'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon', 1),
-  base('enemy-white-devourer', 112, 110, 54, 74, { w: 2.2, h: 1.2 }, { w: 2, h: 1.6, offsetX: 0, offsetY: 0 }, {
+  base('enemy-white-devourer', 156, 152, 76, 104, { w: 3.1, h: 1.7 }, { w: 2.8, h: 2.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
     // `downed` e a BOCA ABERTA, e nao a morte: o Devorador e o unico inimigo
@@ -2701,7 +2726,7 @@ export const ENTITY_SPECS = [
     // tamanho da tabela de gole (GULP): cada quadro do atlas e uma entrada
     // dela, sem repetir nem sobrar.
     downed: { frames: 6, fps: 11, loop: true },
-  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 2),
+  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 3),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

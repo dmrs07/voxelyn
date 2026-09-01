@@ -630,7 +630,30 @@ export const PROTOCOL_VERSION = 28;
 // com o jogador parado onde ele estava, a outra com ele meio tile mais perto —
 // e a distancia entre elas so cresce dali em diante.
 // 45: Diluvio ganha profundidade e descarga massiva evitavel por bolha de ar.
-export const SIMULATION_VERSION = 45;
+// 46: O DEVORADOR CRESCE e para de dancar. `DEVOURER_RADIUS` sobe de 0,8 para
+// 0,95, junto com a escala 1,4 do atlas (ver CONTENT_VERSION): ele ocupava
+// pouco mais da metade da tela dos outros chefes e nao lia como um. Raio decide
+// colisao e tamanho de ALVO, entao duas simulacoes em versoes diferentes
+// discordam de quais tiros acertam durante a janela de dano.
+//
+// E o MERGULHO ganha distancia de espreita. Ele perseguia o jogador sem parada
+// — medido, a distancia estabilizava em 0,10 tile e oscilava a cada tick, com o
+// chefe vibrando em cima dos pes do alvo ("fica dancando ao redor dele"). Agora
+// o passo submerso se divide em radial (corrige ate DEVOURER_STALK_RANGE) e
+// tangencial (circula com o que sobra), com o sentido da volta saindo da
+// paridade do id para ser igual nas duas pontas de uma sala. A posicao dele
+// diverge no primeiro tick de mergulho.
+//
+// Junto vao duas correcoes que a espreita revelou. A direcao do mergulho
+// DEGENERA quando o arco pousa em cima do alvo (`normalized(0,0)` e um passo
+// nulo, e o corpo ficava plantado dentro do jogador para sempre); passa a cair
+// no rumo do corpo, como o arco ja fazia. E a busca da DECOLAGEM passa a
+// recusar celulas a menos de DEVOURER_LEAP_MIN_RANGE da queda: ela aceita ate
+// tres aneis do ponto ideal e anel e distancia de Chebyshev (canto a 4,24),
+// entao a decolagem podia cair a 1,4 tile da queda — arco de comprimento zero,
+// e um furo no vidro, porque com o disco inteiro vitrificado ele ainda achava a
+// areia colada no alvo e saltava dali.
+export const SIMULATION_VERSION = 46;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -699,7 +722,22 @@ export const SIMULATION_VERSION = 45;
 // Um cliente com o atlas antigo continua desenhando o tronco erguido enquanto a
 // simulacao arrasta corpos para dentro de um buraco que ele nao mostra: a pose
 // e o unico sinal de que a janela virou uma boca, e ela e o telegrafo do golpe.
-export const CONTENT_VERSION = 26;
+// 27: o atlas do Devorador sobe para v3 e o modelo inteiro e multiplicado por
+// 1,4 (`DEVOURER_SCALE`), com o canvas indo de 112x110 para 156x152 e a ancora
+// de (54,74) para (76,104) — o mesmo fator, para o corpo nao deslocar no chao.
+//
+// Medido antes da mudanca, na mesma projecao e no mesmo repouso: Guardiao
+// 100x113, Diamandis 92x134, Devorador 92x61. Pouco mais da METADE da presenca
+// de tela dos companheiros de hierarquia, e o relato de playtest foi direto —
+// "nem parece um Boss". Um verme nao compete por altura (a silhueta dele e
+// baixa por definicao, e erguer o corpo foi exatamente a ideia que a boca
+// substituiu), entao ele compete por comprimento: agora 114x76, na mesma faixa
+// de area dos outros dois e o mais largo dos tres.
+//
+// A boca escala junto porque e a metade dianteira deste mesmo animal aberta —
+// escalar uma sem a outra encolheria a cabeca em relacao ao tronco no meio do
+// proprio ciclo.
+export const CONTENT_VERSION = 27;
 
 export type VersionTriple = {
   protocolVersion: number;

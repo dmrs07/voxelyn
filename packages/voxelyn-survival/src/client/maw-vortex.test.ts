@@ -9,7 +9,14 @@ import {
   PLAYER_SPEED,
   mawPull,
 } from '@voxelyn/survival-sim';
-import { MAW_FALL_SECONDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawStreak } from './maw-vortex';
+import {
+  MAW_CLOUDS,
+  MAW_FALL_SECONDS,
+  MAW_NO_RETURN_RADIUS,
+  MAW_STREAKS,
+  mawCloud,
+  mawStreak,
+} from './maw-vortex';
 
 const head = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) => g.path[g.path.length - 1];
 const tail = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) => g.path[0];
@@ -185,5 +192,79 @@ describe('vortice da boca — os graos', () => {
     const early = mawStreak(3, 0.4, DEVOURER_MAW_RADIUS * 0.25);
     const late = mawStreak(3, 0.4, DEVOURER_MAW_RADIUS);
     expect(radius(head(early))).toBeLessThan(radius(head(late)));
+  });
+});
+
+describe('vortice da boca — a poeira', () => {
+  const reach = DEVOURER_MAW_RADIUS;
+
+  it('anda pelo MESMO caminho dos graos, e nunca sai do disco', () => {
+    // A nuvem e a mesma materia que os riscos, indo para o mesmo lugar. Se ela
+    // seguisse um caminho paralelo, a primeira mudanca de passo ou de lei do
+    // raio separaria os dois — e a poeira que deveria ser aquela areia iria
+    // para outro lado.
+    for (let i = 0; i < MAW_CLOUDS; i++) {
+      for (let s = 0; s < 6; s += 0.07) {
+        const c = mawCloud(i, s, reach);
+        const r = Math.hypot(c.dx, c.dy);
+        expect(r).toBeLessThanOrEqual(reach + 0.001);
+        expect(r).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS - 0.001);
+      }
+    }
+  });
+
+  it('desce mais DEVAGAR que o grao: sao duas camadas, nao uma', () => {
+    // Duas coisas na mesma velocidade pelo mesmo caminho viram uma so, e a
+    // nuvem deixaria de ser segundo plano para virar um risco gordo.
+    const travel = (sample: (s: number) => number) => {
+      let sum = 0;
+      for (let s = 0.05; s < 0.55; s += 0.05) sum += Math.abs(sample(s) - sample(s - 0.05));
+      return sum;
+    };
+    const grainR = (s: number) => {
+      const g = mawStreak(0, s, reach);
+      const h = g.path[g.path.length - 1];
+      return Math.hypot(h.dx, h.dy);
+    };
+    const cloudR = (s: number) => {
+      const c = mawCloud(0, s, reach);
+      return Math.hypot(c.dx, c.dy);
+    };
+    expect(travel(cloudR), 'a poeira acompanha o grao').toBeLessThan(travel(grainR));
+  });
+
+  it('ENCOLHE ao descer: a garganta comprime a nuvem', () => {
+    // Uma mancha que chegasse do mesmo tamanho no centro pareceria flutuar por
+    // cima do buraco em vez de entrar nele.
+    const early = mawCloud(0, 0.2, reach);
+    const late = mawCloud(0, MAW_FALL_SECONDS * 2.2, reach);
+    expect(late.radius).toBeLessThan(early.radius);
+    expect(late.radius).toBeGreaterThan(0);
+  });
+
+  it('encolhe com o ALCANCE: no comeco da janela a poeira e pequena', () => {
+    // Raio fixo faria a nuvem ser maior que o proprio vortice enquanto a boca
+    // ainda esta abrindo.
+    const small = mawCloud(2, 0.3, DEVOURER_MAW_RADIUS * 0.2);
+    const full = mawCloud(2, 0.3, DEVOURER_MAW_RADIUS);
+    expect(small.radius).toBeLessThan(full.radius);
+  });
+
+  it('sao deterministicas, como os graos', () => {
+    expect(mawCloud(5, 1.7, reach)).toEqual(mawCloud(5, 1.7, reach));
+  });
+
+  it('espalham sozinhas, sem precisar saber quantas sao', () => {
+    // Os graos precisam receber a contagem (e ela que faz `i / contagem`
+    // espalhar as fases); a poeira nao, porque o deslocamento por indice e uma
+    // sequencia de baixa discrepancia. Isso importa na pratica: a contagem muda
+    // com o preset de qualidade, e um efeito que dependa dela para se espalhar
+    // amontoa quando o preset cai.
+    for (const many of [4, 9, MAW_CLOUDS]) {
+      const radii = [];
+      for (let i = 0; i < many; i++) radii.push(Math.hypot(mawCloud(i, 0.4, reach).dx, mawCloud(i, 0.4, reach).dy));
+      const spread = Math.max(...radii) - Math.min(...radii);
+      expect(spread, `com ${many} nuvens elas se amontoaram`).toBeGreaterThan(reach * 0.3);
+    }
   });
 });

@@ -1,14 +1,14 @@
 {
   "id": "enemy-white-devourer",
-  "version": 2,
+  "version": 3,
   "atlas": "enemy-white-devourer.png",
   "normalAtlas": "enemy-white-devourer.normal.png",
   "normalScale": 2,
-  "frameWidth": 112,
-  "frameHeight": 110,
-  "columns": 36,
-  "anchorX": 54,
-  "anchorY": 74,
+  "frameWidth": 156,
+  "frameHeight": 152,
+  "columns": 26,
+  "anchorX": 76,
+  "anchorY": 104,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -18,12 +18,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 2.2,
-    "h": 1.2
+    "w": 3.1,
+    "h": 1.7
   },
   "footprint": {
-    "w": 2,
-    "h": 1.6,
+    "w": 2.8,
+    "h": 2.2,
     "offsetX": 0,
     "offsetY": 0
   },

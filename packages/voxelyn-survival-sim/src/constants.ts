@@ -825,7 +825,26 @@ export const DEVOURER_BURROW_SPEED = 4.6;
  * arquetipo, e um zero ali diria "fixo como o Pulmao", que e outra coisa.
  */
 export const DEVOURER_SURFACE_SPEED = 1.6;
-export const DEVOURER_RADIUS = 0.8;
+/**
+ * O raio de COLISAO do corpo. Subiu de 0,8 junto com a escala do atlas.
+ *
+ * O sprite cresceu 40% (ver DEVOURER_SCALE no gerador) porque o Devorador
+ * ocupava pouco mais da metade da tela dos outros chefes e nao lia como um. Um
+ * corpo 40% maior com o mesmo raio de colisao seria uma mentira que ja existia
+ * e teria piorado: o desenho e comprido e o colisor e redondo, entao o sprite
+ * sempre passou da circunferencia. Nao da para casar os dois num verme, mas da
+ * para o vao nao crescer.
+ *
+ * 0,95 e menos que os 1,12 que a escala pediria, e a diferenca e deliberada: o
+ * raio decide o tamanho do ALVO, e este chefe passa a janela de dano parado.
+ * Um alvo 40% mais largo transformaria a abertura num acerto garantido. Acima
+ * do Diamandis (0,9), abaixo do que o desenho sugere.
+ *
+ * Na pratica ele quase nao colide: mergulhado atravessa tudo, no ar nao encosta
+ * em nada e de boca aberta nao sai do lugar. O que este numero de fato governa
+ * e o tamanho do alvo durante a janela — e e por isso que ele foi conservador.
+ */
+export const DEVOURER_RADIUS = 0.95;
 /**
  * Quanto do dano a areia absorve enquanto ele esta por baixo.
  *
@@ -1105,6 +1124,35 @@ export const DEVOURER_LEAP_TURN = 2.1;
 export const DEVOURER_LAUNCH_DAMAGE = 18;
 /** Quanto a mira antecipa o movimento do alvo, em segundos. */
 export const DEVOURER_LEAD_SECONDS = 0.9;
+/**
+ * A DISTANCIA DE ESPREITA: a que raio ele circula enquanto esta por baixo.
+ *
+ * Nao existia, e a ausencia dela era um defeito visivel. O mergulho mirava a
+ * posicao do jogador sem distancia de parada, entao ele convergia para cima
+ * dela — medido, a distancia estabilizava em 0,10 tile e oscilava entre 0,10 e
+ * 0,13 a cada tick. O chefe passava o mergulho inteiro vibrando em cima dos pes
+ * do Prospector, que foi exatamente o relato: "fica dancando ao redor dele".
+ *
+ * O ciclo dele ja pedia o contrario. Um verme que vem de BAIXO precisa de
+ * distancia para ter de onde vir: o arco so le como arco a partir de
+ * DEVOURER_LEAP_MIN_RANGE (5), e colado no alvo a decolagem tem de recuar por
+ * baixo antes de subir. Ficar em cima do jogador brigava com o proprio salto.
+ *
+ * 5,6 fica logo acima do minimo do arco: perto o bastante para a ameaca ser
+ * constante, longe o bastante para a faixa de silica ser uma LINHA que aponta
+ * de onde ele vem — e o rastro e o unico aviso que este chefe da.
+ */
+export const DEVOURER_STALK_RANGE = 5.6;
+/**
+ * Quanto do passo submerso ele gasta CIRCULANDO, quando ja esta na distancia.
+ *
+ * Sem isto, chegar na distancia certa significaria parar — e um verme parado
+ * embaixo da areia nao deixa rastro, que e o mesmo que desaparecer. Gastando o
+ * resto do passo de lado, ele ORBITA: a faixa de silica vira um anel se
+ * fechando em volta do jogador, e a ameaca continua sendo desenhada no chao
+ * enquanto ele decide de onde sair.
+ */
+export const DEVOURER_STALK_CIRCLE = 0.85;
 /** Meia-largura da faixa de silica que o mergulho deixa. */
 export const DEVOURER_TRAIL_WIDTH = 1;
 

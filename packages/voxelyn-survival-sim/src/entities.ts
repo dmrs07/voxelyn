@@ -119,6 +119,8 @@ import {
   DEVOURER_MAW_BITE_DAMAGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_STEP,
+  DEVOURER_STALK_CIRCLE,
+  DEVOURER_STALK_RANGE,
   DEVOURER_TRAIL_WIDTH,
   SURF_GLASS,
   SURF_SCORCHED,
@@ -2561,19 +2563,63 @@ const devourerStep = (
   // onde ele anda, e ao mesmo tempo a materia que o contra-jogo consome.
   if (!player) return;
   if (!diverEngaged(state, enemy, player, DEVOURER_BURROW_MIN_TICKS, events)) return;
-  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  const span = distTo(enemy, player);
+  // A DIRECAO DEGENERA quando ele pousa em cima do alvo, e isso nao e hipotese:
+  // a queda do arco e MIRADA no jogador, entao o corpo comeca o mergulho
+  // seguinte a distancia zero dele com alguma regularidade. Ali
+  // `normalized(0, 0)` devolve (0, 0), e um passo multiplicado por (0, 0) e
+  // parado — o chefe ficaria plantado dentro do jogador para sempre, sem rastro
+  // e sem nunca voltar a sair.
+  //
+  // E o mesmo defeito que o arco ja teve (ver DEVOURER_LEAP_TURN) e a mesma
+  // cura: quando nao ha de onde tirar uma direcao, usar a ultima valida.
+  const toward =
+    span > 0.0001
+      ? normalized(player.x - enemy.x, player.y - enemy.y)
+      : normalized(enemy.facing.x, enemy.facing.y);
   enemy.facing = { ...toward };
   const step = DEVOURER_BURROW_SPEED * dt;
+
+  // ELE ESPREITA, e nao persegue ate encostar.
+  //
+  // A versao anterior mirava a posicao do jogador sem distancia de parada, e o
+  // resultado era medivel: a distancia estabilizava em 0,10 tile e oscilava
+  // entre 0,10 e 0,13 a cada tick, com o chefe vibrando em cima dos pes do
+  // Prospector. O relato de playtest foi exatamente isso — "fica dancando ao
+  // redor dele".
+  //
+  // O ciclo dele ja pedia o contrario: o arco so le como arco a partir de
+  // DEVOURER_LEAP_MIN_RANGE, e colado no alvo a decolagem tem de recuar por
+  // baixo antes de subir. Perseguir ate zero brigava com o proprio salto.
+  //
+  // Agora o passo se divide em duas partes. A RADIAL corrige o erro de
+  // distancia ate DEVOURER_STALK_RANGE — aproxima quando esta longe, afasta
+  // quando esta perto demais — e nunca gasta mais que o proprio erro, senao ele
+  // ultrapassaria o anel e voltaria a oscilar, so que num raio maior. O que
+  // sobra do passo vai para a TANGENTE, e e ela que o mantem circulando: um
+  // verme parado embaixo da areia nao deixa rastro, e o rastro e o unico aviso
+  // que este chefe da.
+  const gap = span - DEVOURER_STALK_RANGE;
+  const radial = Math.max(-step, Math.min(step, gap));
+  // O que sobrou do passo depois de corrigir a distancia, com teto: perto do
+  // anel quase tudo vira volta, longe dele quase tudo vira aproximacao.
+  const orbit = Math.sqrt(Math.max(0, step * step - radial * radial)) * DEVOURER_STALK_CIRCLE;
+  // O SENTIDO da volta sai do id do corpo, e nao de um sorteio: ele tem de ser
+  // o mesmo nas duas pontas de uma sala de co-op, e o mesmo em toda re-simulacao
+  // de um replay.
+  const spin = enemy.id % 2 === 0 ? 1 : -1;
+  const side = { x: -toward.y * spin, y: toward.x * spin };
+  const moveX = toward.x * radial + side.x * orbit;
+  const moveY = toward.y * radial + side.y * orbit;
   // Sem `moveEntity`: parede nao vale por baixo. Ele e o unico corpo do jogo
   // que atravessa solido, e e por isso que perseguir nao e uma resposta a ele.
-  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + toward.x * step));
-  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + toward.y * step));
+  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + moveX));
+  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + moveY));
 
   // O RASTRO: silica solta na faixa por onde passou, so em chao aberto e limpo.
   // Nao pinta por cima de nada — nem de fogo, nem de agua, nem do proprio
   // vidro: sobrescrever o vidro apagaria o contra-jogo do jogador com o
   // proprio corpo do chefe.
-  const side = { x: -toward.y, y: toward.x };
   for (let lane = -DEVOURER_TRAIL_WIDTH; lane <= DEVOURER_TRAIL_WIDTH; lane++) {
     const tx = Math.floor(enemy.x + side.x * lane);
     const ty = Math.floor(enemy.y + side.y * lane);
@@ -2685,6 +2731,24 @@ const devourerLaunchSpot = (
     Math.floor(landX + dir.x * reach),
     Math.floor(landY + dir.y * reach),
     DEVOURER_LAUNCH_SEARCH,
+    // A DECOLAGEM NAO PODE CAIR PERTO DA QUEDA, e sem esta recusa ela caía.
+    //
+    // A busca aceita qualquer celula ate `DEVOURER_LAUNCH_SEARCH` aneis do ponto
+    // ideal, e anel e distancia de Chebyshev: o anel 3 tem canto a 4,24 tiles.
+    // Com o ideal no minimo (5), isso deixava a decolagem chegar a 0,76 do
+    // ponto de queda — medido em playtest a 1,41 tile. Um arco desse tamanho e
+    // o "salto de comprimento zero" que este chefe ja teve uma vez, e o
+    // DEVOURER_LEAP_TURN foi posto justamente para ele nao voltar.
+    //
+    // Pior que feio: era um furo no contra-jogo. Vitrificar em volta empurra a
+    // decolagem para longe — e essa e a segunda alavanca do vidro —, mas a
+    // busca podia recuar para uma nadinha de areia colada no alvo e saltar dali
+    // mesmo assim, com o disco inteiro vitrificado em volta.
+    //
+    // A recusa e a MESMA que separa as crateras de uma rajada, com outro raio:
+    // o anel seguinte continua sendo consultado, entao ele acha uma decolagem
+    // valida mais longe em vez de cancelar o arco.
+    { x: landX, y: landY, gap: DEVOURER_LEAP_MIN_RANGE },
   );
 };
 

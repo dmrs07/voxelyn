@@ -78,7 +78,7 @@ import {
   type EntityAnimState,
   PropBank,
 } from './sprites';
-import { MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawStreak } from './maw-vortex';
+import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
 import { ProjectileView, SMALL_PROJECTILE_RADIUS } from './projectiles';
@@ -383,6 +383,15 @@ const drawBiomeVeil = (
   ctx.fillRect(0, 0, vw, vh);
   ctx.restore();
 };
+
+/**
+ * Os raios dos lobos de uma nuvem de silica, como fracao do raio dela.
+ *
+ * Tres passos e o minimo para a mancha perder o contorno; mais que isso custa
+ * um `fill` por nuvem sem mudar a leitura, e as nuvens ja escalam com o preset
+ * de qualidade junto com os riscos.
+ */
+const CLOUD_LOBES = [1, 0.68, 0.36] as const;
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -2569,6 +2578,9 @@ export class SurvivalRenderer {
         //
         // Um anel que promete um raio diferente do raio que agarra e pior que
         // anel nenhum, porque o jogador confia nele para decidir onde ficar.
+        // A fracao com que TODO efeito deste cliente segue o preset de qualidade.
+        // As duas camadas do vortice — a poeira e os riscos — a usam.
+        const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
         const ISO = Math.SQRT2;
         const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
         const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
@@ -2628,7 +2640,43 @@ export class SurvivalRenderer {
           ctx.stroke();
         }
 
-        // 4. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
+        // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a
+        //    cortina que a boca levanta, com os graos passando por cima. Ela
+        //    anda pelo MESMO caminho e mais devagar, e e o que da volume ao
+        //    disco — sem ela o efeito e um punhado de riscos sobre chao limpo.
+        {
+          const clouds = Math.max(4, Math.round(MAW_CLOUDS * fxScale));
+          ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
+          for (let i = 0; i < clouds; i++) {
+            const puff = mawCloud(i, seconds, reach);
+            if (puff.alpha <= 0.01) continue;
+            const [cxp, cyp] = toScreen(maw.x + puff.dx, maw.y + puff.dy);
+            // TRES LOBOS CONCENTRICOS por nuvem, e nao uma elipse.
+            //
+            // Uma elipse unica tem CONTORNO, e contorno e a unica coisa que
+            // poeira nao tem: na primeira captura cada nuvem lia como uma
+            // sombra chapada no chao. Empilhando tres discos que encolhem com o
+            // mesmo alfa baixo, a opacidade cresce para o centro e a borda
+            // desaparece — o mesmo que um gradiente radial daria, sem alocar um
+            // por nuvem a cada quadro.
+            for (const lobe of CLOUD_LOBES) {
+              ctx.globalAlpha = puff.alpha * 0.075;
+              ctx.beginPath();
+              ctx.ellipse(
+                cxp,
+                cyp,
+                ringX(puff.radius * lobe),
+                ringY(puff.radius * lobe),
+                0,
+                0,
+                Math.PI * 2,
+              );
+              ctx.fill();
+            }
+          }
+        }
+
+        // 5. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
         //    celula e o chao limpo chega pelo diff de chunks; o que falta, e o
         //    que estes riscos entregam, e o CAMINHO — a materia indo para
         //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
@@ -2648,10 +2696,7 @@ export class SurvivalRenderer {
         // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
         // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
         // nao um fluxo.
-        const streaks = Math.max(
-          12,
-          Math.round(MAW_STREAKS * (this.quality.maxFx / PRESETS.high.maxFx)),
-        );
+        const streaks = Math.max(12, Math.round(MAW_STREAKS * fxScale));
         for (let i = 0; i < streaks; i++) {
           const grain = mawStreak(i, seconds, reach, streaks);
           if (grain.alpha <= 0.01) continue;

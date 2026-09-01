@@ -24,6 +24,7 @@ import {
   DEVOURER_REPEAT_MIN_GAP,
   CONDUCTIVE_STUN_TICKS,
   DEVOURER_MAW_BITE_DAMAGE,
+  DEVOURER_STALK_RANGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_CORE,
   DEVOURER_MAW_RADIUS,
@@ -157,6 +158,66 @@ describe('Devorador Branco — o rastro', () => {
     const before = worm.x;
     for (let t = 0; t < 40; t++) stepRun(state, [emptyCommand()]);
     expect(worm.x, 'a parede segurou quem anda por baixo dela').toBeLessThan(before - 2);
+  });
+});
+
+describe('Devorador Branco — a espreita', () => {
+  it('mergulhado ele CIRCULA a distancia, e nao gruda no jogador', () => {
+    // Regressao de um defeito relatado em playtest: "quando encosta no
+    // prospector fica tentando achar um ponto pra bater e fica dancando ao
+    // redor dele". Era o mergulho sem distancia de parada — medido, a distancia
+    // estabilizava em 0,10 tile e oscilava entre 0,10 e 0,13 a cada tick, com o
+    // chefe vibrando em cima dos pes do alvo.
+    //
+    // O ciclo dele ja pedia o contrario: o arco so le como arco a partir de
+    // DEVOURER_LEAP_MIN_RANGE, e colado no alvo a decolagem tem de recuar por
+    // baixo antes de subir.
+    const { state, worm, px, py } = arena(731);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    let burrowed = 0;
+    let closest = Infinity;
+    for (let t = 0; t < 400; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (worm.mood !== DEVOURER_BURROWED) {
+        burrowed = 0;
+        continue;
+      }
+      burrowed++;
+      // So depois de o mergulho ASSENTAR. O tick logo apos o pouso tem o corpo
+      // em cima do jogador por construcao — a queda e mirada nele —, e cobrar
+      // distancia ali mediria o arco, nao a espreita.
+      if (burrowed > 25) {
+        closest = Math.min(closest, Math.hypot(worm.x - state.player.x, worm.y - state.player.y));
+      }
+    }
+    expect(closest, 'nunca chegou a mergulhar tempo bastante').toBeLessThan(Infinity);
+    expect(closest, `grudou no jogador a ${closest.toFixed(2)} tiles`).toBeGreaterThan(
+      DEVOURER_STALK_RANGE * 0.5,
+    );
+  });
+
+  it('espreitando ele nao PARA: o rastro continua sendo desenhado', () => {
+    // A outra metade da regra. Chegar na distancia certa nao pode virar ficar
+    // parado: um verme imovel embaixo da areia nao deixa faixa nenhuma, e a
+    // faixa e o unico aviso que este chefe da de onde ele vem.
+    const { state, worm, px, py } = arena(732);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    // Posto ja na distancia de espreita: se ele fosse parar, e aqui.
+    worm.x = px + 0.5 + DEVOURER_STALK_RANGE;
+    worm.y = py + 0.5;
+    let travelled = 0;
+    for (let t = 0; t < 60; t++) {
+      const from = { x: worm.x, y: worm.y };
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (worm.mood === DEVOURER_BURROWED) {
+        travelled += Math.hypot(worm.x - from.x, worm.y - from.y);
+      }
+    }
+    expect(travelled, 'ele parou no anel em vez de circular').toBeGreaterThan(4);
   });
 });
 
@@ -371,6 +432,48 @@ describe('Devorador Branco — a rajada e a janela', () => {
     // O numero e a mecanica: um arco por ciclo dava pressao constante, e
     // pressao constante nao obriga o jogador a errar. A janela paga tres.
     expect(burst(621).arcsBeforeStuck).toBe(DEVOURER_LEAPS_PER_CYCLE);
+  });
+
+  it('a DECOLAGEM nunca cai perto da queda, mesmo com pouca areia', () => {
+    // O defeito que a espreita revelou: a busca da decolagem aceita qualquer
+    // celula ate tres ANEIS do ponto ideal, e anel e distancia de Chebyshev —
+    // o anel 3 tem canto a 4,24 tiles. Com o ideal no minimo (5), a decolagem
+    // podia cair a menos de um tile da queda; medido em playtest, 1,41.
+    //
+    // Era furo no contra-jogo antes de ser feio: com o disco inteiro
+    // vitrificado, ele ainda achava a nadinha de areia colada no alvo e saltava
+    // dali. O teste poe exatamente essa cena — vidro em tudo menos numa janela
+    // pequena junto do jogador — e cobra que todo arco nascido dela respeite o
+    // comprimento minimo.
+    const { state, px, py } = arena(733);
+    const w = state.config.width;
+    for (let y = py - 16; y <= py + 16; y++) {
+      for (let x = px - 16; x <= px + 16; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        const d = Math.hypot(x - px, y - py);
+        if (d > 16 || d <= 1.5) continue;
+        state.surface[y * w + x] = SURF_GLASS;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+    let arcs = 0;
+    for (let t = 0; t < 900; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'action_start' || ev.action !== 'erupt') continue;
+        arcs++;
+        const span = Math.hypot(
+          ev.x - state.bossRuntime.leapToX,
+          ev.y - state.bossRuntime.leapToY,
+        );
+        expect(span, `arco de ${span.toFixed(2)} tiles`).toBeGreaterThanOrEqual(
+          DEVOURER_LEAP_MIN_RANGE - 1.5,
+        );
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    // O teste vale mesmo com zero arcos (vidro negando tudo e o desfecho
+    // correto desta cena), mas o que ele NAO pode e ver um arco curto.
+    expect(arcs, `${arcs} arcos, todos validos`).toBeGreaterThanOrEqual(0);
   });
 
   it('nenhum arco da rajada tem comprimento zero', () => {
