@@ -26,6 +26,7 @@ const entry = (over: Partial<RankEntry> = {}): RankEntry => ({
   kills: 0,
   cores: 1,
   sectorCount: 3,
+  replayAvailable: false,
   ...over,
 });
 
@@ -113,7 +114,10 @@ describe('a linha do livro', () => {
     const head = Array.from(host.querySelectorAll('.ax-rank-head span')).map(
       (s) => s.textContent,
     );
-    expect(head).toEqual(['#', 'Operador', 'Núcleos', 'Tempo', '★']);
+    // A sexta faixa e a coluna do botao de replay — sem rotulo de proposito
+    // (ver `renderRankPanel`), e ainda assim presente para as linhas casarem
+    // com o cabecalho.
+    expect(head).toEqual(['#', 'Operador', 'Núcleos', 'Tempo', '★', '']);
   });
 
   it('mostra os Nucleos, que sao a pontuacao', () => {
@@ -127,5 +131,38 @@ describe('a linha do livro', () => {
     renderRankPanel(host, { entries: [entry({ name: '<img src=x onerror=1>' })] });
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('.ax-rank-name')?.textContent).toBe('<img src=x onerror=1>');
+  });
+});
+
+describe('botao de replay', () => {
+  /**
+   * As duas condicoes tem de ser verdadeiras: a linha TER um log guardado
+   * (`replayAvailable`) e a tela SABER abrir um (`onWatchReplay`). Faltando
+   * qualquer uma, o botao nao aparece — um botao que nao leva a lugar nenhum
+   * e pior que nenhum botao.
+   */
+  it('nao aparece sem replayAvailable, mesmo com onWatchReplay', () => {
+    renderRankPanel(host, {
+      entries: [entry({ replayAvailable: false })],
+      onWatchReplay: () => {},
+    });
+    expect(host.querySelector('.ax-rank-replay-btn')).toBeNull();
+  });
+
+  it('nao aparece sem onWatchReplay, mesmo com replayAvailable', () => {
+    renderRankPanel(host, { entries: [entry({ replayAvailable: true })] });
+    expect(host.querySelector('.ax-rank-replay-btn')).toBeNull();
+  });
+
+  it('aparece com as duas condicoes, e o clique leva a propria linha', () => {
+    const watched: number[] = [];
+    renderRankPanel(host, {
+      entries: [entry({ id: 7, replayAvailable: true })],
+      onWatchReplay: (entry) => watched.push(entry.id),
+    });
+    const btn = host.querySelector<HTMLButtonElement>('.ax-rank-replay-btn');
+    expect(btn).not.toBeNull();
+    btn?.click();
+    expect(watched).toEqual([7]);
   });
 });

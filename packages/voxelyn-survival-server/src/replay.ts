@@ -47,6 +47,7 @@ import {
   decodeCommandLog,
   encodeCommandLog,
   fromBase64,
+  toBase64,
   type DeathEchoCapsule,
   type DeathEchoTraceSample,
 } from '@voxelyn/survival-protocol';
@@ -65,7 +66,22 @@ export const MAX_REPLAY_TICKS = 30 * 60 * TICK_HZ;
 export const MAX_REPLAY_BYTES = 512 * 1024;
 
 export type ReplayResult =
-  | { ok: true; summary: RunSummary; authHash: string; ticks: number; digest: string }
+  | {
+      ok: true;
+      summary: RunSummary;
+      authHash: string;
+      ticks: number;
+      digest: string;
+      /**
+       * O log CANONICO, em base64 — o mesmo que `resimulateRun` acabou de rodar.
+       *
+       * Sai daqui, e nao do corpo da requisicao, pelo mesmo motivo do digest: o
+       * cliente manda o que apertou, isto e o que a verificacao aceitou como
+       * verdade. E o que permite ao leaderboard guardar "o replay desta run" sem
+       * guardar nada que nao tenha passado pela re-simulacao.
+       */
+      replayLog: string;
+    }
   | { ok: false; reason: string };
 
 /**
@@ -273,6 +289,7 @@ export const verifySoloRun = (
     authHash: hashAuthoritativeState(run.state),
     ticks: run.state.tick,
     digest: replayDigest(seed, run.canonicalLog) + (fingerprint ? `:${fingerprint}` : ''),
+    replayLog: toBase64(run.canonicalLog),
   };
 };
 

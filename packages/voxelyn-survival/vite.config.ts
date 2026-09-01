@@ -93,6 +93,7 @@ export default defineConfig({
         sprites: resolve(__dirname, 'sprites.html'),
         salvage: resolve(__dirname, 'salvage.html'),
         arena: resolve(__dirname, 'arena.html'),
+        replay: resolve(__dirname, 'replay.html'),
       },
     },
   },

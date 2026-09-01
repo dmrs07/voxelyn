@@ -69,7 +69,13 @@ import {
   isValidRoomCode,
   normalizeRoomCode,
 } from '@voxelyn/survival-protocol';
-import { RunRecorder, fetchLeaderboard, submitRun, type RankClass } from './run-recorder';
+import {
+  RunRecorder,
+  fetchLeaderboard,
+  submitRun,
+  type RankClass,
+  type RankEntry,
+} from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
@@ -2682,6 +2688,21 @@ document
  * inteiro piscar fora e voltar.
  */
 let rankClasses: RankClass[] = [];
+
+/**
+ * Abre o replay autoritativo de UMA linha, numa aba/pagina separada.
+ *
+ * `replay.html` e uma ferramenta ISOLADA (mesmo espirito de `arena.html`): ela
+ * nao compartilha estado de runtime com este modulo, entao tudo que ela
+ * precisa — o id da linha, o servidor a consultar — viaja pela URL. Navegar em
+ * vez de abrir um overlay aqui dentro evita rodar DOIS lacos de simulacao
+ * (o deste jogo e o do replay) na mesma pagina.
+ */
+const openReplay = (serverUrl: string, entry: RankEntry): void => {
+  const params = new URLSearchParams({ id: String(entry.id), server: serverUrl });
+  window.open(`./replay.html?${params.toString()}`, '_blank');
+};
+
 /**
  * A consulta MAIS RECENTE. Duas trocas de aba rapidas correm em paralelo, e sem
  * este token quem responde por ultimo desenha por ultimo — a lista na tela
@@ -2714,6 +2735,7 @@ const openRankBook = (sectorCount?: number): void => {
         classes: page.classes,
         sectorCount: page.sectorCount,
         onSelectClass: openRankBook,
+        onWatchReplay: (entry) => openReplay(url, entry),
         emptyReason: t('rank.empty.offline'),
       });
     },

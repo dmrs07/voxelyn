@@ -209,9 +209,26 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'rank.col.time': 'Time',
   'rank.class': '{sectors} sectors',
   'rank.class.entries': '{entries} homologated expeditions',
+  'rank.replay': 'Watch authoritative replay',
   'rank.how': 'HOW TO GET IN',
   'rank.how.text':
     'Only runs that extracted count. The server re-simulates your match from the keys you pressed — there is no score to submit, only what happened. Position comes from two things: how many Cores you brought back and how long it took. Each depth keeps its own book — three-sector descents do not compete with seven.',
+
+  // ---------------------------------------------------------------------
+  // Replay panel (replay.html)
+  // ---------------------------------------------------------------------
+  'replay.badge': 'Authoritative replay — re-simulated from the homologated log',
+  'replay.back': '← back to the leaderboard',
+  'replay.loading.title': 'Loading the replay…',
+  'replay.invalid.title': 'Invalid replay',
+  'replay.invalid.detail': 'This page needs a run id in the URL.',
+  'replay.unavailable.title': 'Replay unavailable',
+  'replay.unavailable.detail': 'This run has no stored replay — or the server is down.',
+  'replay.corrupt.title': 'Corrupted replay',
+  'replay.corrupt.detail': "This run's stored log could not be read.",
+  'replay.pause': 'Pause',
+  'replay.resume': 'Resume',
+  'replay.restart': 'Restart',
 
   // ---------------------------------------------------------------------
   // Bestiary: corporate designation and field name

@@ -40,6 +40,14 @@ export type RankView = {
   sectorCount?: number;
   /** Trocar de livro. Ausente enquanto carrega: aba que nao responde e pior que aba ausente. */
   onSelectClass?: (sectorCount: number) => void;
+  /**
+   * Abrir o replay autoritativo de uma linha.
+   *
+   * Ausente tem o mesmo efeito de `entry.replayAvailable` falso: nenhum botao
+   * aparece. As duas condicoes precisam ser verdadeiras porque sao duas coisas
+   * diferentes — a linha TER um log guardado, e a tela SABER abrir um.
+   */
+  onWatchReplay?: (entry: RankEntry) => void;
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
   /**
@@ -126,6 +134,9 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     head.appendChild(el('span', undefined, t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
     head.appendChild(el('span', undefined, '★'));
+    // Sem rotulo: e a coluna do botao de replay, e um cabecalho vazio ainda
+    // preenche a sexta faixa da grade para as linhas continuarem alinhadas.
+    head.appendChild(el('span'));
     host.appendChild(head);
 
     view.entries.forEach((entry, index) => {
@@ -135,6 +146,16 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
       row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));
       row.appendChild(el('span', 'ax-rank-time', formatDuration(entry.ticks)));
       row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
+      const replayCell = el('span', 'ax-rank-replay');
+      if (entry.replayAvailable && view.onWatchReplay) {
+        const btn = el('button', 'ax-rank-replay-btn', '▶') as HTMLButtonElement;
+        btn.type = 'button';
+        btn.title = t('rank.replay');
+        btn.setAttribute('aria-label', t('rank.replay'));
+        btn.addEventListener('click', () => view.onWatchReplay?.(entry));
+        replayCell.appendChild(btn);
+      }
+      row.appendChild(replayCell);
       host.appendChild(row);
     });
   }
