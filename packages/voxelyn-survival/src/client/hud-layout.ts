@@ -50,6 +50,12 @@ const OBJECTIVE_ACCENT_W = 8;
 export type HudPanelInput = {
   viewportWidth: number;
   safe: SafeInsets;
+  /**
+   * Ritmo vertical apertado, para a tela pequena (ver `hudDense`). As mesmas
+   * secoes na mesma ordem — so as folgas encolhem e os cards de modulo
+   * descem de 30 para 24 px.
+   */
+  dense?: boolean;
   /** Modulos ativos: zero esconde a fileira inteira. */
   moduleCount: number;
   /** Altura reservada aos instrumentos de levantamento (0 quando nao ha). */
@@ -71,8 +77,11 @@ export type HudPanelLayout = HudRect & {
   dividerA: number;
   /** Linha de recursos: baseline do texto e centro vertical dos glifos. */
   resources: { baseline: number; glyphY: number; purgeGlyphX: number };
-  /** Fileira de cards; `null` sem modulos. `right` e a borda externa do painel. */
-  modules: { x: number; y: number; right: number } | null;
+  /**
+   * Fileira de cards; `null` sem modulos. `right` e a borda externa do painel
+   * e `size` o lado maximo de cada card.
+   */
+  modules: { x: number; y: number; right: number; size: number } | null;
   dividerB: number;
   sectorBaseline: number;
   biomeBaseline: number;
@@ -106,6 +115,80 @@ export type HudPanelLayout = HudRect & {
 export const hudScale = (viewportWidth: number, viewportHeight: number): number =>
   viewportWidth < 640 || viewportHeight < 520 ? 0.84 : 1;
 
+/**
+ * Tela pequena tambem ganha o ritmo vertical APERTADO: a escala sozinha
+ * encolhe tudo por igual, e o que sobra de altura ainda e o painel inteiro
+ * empilhado sobre o jogo. O ritmo denso tira folga entre secoes e altura de
+ * barra — nunca uma linha de informacao.
+ */
+export const hudDense = (viewportWidth: number, viewportHeight: number): boolean =>
+  hudScale(viewportWidth, viewportHeight) < 1;
+
+/**
+ * O ritmo vertical, em unidades de painel: as duas colunas sao a MESMA
+ * geometria com folgas diferentes, e e por isso que vivem numa tabela e nao
+ * em duas funcoes.
+ */
+type Rhythm = {
+  heartY: number;
+  hpBarH: number;
+  heatY: number;
+  spinY: number;
+  dividerA: number;
+  resourcesBaseline: number;
+  resourcesGlyphY: number;
+  modulesY: number;
+  cardSize: number;
+  dividerBWithModules: number;
+  dividerBWithout: number;
+  sectorGap: number;
+  biomeGap: number;
+  surveyGap: number;
+  objectiveGap: number;
+  lineHeight: number;
+  bottomPad: number;
+};
+
+const ROOMY: Rhythm = {
+  heartY: 21,
+  hpBarH: 15,
+  heatY: 32,
+  spinY: 38,
+  dividerA: 46,
+  resourcesBaseline: 62,
+  resourcesGlyphY: 58,
+  modulesY: 70,
+  cardSize: 30,
+  dividerBWithModules: 108,
+  dividerBWithout: 72,
+  sectorGap: 14,
+  biomeGap: 13,
+  surveyGap: 6,
+  objectiveGap: 13,
+  lineHeight: HUD_OBJECTIVE_LINE_H,
+  bottomPad: 9,
+};
+
+const DENSE: Rhythm = {
+  heartY: 19,
+  hpBarH: 12,
+  heatY: 28,
+  spinY: 33,
+  dividerA: 40,
+  resourcesBaseline: 54,
+  resourcesGlyphY: 50,
+  modulesY: 59,
+  cardSize: 24,
+  dividerBWithModules: 89,
+  dividerBWithout: 64,
+  sectorGap: 12,
+  biomeGap: 11,
+  surveyGap: 4,
+  objectiveGap: 12,
+  lineHeight: 13,
+  bottomPad: 7,
+};
+
 /** Largura do painel: um terco da tela, presa entre o compacto e o confortavel. */
 export const hudPanelWidth = (viewportWidth: number): number =>
   Math.min(300, Math.max(230, viewportWidth * 0.34));
@@ -125,27 +208,35 @@ export const hudPanelLayout = (input: HudPanelInput): HudPanelLayout => {
   const innerLeft = x + HUD_PAD;
   const innerRight = x + width - HUD_PAD;
 
-  const heart = { x: x + 20, y: y + 21 };
-  const hpBar = { x: x + 42, y: y + 13, w: width - 54, h: 15 };
-  const heatRail = { y: y + 32, h: 4 };
-  const spinRail = { y: y + 38, h: 2 };
-  const dividerA = y + 46;
+  const r = input.dense ? DENSE : ROOMY;
 
-  const resources = { baseline: y + 62, glyphY: y + 58, purgeGlyphX: x + 18 };
+  const heart = { x: x + 20, y: y + r.heartY };
+  const hpBar = { x: x + 42, y: y + 13, w: width - 54, h: r.hpBarH };
+  const heatRail = { y: y + r.heatY, h: 4 };
+  const spinRail = { y: y + r.spinY, h: 2 };
+  const dividerA = y + r.dividerA;
+
+  const resources = {
+    baseline: y + r.resourcesBaseline,
+    glyphY: y + r.resourcesGlyphY,
+    purgeGlyphX: x + 18,
+  };
 
   const hasModules = input.moduleCount > 0;
-  const modules = hasModules ? { x: innerLeft, y: y + 70, right: x + width } : null;
-  const dividerB = hasModules ? y + 108 : y + 72;
+  const modules = hasModules
+    ? { x: innerLeft, y: y + r.modulesY, right: x + width, size: r.cardSize }
+    : null;
+  const dividerB = y + (hasModules ? r.dividerBWithModules : r.dividerBWithout);
 
-  const sectorBaseline = dividerB + 14;
-  const biomeBaseline = sectorBaseline + 13;
-  const surveyTop = biomeBaseline + 6;
+  const sectorBaseline = dividerB + r.sectorGap;
+  const biomeBaseline = sectorBaseline + r.biomeGap;
+  const surveyTop = biomeBaseline + r.surveyGap;
   const surveyHeight = Math.max(0, input.surveyHeight);
 
   const lines = Math.max(1, Math.min(HUD_OBJECTIVE_MAX_LINES, Math.floor(input.objectiveLines)));
-  const firstBaseline = surveyTop + surveyHeight + 13;
-  const lastBaseline = firstBaseline + (lines - 1) * HUD_OBJECTIVE_LINE_H;
-  const height = lastBaseline + 9 - y;
+  const firstBaseline = surveyTop + surveyHeight + r.objectiveGap;
+  const lastBaseline = firstBaseline + (lines - 1) * r.lineHeight;
+  const height = lastBaseline + r.bottomPad - y;
 
   return {
     x,
@@ -169,7 +260,7 @@ export const hudPanelLayout = (input: HudPanelInput): HudPanelLayout => {
       x: innerLeft + OBJECTIVE_ACCENT_W,
       accentX: innerLeft,
       firstBaseline,
-      lineHeight: HUD_OBJECTIVE_LINE_H,
+      lineHeight: r.lineHeight,
       maxWidth: hudObjectiveMaxWidth(input.viewportWidth),
       lines,
     },

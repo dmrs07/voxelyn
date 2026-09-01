@@ -163,6 +163,7 @@ import {
   HUD_OBJECTIVE_MAX_LINES,
   hpGhostStep,
   hudObjectiveMaxWidth,
+  hudDense,
   hudPanelLayout,
   hudScale,
   wrapHudText,
@@ -495,15 +496,25 @@ const prefersReducedMotion = (): boolean =>
 export type ModuleHudMetrics = { size: number; gap: number };
 
 /** Mantem todos os modulos visiveis dentro da largura compacta do painel. */
-export const moduleHudMetrics = (count: number, availableWidth: number): ModuleHudMetrics => {
+export const moduleHudMetrics = (
+  count: number,
+  availableWidth: number,
+  maxSize = 30,
+): ModuleHudMetrics => {
   const normalizedCount = Math.max(0, Math.floor(count));
-  if (normalizedCount <= 0) return { size: 30, gap: 7 };
-  if (normalizedCount === 1) return { size: Math.max(24, Math.min(30, availableWidth)), gap: 0 };
+  const minSize = Math.min(24, maxSize);
+  if (normalizedCount <= 0) return { size: maxSize, gap: 7 };
+  if (normalizedCount === 1) {
+    return { size: Math.max(minSize, Math.min(maxSize, availableWidth)), gap: 0 };
+  }
 
   const baseGap = 7;
   const size = Math.max(
-    24,
-    Math.min(30, Math.floor((availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount)),
+    minSize,
+    Math.min(
+      maxSize,
+      Math.floor((availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount),
+    ),
   );
   const remaining = Math.max(0, availableWidth - size * normalizedCount);
   const gap = Math.max(3, Math.min(baseGap, remaining / (normalizedCount - 1)));
@@ -5129,6 +5140,7 @@ export class SurvivalRenderer {
             bottom: this.safeArea.bottom / hs,
             left: this.safeArea.left / hs,
           },
+          dense: hudDense(vw, vh),
           moduleCount: state.playerExtra.activeModules.length,
           surveyHeight: 0,
           objectiveLines: 1,
@@ -5555,6 +5567,7 @@ export class SurvivalRenderer {
         bottom: this.safeArea.bottom / hs,
         left: this.safeArea.left / hs,
       },
+      dense: hudDense(vw, vh),
       moduleCount: extra.activeModules.length,
       surveyHeight,
       objectiveLines: objectiveLines.length,
@@ -5848,6 +5861,7 @@ export class SurvivalRenderer {
         layout.modules.y,
         layout.modules.right,
         this.minigunViews.get(this.localPlayerId - 1).barrelPhase,
+        layout.modules.size,
       );
     }
 
@@ -6104,10 +6118,12 @@ export class SurvivalRenderer {
      * ponto", e ela chega ao olho sem custar uma linha de HUD.
      */
     minigunPhase = 0,
+    /** Lado maximo de cada card; o ritmo denso da tela pequena pede 24. */
+    maxSize = 30,
   ): void {
     const ctx = this.ctx;
     const availableWidth = Math.max(0, viewportWidth - 12 - x);
-    const { size, gap } = moduleHudMetrics(modules.length, availableWidth);
+    const { size, gap } = moduleHudMetrics(modules.length, availableWidth, maxSize);
     let cursor = x;
     for (const module of modules) {
       if (cursor + size > viewportWidth - 12) break;

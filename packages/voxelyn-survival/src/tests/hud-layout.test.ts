@@ -13,6 +13,7 @@ import {
   HP_GHOST_HOLD_MS,
   HUD_OBJECTIVE_MAX_LINES,
   hpGhostStep,
+  hudDense,
   hudObjectiveMaxWidth,
   hudPanelLayout,
   hudPanelWidth,
@@ -93,10 +94,14 @@ describe('largura do painel', () => {
 
 describe('as secoes do painel nunca se invadem', () => {
   const cases = [
-    { moduleCount: 0, surveyHeight: 0, objectiveLines: 1 },
-    { moduleCount: 3, surveyHeight: 0, objectiveLines: 1 },
-    { moduleCount: 0, surveyHeight: 21, objectiveLines: 2 },
-    { moduleCount: 7, surveyHeight: 21, objectiveLines: 3 },
+    { dense: false, moduleCount: 0, surveyHeight: 0, objectiveLines: 1 },
+    { dense: false, moduleCount: 3, surveyHeight: 0, objectiveLines: 1 },
+    { dense: false, moduleCount: 0, surveyHeight: 21, objectiveLines: 2 },
+    { dense: false, moduleCount: 7, surveyHeight: 21, objectiveLines: 3 },
+    { dense: true, moduleCount: 0, surveyHeight: 0, objectiveLines: 1 },
+    { dense: true, moduleCount: 3, surveyHeight: 0, objectiveLines: 1 },
+    { dense: true, moduleCount: 0, surveyHeight: 21, objectiveLines: 2 },
+    { dense: true, moduleCount: 7, surveyHeight: 21, objectiveLines: 3 },
   ];
 
   it.each(cases)('%o', (input) => {
@@ -107,18 +112,18 @@ describe('as secoes do painel nunca se invadem', () => {
     expect(l.spinRail.y + l.spinRail.h).toBeLessThan(l.dividerA);
     // Recursos abaixo do primeiro divisor, com folga para o glifo de 15px.
     expect(l.resources.glyphY - 8).toBeGreaterThan(l.dividerA);
-    // Modulos: cards de ate 30px acima do segundo divisor.
+    // Modulos: cards (mais o anel de 3px em volta) acima do segundo divisor.
     if (input.moduleCount > 0) {
       expect(l.modules).not.toBeNull();
-      expect(l.modules!.y).toBeGreaterThan(l.resources.baseline);
-      expect(l.modules!.y + 30).toBeLessThan(l.dividerB);
+      expect(l.modules!.y - 3).toBeGreaterThan(l.resources.baseline);
+      expect(l.modules!.y + l.modules!.size + 3).toBeLessThan(l.dividerB);
     } else {
       expect(l.modules).toBeNull();
       expect(l.resources.baseline).toBeLessThan(l.dividerB);
     }
     // Setor (10px) e bioma (9px): baselines com espaco para a altura da fonte.
     expect(l.sectorBaseline - 8).toBeGreaterThan(l.dividerB);
-    expect(l.biomeBaseline - l.sectorBaseline).toBeGreaterThanOrEqual(12);
+    expect(l.biomeBaseline - l.sectorBaseline).toBeGreaterThanOrEqual(11);
     // Levantamento comeca abaixo do bioma e a diretiva abaixo do levantamento.
     expect(l.surveyTop).toBeGreaterThan(l.biomeBaseline);
     expect(l.objective.firstBaseline - 9).toBeGreaterThanOrEqual(l.surveyTop + input.surveyHeight);
@@ -167,6 +172,35 @@ describe('as secoes do painel nunca se invadem', () => {
     expect(twoLines.height - base.height).toBe(twoLines.objective.lineHeight);
     // Nunca mais alto que a versao antiga com modulos (157px) mais uma linha.
     expect(base.height).toBeLessThanOrEqual(130);
+  });
+
+  it('o ritmo denso e mais baixo em toda combinacao, sem perder secao', () => {
+    for (const moduleCount of [0, 2, 7]) {
+      for (const objectiveLines of [1, 2, 3]) {
+        const roomy = hudPanelLayout({
+          viewportWidth: 464,
+          safe: SAFE,
+          moduleCount,
+          surveyHeight: 0,
+          objectiveLines,
+        });
+        const dense = hudPanelLayout({
+          viewportWidth: 464,
+          safe: SAFE,
+          dense: true,
+          moduleCount,
+          surveyHeight: 0,
+          objectiveLines,
+        });
+        expect(dense.height).toBeLessThan(roomy.height * 0.92);
+        expect(dense.modules === null).toBe(roomy.modules === null);
+      }
+    }
+  });
+
+  it('a tela pequena e densa; o desktop nao', () => {
+    expect(hudDense(390, 844)).toBe(true);
+    expect(hudDense(1280, 720)).toBe(false);
   });
 
   it('Nucleos e setor dividem a mesma linha', () => {
