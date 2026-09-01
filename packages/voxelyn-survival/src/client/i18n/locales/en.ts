@@ -100,7 +100,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.telemetry.note': 'anonymous session data, no identification',
   'options.net.probe': 'Measure',
   'options.net.probing': 'measuring…',
-  'options.net.idle': 'latency not measured — solo never talks to the server',
+  'options.net.idle': 'latency not measured yet',
   'options.net.live': 'round trip {rtt} ms to the room server',
   'options.net.probed': 'round trip {rtt} ms to the server',
   'options.net.unreachable': 'could not reach the server',

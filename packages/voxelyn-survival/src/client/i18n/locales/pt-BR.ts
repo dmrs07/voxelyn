@@ -116,7 +116,7 @@ export const PT_BR = {
   'options.telemetry.note': 'dados anônimos de sessão, sem identificação',
   'options.net.probe': 'Medir',
   'options.net.probing': 'medindo…',
-  'options.net.idle': 'latência não medida — o solo não fala com o servidor',
+  'options.net.idle': 'latência ainda não medida',
   'options.net.live': 'ida e volta {rtt} ms até o servidor da sala',
   'options.net.probed': 'ida e volta {rtt} ms até o servidor',
   'options.net.unreachable': 'não consegui falar com o servidor',

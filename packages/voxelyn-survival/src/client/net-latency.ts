@@ -30,6 +30,18 @@ export const LATENCY_GOOD_MS = 80;
 /** Acima disto o tiro ja sai visivelmente atras do que a tela mostrava. */
 export const LATENCY_FAIR_MS = 160;
 
+/**
+ * Teto de espera de UMA sondagem.
+ *
+ * Sem ele, um destino que aceita a conexao e nunca responde — proxy travado,
+ * upstream num buraco negro — deixa a promessa pendurada pelo tempo que o
+ * navegador quiser (minutos), e a tela fica em "medindo…" com o botao inerte,
+ * porque a proxima tentativa e recusada enquanto a anterior nao volta. Quatro
+ * segundos e muito acima de qualquer rede jogavel: quem passa disso nao esta
+ * lento, esta inacessivel, e e isso que a tela deve dizer.
+ */
+export const PROBE_TIMEOUT_MS = 4000;
+
 export type LatencyGrade = 'good' | 'fair' | 'poor';
 
 /**
@@ -189,13 +201,22 @@ export const netReadout = (
  * ser `res.ok`: numa resposta opaca `ok` e sempre falso. O que separa chegar
  * de nao chegar e o `fetch` resolver ou lancar.
  */
-export const probeServerLatency = async (serverUrl: string): Promise<number | null> => {
+export const probeServerLatency = async (
+  serverUrl: string,
+  timeoutMs = PROBE_TIMEOUT_MS,
+): Promise<number | null> => {
   const base = serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
   const started = performance.now();
   try {
-    await fetch(`${base}/healthz`, { cache: 'no-store', mode: 'no-cors' });
+    await fetch(`${base}/healthz`, { cache: 'no-store', mode: 'no-cors', signal: abort.signal });
     return performance.now() - started;
   } catch {
+    // O `abort` cai aqui junto com recusa de conexao e DNS que nao resolve, e
+    // os tres dizem a mesma coisa ao jogador: nao deu para medir.
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 };

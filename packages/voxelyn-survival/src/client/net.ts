@@ -133,6 +133,11 @@ export class NetClient {
 
   markOffline(): void {
     this.status = this.resumeToken ? 'reconnecting' : 'offline';
+    // As idas e voltas descrevem um socket que acabou de morrer. Guardadas,
+    // elas voltariam a tela no instante do `welcome` seguinte — antes de o
+    // primeiro `pong` da conexao NOVA ter chegado — dizendo da rede de agora
+    // uma coisa medida na de antes.
+    this.latency.reset();
   }
 
   /**
@@ -238,14 +243,23 @@ export class NetClient {
   }
 
   /**
-   * O que a rede esta cobrando agora, para quem quiser mostrar.
+   * O que a rede esta cobrando agora, para quem quiser mostrar. `null` quando
+   * nao ha conexao de pe.
    *
    * Os dois atrasos juntos porque eles se somam e tem causas diferentes: a ida
    * e volta e a rede; o colchao (`delayTicks`, medido em `playout.ts`) e o
    * preco da IRREGULARIDADE dela. `latency` nulo enquanto nenhum `pong`
    * voltou — antes da primeira resposta nao ha medida, e zero seria mentira.
+   *
+   * O portao de `status` mora AQUI, e nao em quem desenha, porque so este
+   * objeto sabe se o socket ainda esta de pe. Fora dele a leitura mentiria de
+   * dois jeitos: conectando, ela reivindicaria a tela sem ter numero nenhum a
+   * mostrar (e engoliria o resultado da sondagem HTTP, que e justamente o que
+   * ainda funciona); caido, ela seguiria exibindo a ida e volta do socket
+   * anterior como se fosse de agora.
    */
-  get netStats(): { latency: LatencyReading | null; delayTicks: number } {
+  get netStats(): { latency: LatencyReading | null; delayTicks: number } | null {
+    if (this.status !== 'online') return null;
     return { latency: this.latency.read(), delayTicks: this.playout.delayTicks };
   }
 

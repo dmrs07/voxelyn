@@ -7,7 +7,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { TICK_MS } from '@voxelyn/survival-sim';
-import { LATENCY_WINDOW, LatencyWindow, cushionMs, latencyGrade, netReadout } from './net-latency';
+import {
+  LATENCY_WINDOW,
+  LatencyWindow,
+  cushionMs,
+  latencyGrade,
+  netReadout,
+  probeServerLatency,
+} from './net-latency';
 
 const windowWith = (...samples: number[]): LatencyWindow => {
   const win = new LatencyWindow();
@@ -112,5 +119,68 @@ describe('o que a folha de Opcoes mostra', () => {
   it('sondagem que nao chegou e diferente de nunca ter sondado', () => {
     expect(netReadout(null, null)).toEqual({ kind: 'unreachable' });
     expect(netReadout(null, undefined)).toEqual({ kind: 'idle' });
+  });
+
+  /**
+   * Sem socket de pe, quem manda e a sondagem.
+   *
+   * `netStats` devolve `null` fora de `online` (ver `net.ts`), e e isso que
+   * impede os dois enganos: conectando, a sala reivindicaria a tela sem numero
+   * nenhum e engoliria o resultado da sondagem; caida, ela seguiria mostrando
+   * a ida e volta do socket anterior como se fosse de agora.
+   */
+  it('sala fora do ar nao engole a sondagem', () => {
+    expect(netReadout(null, 90)).toEqual({ kind: 'probe', rttMs: 90, grade: 'fair' });
+  });
+});
+
+describe('sondagem avulsa', () => {
+  const withFetch = async (
+    impl: typeof globalThis.fetch,
+    run: () => Promise<unknown>,
+  ): Promise<unknown> => {
+    const real = globalThis.fetch;
+    globalThis.fetch = impl;
+    try {
+      return await run();
+    } finally {
+      globalThis.fetch = real;
+    }
+  };
+
+  it('mede a ida e volta quando o servidor responde', async () => {
+    const result = await withFetch(
+      (async () => new Response(null)) as typeof globalThis.fetch,
+      () => probeServerLatency('ws://exemplo:8080'),
+    );
+    expect(typeof result).toBe('number');
+    expect(result as number).toBeGreaterThanOrEqual(0);
+  });
+
+  /**
+   * O destino que aceita a conexao e nunca responde.
+   *
+   * Sem teto, a promessa fica pendurada e a tela trava em "medindo…" — com o
+   * botao inerte, porque a tentativa seguinte e recusada enquanto esta nao
+   * volta. O teto tem de devolver `null` pelo mesmo caminho de "nao deu para
+   * medir".
+   */
+  it('desiste no teto em vez de ficar pendurada', async () => {
+    const nuncaResponde: typeof globalThis.fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('abortado')));
+      });
+    const result = await withFetch(nuncaResponde, () =>
+      probeServerLatency('ws://exemplo:8080', 20),
+    );
+    expect(result).toBeNull();
+  });
+
+  it('servidor inacessivel devolve null', async () => {
+    const result = await withFetch(
+      (() => Promise.reject(new Error('sem rota'))) as typeof globalThis.fetch,
+      () => probeServerLatency('ws://exemplo:8080', 50),
+    );
+    expect(result).toBeNull();
   });
 });
