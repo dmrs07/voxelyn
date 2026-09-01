@@ -21,6 +21,7 @@ import {
   type WorldFlags,
 } from '@voxelyn/survival-protocol';
 import { PlayoutClock, TickEventQueue } from './playout';
+import { LatencyWindow, type LatencyReading } from './net-latency';
 
 export type NetStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
 
@@ -58,6 +59,8 @@ export class NetClient {
    * protocolo e da montagem do mundo, o relogio cuida do tempo.
    */
   private readonly playout = new PlayoutClock<FrameEntities>();
+  /** As idas e voltas recentes, alimentadas pelo `pong`. Ver `netStats`. */
+  private readonly latency = new LatencyWindow();
   /** A narracao de cada tick, segurada ate a linha de render alcanca-la. */
   private readonly eventQueue = new TickEventQueue<SemanticEvent>((events) => {
     this.events.push(...events);
@@ -220,8 +223,30 @@ export class NetClient {
     this.requestResync(reason);
   }
 
-  ping(nowMs: number): void {
-    this.send(encodeMessage({ t: 'ping', seq: this.seq, clientTimeMs: nowMs }));
+  /**
+   * Pergunta ao servidor quanto tempo leva a ida e volta.
+   *
+   * O carimbo e lido AQUI, e nao recebido do chamador. O laco chama isto no
+   * meio de um quadro, e o `now` de um quadro e o instante em que ele
+   * COMECOU — entre esse instante e o envio de fato cabem a simulacao e o
+   * desenho do mundo inteiro. Medido contra o inicio do quadro, um servidor em
+   * localhost respondia "46 ms": o numero era o proprio laco de render deste
+   * cliente, com a rede escondida dentro dele.
+   */
+  ping(): void {
+    this.send(encodeMessage({ t: 'ping', seq: this.seq, clientTimeMs: performance.now() }));
+  }
+
+  /**
+   * O que a rede esta cobrando agora, para quem quiser mostrar.
+   *
+   * Os dois atrasos juntos porque eles se somam e tem causas diferentes: a ida
+   * e volta e a rede; o colchao (`delayTicks`, medido em `playout.ts`) e o
+   * preco da IRREGULARIDADE dela. `latency` nulo enquanto nenhum `pong`
+   * voltou — antes da primeira resposta nao ha medida, e zero seria mentira.
+   */
+  get netStats(): { latency: LatencyReading | null; delayTicks: number } {
+    return { latency: this.latency.read(), delayTicks: this.playout.delayTicks };
   }
 
   /** Processa uma mensagem crua do servidor. */
@@ -233,6 +258,10 @@ export class NetClient {
         this.resumeToken = msg.resumeToken;
         this.slot = msg.playerId - 1;
         this.activeRoomCode = msg.roomCode;
+        // Conexao nova, medida nova. As idas e voltas da sessao anterior
+        // descrevem um socket que nao existe mais — e a reconexao costuma ser
+        // justamente o momento em que a rede mudou.
+        this.latency.reset();
         // `sector` e obrigatorio na geracao local: com varios setores por run,
         // a seed sozinha deixou de identificar um mundo. Entrar numa sala ja no
         // setor 2 gerando o mapa do setor 1 produziria divergencia imediata.
@@ -345,6 +374,13 @@ export class NetClient {
         this.eventQueue.push(msg.serverTick, msg.events);
         break;
       }
+      case 'pong':
+        // O servidor devolve o `clientTimeMs` que recebeu, entao a ida e volta
+        // sai de UM relogio so — o `performance.now()` deste cliente. Nada aqui
+        // depende de os dois relogios concordarem, que e o unico jeito de medir
+        // rede sem sincronizar tempo.
+        this.latency.push(nowMs - msg.clientTimeMs);
+        break;
       case 'reject':
         // resume token invalido (ex.: servidor reiniciou e perdeu as salas):
         // limpa o token para que o proximo handshake seja uma sessao NOVA,
