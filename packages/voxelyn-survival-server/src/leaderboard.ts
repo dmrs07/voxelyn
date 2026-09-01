@@ -11,7 +11,12 @@
 // runs solo passam por `verifySoloRun`. Este arquivo guarda e ordena; ele nao
 // julga.
 
-import { compareRunScore, type RunSummary } from '@voxelyn/survival-sim';
+import {
+  compareRunScore,
+  type PlayerTuning,
+  type RunDepthConfig,
+  type RunSummary,
+} from '@voxelyn/survival-sim';
 
 export type LeaderboardMode = 'solo' | 'coop';
 
@@ -49,6 +54,15 @@ export type LeaderboardEntry = {
    */
   ore: number;
   createdAt: string;
+  /**
+   * Ha um replay guardado para esta linha?
+   *
+   * So runs solo verificadas por `verifySoloRun` carregam o log canonico — ver
+   * `getReplay`. Fica na linha, e nao numa segunda consulta, pelo mesmo motivo
+   * de `sectorCount`: um botao de replay que so descobre depois de clicado que
+   * nao ha nada a mostrar e pior que um botao ausente.
+   */
+  replayAvailable: boolean;
 };
 
 /** Um livro: uma classe de run e quantas expedicoes ja entraram nele. */
@@ -57,12 +71,30 @@ export type LeaderboardClass = {
   entries: number;
 };
 
+/** O que `getReplay` devolve: o bastante para re-simular a run e assistir. */
+export type ReplayRecord = {
+  seed: number;
+  log: string;
+  tuning?: PlayerTuning;
+  depth?: RunDepthConfig;
+};
+
 export type SubmitInput = {
   name: string;
   mode: LeaderboardMode;
   summary: RunSummary;
   /** Digest do replay, para deduplicar reenvio. Null para runs de co-op. */
   digest: string | null;
+  /**
+   * O log CANONICO desta run, em base64 — o que `verifySoloRun` devolveu.
+   *
+   * Ausente para co-op: aquelas runs nao passam por re-simulacao de log, e
+   * gravar o que nao existe faria `replayAvailable` mentir.
+   */
+  replayLog?: string;
+  /** A configuracao sob a qual o log foi verificado — necessaria para replaya-lo. */
+  tuning?: PlayerTuning;
+  depth?: RunDepthConfig;
 };
 
 export type LeaderboardQuery = {
@@ -95,6 +127,8 @@ export interface LeaderboardStore {
    * placar nao cumpriu.
    */
   classes(query: Omit<LeaderboardQuery, 'limit' | 'sectorCount'>): Promise<LeaderboardClass[]>;
+  /** O replay de UMA linha, ou null quando ela nao tem um (co-op, ou legado). */
+  getReplay(id: number): Promise<ReplayRecord | null>;
   close(): Promise<void>;
 }
 
@@ -151,14 +185,16 @@ const clampLimit = (limit: number | undefined): number =>
 export class MemoryLeaderboard implements LeaderboardStore {
   private readonly rows: LeaderboardEntry[] = [];
   private readonly digests = new Set<string>();
+  private readonly replays = new Map<number, ReplayRecord>();
   private nextId = 1;
 
   async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {
     if (!isLeaderboardEligible(input.summary)) return null;
     if (input.digest && this.digests.has(input.digest)) return null;
     if (input.digest) this.digests.add(input.digest);
+    const id = this.nextId++;
     const entry: LeaderboardEntry = {
-      id: this.nextId++,
+      id,
       name: input.name,
       seed: input.summary.seed,
       stars: input.summary.stars,
@@ -170,9 +206,22 @@ export class MemoryLeaderboard implements LeaderboardStore {
       sectorCount: input.summary.sectorCount,
       ore: input.summary.stats.oreCollected,
       createdAt: new Date().toISOString(),
+      replayAvailable: input.replayLog !== undefined,
     };
     this.rows.push(entry);
+    if (input.replayLog !== undefined) {
+      this.replays.set(id, {
+        seed: input.summary.seed,
+        log: input.replayLog,
+        tuning: input.tuning,
+        depth: input.depth,
+      });
+    }
     return entry;
+  }
+
+  async getReplay(id: number): Promise<ReplayRecord | null> {
+    return this.replays.get(id) ?? null;
   }
 
   async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {
@@ -280,6 +329,27 @@ create index if not exists leaderboard_rank_class_idx
   on leaderboard_entries (sector_count, cores desc, ticks asc, id asc);
 create index if not exists leaderboard_seed_class_idx
   on leaderboard_entries (sector_count, seed, cores desc, ticks asc, id asc);
+-- O replay: o log CANONICO da run, e a configuracao sob a qual ele foi
+-- verificado. Nasceram nulaveis pelo mesmo motivo de todo o resto deste
+-- schema — toda linha que ja existia foi gravada antes de este modulo saber
+-- guardar um replay, e nula e a resposta honesta para "nao guardamos", nao
+-- "guardamos vazio".
+alter table leaderboard_entries add column if not exists replay_log text;
+alter table leaderboard_entries add column if not exists tuning jsonb;
+alter table leaderboard_entries add column if not exists depth jsonb;
+`;
+
+/**
+ * As colunas que toda LEITURA de LISTA precisa — nunca `replay_log`.
+ *
+ * Uma run solo carrega ate `MAX_REPLAY_BYTES` (512 KiB) de log; puxar isso em
+ * CADA linha de UMA pagina do livro multiplicaria o peso da resposta por
+ * cem sem que o livro tenha uso algum para os bytes. `getReplay` busca o log
+ * por linha, sob demanda — so quando o jogador de fato clicou em assistir.
+ */
+const LIST_COLUMNS = `
+  id, name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count,
+  created_at, (replay_log is not null) as replay_available
 `;
 
 const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
@@ -297,6 +367,7 @@ const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
   sectorCount: Number(row.sector_count ?? LEGACY_SECTOR_COUNT),
   ore: Number(row.ore ?? 0),
   createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+  replayAvailable: row.replay_available === true,
 });
 
 /**
@@ -352,10 +423,11 @@ export class PostgresLeaderboard implements LeaderboardStore {
     // nao tem janela.
     const result = await this.pool.query(
       `insert into leaderboard_entries
-         (name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count, digest)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         (name, seed, stars, ticks, phase, mode, kills, ore, cores, sector_count, digest,
+          replay_log, tuning, depth)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        on conflict (digest) do nothing
-       returning *`,
+       returning ${LIST_COLUMNS}`,
       [
         input.name,
         input.summary.seed,
@@ -368,6 +440,9 @@ export class PostgresLeaderboard implements LeaderboardStore {
         input.summary.cores,
         input.summary.sectorCount,
         input.digest,
+        input.replayLog ?? null,
+        input.tuning ? JSON.stringify(input.tuning) : null,
+        input.depth ? JSON.stringify(input.depth) : null,
       ],
     );
     const row = result.rows[0];
@@ -378,12 +453,28 @@ export class PostgresLeaderboard implements LeaderboardStore {
     const { where, values } = filterOf(query);
     values.push(clampLimit(query.limit));
     const result = await this.pool.query(
-      `select * from leaderboard_entries ${where}
+      `select ${LIST_COLUMNS} from leaderboard_entries ${where}
        order by cores desc, ticks asc, id asc
        limit $${values.length}`,
       values,
     );
     return result.rows.map(rowToEntry);
+  }
+
+  async getReplay(id: number): Promise<ReplayRecord | null> {
+    const result = await this.pool.query(
+      `select seed, replay_log, tuning, depth from leaderboard_entries
+       where id = $1 and replay_log is not null`,
+      [id],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      seed: Number(row.seed),
+      log: String(row.replay_log),
+      tuning: (row.tuning as PlayerTuning | null) ?? undefined,
+      depth: (row.depth as RunDepthConfig | null) ?? undefined,
+    };
   }
 
   async classes(

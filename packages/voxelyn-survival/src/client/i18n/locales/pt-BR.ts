@@ -224,9 +224,27 @@ export const PT_BR = {
   'rank.col.time': 'Tempo',
   'rank.class': '{sectors} setores',
   'rank.class.entries': '{entries} expedições homologadas',
+  'rank.replay': 'Assistir replay autoritativo',
   'rank.how': 'COMO ENTRAR',
   'rank.how.text':
     'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu. A posição sai de duas coisas: quantos Núcleos você trouxe e quanto tempo levou. Cada profundidade tem o seu próprio livro — descidas de três setores não competem com as de sete.',
+
+  // ---------------------------------------------------------------------
+  // Painel Replay (replay.html)
+  // ---------------------------------------------------------------------
+  'replay.badge': 'Replay autoritativo — re-simulado a partir do log homologado',
+  'replay.back': '← voltar ao ranking',
+  'replay.loading.title': 'Carregando o replay…',
+  'replay.invalid.title': 'Replay inválido',
+  'replay.invalid.detail': 'Esta página precisa de um id de run na URL.',
+  'replay.unavailable.title': 'Replay indisponível',
+  'replay.unavailable.detail':
+    'Esta run não tem um replay guardado — ou o servidor está fora do ar.',
+  'replay.corrupt.title': 'Replay corrompido',
+  'replay.corrupt.detail': 'O log guardado para esta run não pôde ser lido.',
+  'replay.pause': 'Pausar',
+  'replay.resume': 'Continuar',
+  'replay.restart': 'Reiniciar',
 
   // ---------------------------------------------------------------------
   // Bestiário: designação corporativa e nome de campo

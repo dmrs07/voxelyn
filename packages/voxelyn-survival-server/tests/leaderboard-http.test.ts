@@ -240,6 +240,39 @@ describe('POST /leaderboard', () => {
   });
 });
 
+describe('GET /leaderboard/:id/replay', () => {
+  it('devolve seed e log da run submetida, prontos para re-simular de novo', async () => {
+    // Servidor ISOLADO: `firstExtraction` e determinista e outros testes deste
+    // arquivo ja submeteram a mesma primeira seed vencedora ao `store`
+    // compartilhado — reusa-lo aqui bateria no mesmo digest e devolveria
+    // `entry: null` (reenvio duplicado), nao a submissao nova que este teste
+    // precisa.
+    const isolated = await bootServer();
+    try {
+      const played = firstExtraction();
+      const res = await postTo(isolated.base, { seed: played.seed, log: played.base64, name: 'Dani' });
+      const body = (await res.json()) as { entry: { id: number; replayAvailable: boolean } };
+      expect(body.entry.replayAvailable).toBe(true);
+
+      const replayRes = await fetch(`${isolated.base}/leaderboard/${body.entry.id}/replay`);
+      expect(replayRes.status).toBe(200);
+      const replay = (await replayRes.json()) as { seed: number; log: string };
+      expect(replay.seed).toBe(played.seed);
+
+      // O log devolvido tem de re-simular para o MESMO resultado: e o que
+      // separa "guardamos um log" de "guardamos O log desta run".
+      const again = await postTo(isolated.base, { seed: replay.seed, log: replay.log, name: 'Dani' });
+      expect((await again.json()) as { duplicate: boolean }).toMatchObject({ duplicate: true });
+    } finally {
+      await isolated.handle.close();
+    }
+  });
+
+  it('id inexistente devolve 404, e nao uma lista vazia', async () => {
+    expect((await fetch(`${base}/leaderboard/999999/replay`)).status).toBe(404);
+  });
+});
+
 describe('GET /leaderboard', () => {
   it('devolve as entradas ordenadas por Nucleo e depois por tempo', async () => {
     const res = await fetch(`${base}/leaderboard?limit=10`);

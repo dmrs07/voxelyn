@@ -416,3 +416,40 @@ describe('store', () => {
     expect((await store.top({ limit: 9999 })).length).toBeLessThanOrEqual(100);
   });
 });
+
+describe('replay', () => {
+  it('runs sem log nao marcam replayAvailable, e getReplay nao acha nada', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await store.submit({ name: 'sem log', mode: 'solo', summary: summary(), digest: 'x' });
+    expect(entry?.replayAvailable).toBe(false);
+    expect(await store.getReplay(entry!.id)).toBeNull();
+  });
+
+  it('runs de co-op nunca marcam replayAvailable', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await store.submit({ name: 'sala', mode: 'coop', summary: summary(), digest: null });
+    expect(entry?.replayAvailable).toBe(false);
+  });
+
+  it('grava o log e a configuracao junto da linha, e devolve os dois em getReplay', async () => {
+    const store = new MemoryLeaderboard();
+    const depth = runDepthForGeneration('G-01');
+    const entry = await store.submit({
+      name: 'com log',
+      mode: 'solo',
+      summary: summary({ seed: 321 }),
+      digest: 'y',
+      replayLog: 'QQ==',
+      depth,
+    });
+    expect(entry?.replayAvailable).toBe(true);
+
+    const replay = await store.getReplay(entry!.id);
+    expect(replay).toEqual({ seed: 321, log: 'QQ==', tuning: undefined, depth });
+  });
+
+  it('getReplay de um id inexistente devolve null', async () => {
+    const store = new MemoryLeaderboard();
+    expect(await store.getReplay(999)).toBeNull();
+  });
+});

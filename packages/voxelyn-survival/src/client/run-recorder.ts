@@ -14,7 +14,7 @@
 // impossivel em vez de improvavel.
 
 import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
-import type { PlayerCommand } from '@voxelyn/survival-sim';
+import type { PlayerCommand, PlayerTuning, RunDepthConfig } from '@voxelyn/survival-sim';
 
 /**
  * Teto de ticks gravados. 30 minutos a 20 Hz — o mesmo do servidor.
@@ -140,6 +140,8 @@ export type RankEntry = {
   cores: number;
   /** Setores atravessados: a classe do livro em que a run compete. */
   sectorCount: number;
+  /** Ha um replay autoritativo guardado para esta linha? Ver `fetchReplay`. */
+  replayAvailable: boolean;
 };
 
 /** Um livro do ranking: uma profundidade de descida e quantas runs tem. */
@@ -187,5 +189,31 @@ export const fetchLeaderboard = async (
     };
   } catch {
     return EMPTY_PAGE;
+  }
+};
+
+/** O que `fetchReplay` devolve: o bastante para re-simular a run e assistir. */
+export type ReplayPayload = {
+  seed: number;
+  log: string;
+  tuning?: PlayerTuning;
+  depth?: RunDepthConfig;
+};
+
+/**
+ * Busca o replay de UMA linha do ranking.
+ *
+ * `null` cobre offline, servidor fora, e a run genuinamente nao ter log
+ * (co-op, ou gravada antes de este endpoint existir) — os tres sao "sem
+ * replay para mostrar", nao um erro que o jogador precise ler.
+ */
+export const fetchReplay = async (serverUrl: string, id: number): Promise<ReplayPayload | null> => {
+  const base = serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
+  try {
+    const res = await fetch(`${base}/leaderboard/${id}/replay`);
+    if (!res.ok) return null;
+    return (await res.json()) as ReplayPayload;
+  } catch {
+    return null;
   }
 };

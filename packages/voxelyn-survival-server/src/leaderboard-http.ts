@@ -159,6 +159,21 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
       return true;
     }
 
+    // `/leaderboard/:id/replay` — o log de UMA linha, sob demanda. Antes do
+    // GET generico porque o mesmo prefixo (`/leaderboard`) casaria com os dois;
+    // este e mais especifico e tem de ser resolvido primeiro.
+    const replayMatch = req.method === 'GET' && /^\/leaderboard\/(\d+)\/replay$/.exec(url.pathname);
+    if (replayMatch) {
+      const id = Number(replayMatch[1]);
+      const replay = await opts.store.getReplay(id);
+      if (!replay) {
+        json(res, 404, { error: 'sem replay para esta run' });
+        return true;
+      }
+      json(res, 200, replay);
+      return true;
+    }
+
     if (req.method === 'GET') {
       const seedParam = url.searchParams.get('seed');
       const modeParam = url.searchParams.get('mode');
@@ -307,6 +322,9 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
         mode: 'solo',
         summary: verdict.summary,
         digest,
+        replayLog: verdict.replayLog,
+        tuning: authorized?.tuning,
+        depth: authorized?.depth,
       });
       opts.log({
         ev: 'replay_accepted',
