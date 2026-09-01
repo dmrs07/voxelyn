@@ -208,6 +208,7 @@ export const PT_BR = {
   'records.history.seed': 'seed {seed}',
   'records.history.core': 'núcleo',
   'records.history.extracted': 'saiu',
+  'records.replay': 'Rever esta descida',
 
   // ---------------------------------------------------------------------
   // Painel Ranking
@@ -233,7 +234,10 @@ export const PT_BR = {
   // Painel Replay (replay.html)
   // ---------------------------------------------------------------------
   'replay.badge': 'Replay autoritativo — re-simulado a partir do log homologado',
+  'replay.badge.local': 'Replay local — re-simulado a partir do log gravado neste aparelho',
   'replay.back': '← voltar ao ranking',
+  'replay.unavailable.local':
+    'O log desta descida não está mais neste aparelho — ou foi gravado por outra versão da simulação.',
   'replay.loading.title': 'Carregando o replay…',
   'replay.invalid.title': 'Replay inválido',
   'replay.invalid.detail': 'Esta página precisa de um id de run na URL.',

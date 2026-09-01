@@ -193,6 +193,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'records.history.seed': 'seed {seed}',
   'records.history.core': 'core',
   'records.history.extracted': 'out',
+  'records.replay': 'Watch this descent again',
 
   // ---------------------------------------------------------------------
   // Leaderboard panel
@@ -218,7 +219,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // Replay panel (replay.html)
   // ---------------------------------------------------------------------
   'replay.badge': 'Authoritative replay — re-simulated from the homologated log',
+  'replay.badge.local': 'Local replay — re-simulated from the log recorded on this device',
   'replay.back': '← back to the leaderboard',
+  'replay.unavailable.local':
+    "This descent's log is no longer on this device — or it was recorded by another simulation version.",
   'replay.loading.title': 'Loading the replay…',
   'replay.invalid.title': 'Invalid replay',
   'replay.invalid.detail': 'This page needs a run id in the URL.',

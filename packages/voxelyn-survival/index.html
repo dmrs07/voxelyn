@@ -2226,14 +2226,30 @@
       }
       /* Botao de replay: um icone quieto ao lado da run, nao mais uma coluna de
          numero — por isso nao entra nos seletores de alinhamento a direita
-         acima, e fica sem rotulo no cabecalho. */
+         acima, e fica sem rotulo no cabecalho.
+
+         A REGRA visual e compartilhada com o Registro (`.ax-ledger-row`), que
+         oferece o mesmo gesto sobre as descidas guardadas neste aparelho: o
+         mesmo desenho para a mesma acao, em dois livros diferentes. Só o
+         encaixe muda — aqui uma celula da grade, la o fim de uma linha flex. */
       .ax-rank-row .ax-rank-replay {
         display: flex;
         justify-content: center;
       }
-      .ax-rank-replay-btn {
+      .ax-ledger-row .ax-replay-btn {
+        flex: 0 0 auto;
+        margin-left: 10px;
+      }
+      .ax-replay-btn {
         width: 22px;
         height: 22px;
+        /* O `button` global e um botao de MENU: 220px de largura minima e 44px
+           de alvo de toque. Sem zerar os dois aqui, este icone herda a caixa
+           inteira e vira um retangulo atravessado na linha — que foi
+           exatamente o que aconteceu no livro do ranking. Largura e altura
+           sozinhas nao ganham de um `min-*`. */
+        min-width: 0;
+        min-height: 0;
         padding: 0;
         display: inline-flex;
         align-items: center;
@@ -2246,7 +2262,7 @@
         line-height: 1;
         cursor: pointer;
       }
-      .ax-rank-replay-btn:hover {
+      .ax-replay-btn:hover {
         border-color: var(--ax-teal);
         color: var(--ax-text-bright);
       }

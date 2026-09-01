@@ -24,6 +24,7 @@ import {
   BESTIARY_ORDER,
   DISCOVERIES,
   hasDiscovery,
+  runSummaryIdentity,
   type Records,
 } from './records';
 import { t, type MessageKey } from './i18n';
@@ -43,6 +44,20 @@ import { externalLinkIconSvg, newDotSpan } from './matrix-icons';
 export type RecordsCodexLink = {
   profile: PublicProgressionProfile | null;
   onViewDocs: (context: CodexContext) => void;
+};
+
+/**
+ * O que o Registro oferece ALEM de ler os proprios records.
+ *
+ * Hoje so o replay das descidas guardadas neste aparelho. As duas metades
+ * chegam de fora — quais linhas tem log (`replayable`) e o que fazer ao clicar
+ * (`onWatchReplay`) — porque `local-replays.ts` fala com `localStorage`, e um
+ * painel que le storage sozinho deixa de poder ser desenhado num teste.
+ */
+export type RecordsPanelOptions = {
+  /** As identidades (`runSummaryIdentity`) que tem replay guardado e valido. */
+  replayable?: ReadonlySet<string>;
+  onWatchReplay?: (run: RunSummary) => void;
 };
 
 /** Os documentos deste contexto tem algum ainda nao lido? */
@@ -334,7 +349,11 @@ const historyOutcome = (run: RunSummary): string =>
       ? t('records.history.extracted')
       : describeCause(run.deathCause).headline;
 
-const renderHistoryTab = (host: HTMLElement, records: Records): void => {
+const renderHistoryTab = (
+  host: HTMLElement,
+  records: Records,
+  options?: RecordsPanelOptions,
+): void => {
   section(host, t('records.history'));
   if (records.history.length === 0) {
     host.appendChild(el('div', 'locked', t('records.history.empty')));
@@ -348,18 +367,40 @@ const renderHistoryTab = (host: HTMLElement, records: Records): void => {
     row.appendChild(
       el('span', 'lesson', t('records.history.seed', { seed: formatSeed(run.seed) })),
     );
+    // O botao so aparece com log guardado E com quem saiba abri-lo — as duas
+    // coisas, pela mesma razao do livro do ranking: um botao que nao leva a
+    // lugar nenhum e pior que nenhum botao. Aqui a diferenca e que a maioria
+    // destas linhas e MORTE, e morte nao sobe para o servidor: o que torna
+    // estas revisiveis e o log neste aparelho, e nada mais.
+    if (options?.onWatchReplay && options.replayable?.has(runSummaryIdentity(run))) {
+      const btn = el('button', 'ax-replay-btn', '▶') as HTMLButtonElement;
+      btn.type = 'button';
+      btn.title = t('records.replay');
+      btn.setAttribute('aria-label', t('records.replay'));
+      btn.addEventListener('click', () => options.onWatchReplay?.(run));
+      row.appendChild(btn);
+    }
     host.appendChild(row);
   }
 };
 
 const TAB_RENDER: Record<
   RecordsTab,
-  (host: HTMLElement, records: Records, sprites?: SpriteBank, codex?: RecordsCodexLink) => void
+  (
+    host: HTMLElement,
+    records: Records,
+    sprites?: SpriteBank,
+    codex?: RecordsCodexLink,
+    options?: RecordsPanelOptions,
+  ) => void
 > = {
   summary: renderSummaryTab,
   assets: renderAssetsTab,
   discoveries: renderDiscoveriesTab,
-  history: renderHistoryTab,
+  // A aba do historico e a unica que le `options`; as outras ignoram o
+  // parametro, e a assinatura comum e o que mantem o despacho por tabela.
+  history: (host, records, _sprites, _codex, options) =>
+    renderHistoryTab(host, records, options),
 };
 
 export const renderRecordsPanel = (
@@ -367,6 +408,7 @@ export const renderRecordsPanel = (
   records: Records,
   sprites?: SpriteBank,
   codex?: RecordsCodexLink,
+  options?: RecordsPanelOptions,
 ): void => {
   // Redesenhar limpa o DOM e derrubaria o foco no documento a cada troca de
   // aba — o mesmo problema (e a mesma solucao) do painel da Matriz.
@@ -391,7 +433,7 @@ export const renderRecordsPanel = (
     button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => {
       activeTab = tab;
-      renderRecordsPanel(host, records, sprites, codex);
+      renderRecordsPanel(host, records, sprites, codex, options);
     });
     tabs.appendChild(button);
   }
@@ -401,7 +443,7 @@ export const renderRecordsPanel = (
   body.style.width = 'auto';
   body.style.maxHeight = 'none';
   body.style.border = 'none';
-  TAB_RENDER[activeTab](body, records, sprites, codex);
+  TAB_RENDER[activeTab](body, records, sprites, codex, options);
   host.appendChild(body);
 
   if (focusKey) {
