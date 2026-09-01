@@ -23,6 +23,7 @@ import {
   DEVOURER_TAIL_TILES,
   DevourerSpines,
   devourerHeadLiftPx,
+  type SpineNode,
 } from './devourer-spine';
 
 const head = (x: number, y: number, liftPx = 0, dirX = 1, dirY = 0) => ({ x, y, liftPx, dirX, dirY });
@@ -217,5 +218,87 @@ describe('a ninhada — o contrato com o atlas', () => {
         expect(v * BROOD_PHASES + f).toBeLessThan(m.animations.idle.frames);
       }
     }
+  });
+});
+
+describe('o rastro NAO pode depender de a cabeca estar visivel', () => {
+  /** Um passeio curto em curva, o suficiente para o corpo deixar de ser reto. */
+  const passeio = (spines: DevourerSpines, id: number): SpineNode[] => {
+    let out: SpineNode[] = [];
+    for (let i = 0; i < 60; i++) {
+      const t = i * 0.05;
+      out = spines.follow(
+        id,
+        { x: 40 + Math.cos(t) * 4, y: 40 + Math.sin(t) * 4, liftPx: 0, dirX: 1, dirY: 0 },
+        i * 50,
+      );
+    }
+    return out;
+  };
+
+  /** O quanto o corpo se afasta da reta que vai da cabeca a cauda. */
+  /** A cabeca no ponto exato onde o passeio parou. */
+  const cabeca = {
+    x: 40 + Math.cos(59 * 0.05) * 4,
+    y: 40 + Math.sin(59 * 0.05) * 4,
+    liftPx: 0,
+    dirX: 1,
+    dirY: 0,
+  };
+
+  const curvatura = (nodes: SpineNode[]): number => {
+    const a = nodes[0];
+    const b = nodes[nodes.length - 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    let max = 0;
+    for (const n of nodes) {
+      const d = Math.abs((b.x - a.x) * (a.y - n.y) - (a.x - n.x) * (b.y - a.y)) / len;
+      max = Math.max(max, d);
+    }
+    return max;
+  };
+
+  it('um quadro sem registrar o id joga o rastro fora e o corpo volta RETO', () => {
+    // Este e o mecanismo por tras do defeito que a revisao apontou no render: o
+    // corte de luz saia da iteracao pela luz da CABECA, entao um chefe com a
+    // cabeca na sombra nao entrava no conjunto do quadro — e `keepOnly`, que so
+    // existe para esquecer chefe morto, esquecia um chefe vivo.
+    //
+    // A prova mede a consequencia e nao a intencao: o corpo que estava em curva
+    // volta a ser uma reta. Um corpo de seis tiles endireitando de um quadro
+    // para o outro e a coisa mais visivel que este sistema pode fazer de errado.
+    const spines = new DevourerSpines();
+    const curvo = passeio(spines, 7);
+    expect(curvatura(curvo)).toBeGreaterThan(0.2);
+
+    // O quadro em que o id nao foi registrado.
+    spines.keepOnly(new Set<number>());
+    const depois = spines.follow(7, cabeca, 3000);
+
+    // A prova nao e "ficou menos curvo": e que o corpo voltou a ser EXATAMENTE o
+    // corpo que nasce do nada. Comparado anel a anel com uma coluna virgem que
+    // so viu esta cabeca, no mesmo instante de relogio — se bate ponto a ponto,
+    // os dois segundos de rastro foram jogados fora.
+    const virgem = new DevourerSpines().follow(7, cabeca, 3000);
+    expect(depois.length).toBe(virgem.length);
+    for (let i = 0; i < depois.length; i++) {
+      expect(depois[i].x, `anel ${i}`).toBeCloseTo(virgem[i].x, 9);
+      expect(depois[i].y, `anel ${i}`).toBeCloseTo(virgem[i].y, 9);
+    }
+    expect(curvatura(depois)).toBeLessThan(curvatura(curvo) / 3);
+  });
+
+  it('registrando o id em todo quadro, a curva sobrevive', () => {
+    const spines = new DevourerSpines();
+    const curvo = passeio(spines, 7);
+    spines.keepOnly(new Set([7]));
+    const depois = spines.follow(7, cabeca, 3000);
+
+    const virgem = new DevourerSpines().follow(7, cabeca, 3000);
+    const renasceu = depois.every(
+      (n, i) => Math.abs(n.x - virgem[i].x) < 1e-9 && Math.abs(n.y - virgem[i].y) < 1e-9,
+    );
+    expect(renasceu, 'o corpo nao pode ter renascido').toBe(false);
+    expect(curvatura(depois)).toBeGreaterThan(curvatura(curvo) * 0.9);
   });
 });

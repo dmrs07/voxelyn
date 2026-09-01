@@ -41,7 +41,7 @@ import { resetMinigun } from './minigun.js';
 import { emptyBossRuntime } from './bosses.js';
 import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
-import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
+import { ARCHETYPES, SIGNATURE_OF_STRATUM, SIGNATURE_PACK, circleBlocked, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
@@ -312,6 +312,16 @@ export const populateSector = (
 const BROOD_SPAWN_STEP = 0.5;
 
 /**
+ * Quantos raios do angulo aureo um filhote pode tentar antes de desistir.
+ *
+ * Oito e medido e nao escolhido: com um so raio sobravam ninhadas curtas
+ * (tres em dezoito camaras, a pior com doze de catorze) porque ha angulos em
+ * que a rocha vai da parede ate o raio da mordida sem uma celula livre. Com
+ * oito, nenhuma camara da amostra fica curta.
+ */
+const BROOD_RAY_TRIES = 8;
+
+/**
  * Os filhotes do Devorador, espalhados em volta da camara.
  *
  * A distribuicao e uma espiral de ANGULO AUREO e nao um circulo, pela mesma
@@ -328,32 +338,33 @@ const BROOD_SPAWN_STEP = 0.5;
  */
 const spawnDevourerBrood = (state: SurvivalState, cx: number, cy: number): void => {
   const w = state.config.width;
-  // CHAO ABERTO, e a guarda nao e zelo — e a promessa deles.
+  const radius = ARCHETYPES.devourer_brood.radius;
+  // O CORPO INTEIRO em chao aberto, e nao a celula do centro.
   //
-  // A primeira versao nascia em qualquer lugar, no argumento de que eles vivem
-  // NA areia como a mae. A mae esta ENTERRADA; eles nao. Um filhote dentro da
-  // rocha e invisivel e nao pode ser pisado, e "podem ser esmagados" e metade
-  // do que eles sao.
+  // A guarda de centro deixava 87 filhotes de 18 camaras nascerem com um canto
+  // do circulo dentro da pedra — e dali `moveEntity` nao os tira, porque todo
+  // passo que sairia ja comeca bloqueado. Pergunta-se agora com o mesmo
+  // `circleBlocked` que o movimento usa: a geracao e o passo tem de concordar
+  // sobre o que e um lugar onde este corpo cabe.
   //
-  // A CELULA QUE O CORPO VAI OCUPAR, e nao a que o argumento aponta:
+  // AS COORDENADAS QUE O CORPO VAI OCUPAR, e nao as que o argumento aponta:
   // `spawnEnemy` soma meio tile aos dois eixos (os chamadores passam coordenada
   // de TILE, nao de mundo). A primeira versao desta guarda testava `floor(x)` e
   // deixava passar todo caso em que o meio tile atravessava a fronteira — e o
   // invariante do repositorio pegou exatamente esses.
-  const open = (x: number, y: number): boolean => {
-    const tx = Math.floor(x + 0.5);
-    const ty = Math.floor(y + 0.5);
-    if (tx < 2 || ty < 2 || tx >= w - 2 || ty >= state.config.height - 2) return false;
-    return state.solid[ty * w + tx] === SOLID_NONE;
+  const fits = (x: number, y: number): boolean => {
+    const wx = x + 0.5;
+    const wy = y + 0.5;
+    if (wx < 2 || wy < 2 || wx >= w - 2 || wy >= state.config.height - 2) return false;
+    return !circleBlocked(state, wx, wy, radius);
   };
   for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
-    const a = i * 2.39996;
     const far =
       DEVOURER_MAW_BITE_RADIUS + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
     // QUEM CAI NA PEDRA DESCE O PROPRIO RAIO ate achar areia, em vez de sumir.
     //
     // A espiral e ideal e a camara e escavada: o anel de fora quase sempre
-    // encosta na parede, e a versao anterior simplesmente DESISTIA do filhote —
+    // encosta na parede, e a primeira versao simplesmente DESISTIA do filhote —
     // medido, nenhuma camara gerada chegava aos catorze e uma delas nasceu com
     // UM. Catorze e o numero que faz a succao da boca significar alguma coisa.
     //
@@ -365,12 +376,22 @@ const spawnDevourerBrood = (state: SurvivalState, cx: number, cy: number): void 
     //
     // O piso e o raio da mordida: ninguem nasce dentro da garganta, senao e
     // devorado no primeiro tick da primeira janela e ninguem chega a ve-lo.
-    for (let r = far; r >= DEVOURER_MAW_BITE_RADIUS - 1e-6; r -= BROOD_SPAWN_STEP) {
-      const x = cx + Math.cos(a) * r;
-      const y = cy + Math.sin(a) * r;
-      if (!open(x, y)) continue;
-      spawnEnemy(state, 'devourer_brood', x, y, false);
-      break;
+    //
+    // COM O RAIO INTEIRO NA ROCHA ele nao desiste: tenta o PROXIMO raio da mesma
+    // espiral, `i + k*n`. E deliberadamente a continuacao da sequencia e nao um
+    // angulo qualquer — todo angulo que a ninhada pode ocupar continua sendo um
+    // angulo aureo, entao a saida de emergencia nao pode alinhar dois filhotes.
+    let placed = false;
+    for (let k = 0; k < BROOD_RAY_TRIES && !placed; k++) {
+      const a = (i + k * DEVOURER_BROOD_COUNT) * 2.39996;
+      for (let r = far; r >= DEVOURER_MAW_BITE_RADIUS - 1e-6; r -= BROOD_SPAWN_STEP) {
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        if (!fits(x, y)) continue;
+        spawnEnemy(state, 'devourer_brood', x, y, false);
+        placed = true;
+        break;
+      }
     }
   }
 };

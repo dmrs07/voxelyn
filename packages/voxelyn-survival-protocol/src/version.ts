@@ -752,7 +752,28 @@ export const PROTOCOL_VERSION = 28;
 // ate a mae atravessa o vao aberto — em vez de num bolso atras da parede.
 //
 // Nas mesmas 13 camaras: media 13,8, minimo 12, nenhum filhote na pedra.
-export const SIMULATION_VERSION = 51;
+//
+// 52: a ninhada nasce COM O CORPO INTEIRO em chao aberto, e ninguem fica de
+// fora.
+//
+// Dois defeitos que a versao 51 nao resolveu, os dois medidos aqui:
+//
+// A guarda olhava a CELULA DO CENTRO e nao o circulo do corpo — 87 filhotes em
+// 18 camaras nasciam com um canto dentro da pedra, e dali `moveEntity` nao tira
+// ninguem: todo passo que sairia ja comeca bloqueado. Agora a pergunta e o
+// mesmo `circleBlocked` que o movimento usa, exportado para isso. A geracao e o
+// passo tem de concordar sobre o que e um lugar onde este corpo cabe.
+//
+// E a descida pelo raio ainda desistia quando a rocha ia da parede ate o raio
+// da mordida sem uma celula livre: tres ninhadas curtas em 18 camaras, a pior
+// com doze de catorze. Agora o filhote tenta ate oito raios, e o raio seguinte
+// e `i + k*n` — a CONTINUACAO da mesma espiral aurea, nao um angulo qualquer.
+// A saida de emergencia nao pode alinhar dois filhotes, que e exatamente o que
+// procurar a celula livre mais proxima faria.
+//
+// Medido em 44 camaras geradas: catorze filhotes em todas, nenhum com o corpo
+// encostado na pedra.
+export const SIMULATION_VERSION = 52;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

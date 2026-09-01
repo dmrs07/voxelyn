@@ -3304,7 +3304,19 @@ export class SurvivalRenderer {
       }
 
       const b = brightness(enemy.x, enemy.y);
-      if (b <= 0.05) continue;
+      // O CORTE DE LUZ E DA CABECA, e a cabeca do Devorador nao e o corpo dele.
+      //
+      // Sair da iteracao aqui apagava os dez aneis inteiros no instante em que a
+      // CABECA entrava numa celula escura — um corpo de seis tiles some porque
+      // uma ponta dele atravessou uma sombra, com o resto ainda iluminado. Pior
+      // que o sumico: sem passar pelo `wormsDrawn` deste quadro, `keepOnly`
+      // jogava fora o rastro, e o corpo voltava RETO quando a cabeca reaparecia.
+      //
+      // Entao o corte espera: o corpo e montado e enfileirado antes dele, e quem
+      // decide anel por anel e a luz de cada anel, que ja e conferida no laco de
+      // baixo. Todo o resto (sprite da cabeca, barra, sombra) continua cortado.
+      const headDark = b <= 0.05;
+      if (headDark && enemy.archetype !== 'white_devourer') continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // Espreitador DENTRO do elemento: o corpo nao aparece. A simulacao ja
@@ -3422,6 +3434,8 @@ export class SurvivalRenderer {
           });
         }
       }
+      // Montado o corpo (e preservado o rastro), a cabeca no escuro para aqui.
+      if (headDark) continue;
 
       // A NINHADA. Caminho proprio e curto, porque tudo o que o caminho comum
       // faz por um inimigo esta errado para ela: nao ha barra de vida (um

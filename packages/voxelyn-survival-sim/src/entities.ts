@@ -663,7 +663,15 @@ export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean =
   return state.solid[cy * state.config.width + cx] !== SOLID_NONE;
 };
 
-const circleBlocked = (state: SurvivalState, x: number, y: number, r: number): boolean =>
+/**
+ * O CORPO cabe aqui? Nao a celula do centro — o circulo inteiro.
+ *
+ * Exportada porque a geracao de mundo precisa da MESMA pergunta que o
+ * movimento faz. Um nascimento conferido so pela celula do centro pode por
+ * um canto do circulo dentro da pedra, e dali `moveEntity` nao tira mais:
+ * todo passo que sairia ja comeca bloqueado.
+ */
+export const circleBlocked = (state: SurvivalState, x: number, y: number, r: number): boolean =>
   isSolidAt(state, x - r, y - r) ||
   isSolidAt(state, x + r, y - r) ||
   isSolidAt(state, x - r, y + r) ||

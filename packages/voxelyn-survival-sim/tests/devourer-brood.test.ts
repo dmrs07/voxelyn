@@ -4,7 +4,7 @@
 // continua parecendo um filhote inofensivo enquanto cobra.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy } from '../src/entities';
+import { circleBlocked, damageEntity, spawnEnemy } from '../src/entities';
 import {
   DEVOURER_BROOD_COUNT,
   DEVOURER_MAW_BITE_RADIUS,
@@ -270,19 +270,21 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
   // porque varrer sessenta sementes x tres setores custa oito segundos e o que
   // importa aqui nao e a varredura: e que camara GERADA de verdade, com a
   // parede onde o gerador a pos, nasca com o enxame inteiro.
-  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60];
+  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60, 95, 153, 710];
 
-  it('camara gerada nasce com o enxame inteiro, e nenhum filhote dentro da pedra', () => {
+  it('camara gerada nasce com o enxame INTEIRO, e nenhum corpo encostado na pedra', () => {
     // O ANGULO AUREO e ideal e a camara e escavada: o anel de fora encosta na
-    // parede quase sempre. A versao anterior desistia do filhote que caia na
+    // parede quase sempre. A primeira versao desistia do filhote que caia na
     // pedra e o resultado medido era um enxame que nunca existia — media 5,5 de
-    // catorze nestas mesmas camaras, e a semente 60 nascia com UM.
+    // catorze, e a semente 60 nascia com UM. Catorze e o numero que faz a succao
+    // valer: sao eles sumindo garganta abaixo que ensinam o raio da boca.
     //
-    // Catorze e o numero que faz a succao valer: sao eles sumindo garganta
-    // abaixo que ensinam o raio da boca. Um filhote so nao ensina nada.
+    // A conta e CATORZE e nao "catorze menos dois". A primeira versao desta
+    // prova aceitava a folga que a implementacao daquele momento precisava —
+    // regua escolhida depois de ver o resultado, que e exatamente como um
+    // numero de configuracao vira decoracao.
     for (const seed of DEVOURER_SEEDS) {
       const state = createRun({ seed, sector: 3 });
-      const w = state.config.width;
       const mother = state.enemies.find((e) => e.archetype === 'white_devourer');
       expect(mother, `semente ${seed} deveria ter Devorador`).toBeDefined();
       const litter = brood(state);
@@ -290,15 +292,17 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
       expect(
         litter.length,
         `semente ${seed}: ${litter.length} filhotes de ${DEVOURER_BROOD_COUNT}`
-      ).toBeGreaterThanOrEqual(DEVOURER_BROOD_COUNT - 2);
+      ).toBe(DEVOURER_BROOD_COUNT);
 
       for (const b of litter) {
-        const tx = Math.floor(b.x);
-        const ty = Math.floor(b.y);
+        // O CIRCULO INTEIRO, e nao a celula do centro. A primeira versao desta
+        // prova olhava so o centro e passava com 87 filhotes de 18 camaras
+        // nascidos com um canto dentro da pedra — de onde `moveEntity` nao tira
+        // ninguem, porque todo passo que sairia ja comeca bloqueado.
         expect(
-          state.solid[ty * w + tx],
-          `semente ${seed}: filhote ${b.id} dentro da pedra em ${tx},${ty}`
-        ).toBe(SOLID_NONE);
+          circleBlocked(state, b.x, b.y, b.radius),
+          `semente ${seed}: filhote ${b.id} nasceu com o corpo na pedra em ${b.x},${b.y}`
+        ).toBe(false);
         // Ninguem nasce dentro da garganta: quem desce o raio para no raio da
         // mordida e nao um passo alem dele.
         expect(
@@ -309,15 +313,20 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
     }
   });
 
-  it('quem desce o raio cede o raio e NAO o angulo', () => {
+  it('quem desce o raio cede o raio, e o raio de emergencia continua sendo aureo', () => {
     // O que o angulo aureo compra e a ausencia de pente. Procurar a celula livre
     // mais proxima devolveria o pente pela porta dos fundos: dois filhotes
     // empurrados para o mesmo lado da parede saem alinhados. Descer o proprio
-    // raio nao mexe no angulo — e e isso que esta prova cobra.
+    // raio nao mexe no angulo, e o raio de emergencia (`i + k*n`) e a
+    // CONTINUACAO da mesma espiral — nao um angulo qualquer. Esta prova cobra as
+    // duas coisas de uma vez: todo filhote esta num angulo da sequencia.
     for (const seed of DEVOURER_SEEDS) {
       const state = createRun({ seed, sector: 3 });
       const mother = state.enemies.find((e) => e.archetype === 'white_devourer')!;
-      const ideais = Array.from({ length: DEVOURER_BROOD_COUNT }, (_, i) => i * 2.39996);
+      const ideais = Array.from(
+        { length: DEVOURER_BROOD_COUNT * 8 },
+        (_, i) => i * 2.39996
+      );
       for (const b of brood(state)) {
         const a = Math.atan2(b.y - mother.y, b.x - mother.x);
         const perto = ideais.some((ideal) => {
