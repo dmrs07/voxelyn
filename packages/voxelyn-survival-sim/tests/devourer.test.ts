@@ -397,6 +397,79 @@ describe('Devorador Branco — o arco', () => {
   });
 });
 
+describe('Devorador Branco — a espreita anda para onde olha', () => {
+  /** Poe o chefe exatamente no anel de espreita e roda UM tick. */
+  const orbitTick = (seed: number) => {
+    const { state, worm, px, py } = arena(seed);
+    state.player.x = px + 0.5;
+    state.player.y = py + 0.5;
+    // No anel: o erro de distancia zera e o passo inteiro vira tangente, que e
+    // o caso em que os dois defeitos apareciam.
+    worm.x = px + 0.5 + DEVOURER_STALK_RANGE;
+    worm.y = py + 0.5;
+    worm.mood = DEVOURER_BURROWED;
+    worm.action = undefined;
+    // Longe do tick de emergir: o que se quer medir e o passo submerso.
+    worm.nextActionAt = state.tick + 500;
+    state.bossRuntime.awake = true;
+    const from = { x: worm.x, y: worm.y };
+    const silt = new Set<number>();
+    const w = state.config.width;
+    for (let y = 0; y < state.config.height; y++)
+      for (let x = 0; x < w; x++) if (state.surface[y * w + x] === SURF_SILT) silt.add(y * w + x);
+    stepRun(state, [emptyCommand()]);
+    const painted: Array<{ x: number; y: number }> = [];
+    for (let y = 0; y < state.config.height; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (state.surface[i] === SURF_SILT && !silt.has(i)) painted.push({ x, y });
+      }
+    }
+    return { state, worm, move: { x: worm.x - from.x, y: worm.y - from.y }, painted };
+  };
+
+  it('a cara aponta para a MARCHA, e nao para o alvo', () => {
+    // No anel de espreita a componente radial zera e o passo inteiro e
+    // tangente: o chefe andava de lado com o rosto virado para o jogador.
+    //
+    // Sempre foi errado, e passou a ser VISIVEL com o corpo segmentado — o
+    // cliente escolhe a direcao do sprite da cabeca pela `facing` autoritativa e
+    // deriva a tangente dos aneis da trajetoria, entao a cabeca encontrava um
+    // pescoco perpendicular a ela, na costura exata que o corpo novo existe
+    // para esconder.
+    for (const seed of [301, 302, 303]) {
+      const { worm, move } = orbitTick(seed);
+      const len = Math.hypot(move.x, move.y);
+      expect(len, `seed ${seed}: ele nao andou`).toBeGreaterThan(0.01);
+      const alinhamento = (worm.facing.x * move.x + worm.facing.y * move.y) / len;
+      expect(alinhamento, `seed ${seed}: a cara esta a ${alinhamento.toFixed(2)} da marcha`).toBeGreaterThan(
+        0.99
+      );
+    }
+  });
+
+  it('o rastro e uma FAIXA atravessada, e nao uma linha em cima do caminho', () => {
+    // As faixas se deslocavam por `side`, que no anel E a direcao do passo: as
+    // tres caiam uma na frente da outra e a banda de tres tiles virava uma linha
+    // de um. Nao e so feio — o rastro e o unico aviso deste chefe e a area que o
+    // jogador tem para vitrificar antes de a boca abrir, entao a largura dele e
+    // mecanica.
+    for (const seed of [301, 302, 303]) {
+      const { move, painted } = orbitTick(seed);
+      expect(painted.length, `seed ${seed}: nao pintou nada`).toBeGreaterThan(0);
+      const len = Math.hypot(move.x, move.y);
+      // O quanto as celulas pintadas se espalham ATRAVESSANDO a marcha.
+      const nx = -move.y / len;
+      const ny = move.x / len;
+      const across = painted.map((c) => c.x * nx + c.y * ny);
+      const largura = Math.max(...across) - Math.min(...across);
+      expect(largura, `seed ${seed}: faixa de ${largura.toFixed(2)} tile de largura`).toBeGreaterThan(
+        1
+      );
+    }
+  });
+});
+
 describe('Devorador Branco — o silencio antes da boca', () => {
   /** Roda o ciclo e devolve o vao, em ticks, entre o ultimo pouso e a boca. */
   const gap = (seed: number): number => {

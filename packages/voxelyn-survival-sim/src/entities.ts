@@ -2860,7 +2860,6 @@ const devourerStep = (
     span > 0.0001
       ? normalized(player.x - enemy.x, player.y - enemy.y)
       : normalized(enemy.facing.x, enemy.facing.y);
-  enemy.facing = { ...toward };
   const step = DEVOURER_BURROW_SPEED * dt;
 
   // ELE ESPREITA, e nao persegue ate encostar.
@@ -2894,6 +2893,26 @@ const devourerStep = (
   const side = { x: -toward.y * spin, y: toward.x * spin };
   const moveX = toward.x * radial + side.x * orbit;
   const moveY = toward.y * radial + side.y * orbit;
+  const travel = Math.hypot(moveX, moveY);
+
+  // A CARA SEGUE O MOVIMENTO, e nao o alvo.
+  //
+  // Ela apontava para o jogador (`toward`), e no anel de espreita isso e quase
+  // perpendicular a marcha: chegando a `DEVOURER_STALK_RANGE` o erro de
+  // distancia zera, a componente radial some e o passo inteiro vira tangente.
+  // O chefe andava de lado com o rosto virado para o alvo.
+  //
+  // Isso sempre foi errado e passou a ser VISIVEL com o corpo segmentado. O
+  // cliente escolhe a direcao do sprite da cabeca pela `facing` autoritativa e
+  // deriva a tangente dos aneis da TRAJETORIA — quer dizer que a cabeca
+  // encontrava um pescoco perpendicular a ela, exatamente na costura que o
+  // corpo novo existe para esconder.
+  //
+  // O recuo continua sendo `toward`, e so quando nao ha marcha de onde tirar
+  // uma direcao: um corpo parado precisa continuar olhando para algum lugar.
+  const heading = travel > 0.0001 ? { x: moveX / travel, y: moveY / travel } : toward;
+  enemy.facing = { ...heading };
+
   // Sem `moveEntity`: parede nao vale por baixo. Ele e o unico corpo do jogo
   // que atravessa solido, e e por isso que perseguir nao e uma resposta a ele.
   enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + moveX));
@@ -2903,9 +2922,20 @@ const devourerStep = (
   // Nao pinta por cima de nada — nem de fogo, nem de agua, nem do proprio
   // vidro: sobrescrever o vidro apagaria o contra-jogo do jogador com o
   // proprio corpo do chefe.
-  for (let lane = -DEVOURER_TRAIL_WIDTH; lane <= DEVOURER_TRAIL_WIDTH; lane++) {
-    const tx = Math.floor(enemy.x + side.x * lane);
-    const ty = Math.floor(enemy.y + side.y * lane);
+  //
+  // A FAIXA E PERPENDICULAR A MARCHA, e nao a `side`.
+  //
+  // `side` e a tangente da orbita, e no anel de espreita ela E a direcao do
+  // passo — as tres faixas caiam uma na frente da outra, em cima do proprio
+  // caminho, e a banda de tres tiles que este rastro promete virava uma linha
+  // de um. Nao e so feio: o rastro e o unico aviso deste chefe e a area que o
+  // jogador tem para vitrificar antes de a boca abrir, entao a largura dele e
+  // mecanica.
+  const lane =
+    travel > 0.0001 ? { x: -moveY / travel, y: moveX / travel } : { x: -toward.y, y: toward.x };
+  for (let l = -DEVOURER_TRAIL_WIDTH; l <= DEVOURER_TRAIL_WIDTH; l++) {
+    const tx = Math.floor(enemy.x + lane.x * l);
+    const ty = Math.floor(enemy.y + lane.y * l);
     if (tx < 1 || ty < 1 || tx >= w - 1 || ty >= state.config.height - 1) continue;
     const i = ty * w + tx;
     if (state.solid[i] !== SOLID_NONE) continue;

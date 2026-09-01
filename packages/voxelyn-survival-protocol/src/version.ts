@@ -711,7 +711,28 @@ export const PROTOCOL_VERSION = 28;
 // leaderboard, e catorze bichinhos inofensivos por camara seriam pontos de
 // graca. O evento de morte continua indo (o jogador precisa ver que pisou em
 // alguma coisa); o que nao vai e o credito.
-export const SIMULATION_VERSION = 49;
+//
+// 50: a ESPREITA passa a andar para onde olha, e a pintar atravessado.
+//
+// Dois defeitos no mesmo passo submerso, os dois medidos em zero — o pior caso
+// possivel, nao um desvio de borda.
+//
+// A CARA apontava para o jogador (`toward`). No anel de espreita o erro de
+// distancia zera, a componente radial some e o passo inteiro vira tangente:
+// alinhamento entre a `facing` e a marcha medido em 0,00, quer dizer
+// perpendicular exata. Sempre foi errado e passou a ser VISIVEL com o corpo
+// segmentado — o cliente escolhe a direcao do sprite da cabeca pela `facing` e
+// deriva a tangente dos aneis da trajetoria, entao a cabeca encontrava um
+// pescoco perpendicular a ela, na costura exata que o corpo novo existe para
+// esconder. Agora ela sai da marcha, com `toward` de recuo quando nao ha passo.
+//
+// O RASTRO se deslocava por `side`, que no anel E a direcao do passo: as tres
+// faixas caiam uma na frente da outra, em cima do proprio caminho, e a largura
+// atravessada media 0,00 tile — a banda de tres tiles virava uma linha de um.
+// Nao e so feio: o rastro e o unico aviso deste chefe e a area que o jogador
+// tem para vitrificar antes de a boca abrir, entao a largura dele e mecanica.
+// A faixa agora e perpendicular a marcha.
+export const SIMULATION_VERSION = 50;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
