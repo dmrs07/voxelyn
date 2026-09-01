@@ -715,6 +715,25 @@ const homologateRun = (state: SurvivalState): void => {
 let soloRunConfig: { tuning?: PlayerTuning; depth?: RunDepthConfig } | null = null;
 
 /**
+ * Comeca a gravar uma descida solo: o log E a configuracao dele, JUNTOS.
+ *
+ * Os dois numa chamada so pela mesma razao que `capture` do `RunRecorder`
+ * devolve o comando que vai ser simulado: separados, um deles um dia deixa de
+ * ser atualizado. Foi o que aconteceu — o reinicio pela tela de resultado tira
+ * um ticket NOVO (tuning relido do perfil, profundidade possivelmente outra) e
+ * so trocava o recorder, deixando a run seguinte emparelhada com a
+ * configuracao da anterior. O replay local reproduzia outra descida.
+ */
+const beginSoloRecording = (auth: {
+  seed: number;
+  tuning?: PlayerTuning;
+  depth?: RunDepthConfig;
+}): void => {
+  recorder.start(auth.seed);
+  soloRunConfig = { tuning: auth.tuning, depth: auth.depth };
+};
+
+/**
  * Guarda o log da descida que acabou, para o Registro poder reve-la.
  *
  * So SOLO: uma run de co-op e simulada pelo servidor, e o log deste cliente nao
@@ -1212,10 +1231,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   // mundo de nascer atras do menu.
   if (myDescent !== descentToken) return null;
   const seed = authorized.seed;
-  recorder.start(seed);
-  // Junto do recorder, e pelo mesmo motivo dele: e o par (log, configuracao)
-  // que reproduz esta descida depois. Ver `keepLocalReplay`.
-  soloRunConfig = { tuning: authorized.tuning, depth: authorized.depth };
+  beginSoloRecording(authorized);
   resetRunTracking();
   telemetry.begin();
   let state: SurvivalState = createRun({
@@ -1319,7 +1335,10 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
         // desatualizado se ele tivesse comprado alguma coisa no intervalo.
         void authorizeExpedition(nextSeed(), myDescent).then((next) => {
           if (myDescent !== descentToken) return;
-          recorder.start(next.seed);
+          // O ticket e NOVO, e a configuracao dele tambem: gravar so a seed
+          // deixaria o log desta tentativa emparelhado com o tuning da
+          // anterior. Ver `beginSoloRecording`.
+          beginSoloRecording(next);
           telemetry.begin();
           state = createRun({ seed: next.seed, tuning: next.tuning, depth: next.depth });
           liveRun = state;

@@ -11,6 +11,7 @@ import {
   applyRunOnce,
   emptyRecords,
   hasDiscovery,
+  runSummaryIdentity,
 } from './records';
 import { t } from './i18n';
 
@@ -145,6 +146,33 @@ describe('registro entre runs', () => {
     const nextRun = applyRunOnce(duplicate.records, copy, null);
     expect(nextRun.applied).toBe(true);
     expect(nextRun.records.totals.runs).toBe(2);
+  });
+
+  /**
+   * A identidade tem de separar duas TENTATIVAS no mesmo mapa.
+   *
+   * Com seed fixa (o "mesmo mapa para todos", e o campo de seed nas opcoes),
+   * morrer no mesmo tick duas vezes nao e exotico. Enquanto a chave era so
+   * `seed:fase:ticks`, as duas descidas dividiam a mesma — e o replay guardado
+   * de uma abria pela linha da outra.
+   */
+  it('separa duas descidas que so empatam em seed, fase e tempo', () => {
+    const primeira = summary({ seed: 42, phase: 'dead', ticks: 777 });
+    const segunda = summary({
+      seed: 42,
+      phase: 'dead',
+      ticks: 777,
+      stats: { ...primeira.stats, shotsFired: primeira.stats.shotsFired + 4 },
+    });
+    expect(runSummaryIdentity(segunda)).not.toBe(runSummaryIdentity(primeira));
+  });
+
+  // A outra metade do contrato, que a primeira nao pode custar: a MESMA run,
+  // chegando de novo pelo snapshot terminal, continua sendo a mesma.
+  it('a mesma run congelada mantem a identidade entre copias', () => {
+    const original = summary({ seed: 9, phase: 'extracted', ticks: 4242, cores: 1 });
+    const copy = JSON.parse(JSON.stringify(original)) as RunSummary;
+    expect(runSummaryIdentity(copy)).toBe(runSummaryIdentity(original));
   });
 
   // applyRun e pura porque este e o unico lugar do cliente em que um bug

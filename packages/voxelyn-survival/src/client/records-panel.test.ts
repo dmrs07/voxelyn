@@ -10,22 +10,10 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { RunSummary } from '@voxelyn/survival-sim';
+import { emptyStats } from '@voxelyn/survival-sim';
 import { renderRecordsPanel } from './records-panel';
-import {
-  BESTIARY_ORDER,
-  applyRun,
-  emptyRecords,
-  runSummaryIdentity,
-  type Records,
-} from './records';
+import { applyRun, emptyRecords, runSummaryIdentity, type Records } from './records';
 import { setLocale } from './i18n';
-
-// Montado da lista de arquetipos em vez de escrito a mao: a tabela de abates
-// cobre o bestiario inteiro, e uma copia literal aqui vira erro de compilacao
-// no dia em que entrar uma criatura nova.
-const noKills = Object.fromEntries(
-  BESTIARY_ORDER.map((archetype) => [archetype, 0]),
-) as RunSummary['stats']['kills'];
 
 const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   seed: 42,
@@ -35,7 +23,7 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 3,
-    kills: noKills,
+    kills: emptyStats().kills,
     damageTakenTenths: 40,
     damageDealtTenths: 10,
     solidsDestroyed: 0,

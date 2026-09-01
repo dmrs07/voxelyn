@@ -151,9 +151,41 @@ export const saveRecords = (records: Records): void => {
  * custaria dado do jogador — e uma funcao pura pode ser testada com o historico
  * inteiro sem tocar em localStorage.
  */
-/** Stable across JSON/WebSocket copies of the same frozen terminal run. */
+/**
+ * A identidade de uma run TERMINADA. Estavel entre copias JSON/WebSocket da
+ * mesma run congelada, e diferente entre duas descidas diferentes.
+ *
+ * As duas metades da frase acima custam coisas opostas, e por isso ela e feita
+ * de campos CONGELADOS do sumario e de nada mais: qualquer coisa vinda de fora
+ * dele (um contador de sessao, o relogio) quebraria a primeira metade, que e a
+ * que impede a mesma run de entrar duas vezes no historico quando o snapshot
+ * terminal chega repetido.
+ *
+ * `seed:fase:ticks` sozinho nao dava conta da segunda. Com seed FIXA — o
+ * "mesmo mapa para todos", e o campo de seed nas opcoes — duas tentativas que
+ * morrem no mesmo tick colidem, e o `localStorage` de replays passa a guardar
+ * uma sob a chave da outra: clicar na linha antiga abre a descida nova. Os
+ * contadores abaixo sao o que distingue duas tentativas naquele mesmo mapa —
+ * tiros dados, dano dado e levado, minerio e Nucleos trazidos.
+ *
+ * NAO e um identificador unico universal, e nao tenta ser: duas runs que
+ * empatem em TODOS estes numeros continuam colidindo. Ali as duas linhas do
+ * livro sao indistinguiveis uma da outra de qualquer forma — mesma nota, mesmo
+ * tempo, mesma causa, mesma seed —, e um id de verdade sairia caro: ele teria
+ * de ser gravado junto de cada run, e o schema novo do `voxelyn.records`
+ * DESCARTA o historico que o jogador ja tem (ver `SCHEMA`).
+ */
 export const runSummaryIdentity = (summary: RunSummary): string =>
-  `${summary.seed}:${summary.phase}:${summary.ticks}`;
+  [
+    summary.seed,
+    summary.phase,
+    summary.ticks,
+    summary.cores,
+    summary.stats.shotsFired,
+    summary.stats.damageDealtTenths,
+    summary.stats.damageTakenTenths,
+    summary.stats.oreCollected,
+  ].join(':');
 
 export type ApplyRunOnceResult = {
   records: Records;
