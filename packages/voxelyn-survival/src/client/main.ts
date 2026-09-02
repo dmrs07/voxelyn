@@ -148,8 +148,9 @@ const pauseOptionsSlot = document.getElementById('pause-options-slot') as HTMLDi
 const netReadoutEl = document.getElementById('net-readout') as HTMLSpanElement;
 const netDetailEl = document.getElementById('net-detail') as HTMLDivElement;
 const netProbeButton = document.getElementById('btn-net-probe') as HTMLButtonElement;
-const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
-const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
+const contractLabel = document.getElementById('contract-label') as HTMLElement;
+const contractMode = document.getElementById('mode-contract') as HTMLButtonElement;
+const roomPanel = document.getElementById('room-panel') as HTMLDivElement;
 const languageSelect = document.getElementById('language') as HTMLSelectElement;
 
 // ---------------------------------------------------------------------------
@@ -2228,27 +2229,62 @@ const withInduction = (descend: () => void): void => {
   openInduction('briefing', descend, startTraining);
 };
 
-document.getElementById('btn-induction')?.addEventListener('click', () => {
-  openInduction('archive', () => {});
-});
 document
   .getElementById('btn-induction-close')
   ?.addEventListener('click', () => closeOverlay(inductionOverlay));
 
-// `() => startSolo()` e nao `startSolo`: o handler receberia o MouseEvent como
-// primeiro argumento e o contrato passaria a ser um evento de clique.
-document
-  .getElementById('btn-solo')
-  ?.addEventListener('click', () => withInduction(() => startSolo()));
-document.getElementById('btn-online')?.addEventListener('click', () => withInduction(startOnline));
-contractButton.addEventListener('click', () => withInduction(startContract));
-// NAO e `withInduction(startTraining)`: isso faria o carimbo "AUTORIZAR
-// DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o briefing
-// normal — com a descida real no primario e o exercicio no secundario — e quem
-// ja leu vai direto ao exercicio.
-document.getElementById('btn-training')?.addEventListener('click', () => {
-  if (inductionSeen()) startTraining();
-  else openInduction('briefing', () => startSolo(), startTraining);
+/**
+ * O seletor de modo: a requisicao e a linha marcada, o carimbo (DESCER) a
+ * executa. Um unico carimbo para quatro descidas.
+ */
+type DispatchMode = 'solo' | 'online' | 'training' | 'contract';
+const MODE_LABEL: Record<DispatchMode, MessageKey> = {
+  solo: 'menu.mode.solo',
+  online: 'menu.online',
+  training: 'menu.training',
+  contract: 'menu.contract',
+};
+let dispatchMode: DispatchMode = 'solo';
+const modeButtons = document.querySelectorAll<HTMLButtonElement>('.ax-mode');
+const stampMode = document.getElementById('stamp-mode') as HTMLElement;
+const selectMode = (mode: DispatchMode): void => {
+  dispatchMode = mode;
+  modeButtons.forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle('is-selected', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  roomPanel.classList.toggle('hidden', mode !== 'online');
+  stampMode.textContent = t(MODE_LABEL[mode]);
+};
+modeButtons.forEach((b) => {
+  b.addEventListener('click', () => {
+    audio.ui();
+    selectMode(b.dataset.mode as DispatchMode);
+  });
+});
+// A sublinha do carimbo nasce traduzida: o HTML so carrega o texto em pt-BR.
+selectMode(dispatchMode);
+document.getElementById('btn-solo')?.addEventListener('click', () => {
+  switch (dispatchMode) {
+    case 'online':
+      withInduction(startOnline);
+      break;
+    case 'contract':
+      withInduction(startContract);
+      break;
+    case 'training':
+      // NAO e `withInduction(startTraining)`: isso faria o carimbo "AUTORIZAR
+      // DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o
+      // briefing normal e quem ja leu vai direto ao exercicio.
+      if (inductionSeen()) startTraining();
+      else openInduction('briefing', () => startSolo(), startTraining);
+      break;
+    default:
+      // `() => startSolo()`: startSolo tem parametro opcional e nao pode
+      // receber o MouseEvent.
+      withInduction(() => startSolo());
+  }
 });
 serverInput.placeholder = defaultServerUrl();
 
@@ -2264,8 +2300,7 @@ void fetchDeathEchoContract(serverInput.value.trim() || defaultServerUrl()).then
   if (!contract) return;
   advertisedContract = contract;
   contractLabel.textContent = contractText(contract);
-  contractButton.classList.remove('hidden');
-  contractLabel.classList.remove('hidden');
+  contractMode.classList.remove('hidden');
 });
 
 // ---------------------------------------------------------------------------
@@ -2955,6 +2990,7 @@ for (const id of [
   'matrix-mark',
   'rank-mark',
   'training-complete-mark',
+  'requisition-mark',
 ]) {
   const slot = document.getElementById(id);
   if (slot) slot.innerHTML = aurixMarkHtml();
@@ -2965,7 +3001,6 @@ for (const id of [
 // handlers ja escutam) e apertar o botao do menu correspondente — quem carrega
 // dados, toca som e esconde o menu continua sendo o handler existente.
 const NAV_BUTTON: Record<string, string> = {
-  induction: 'btn-induction',
   records: 'btn-records',
   matrix: 'btn-matrix',
   rank: 'btn-rank',
@@ -2999,6 +3034,7 @@ onLocaleChange(() => {
   renderMusicSourceLabel();
   renderTelemetryLabel();
   languageSelect.value = getLocale();
+  stampMode.textContent = t(MODE_LABEL[dispatchMode]);
   if (advertisedContract) contractLabel.textContent = contractText(advertisedContract);
   // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
   // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
@@ -3050,7 +3086,11 @@ renderDescentClearance();
 //    inicializado duas vezes.
 const params = new URLSearchParams(location.search);
 const roomParam = params.get('room');
-if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
+if (roomParam) {
+  roomInput.value = normalizeRoomCode(roomParam);
+  // O convite chegou com sala: a linha do co-op ja vem marcada, com o codigo.
+  selectMode('online');
+}
 
 void runBootSequence({
   buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),

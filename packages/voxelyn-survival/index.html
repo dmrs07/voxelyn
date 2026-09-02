@@ -1230,18 +1230,133 @@
         color: var(--ax-teal);
         text-shadow: 0 0 12px rgba(79, 214, 201, 0.3);
       }
-      /* A diretiva semanal como ficha de contexto (o botao e a acao) */
-      #contract-label {
-        border: 1px solid var(--ax-brass-strong);
-        background: linear-gradient(180deg, rgba(201, 163, 90, 0.09), rgba(201, 163, 90, 0.03));
-        padding: 7px 9px;
-        font-size: 11px;
-        letter-spacing: 0.1em;
-        color: var(--ax-gold);
+      /* Fichas de modo: a requisicao e a linha marcada, o carimbo (DESCER) a
+         executa. A mesma gramatica do trilho (filete a esquerda que acende em
+         teal quando marcada), deitada dentro do formulario. Quatro descidas,
+         um carimbo: a coluna de autorizacao nunca mais cresce — era a quarta
+         linha dela que caia fora da tela em paisagem de celular. */
+      .ax-modes {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ax-mode {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        min-height: 48px;
+        padding: 7px 10px 7px 12px;
+        border: 1px solid var(--ax-key);
+        border-left: 3px solid var(--ax-brass);
+        background: linear-gradient(90deg, rgba(201, 163, 90, 0.045), transparent);
+        color: #b3a893;
+        text-align: left;
+        white-space: normal;
         min-width: 0;
+      }
+      .ax-mode.is-selected {
+        border-color: var(--ax-teal-dim);
+        border-left-color: var(--ax-teal);
+        background: linear-gradient(90deg, rgba(79, 214, 201, 0.13), transparent);
+        color: #eaf6f3;
+      }
+      .ax-mode-title {
+        font-size: 13px;
+        letter-spacing: 0.06em;
+      }
+      .ax-mode-sub {
+        max-width: 100%;
+        font-size: 10px;
+        /* 1.5 e nao o padrao: com overflow hidden, uma linha justa decapita o
+           acento das maiusculas — "ALEATÓRIA" virava "ALEATORIA". */
+        line-height: 1.5;
+        letter-spacing: 0.12em;
+        color: var(--ax-text-mute);
+        text-transform: uppercase;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .ax-mode.is-directive {
+        border-color: var(--ax-brass-strong);
+      }
+      .ax-mode.is-directive .ax-mode-sub {
+        color: var(--ax-gold);
+      }
+      /* A sala, dobrada sob a ficha de co-op: mesma borda teal da ficha
+         marcada, sem a linha de cima, para ler como a gaveta da ficha e nao
+         como uma quinta linha. So existe enquanto o co-op esta marcado. */
+      .ax-room {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: -6px;
+        padding: 9px 10px;
+        border: 1px solid var(--ax-teal-dim);
+        border-top: none;
+        background: #0c0f0f;
+      }
+      /* Papel timbrado: o monograma da companhia, palido, no canto do
+         formulario. Atras de tudo (z-index) e fora do alcance do toque. */
+      .ax-requisition {
+        position: relative;
+        overflow: hidden;
+      }
+      .ax-requisition > * {
+        position: relative;
+        z-index: 1;
+      }
+      .ax-requisition > .ax-watermark {
+        position: absolute;
+        right: -14px;
+        bottom: -10px;
+        z-index: 0;
+        pointer-events: none;
+        line-height: 0;
+      }
+      .ax-watermark .corp-mark {
+        width: 210px;
+        height: 210px;
+        opacity: 0.07;
+      }
+      /* Paisagem de celular (ate 560px de altura): a Ordem de Despacho recebe o
+         mesmo tratamento que a folha de opcoes — o cromo encolhe antes do
+         conteudo, e o carimbo para de crescer. Nenhum alvo de toque fica
+         abaixo de 42px. Era aqui que a quarta linha da coluna de autorizacao
+         caia fora da tela. */
+      @media (max-height: 560px) {
+        #menu .ax-sheet-head {
+          padding: 5px 14px;
+        }
+        #menu .ax-sheet-head .sub {
+          display: none;
+        }
+        #menu .ax-sheet-foot {
+          padding: 3px 14px;
+          min-height: 22px;
+        }
+        #menu .ax-requisition,
+        #menu .ax-authorisation {
+          padding: 7px 12px;
+          gap: 6px;
+        }
+        #menu .ax-clearance {
+          margin: 0 0 2px;
+          line-height: 1.4;
+        }
+        #menu .ax-stamp {
+          flex: 0 0 auto;
+          min-height: 58px;
+          font-size: 30px;
+        }
+        #menu .ax-order-secondary {
+          min-height: 42px;
+        }
+        .ax-watermark .corp-mark {
+          width: 150px;
+          height: 150px;
+        }
       }
       #menu .ax-sheet-foot .ax-motto {
         color: var(--ax-gold);
@@ -2503,7 +2618,9 @@
         }
       }
       /* Retrato / telas estreitas: o trilho vira barra inferior de 56px e a
-         ordem de despacho empilha (autorização primeiro — DESCER no topo). */
+         ordem de despacho empilha na ordem em que se preenche — primeiro se
+         marca a linha da requisicao, depois se carimba (DESCER fecha a folha,
+         logo acima do trilho). */
       @media (max-width: 700px) {
         .ax-screen {
           grid-template-columns: minmax(0, 1fr);
@@ -2548,14 +2665,14 @@
           grid-template-rows: auto;
           overflow-y: auto;
         }
-        .ax-authorisation {
-          order: 1;
-          overflow: visible;
-        }
         .ax-requisition {
-          order: 2;
+          order: 1;
           border-right: none;
-          border-top: 1px solid var(--ax-key);
+          border-bottom: 1px solid var(--ax-key);
+          overflow: hidden;
+        }
+        .ax-authorisation {
+          order: 2;
           overflow: visible;
         }
         /* Pausa em retrato: RETOMAR volta ao topo (primeira coisa visivel),
@@ -3042,10 +3159,25 @@
       jogador, sao ferramentas de desenvolvimento. Vivem atras de ?dev=1, como
       linhas de requisicao do formulario.
 
+      A requisicao e um seletor: o operador marca O QUE requisita (descida
+      livre, co-op, treinamento, o contrato semanal que a companhia publica) e
+      o carimbo DESCER executa a linha marcada. Um carimbo para quatro
+      descidas: a coluna de autorizacao nunca cresce, e nada dela cai fora da
+      tela em paisagem de celular — que era o defeito.
+
+      A sala do co-op tambem saiu do formulario aberto: ela nao e uma
+      requisicao, e um dado que so o co-op pede. Vive dobrada sob a ficha de
+      co-op e so aparece quando ela esta marcada — quem desce sozinho nunca a
+      ve.
+
+      A Inducao nao tem lugar no trilho: e uma circular de primeira leitura,
+      entregue uma vez antes da primeira descida (`withInduction`). Lida e
+      consentida, ela nao volta.
+
       A hierarquia da folha: 1. autorizacao de descida (DESCER, o carimbo
-      primario e o maior alvo da tela) · 2. modos (co-op, semanal) ·
-      3. requisicao (sala, seed, servidor) · 4. trilho de arquivo ·
-      5. telemetria de rodape.
+      primario e o maior alvo da tela) · 2. requisicao (as fichas de modo;
+      seed e servidor atras de ?dev=1) · 3. trilho de arquivo · 4. telemetria
+      de rodape.
     -->
     <!-- `hidden` desde o HTML: quem revela o menu e o fim da sequencia de
          abertura (`boot/index.ts`). Sem isto o navegador pintaria a Ordem de
@@ -3055,7 +3187,6 @@
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="menu-mark"></div>
         <span class="ax-rail-item is-active" data-i18n="aurix.rail.dispatch">Despacho</span>
-        <button id="btn-induction" class="ax-rail-item" data-i18n="menu.induction">Indução</button>
         <button id="btn-records" class="ax-rail-item" data-i18n="menu.records">Registro</button>
         <button id="btn-matrix" class="ax-rail-item" data-i18n="menu.matrix">
           Matriz Geracional
@@ -3080,17 +3211,54 @@
         <div class="ax-dispatch">
           <div class="ax-requisition">
             <div class="ax-section-label" data-i18n="aurix.menu.requisition">Requisição</div>
-            <div class="ax-field">
-              <label class="ax-field-label" for="room" data-i18n="menu.room.label">Sala</label>
-              <span class="ax-field-dots"></span>
-              <input
-                id="room"
-                size="6"
-                maxlength="9"
-                data-i18n-placeholder="menu.room.placeholder"
-              />
+            <!--
+              O operador preenche a requisicao escolhendo O QUE requisita; o
+              carimbo (DESCER) executa a linha marcada. Um unico carimbo para
+              quatro descidas: a coluna de autorizacao nunca mais cresce.
+            -->
+            <div class="ax-modes" role="radiogroup">
+              <button class="ax-mode is-selected" role="radio" aria-checked="true" data-mode="solo">
+                <span class="ax-mode-title" data-i18n="menu.mode.solo">Descida livre</span>
+                <span class="ax-mode-sub" data-i18n="menu.mode.solo.sub"
+                  >Sozinho · seed aleatória</span
+                >
+              </button>
+              <button class="ax-mode" role="radio" aria-checked="false" data-mode="online">
+                <span class="ax-mode-title" data-i18n="menu.online">Co-op online</span>
+                <span class="ax-mode-sub" data-i18n="menu.mode.online.sub"
+                  >Sala aberta ou por código</span
+                >
+              </button>
+              <div id="room-panel" class="ax-room hidden">
+                <div class="ax-field">
+                  <label class="ax-field-label" for="room" data-i18n="menu.room.label">Sala</label>
+                  <span class="ax-field-dots"></span>
+                  <input
+                    id="room"
+                    size="6"
+                    maxlength="9"
+                    data-i18n-placeholder="menu.room.placeholder"
+                  />
+                </div>
+                <div class="sub" data-i18n="menu.room.hint">vazio = qualquer sala</div>
+              </div>
+              <button class="ax-mode" role="radio" aria-checked="false" data-mode="training">
+                <span class="ax-mode-title" data-i18n="menu.training">Operação de treinamento</span>
+                <span class="ax-mode-sub" data-i18n="menu.mode.training.sub"
+                  >Exercício do chassi</span
+                >
+              </button>
+              <button
+                id="mode-contract"
+                class="ax-mode is-directive hidden"
+                role="radio"
+                aria-checked="false"
+                data-mode="contract"
+              >
+                <span class="ax-mode-title" data-i18n="menu.contract">Desafio Semanal</span>
+                <span class="ax-mode-sub" id="contract-label"></span>
+              </button>
             </div>
-            <div class="sub" data-i18n="menu.room.hint">vazio = qualquer sala</div>
             <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
             <div
               id="dev-tools"
@@ -3110,47 +3278,19 @@
                 <input id="server" size="18" data-i18n-placeholder="menu.dev.server.placeholder" />
               </div>
             </div>
-            <!--
-              Desafio Semanal: a MESMA seed para todo mundo, publicada pela
-              companhia. A ficha e contexto; o carimbo (botao) fica na coluna de
-              autorizacao. Escondida enquanto o servidor nao anuncia contrato.
-            -->
-            <div id="contract-label" class="hidden"></div>
             <div class="sub warn" style="margin-top: auto" data-i18n="menu.headphones">
               Use fones: o som avisa o que a tela ainda não mostra.
             </div>
+            <div class="ax-watermark" id="requisition-mark" aria-hidden="true"></div>
           </div>
           <div class="ax-authorisation">
             <div class="ax-section-label" data-i18n="aurix.menu.authorisation">
               Autorização de descida
             </div>
-            <!--
-              O carimbo de autorização: geração, profundidade e Núcleos
-              detectáveis. Informativo e compacto de propósito — não é uma
-              tela nova nem um seletor. A geração continua sendo consequência
-              dos protocolos comprados, e este bloco só diz o que ela liberou.
-              Preenchido em main.ts a partir do perfil em cache; fica oculto
-              enquanto não houver perfil (sessão offline, primeira visita).
-            -->
             <div id="descent-clearance" class="ax-clearance hidden" aria-live="polite"></div>
-            <button id="btn-solo" class="primary ax-stamp" data-i18n="menu.solo">Descer</button>
-            <button id="btn-online" class="ax-order-secondary is-uplink" data-i18n="menu.online">
-              Co-op online
-            </button>
-            <!--
-              A operação de treinamento: o exercício da primeira descida.
-              Permanente e nunca obrigatório — quem quiser reaprender o chassi
-              volta aqui; quem nunca precisou nem repara nele.
-            -->
-            <button id="btn-training" class="ax-order-secondary" data-i18n="menu.training">
-              Operação de treinamento
-            </button>
-            <button
-              id="btn-contract"
-              class="ax-order-secondary is-directive hidden"
-              data-i18n="menu.contract"
-            >
-              Desafio Semanal
+            <button id="btn-solo" class="primary ax-stamp">
+              <span data-i18n="menu.solo">Descer</span>
+              <small id="stamp-mode">Descida livre</small>
             </button>
           </div>
         </div>
