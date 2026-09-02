@@ -346,7 +346,9 @@ const nodeStateClass = (state: NodeState): string => {
     case 'locked':
       return ' is-locked';
     case 'missing':
-      return '';
+      // Pre-requisitos cumpridos, lastro nao: e o PROXIMO da fila, e o trilho
+      // o marca como tal — num ramo inteiro de "✕" e ele que diz "comece aqui".
+      return ' is-next';
   }
 };
 
@@ -743,11 +745,14 @@ const renderCodexTab = (
   const codex = view.codex;
   if (!codex) {
     const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
-    body.appendChild(
-      pending.key === 'matrix.loading'
-        ? el('div', 'ax-scan ax-loading', t(pending.key, pending.params))
-        : el('p', 'sub warn', t(pending.key, pending.params)),
-    );
+    if (pending.key === 'matrix.loading') {
+      body.appendChild(el('div', 'ax-scan ax-loading', t(pending.key, pending.params)));
+    } else {
+      body.appendChild(el('p', 'sub warn', t(pending.key, pending.params)));
+      // Sem conexao a aba nao pode ficar em branco: diz o que os arquivos
+      // sao e por que nao ha nenhum para ler agora.
+      body.appendChild(el('p', 'sub', t('codex.offlineHint')));
+    }
     return body;
   }
 
@@ -782,11 +787,30 @@ const renderCodexTab = (
 
   if (codex.unlocked.length <= 1) body.appendChild(el('p', 'sub', t('codex.empty')));
 
+  // Trancados AGRUPADOS por nivel de autorizacao: 127 fichas identicas, de
+  // tres linhas cada, eram uma parede de 40 telas que ninguem rolava ate o
+  // fim. Uma ficha por nivel diz o mesmo — quantos faltam, e a que distancia —
+  // e os codigos mascarados continuam la, em letra pequena, para quem conta.
+  const byLevel = new Map<number, typeof codex.locked>();
   for (const locked of codex.locked) {
+    const slots = byLevel.get(locked.clearanceLevel) ?? [];
+    slots.push(locked);
+    byLevel.set(locked.clearanceLevel, slots);
+  }
+  for (const [level, slots] of [...byLevel.entries()].sort((a, b) => a[0] - b[0])) {
     const card = el('article', 'codex-doc codex-locked');
-    card.appendChild(el('div', 'codex-code', locked.maskedCode));
+    card.appendChild(
+      el(
+        'div',
+        'codex-code',
+        t(slots.length === 1 ? 'codex.lockedGroup.one' : 'codex.lockedGroup.many', {
+          count: slots.length,
+          level,
+        }),
+      ),
+    );
     card.appendChild(el('div', 'sub', t('codex.locked')));
-    card.appendChild(el('div', 'sub', t('codex.clearance', { level: locked.clearanceLevel })));
+    card.appendChild(el('div', 'codex-locked-codes', slots.map((s) => s.maskedCode).join(' · ')));
     body.appendChild(card);
   }
   return body;

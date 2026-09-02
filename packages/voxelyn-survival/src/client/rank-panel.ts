@@ -51,6 +51,12 @@ export type RankView = {
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
   /**
+   * O nome local do operador, para destacar a propria linha. Nomes nao sao
+   * unicos (ver settings.ts), entao o destaque e uma conveniencia de leitura,
+   * nunca uma prova de autoria.
+   */
+  selfName?: string;
+  /**
    * A consulta ainda esta no ar?
    *
    * Separado de `emptyReason` porque espera e ausencia nao podem vestir a
@@ -131,7 +137,10 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     const head = el('div', 'ax-rank-head');
     head.appendChild(el('span', undefined, '#'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
-    head.appendChild(el('span', undefined, t('rank.col.cores')));
+    // "Nucleos" nao cabe na coluna de 30px de um celular de 320px: la o CSS
+    // troca o texto pelo simbolo da moeda (um pseudo-elemento, para o texto
+    // continuar sendo "Nucleos" para leitores de tela e para os testes).
+    head.appendChild(el('span', 'ax-col-cores', t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
     head.appendChild(el('span', undefined, '★'));
     // Sem rotulo: e a coluna do botao de replay, e um cabecalho vazio ainda
@@ -139,8 +148,14 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     head.appendChild(el('span'));
     host.appendChild(head);
 
+    const self = view.selfName?.trim().toLowerCase() ?? '';
     view.entries.forEach((entry, index) => {
-      const row = el('div', `ax-rank-row${index < 3 ? ' is-podium' : ''}`);
+      const isSelf = self !== '' && entry.name.trim().toLowerCase() === self;
+      const row = el(
+        'div',
+        `ax-rank-row${index < 3 ? ' is-podium' : ''}${isSelf ? ' is-self' : ''}`,
+      );
+      if (isSelf) row.title = t('rank.self');
       row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
       row.appendChild(el('span', 'ax-rank-name', entry.name));
       row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));
@@ -163,5 +178,11 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   // A explicacao da homologacao: toda descida e reexecutada pela Aurix a
   // partir das entradas registradas. E o que separa o livro de um placar.
   host.appendChild(el('h2', 'ax-section-label', t('rank.how')));
-  host.appendChild(el('span', 'lesson', t('rank.how.text')));
+  // Tres regras, tres itens: num paragrafo so, a terceira (cada profundidade
+  // tem o seu livro) era a que ninguem chegava a ler.
+  const how = el('ul', 'lesson ax-how');
+  for (const key of ['rank.how.1', 'rank.how.2', 'rank.how.3'] as const) {
+    how.appendChild(el('li', undefined, t(key)));
+  }
+  host.appendChild(how);
 };

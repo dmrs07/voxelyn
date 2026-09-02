@@ -9,7 +9,7 @@ import type {
 } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { DesktopControlBar } from './desktop-controls';
-import { inductionSeen, markInductionSeen, renderInduction, type InductionMode } from './induction';
+import { inductionSeen, markInductionSeen, renderInduction } from './induction';
 import { createTrainingRun, markTrainingDone } from './training-setup';
 import { TrainingDirector, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
@@ -148,8 +148,9 @@ const pauseOptionsSlot = document.getElementById('pause-options-slot') as HTMLDi
 const netReadoutEl = document.getElementById('net-readout') as HTMLSpanElement;
 const netDetailEl = document.getElementById('net-detail') as HTMLDivElement;
 const netProbeButton = document.getElementById('btn-net-probe') as HTMLButtonElement;
-const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
-const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
+const contractLabel = document.getElementById('contract-label') as HTMLElement;
+const contractMode = document.getElementById('mode-contract') as HTMLButtonElement;
+const roomPanel = document.getElementById('room-panel') as HTMLDivElement;
 const languageSelect = document.getElementById('language') as HTMLSelectElement;
 
 // ---------------------------------------------------------------------------
@@ -406,9 +407,17 @@ volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
 sfxVolumeInput.value = String(Math.round(audioSettings.sfxVolume * 100));
 
+/** O numero ao lado do slider: `<output id="<slider>-value">`, se existir. */
+const syncRangeValue = (input: HTMLInputElement): void => {
+  const out = document.getElementById(`${input.id}-value`);
+  if (out) out.textContent = input.value;
+};
+for (const input of [volumeInput, musicVolumeInput, sfxVolumeInput]) syncRangeValue(input);
+
 const renderMuteLabel = (): void => {
   muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
-  muteButton.classList.toggle('primary', !audioSettings.muted);
+  muteButton.classList.toggle('is-on', !audioSettings.muted);
+  muteButton.setAttribute('aria-pressed', String(!audioSettings.muted));
 };
 renderMuteLabel();
 
@@ -439,12 +448,14 @@ const setMuted = (muted: boolean): void => {
 };
 
 volumeInput.addEventListener('input', () => {
+  syncRangeValue(volumeInput);
   audioSettings.volume = Number(volumeInput.value) / 100;
   audio.setVolume(audioSettings.volume);
   saveAudioSettings(audioSettings);
 });
 
 musicVolumeInput.addEventListener('input', () => {
+  syncRangeValue(musicVolumeInput);
   audioSettings.musicVolume = Number(musicVolumeInput.value) / 100;
   audio.setMusicVolume(audioSettings.musicVolume);
   saveAudioSettings(audioSettings);
@@ -456,6 +467,7 @@ musicVolumeInput.addEventListener('input', () => {
 // jogo fazendo barulho atras, e um bipe por passo do slider disputaria com
 // justamente o som que ele esta tentando ajustar.
 sfxVolumeInput.addEventListener('input', () => {
+  syncRangeValue(sfxVolumeInput);
   audioSettings.sfxVolume = Number(sfxVolumeInput.value) / 100;
   audio.setSfxVolume(audioSettings.sfxVolume);
   saveAudioSettings(audioSettings);
@@ -2019,6 +2031,10 @@ const startOnline = (): void => {
   if (code !== '' && !isValidRoomCode(code)) {
     setBanner(t('banner.room.invalid', { code }), 'error');
     setTimeout(() => setBanner(null), 2400);
+    // O erro mora no campo: moldura vermelha e foco, para corrigir sem
+    // procurar onde foi que deu errado.
+    roomInput.setAttribute('aria-invalid', 'true');
+    roomInput.focus();
     return;
   }
   contractRun = null;
@@ -2140,7 +2156,9 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
  * basta.
  *
  * A seed sobrevive aos reinicios, como qualquer seed fixada: a razao de existir um
- * contrato e tentar o MESMO mapa de novo depois de morrer nele.
+ * contrato e tentar o MESMO mapa de novo depois de morrer nele. Ela se desfaz no
+ * proximo despacho que NAO seja o contrato (ver o carimbo DESCER): descida livre
+ * volta a sortear, como a ficha promete.
  */
 /**
  * O rotulo do desafio no idioma do jogador.
@@ -2160,8 +2178,10 @@ const contractText = (contract: DeathEchoContract): string => {
 const startContract = (): void => {
   const contract = advertisedContract;
   if (!contract) return;
+  // So `forcedSeed`, nunca o campo de seed: o campo e a ferramenta de
+  // desenvolvimento, e escrever o contrato nele fazia a proxima descida livre
+  // reler o contrato como se fosse uma seed digitada.
   forcedSeed = contract.seed;
-  seedInput.value = formatSeed(contract.seed);
   setBanner(contractText(contract));
   setTimeout(() => setBanner(null), 3200);
   startSolo(contract);
@@ -2187,11 +2207,7 @@ const inductionBody = document.getElementById('induction-body') as HTMLDivElemen
  * e fecham a circular antes de seguir — mudar de ideia depois de ler e
  * exatamente o que os dois botoes existem para permitir.
  */
-const openInduction = (
-  mode: InductionMode,
-  onAuthorise: () => void,
-  onTraining?: () => void,
-): void => {
+const openInduction = (onAuthorise: () => void, onTraining?: () => void): void => {
   const dismissInto = (next: () => void) => (): void => {
     markInductionSeen();
     inductionOverlay.classList.add('hidden');
@@ -2200,7 +2216,6 @@ const openInduction = (
     next();
   };
   renderInduction(inductionBody, {
-    mode,
     onDismiss: dismissInto(onAuthorise),
     onTraining: onTraining ? dismissInto(onTraining) : undefined,
   });
@@ -2225,30 +2240,94 @@ const withInduction = (descend: () => void): void => {
     descend();
     return;
   }
-  openInduction('briefing', descend, startTraining);
+  openInduction(descend, startTraining);
 };
 
-document.getElementById('btn-induction')?.addEventListener('click', () => {
-  openInduction('archive', () => {});
-});
 document
   .getElementById('btn-induction-close')
   ?.addEventListener('click', () => closeOverlay(inductionOverlay));
 
-// `() => startSolo()` e nao `startSolo`: o handler receberia o MouseEvent como
-// primeiro argumento e o contrato passaria a ser um evento de clique.
-document
-  .getElementById('btn-solo')
-  ?.addEventListener('click', () => withInduction(() => startSolo()));
-document.getElementById('btn-online')?.addEventListener('click', () => withInduction(startOnline));
-contractButton.addEventListener('click', () => withInduction(startContract));
-// NAO e `withInduction(startTraining)`: isso faria o carimbo "AUTORIZAR
-// DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o briefing
-// normal — com a descida real no primario e o exercicio no secundario — e quem
-// ja leu vai direto ao exercicio.
-document.getElementById('btn-training')?.addEventListener('click', () => {
-  if (inductionSeen()) startTraining();
-  else openInduction('briefing', () => startSolo(), startTraining);
+/**
+ * O seletor de modo: a requisicao e a linha marcada, o carimbo (DESCER) a
+ * executa. Um unico carimbo para quatro descidas.
+ */
+type DispatchMode = 'solo' | 'online' | 'training' | 'contract';
+const MODE_LABEL: Record<DispatchMode, MessageKey> = {
+  solo: 'menu.mode.solo',
+  online: 'menu.online',
+  training: 'menu.training',
+  contract: 'menu.contract',
+};
+let dispatchMode: DispatchMode = 'solo';
+const modeButtons = document.querySelectorAll<HTMLButtonElement>('.ax-mode');
+const stampMode = document.getElementById('stamp-mode') as HTMLElement;
+const selectMode = (mode: DispatchMode): void => {
+  dispatchMode = mode;
+  modeButtons.forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle('is-selected', on);
+    b.setAttribute('aria-checked', String(on));
+    // Tabindex itinerante: so a ficha marcada entra na ordem de Tab, e as
+    // setas andam entre as fichas — o contrato de um grupo de radio. Sem
+    // isto, DESCER ficava a oito Tabs do inicio da folha.
+    b.tabIndex = on ? 0 : -1;
+  });
+  roomPanel.classList.toggle('hidden', mode !== 'online');
+  stampMode.textContent = t(MODE_LABEL[mode]);
+};
+/** As fichas VISIVEIS, na ordem do formulario (o contrato so entra anunciado). */
+const visibleModes = (): HTMLButtonElement[] =>
+  Array.from(modeButtons).filter((b) => !b.classList.contains('hidden'));
+modeButtons.forEach((b) => {
+  b.addEventListener('click', () => {
+    audio.ui();
+    selectMode(b.dataset.mode as DispatchMode);
+  });
+  b.addEventListener('keydown', (event) => {
+    const modes = visibleModes();
+    const index = modes.indexOf(b);
+    let next = -1;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % modes.length;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+      next = (index - 1 + modes.length) % modes.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = modes.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    audio.ui();
+    selectMode(modes[next].dataset.mode as DispatchMode);
+    modes[next].focus();
+  });
+});
+// A sublinha do carimbo nasce traduzida: o HTML so carrega o texto em pt-BR.
+selectMode(dispatchMode);
+roomInput.addEventListener('input', () => roomInput.removeAttribute('aria-invalid'));
+document.getElementById('btn-solo')?.addEventListener('click', () => {
+  // A seed do contrato fica retida entre reinicios de proposito (ver
+  // `startContract`) — mas so ate o operador despachar OUTRA coisa. Sem isto,
+  // "Descida livre · seed aleatoria" repetia o mapa do desafio: a ficha
+  // prometia sorteio e entregava o contrato. O campo de seed (?dev=1) volta a
+  // ser a unica fonte de seed fixada para as descidas que nao sao o contrato.
+  if (dispatchMode !== 'contract') forcedSeed = parseSeed(seedInput.value);
+  switch (dispatchMode) {
+    case 'online':
+      withInduction(startOnline);
+      break;
+    case 'contract':
+      withInduction(startContract);
+      break;
+    case 'training':
+      // NAO e `withInduction(startTraining)`: isso faria o carimbo "AUTORIZAR
+      // DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o
+      // briefing normal e quem ja leu vai direto ao exercicio.
+      if (inductionSeen()) startTraining();
+      else openInduction(() => startSolo(), startTraining);
+      break;
+    default:
+      // `() => startSolo()`: startSolo tem parametro opcional e nao pode
+      // receber o MouseEvent.
+      withInduction(() => startSolo());
+  }
 });
 serverInput.placeholder = defaultServerUrl();
 
@@ -2264,8 +2343,7 @@ void fetchDeathEchoContract(serverInput.value.trim() || defaultServerUrl()).then
   if (!contract) return;
   advertisedContract = contract;
   contractLabel.textContent = contractText(contract);
-  contractButton.classList.remove('hidden');
-  contractLabel.classList.remove('hidden');
+  contractMode.classList.remove('hidden');
 });
 
 // ---------------------------------------------------------------------------
@@ -2789,13 +2867,15 @@ const renderNetReadout = (): void => {
   if (readout.kind === 'live') {
     set('options.net.live', { rtt: ms(readout.rttMs) });
     netDetailEl.textContent = t('options.net.cushion', { cushion: ms(readout.cushionMs) });
-    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+    if (readout.grade !== 'good')
+      netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
     return;
   }
   netDetailEl.textContent = '';
   if (readout.kind === 'probe') {
     set('options.net.probed', { rtt: ms(readout.rttMs) });
-    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+    if (readout.grade !== 'good')
+      netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
   } else if (readout.kind === 'unreachable') {
     set('options.net.unreachable');
     netReadoutEl.classList.add('danger');
@@ -2832,7 +2912,8 @@ renderNetReadout();
 
 const renderTelemetryLabel = (): void => {
   telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');
-  telemetryButton.classList.toggle('primary', !isOptedOut());
+  telemetryButton.classList.toggle('is-on', !isOptedOut());
+  telemetryButton.setAttribute('aria-pressed', String(!isOptedOut()));
 };
 renderTelemetryLabel();
 telemetryButton.addEventListener('click', () => {
@@ -2926,7 +3007,9 @@ const openRankBook = (sectorCount?: number): void => {
         sectorCount: page.sectorCount,
         onSelectClass: openRankBook,
         onWatchReplay: (entry) => openReplay(url, entry),
-        emptyReason: t('rank.empty.offline'),
+        selfName: playerName,
+        // Duas causas, duas frases: o cliente sabe se a Aurix respondeu.
+        emptyReason: t(page.unreachable ? 'rank.empty.unreachable' : 'rank.empty'),
       });
     },
   );
@@ -2955,6 +3038,7 @@ for (const id of [
   'matrix-mark',
   'rank-mark',
   'training-complete-mark',
+  'requisition-mark',
 ]) {
   const slot = document.getElementById(id);
   if (slot) slot.innerHTML = aurixMarkHtml();
@@ -2965,7 +3049,6 @@ for (const id of [
 // handlers ja escutam) e apertar o botao do menu correspondente — quem carrega
 // dados, toca som e esconde o menu continua sendo o handler existente.
 const NAV_BUTTON: Record<string, string> = {
-  induction: 'btn-induction',
   records: 'btn-records',
   matrix: 'btn-matrix',
   rank: 'btn-rank',
@@ -2999,6 +3082,7 @@ onLocaleChange(() => {
   renderMusicSourceLabel();
   renderTelemetryLabel();
   languageSelect.value = getLocale();
+  stampMode.textContent = t(MODE_LABEL[dispatchMode]);
   if (advertisedContract) contractLabel.textContent = contractText(advertisedContract);
   // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
   // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
@@ -3050,7 +3134,11 @@ renderDescentClearance();
 //    inicializado duas vezes.
 const params = new URLSearchParams(location.search);
 const roomParam = params.get('room');
-if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
+if (roomParam) {
+  roomInput.value = normalizeRoomCode(roomParam);
+  // O convite chegou com sala: a linha do co-op ja vem marcada, com o codigo.
+  selectMode('online');
+}
 
 void runBootSequence({
   buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),

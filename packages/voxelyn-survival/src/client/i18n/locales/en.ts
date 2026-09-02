@@ -41,16 +41,25 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'menu.room.label': 'Room',
   'menu.room.placeholder': 'code',
   'menu.room.hint': 'empty = any room',
+  'menu.mode.solo': 'Free descent',
+  'menu.mode.solo.sub': 'Alone · random seed',
+  'menu.mode.online.sub': 'Open room or by code',
+  'menu.mode.training.sub': 'Chassis drill',
   'menu.options': 'Options',
+  'rail.records': 'Log',
+  'rail.matrix': 'Matrix',
+  'rail.rank': 'Ranking',
+  'rail.options': 'Options',
   'menu.records': 'Log',
   'menu.rank': 'Leaderboard',
   'menu.dev.seed': 'Seed',
   'menu.dev.seed.placeholder': 'random',
   'menu.dev.server': 'Server',
   'menu.dev.server.placeholder': 'auto',
-  'menu.controls':
-    'Tap to play · WASD/mouse on desktop · R restarts · T backs to terminal · M mutes',
-  'menu.headphones': 'Use headphones: the sound warns you before the screen does.',
+  'menu.controls.tap': 'Tap to play',
+  'menu.controls.headphones': 'Use headphones: sound warns first',
+  'menu.controls.keys':
+    ' · WASD moves · mouse aims and fires · R restarts · T backs to terminal · M mutes',
 
   // Aurix chrome (redesign doc AD-UI-2.0): decorative document labels.
   'aurix.motto': 'EXTRACT. PROTECT. ADAPT.',
@@ -211,7 +220,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'rank.best': 'BEST DESCENTS',
   'rank.seed': 'SEED {seed}',
   'rank.empty': 'nobody has extracted yet',
-  'rank.empty.offline': 'nobody has extracted yet — or the server is down',
+  'rank.empty.unreachable': 'Aurix did not answer — the book could not be consulted',
   'rank.loading': 'loading…',
   'rank.entry': '{position}. {stars} {name}',
   'rank.col.operator': 'Operator',
@@ -220,9 +229,13 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'rank.class': '{sectors} sectors',
   'rank.class.entries': '{entries} homologated expeditions',
   'rank.replay': 'Watch authoritative replay',
+  'rank.self': 'you',
   'rank.how': 'HOW TO GET IN',
-  'rank.how.text':
-    'Only runs that extracted count. The server re-simulates your match from the keys you pressed — there is no score to submit, only what happened. Position comes from two things: how many Cores you brought back and how long it took. Each depth keeps its own book — three-sector descents do not compete with seven.',
+  'rank.how.1':
+    'Only runs that extracted count. The server re-simulates your match from the keys you pressed: there is no score to submit, only what happened.',
+  'rank.how.2':
+    'Position comes from two things: how many Cores you brought back and how long it took.',
+  'rank.how.3': 'Each depth keeps its own book: three-sector descents do not compete with seven.',
 
   // ---------------------------------------------------------------------
   // Replay panel (replay.html)
@@ -545,7 +558,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.inspector.balanceAfter': 'Balance after',
   'matrix.inspector.sealed':
     'Aurix Dynamics does not specify what it has not yet reached. Incorporate the previous protocol to open this specification.',
-  'matrix.legend': '● installed · + authorisable · ⬡ short on funds · ✕ prerequisite missing',
+  'matrix.legend':
+    '● installed · + authorisable · ⬡ short on funds · ✕ prerequisite missing · X branch capstone',
   'matrix.declassified': 'FILE DECLASSIFIED',
   'matrix.generationUp': 'CHASSIS CLEARED: {generation}',
   'matrix.offline':
@@ -559,11 +573,15 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.loading': 'Querying Aurix Dynamics…',
   'matrix.policy': 'What returns is cleared. What stays in the Vein never existed.',
   'codex.locked': 'INSUFFICIENT CLEARANCE',
+  'codex.lockedGroup.one': '1 file · level {level}',
+  'codex.lockedGroup.many': '{count} files · level {level}',
   'codex.clearance': 'level {level}',
   'codex.related': 'Related files',
   'codex.source': 'Source',
   'codex.count': '{unlocked} of {total} files',
   'codex.empty': 'No files declassified beyond the public material.',
+  'codex.offlineHint':
+    'Files are declassified as you meet Assets in the Vein. Without a connection, none can be consulted.',
   'codex.new': 'new',
   'codex.filter.all': 'All',
   'codex.filter.asset': 'Asset: {name}',
@@ -855,8 +873,6 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'induction.controls.note':
     'On a touch device the scheme differs: left stick moves, right stick aims and fires, and the buttons above it repeat this list.',
   'induction.begin': 'AUTHORISE DESCENT',
-  'induction.archiveButton': 'FILE',
-  'induction.reopen': 'This document stays in dispatch, under INDUCTION.',
   'induction.training': 'TRAINING OPERATION',
 
   // ---------------------------------------------------------------------
