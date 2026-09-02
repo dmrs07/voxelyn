@@ -577,7 +577,6 @@ const authorizeExpedition = async (
   // o unico estado autoritativo que o jogo tem antes de descer.
   if (authorized.openedProfile) {
     writeCachedProfile(authorized.openedProfile, Date.now());
-    renderer.setProspectorGeneration(authorized.openedProfile.generation);
     renderDescentClearance();
   }
   const result = authorized.ticket;
@@ -592,10 +591,6 @@ const authorizeExpedition = async (
   // O chassi que vai aparecer na tela e o da arvore que AUTORIZOU esta run.
   // Derivado da contagem de protocolos do perfil em cache — o servidor ja
   // devolveu a geracao no perfil, e o ticket carrega a versao que a produziu.
-  const cachedProfile = readCachedProfile()?.profile;
-  if (cachedProfile && cachedProfile.profileVersion === ticket.progressionProfileVersion) {
-    renderer.setProspectorGeneration(cachedProfile.generation);
-  }
   // Tuning E PROFUNDIDADE vem do SERVIDOR, derivados do perfil autoritativo. O
   // cliente nao os calcula nem os corrige: ele executa a configuracao que foi
   // autorizada. Quantos setores esta run tem ja esta decidido antes do primeiro
@@ -2519,7 +2514,6 @@ const refreshProfile = async (): Promise<void> => {
   matrixView.cached = false;
   matrixView.stale = null;
   writeCachedProfile(result.value.profile, Date.now());
-  renderer.setProspectorGeneration(result.value.profile.generation);
   renderDescentClearance();
   drawMatrix();
 };

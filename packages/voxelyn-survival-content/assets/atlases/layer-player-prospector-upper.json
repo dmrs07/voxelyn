@@ -4,10 +4,10 @@
   "atlas": "layer-player-prospector-upper.png",
   "normalAtlas": "layer-player-prospector-upper.normal.png",
   "normalScale": 2,
-  "frameWidth": 88,
+  "frameWidth": 96,
   "frameHeight": 112,
-  "columns": 32,
-  "anchorX": 44,
+  "columns": 28,
+  "anchorX": 48,
   "anchorY": 108,
   "directions": 4,
   "authoredDirs": [
@@ -44,12 +44,18 @@
     "#d5cdba",
     "#ff7a2f",
     "#ffa63f",
+    "#ffd166",
     "#ffe9b8"
   ],
   "animations": {
     "idle": {
       "frames": 4,
       "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 18.4,
       "loop": true
     },
     "attack": {
@@ -61,19 +67,23 @@
   "frameMap": {
     "dr": {
       "idle": 0,
-      "attack": 4
+      "walk": 4,
+      "attack": 10
     },
     "dl": {
-      "idle": 8,
-      "attack": 12
+      "idle": 14,
+      "walk": 18,
+      "attack": 24
     },
     "ur": {
-      "idle": 16,
-      "attack": 20
+      "idle": 28,
+      "walk": 32,
+      "attack": 38
     },
     "ul": {
-      "idle": 24,
-      "attack": 28
+      "idle": 42,
+      "walk": 46,
+      "attack": 52
     }
   },
   "generation": {

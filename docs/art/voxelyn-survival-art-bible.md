@@ -40,7 +40,7 @@ imagens borradas/semi-realistas, personagens com perspectivas diferentes entre s
 | Tile lógico | 32×16 px lógicos (losango isométrico 2:1) = 64×32 px de atlas |
 | Altura de parede/andar | 14 px lógicos (7 unidades autoradas) |
 | Perspectiva | Isométrica 2:1 (dimétrica), câmera fixa, sem rotação |
-| Personagem padrão (Prospector) | 88×112 px de atlas |
+| Personagem padrão (Prospector) | 96×112 px de atlas |
 | Criatura pequena (stalker/spitter/bomber) | 64×64 px de atlas |
 | Criatura grande (bruiser) | 96×136 px de atlas |
 | Chefe final (guardian) | 112×128 px de atlas — o único canvas desta classe; a hierarquia de tamanho sobre o bruiser é contrato |
@@ -155,6 +155,11 @@ packages/voxelyn-survival-content/assets/
   `enemy-spore-bomber`, `enemy-guardian`, `prop-terminal`, `prop-portal`, `prop-crystal`,
   `prop-fungal-cluster`, `prop-exit-core`, `fx-projectile-bolt`, `fx-impact-burst`,
   `loot-cache`.
+- Camadas do Prospector, com prefixo `layer-`: o corpo em três (`layer-player-prospector-lower`,
+  `-upper`, `-gun`) e uma por módulo acoplável (`layer-module-<id>`). Todas partilham quadro
+  (96×112), âncora e enquadramento com o corpo; o cliente as empilha na ordem de profundidade
+  que o pacote de conteúdo mede nos voxels. Não há camada por geração: a leitura da geração no
+  chassi está engavetada (spec da Matriz Geracional, §14.4).
 - Nome de frame dentro do atlas: `<id>/<anim>/<dir>/<frame>` (ex.: `enemy-stalker/walk/dr/003`).
 - Proibido nome opaco (o caso `9+BtwY.png` do baseline é o anti-exemplo canônico).
 

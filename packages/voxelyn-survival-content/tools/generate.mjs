@@ -102,8 +102,15 @@ const buildEntity = (spec) => {
   // atlas simplesmente nao carrega no aparelho. Quando os frames nao cabem numa
   // linha, o sheet passa a ter varias — cortar frames de animacao para caber
   // seria degradar o jogo por causa de empacotamento.
-  const columns = Math.min(totalCols, Math.floor(MAX_TEXTURE / spec.frameWidth));
-  const rows = Math.ceil(totalCols / columns);
+  const maxColumns = Math.min(totalCols, Math.floor(MAX_TEXTURE / spec.frameWidth));
+  const rows = Math.ceil(totalCols / maxColumns);
+  // Com mais de uma linha, as colunas sao REPARTIDAS entre elas em vez de
+  // encher a primeira ate 4096 e deixar a ultima quase vazia: 56 quadros de
+  // 96 px em 42 colunas sao duas linhas com 28 vagas em branco — um terco do
+  // atlas, pago em RGBA no boot. Em 28 colunas sao as mesmas duas linhas sem
+  // nenhuma vaga. Medido no pacote inteiro: ~27 MiB de vagas em branco, num
+  // orcamento de 160. Sobra no maximo `rows - 1` vagas por atlas.
+  const columns = Math.ceil(totalCols / rows);
   const atlas = grid(columns * spec.frameWidth, rows * spec.frameHeight);
   const frameMap = {};
   const palette = new Set();

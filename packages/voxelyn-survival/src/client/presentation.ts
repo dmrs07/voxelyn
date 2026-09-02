@@ -231,7 +231,10 @@ const layeredPlayerAnimation = (
       facingY: lowerFacing.y,
     },
     upper: {
-      animation: action ? actionAnimation(action.action) : 'idle',
+      // Andando, o tronco tambem anda: e o braco de extracao balancando com a
+      // passada (ver `prospector.mjs`). O tiro continua mandando — o coice e a
+      // unica animacao do braco da arma, andando ou parado.
+      animation: action ? actionAnimation(action.action) : walking ? 'walk' : 'idle',
       elapsedMs: upperElapsedMs,
       facingX: upperFacing.x,
       facingY: upperFacing.y,

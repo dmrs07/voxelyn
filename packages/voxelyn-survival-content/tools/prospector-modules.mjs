@@ -196,6 +196,16 @@ export const ATTACHMENT_IDS = Object.keys(MODULE_ATTACHMENTS);
  * tres voltas por segundo — rapido o bastante para ler como maquina, devagar o
  * bastante para nao cintilar a 30 quadros por segundo.
  */
+/**
+ * Quantas posicoes a ventoinha tem — e, por consequencia, quantos quadros CADA
+ * animacao da camada da Minigun tem. O quadro dela codifica so a posicao da
+ * ventoinha (o cliente o escolhe por `barrelPhase`, nunca pelo relogio), entao
+ * `idle`, `walk` e `attack` precisam ter exatamente esta contagem: um `walk`
+ * com os seis quadros da passada teria dois quadros que nenhum angulo alcança.
+ * O cliente trava o mesmo numero em `sprites.ts` (`MINIGUN_FAN_FRAMES`).
+ */
+export const MINIGUN_FAN_FRAMES = 4;
+
 export const minigunGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, fan = 0, flash = false } = {}) => {
   const a = gunAnchor({ bob, kick, lean, crouch });
 
@@ -210,7 +220,7 @@ export const minigunGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, fan = 0, f
     [a.y - 2.5, a.z - 0.5],
     [a.y - 3.5, a.z + 0.5],
   ];
-  const [fy, fz] = orbit[((fan % orbit.length) + orbit.length) % orbit.length];
+  const [fy, fz] = orbit[((fan % MINIGUN_FAN_FRAMES) + MINIGUN_FAN_FRAMES) % MINIGUN_FAN_FRAMES];
 
   return [
     // CARCACA DO MOTOR: o volume dominante, em latao, com a chapa escura em

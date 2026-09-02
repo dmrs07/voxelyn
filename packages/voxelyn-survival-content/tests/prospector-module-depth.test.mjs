@@ -38,13 +38,17 @@ describe('profundidade entre corpo e modulos acoplados', () => {
       return { dir, disputed, share: disputed ? inFront / disputed : 0 };
     });
 
-  it('toda camada de modulo disputa pixel com o corpo em toda direcao', () => {
+  it('toda camada de modulo disputa pixel com o corpo nas direcoes decididas', () => {
     // Sem pixel disputado a medida concordaria com qualquer ordem, inclusive
-    // com a errada.
+    // com a errada. As duas direcoes que o bloco seguinte trava (dr e ul) tem
+    // de disputar de verdade; nas outras a peca pode estar limpa do corpo —
+    // desde que a arma vive na mao do braco, o perfurante em `dl` aponta para
+    // fora da silhueta e nao encosta em pixel nenhum do chassi, e ali a ordem
+    // nao muda nada.
     for (const id of ALL_MODULE_IDS) {
-      for (const { dir, disputed } of verdict(id)) {
-        expect(disputed, `${id} em ${dir}`).toBeGreaterThan(20);
-      }
+      const byDir = Object.fromEntries(verdict(id).map((v) => [v.dir, v.disputed]));
+      expect(byDir.dr, `${id} em dr`).toBeGreaterThan(20);
+      expect(byDir.ul, `${id} em ul`).toBeGreaterThan(20);
     }
   });
 

@@ -4,10 +4,10 @@
   "atlas": "layer-module-ricochet.png",
   "normalAtlas": "layer-module-ricochet.normal.png",
   "normalScale": 2,
-  "frameWidth": 88,
+  "frameWidth": 96,
   "frameHeight": 112,
-  "columns": 32,
-  "anchorX": 44,
+  "columns": 36,
+  "anchorX": 48,
   "anchorY": 108,
   "directions": 4,
   "authoredDirs": [
@@ -43,6 +43,11 @@
       "fps": 6,
       "loop": true
     },
+    "walk": {
+      "frames": 1,
+      "fps": 18.4,
+      "loop": true
+    },
     "attack": {
       "frames": 4,
       "fps": 12,
@@ -52,19 +57,23 @@
   "frameMap": {
     "dr": {
       "idle": 0,
-      "attack": 4
+      "walk": 4,
+      "attack": 5
     },
     "dl": {
-      "idle": 8,
-      "attack": 12
+      "idle": 9,
+      "walk": 13,
+      "attack": 14
     },
     "ur": {
-      "idle": 16,
-      "attack": 20
+      "idle": 18,
+      "walk": 22,
+      "attack": 23
     },
     "ul": {
-      "idle": 24,
-      "attack": 28
+      "idle": 27,
+      "walk": 31,
+      "attack": 32
     }
   },
   "generation": {

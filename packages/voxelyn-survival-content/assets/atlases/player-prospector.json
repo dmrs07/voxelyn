@@ -4,10 +4,10 @@
   "atlas": "player-prospector.png",
   "normalAtlas": "player-prospector.normal.png",
   "normalScale": 2,
-  "frameWidth": 88,
+  "frameWidth": 96,
   "frameHeight": 112,
-  "columns": 46,
-  "anchorX": 44,
+  "columns": 42,
+  "anchorX": 48,
   "anchorY": 108,
   "directions": 4,
   "authoredDirs": [

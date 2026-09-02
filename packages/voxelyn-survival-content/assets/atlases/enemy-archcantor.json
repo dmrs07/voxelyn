@@ -6,7 +6,7 @@
   "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 114,
-  "columns": 64,
+  "columns": 50,
   "anchorX": 30,
   "anchorY": 97,
   "directions": 4,
