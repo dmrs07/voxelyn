@@ -650,12 +650,35 @@ oposto, e pela razão simétrica: os dois são **centralizados** em `damageEntit
 novo que esquecesse o multiplicador apareceria como bug de balanceamento; assim
 ele aparece no `if`.
 
-### 14.4 A evolução visual é overlay de runtime
+### 14.4 A evolução visual no chassi está ENGAVETADA
 
 Um atlas por protocolo seriam 24 conjuntos completos de animação por direção, e a
-silhueta — o requisito mais duro da direção de arte — quebra antes disso. Ficaram
-cinco marcos cumulativos desenhados sobre o sprite, sem tocar hitbox, com os
-atlases finais registrados como trabalho futuro.
+silhueta — o requisito mais duro da direção de arte — quebra antes disso. A
+primeira entrega ficou com cinco marcos cumulativos desenhados em runtime sobre o
+sprite, sem tocar hitbox.
+
+**Estado atual (2026-09): nenhum marco é desenhado no chassi em campo.** Os
+overlays de runtime saíram porque foram medidos para um corpo mais baixo que o
+sprite atual — caíam na cintura em vez do ombro — e eram presos aos pés, sem
+acompanhar andar, esquiva, tremor ou solavanco; no playtest liam como glitch. A
+alternativa foi construída e depois **revertida por decisão de produto**: uma
+camada de atlas por marco (`layer-generation-g01`..`g04`), assada pelo
+rasterizador do Prospector com o tronco como oclusor, empilhada pelo cliente a
+partir da geração da run. Ela funciona e está inteira no histórico do repositório
+(commit `a8a6012`, "os marcos geracionais viram camadas de atlas sobre o G-00",
+revertido em seguida), com alegorias por marco, rasterizador com oclusão, testes
+de interpenetração e de composição pixel a pixel.
+
+Por que não seguiu: a leitura da geração no chassi não é prioridade agora, e
+manter quatro atlases, um modo do rasterizador e um caminho a mais no desenho do
+Prospector para uma feature que não vai ser exercida é peso sem retorno. Enquanto
+isso, a geração continua legível **na Matriz** (tela de progressão) e no texto
+das telas de autorização; o chassi em campo tem uma silhueta só, do G-00 ao G-04.
+
+Se a ideia voltar, o ponto de partida é o commit acima, e há dois pontos abertos
+que ele não resolveu: as poses de acerto, queda e revive vêm do sprite completo
+(sem camadas), então os marcos sumiriam nesses instantes; e o co-op padronizado
+em G-00 esconderia a geração dos dois jogadores por construção.
 
 ## 15. O que ficou de fora desta entrega
 
@@ -665,7 +688,8 @@ atlases finais registrados como trabalho futuro.
   schema da tabela, e não cabia junto com o resto. A estrutura para isso está
   pronta: a liquidação já loga `phase`, `ore`, `cores` e duração de forma
   estruturada.
-- **Atlases finais dos marcos geracionais** (§14.4).
+- **Leitura da geração no chassi em campo.** Engavetada (§14.4): nem overlay de
+  runtime nem camadas de atlas; a implementação por camadas está no histórico.
 - **Co-op geracional.** O co-op continua padronizado em G-00, como a spec previa
   para a primeira entrega.
 
