@@ -2267,6 +2267,12 @@
           min-height: 44px;
           padding: 8px 12px;
         }
+        /* R, T, M e "mouse" sao atalhos de teclado: sem teclado para
+           pressiona-los, a legenda vira ruido. "Toque para jogar" continua —
+           e a unica instrucao que serve a quem so tem o dedo. */
+        #menu .ax-foot-note-keys {
+          display: none;
+        }
       }
       .found {
         align-items: center;
@@ -3296,8 +3302,11 @@
         </div>
         <div class="ax-sheet-foot">
           <span class="ax-motto" data-i18n="aurix.motto">EXTRAIR. PROTEGER. ADAPTAR.</span>
-          <span class="ax-foot-note" data-i18n="menu.controls">
-            Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia
+          <span class="ax-foot-note">
+            <span data-i18n="menu.controls.tap">Toque para jogar</span
+            ><span class="ax-foot-note-keys" data-i18n="menu.controls.keys">
+              · WASD/mouse no desktop · R reinicia · T volta ao terminal · M silencia</span
+            >
           </span>
         </div>
       </div>
