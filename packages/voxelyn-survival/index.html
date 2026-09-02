@@ -829,6 +829,31 @@
         font-size: 12px;
         min-height: 36px;
       }
+      /* Interruptor LIGADO (som, telemetria): a moldura teal do chip vivo,
+         sem o brilho do carimbo — brilho e "acao primaria" no resto da folha,
+         e aqui o botao so declara um estado. */
+      button.compact.is-on {
+        border-color: var(--ax-teal-dim);
+        color: var(--ax-teal-bright);
+        background: rgba(79, 214, 201, 0.07);
+      }
+      /* Leitura numerica dos sliders: o polegar so diz "mais ou menos". */
+      .ax-range-value {
+        flex: 0 0 auto;
+        min-width: 3ch;
+        text-align: right;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: var(--ax-text-bright);
+      }
+      /* Como entrar no ranking: tres regras, tres itens. */
+      .ax-how {
+        margin: 0;
+        padding-left: 1.2em;
+      }
+      .ax-how li {
+        margin: 3px 0;
+      }
       /* O abandono e a unica acao irreversivel do jogo: ela nao pode parecer
          com "Voltar". Vermelho, e nunca a primeira da coluna. */
       button.danger {
@@ -1099,6 +1124,11 @@
           column-gap: 36px;
         }
       }
+      @media (min-width: 1200px) {
+        #records-body .panel dl {
+          grid-template-columns: repeat(3, minmax(0, 1fr) auto);
+        }
+      }
       .ax-sheet-foot {
         display: flex;
         align-items: center;
@@ -1117,6 +1147,11 @@
       /* ------------------------------------------------------------------
          Menu principal: a Ordem de Despacho (direção 2a)
          ------------------------------------------------------------------ */
+      /* O carimbo cresce ate 220px e para: num desktop a coluna tem 1000px e
+         um botao dessa altura e um bloco, nao um carimbo. */
+      #menu .ax-stamp {
+        max-height: 220px;
+      }
       #menu .ax-sheet-head h1 {
         font-size: 17px;
         letter-spacing: 0.1em;
@@ -1892,6 +1927,21 @@
         font-size: 13px;
         line-height: 1.2;
       }
+      /* Retrato: titulo e carteira nao cabem lado a lado em 390px, e a
+         carteira era pintada POR CIMA do titulo. Ela desce para a propria
+         linha, alinhada a esquerda como o resto do documento. */
+      @media (max-width: 700px) {
+        #matrix .ax-sheet-head {
+          flex-wrap: wrap;
+          row-gap: 4px;
+        }
+        #matrix .ax-head-stats {
+          flex: 1 0 100%;
+          margin-left: 0;
+          justify-content: flex-start;
+          text-align: left;
+        }
+      }
       /* Ainda usado pelo inspetor (pre-requisito cumprido ganha o teal). */
       .matrix-card-value {
         color: var(--ax-teal);
@@ -1987,6 +2037,13 @@
         border-color: var(--ax-teal);
         background: rgba(79, 214, 201, 0.04);
         color: var(--ax-teal);
+      }
+      /* O proximo da fila, ainda sem lastro: moldura de ouro cheia, para
+         que num trilho de "✕" o jogador veja onde a compra comeca. */
+      .ax-node.is-next {
+        border-color: var(--ax-brass-strong);
+        background: rgba(201, 163, 90, 0.07);
+        color: var(--ax-gold);
       }
       .ax-node.is-locked {
         border: 1px dashed #3a3128;
@@ -2157,11 +2214,6 @@
         align-items: center;
         gap: 6px;
         margin: 16px 0 4px;
-      }
-      .induction-reopen {
-        color: var(--ax-text-mute);
-        font-size: 10px;
-        letter-spacing: 0.08em;
       }
       .codex-reveal-title {
         color: var(--ax-teal-bright);
@@ -2559,9 +2611,11 @@
         #options-controls {
           gap: 7px;
         }
+        /* 5px e 4px, nao 6 e 6: com 6 os creditos passavam 5px da folha e
+           ficavam atras do rodape numa paisagem de 390px de altura. */
         #options #options-controls .ax-optgroup {
-          gap: 6px;
-          margin-bottom: 6px;
+          gap: 5px;
+          margin-bottom: 4px;
         }
         /* A linha do Volume custava 48px enquanto as dos outros sliders
            custavam 20: numa coluna de ~290px, o rotulo (72) + o slider (110) +
@@ -2742,6 +2796,12 @@
         }
         #menu .ax-sheet-foot .ax-foot-note {
           white-space: normal;
+        }
+        /* Titulo em duas linhas + tagline em duas custavam um quinto da tela
+           antes do conteudo. A tagline e a unica linha que nao carrega
+           informacao. */
+        #menu .ax-sheet-head .sub {
+          display: none;
         }
       }
 
@@ -3403,7 +3463,8 @@
                 <div class="row">
                   <label for="volume" data-i18n="options.volume">Volume</label>
                   <input id="volume" type="range" min="0" max="100" step="1" />
-                  <button id="btn-mute" class="compact primary">Som: ligado</button>
+                  <output class="ax-range-value" for="volume" id="volume-value"></output>
+                  <button id="btn-mute" class="compact">Som: ligado</button>
                 </div>
                 <!--
                   Efeitos ANTES de musica, e depois do mestre: e a ordem de um
@@ -3413,10 +3474,16 @@
                 <div class="row">
                   <label for="sfx-volume" data-i18n="options.sfx">Efeitos</label>
                   <input id="sfx-volume" type="range" min="0" max="100" step="1" />
+                  <output class="ax-range-value" for="sfx-volume" id="sfx-volume-value"></output>
                 </div>
                 <div class="row">
                   <label for="music-volume" data-i18n="options.music">Música</label>
                   <input id="music-volume" type="range" min="0" max="100" step="1" />
+                  <output
+                    class="ax-range-value"
+                    for="music-volume"
+                    id="music-volume-value"
+                  ></output>
                 </div>
                 <div class="row">
                   <label for="btn-music-source" data-i18n="options.musicSource">Trilha</label>
@@ -3582,17 +3649,13 @@
     <div id="induction" class="overlay ax-screen hidden">
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="induction-mark"></div>
+        <!-- Leitura obrigatoria: o trilho so oferece a volta ao despacho. Os
+             outros arquivos ficam para depois de ler — e a ordem do trilho
+             do menu nao se repete aqui por isso mesmo. -->
         <button id="btn-induction-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
           Despacho
         </button>
         <span class="ax-rail-item is-active" data-i18n="menu.induction">Indução</span>
-        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
-          Matriz Geracional
-        </button>
-        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
-          Registro
-        </button>
-        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">

@@ -9,7 +9,7 @@ import type {
 } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { DesktopControlBar } from './desktop-controls';
-import { inductionSeen, markInductionSeen, renderInduction, type InductionMode } from './induction';
+import { inductionSeen, markInductionSeen, renderInduction } from './induction';
 import { createTrainingRun, markTrainingDone } from './training-setup';
 import { TrainingDirector, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
@@ -407,9 +407,17 @@ volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
 sfxVolumeInput.value = String(Math.round(audioSettings.sfxVolume * 100));
 
+/** O numero ao lado do slider: `<output id="<slider>-value">`, se existir. */
+const syncRangeValue = (input: HTMLInputElement): void => {
+  const out = document.getElementById(`${input.id}-value`);
+  if (out) out.textContent = input.value;
+};
+for (const input of [volumeInput, musicVolumeInput, sfxVolumeInput]) syncRangeValue(input);
+
 const renderMuteLabel = (): void => {
   muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
-  muteButton.classList.toggle('primary', !audioSettings.muted);
+  muteButton.classList.toggle('is-on', !audioSettings.muted);
+  muteButton.setAttribute('aria-pressed', String(!audioSettings.muted));
 };
 renderMuteLabel();
 
@@ -440,12 +448,14 @@ const setMuted = (muted: boolean): void => {
 };
 
 volumeInput.addEventListener('input', () => {
+  syncRangeValue(volumeInput);
   audioSettings.volume = Number(volumeInput.value) / 100;
   audio.setVolume(audioSettings.volume);
   saveAudioSettings(audioSettings);
 });
 
 musicVolumeInput.addEventListener('input', () => {
+  syncRangeValue(musicVolumeInput);
   audioSettings.musicVolume = Number(musicVolumeInput.value) / 100;
   audio.setMusicVolume(audioSettings.musicVolume);
   saveAudioSettings(audioSettings);
@@ -457,6 +467,7 @@ musicVolumeInput.addEventListener('input', () => {
 // jogo fazendo barulho atras, e um bipe por passo do slider disputaria com
 // justamente o som que ele esta tentando ajustar.
 sfxVolumeInput.addEventListener('input', () => {
+  syncRangeValue(sfxVolumeInput);
   audioSettings.sfxVolume = Number(sfxVolumeInput.value) / 100;
   audio.setSfxVolume(audioSettings.sfxVolume);
   saveAudioSettings(audioSettings);
@@ -2188,11 +2199,7 @@ const inductionBody = document.getElementById('induction-body') as HTMLDivElemen
  * e fecham a circular antes de seguir — mudar de ideia depois de ler e
  * exatamente o que os dois botoes existem para permitir.
  */
-const openInduction = (
-  mode: InductionMode,
-  onAuthorise: () => void,
-  onTraining?: () => void,
-): void => {
+const openInduction = (onAuthorise: () => void, onTraining?: () => void): void => {
   const dismissInto = (next: () => void) => (): void => {
     markInductionSeen();
     inductionOverlay.classList.add('hidden');
@@ -2201,7 +2208,6 @@ const openInduction = (
     next();
   };
   renderInduction(inductionBody, {
-    mode,
     onDismiss: dismissInto(onAuthorise),
     onTraining: onTraining ? dismissInto(onTraining) : undefined,
   });
@@ -2226,7 +2232,7 @@ const withInduction = (descend: () => void): void => {
     descend();
     return;
   }
-  openInduction('briefing', descend, startTraining);
+  openInduction(descend, startTraining);
 };
 
 document
@@ -2253,14 +2259,36 @@ const selectMode = (mode: DispatchMode): void => {
     const on = b.dataset.mode === mode;
     b.classList.toggle('is-selected', on);
     b.setAttribute('aria-checked', String(on));
+    // Tabindex itinerante: so a ficha marcada entra na ordem de Tab, e as
+    // setas andam entre as fichas — o contrato de um grupo de radio. Sem
+    // isto, DESCER ficava a oito Tabs do inicio da folha.
+    b.tabIndex = on ? 0 : -1;
   });
   roomPanel.classList.toggle('hidden', mode !== 'online');
   stampMode.textContent = t(MODE_LABEL[mode]);
 };
+/** As fichas VISIVEIS, na ordem do formulario (o contrato so entra anunciado). */
+const visibleModes = (): HTMLButtonElement[] =>
+  Array.from(modeButtons).filter((b) => !b.classList.contains('hidden'));
 modeButtons.forEach((b) => {
   b.addEventListener('click', () => {
     audio.ui();
     selectMode(b.dataset.mode as DispatchMode);
+  });
+  b.addEventListener('keydown', (event) => {
+    const modes = visibleModes();
+    const index = modes.indexOf(b);
+    let next = -1;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % modes.length;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+      next = (index - 1 + modes.length) % modes.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = modes.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    audio.ui();
+    selectMode(modes[next].dataset.mode as DispatchMode);
+    modes[next].focus();
   });
 });
 // A sublinha do carimbo nasce traduzida: o HTML so carrega o texto em pt-BR.
@@ -2278,7 +2306,7 @@ document.getElementById('btn-solo')?.addEventListener('click', () => {
       // DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o
       // briefing normal e quem ja leu vai direto ao exercicio.
       if (inductionSeen()) startTraining();
-      else openInduction('briefing', () => startSolo(), startTraining);
+      else openInduction(() => startSolo(), startTraining);
       break;
     default:
       // `() => startSolo()`: startSolo tem parametro opcional e nao pode
@@ -2824,13 +2852,15 @@ const renderNetReadout = (): void => {
   if (readout.kind === 'live') {
     set('options.net.live', { rtt: ms(readout.rttMs) });
     netDetailEl.textContent = t('options.net.cushion', { cushion: ms(readout.cushionMs) });
-    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+    if (readout.grade !== 'good')
+      netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
     return;
   }
   netDetailEl.textContent = '';
   if (readout.kind === 'probe') {
     set('options.net.probed', { rtt: ms(readout.rttMs) });
-    if (readout.grade !== 'good') netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
+    if (readout.grade !== 'good')
+      netReadoutEl.classList.add(readout.grade === 'fair' ? 'warn' : 'danger');
   } else if (readout.kind === 'unreachable') {
     set('options.net.unreachable');
     netReadoutEl.classList.add('danger');
@@ -2867,7 +2897,8 @@ renderNetReadout();
 
 const renderTelemetryLabel = (): void => {
   telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');
-  telemetryButton.classList.toggle('primary', !isOptedOut());
+  telemetryButton.classList.toggle('is-on', !isOptedOut());
+  telemetryButton.setAttribute('aria-pressed', String(!isOptedOut()));
 };
 renderTelemetryLabel();
 telemetryButton.addEventListener('click', () => {
@@ -2961,7 +2992,8 @@ const openRankBook = (sectorCount?: number): void => {
         sectorCount: page.sectorCount,
         onSelectClass: openRankBook,
         onWatchReplay: (entry) => openReplay(url, entry),
-        emptyReason: t('rank.empty.offline'),
+        // Duas causas, duas frases: o cliente sabe se a Aurix respondeu.
+        emptyReason: t(page.unreachable ? 'rank.empty.unreachable' : 'rank.empty'),
       });
     },
   );

@@ -163,5 +163,11 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   // A explicacao da homologacao: toda descida e reexecutada pela Aurix a
   // partir das entradas registradas. E o que separa o livro de um placar.
   host.appendChild(el('h2', 'ax-section-label', t('rank.how')));
-  host.appendChild(el('span', 'lesson', t('rank.how.text')));
+  // Tres regras, tres itens: num paragrafo so, a terceira (cada profundidade
+  // tem o seu livro) era a que ninguem chegava a ler.
+  const how = el('ul', 'lesson ax-how');
+  for (const key of ['rank.how.1', 'rank.how.2', 'rank.how.3'] as const) {
+    how.appendChild(el('li', undefined, t(key)));
+  }
+  host.appendChild(how);
 };

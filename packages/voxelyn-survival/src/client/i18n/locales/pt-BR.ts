@@ -69,7 +69,8 @@ export const PT_BR = {
   'menu.dev.server.placeholder': 'auto',
   'menu.controls.tap': 'Toque para jogar',
   'menu.controls.headphones': 'Use fones: o som avisa antes',
-  'menu.controls.keys': ' · WASD/mouse no desktop · R reinicia · T volta ao terminal · M silencia',
+  'menu.controls.keys':
+    ' · WASD move · mouse mira e atira · R reinicia · T volta ao terminal · M silencia',
 
   // Cromo Aurix do redesign (doc AD-UI-2.0): rótulos decorativos do documento.
   // Não mudam o significado de nenhum botão existente — só o papel timbrado.
@@ -230,7 +231,7 @@ export const PT_BR = {
   'rank.best': 'MELHORES DESCIDAS',
   'rank.seed': 'SEED {seed}',
   'rank.empty': 'ninguém extraiu ainda',
-  'rank.empty.offline': 'ninguém extraiu ainda — ou o servidor está fora do ar',
+  'rank.empty.unreachable': 'a Aurix não respondeu — o livro não pôde ser consultado',
   'rank.loading': 'carregando…',
   'rank.entry': '{position}. {stars} {name}',
   'rank.col.operator': 'Operador',
@@ -240,8 +241,11 @@ export const PT_BR = {
   'rank.class.entries': '{entries} expedições homologadas',
   'rank.replay': 'Assistir replay autoritativo',
   'rank.how': 'COMO ENTRAR',
-  'rank.how.text':
-    'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu. A posição sai de duas coisas: quantos Núcleos você trouxe e quanto tempo levou. Cada profundidade tem o seu próprio livro — descidas de três setores não competem com as de sete.',
+  'rank.how.1':
+    'Só runs que extraíram entram. O servidor re-simula a partida a partir das teclas que você apertou: não há placar para enviar, só o que aconteceu.',
+  'rank.how.2': 'A posição sai de duas coisas: quantos Núcleos você trouxe e quanto tempo levou.',
+  'rank.how.3':
+    'Cada profundidade tem o seu próprio livro: descidas de três setores não competem com as de sete.',
 
   // ---------------------------------------------------------------------
   // Painel Replay (replay.html)
@@ -566,7 +570,8 @@ export const PT_BR = {
   'matrix.inspector.balanceAfter': 'Saldo após',
   'matrix.inspector.sealed':
     'A Aurix Dynamics não especifica o que ainda não alcançou. Incorpore o protocolo anterior para abrir esta especificação.',
-  'matrix.legend': '● incorporado · + autorizável · ⬡ sem lastro · ✕ pré-requisito ausente',
+  'matrix.legend':
+    '● incorporado · + autorizável · ⬡ sem lastro · ✕ pré-requisito ausente · X protocolo terminal do ramo',
   'matrix.declassified': 'ARQUIVO DESCLASSIFICADO',
   'matrix.generationUp': 'CHASSI HOMOLOGADO: {generation}',
   'matrix.offline':
@@ -585,6 +590,8 @@ export const PT_BR = {
   'codex.source': 'Origem',
   'codex.count': '{unlocked} de {total} arquivos',
   'codex.empty': 'Nenhum arquivo desclassificado além do material público.',
+  'codex.offlineHint':
+    'Os arquivos são desclassificados conforme você encontra Ativos no Veio. Sem conexão, nenhum pode ser consultado.',
   'codex.new': 'novo',
   'codex.filter.all': 'Todos',
   'codex.filter.asset': 'Ativo: {name}',
@@ -885,8 +892,6 @@ export const PT_BR = {
   'induction.controls.note':
     'Em aparelho de toque o esquema é outro: manche esquerdo move, manche direito mira e dispara, e os botões acima dele repetem esta lista.',
   'induction.begin': 'AUTORIZAR DESCIDA',
-  'induction.archiveButton': 'ARQUIVAR',
-  'induction.reopen': 'Este documento continua no despacho, em INDUÇÃO.',
   'induction.training': 'OPERAÇÃO DE TREINAMENTO',
 
   // ---------------------------------------------------------------------

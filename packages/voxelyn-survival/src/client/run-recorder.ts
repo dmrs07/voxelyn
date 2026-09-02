@@ -161,10 +161,13 @@ export type RankPage = {
   sectorCount: number;
   classes: RankClass[];
   entries: RankEntry[];
+  /** A Aurix nao respondeu (offline, fora do ar, erro). Um livro vazio de
+   *  verdade vem SEM esta marca — e a tela diz uma coisa ou outra. */
+  unreachable?: boolean;
 };
 
 /** Offline, ou servidor fora: nenhum livro, nenhuma aba. Nunca um erro na tela. */
-const EMPTY_PAGE: RankPage = { sectorCount: 0, classes: [], entries: [] };
+const EMPTY_PAGE: RankPage = { sectorCount: 0, classes: [], entries: [], unreachable: true };
 
 export const fetchLeaderboard = async (
   serverUrl: string,

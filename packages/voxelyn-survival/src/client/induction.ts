@@ -64,14 +64,7 @@ const ARTICLES: readonly Article[] = [
   },
 ];
 
-export type InductionMode =
-  /** Antes da primeira descida: o botao AUTORIZA e a run comeca ao fechar. */
-  | 'briefing'
-  /** Reaberto no despacho: o botao so arquiva. */
-  | 'archive';
-
 export type InductionHost = {
-  mode: InductionMode;
   /** O jogador terminou de ler. Em `briefing`, e aqui que a descida sai. */
   onDismiss: () => void;
   /**
@@ -139,24 +132,19 @@ export const renderInduction = (body: HTMLElement, host: InductionHost): void =>
   const footer = el('div', 'induction-footer');
   const action = el('button', 'primary ax-stamp');
   action.type = 'button';
-  action.textContent = t(host.mode === 'briefing' ? 'induction.begin' : 'induction.archiveButton');
+  action.textContent = t('induction.begin');
   action.addEventListener('click', () => host.onDismiss());
   footer.append(action);
   // A alternativa do novato: treinar antes de autorizar. Secundaria de
   // proposito — a descida real continua sendo o carimbo, e o exercicio nunca
   // e obrigatorio.
-  if (host.mode === 'briefing' && host.onTraining) {
+  if (host.onTraining) {
     const training = el('button', 'ax-order-secondary');
     training.type = 'button';
     training.textContent = t('induction.training');
     const onTraining = host.onTraining;
     training.addEventListener('click', () => onTraining());
     footer.append(training);
-  }
-  // So no briefing: quem esta reabrindo o documento acabou de achar onde ele
-  // mora, e nao precisa que a tela explique onde ele mora.
-  if (host.mode === 'briefing') {
-    footer.append(el('div', 'induction-reopen', t('induction.reopen')));
   }
   body.append(footer);
 };

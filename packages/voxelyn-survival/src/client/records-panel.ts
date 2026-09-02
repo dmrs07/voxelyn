@@ -153,15 +153,19 @@ const renderSummaryTab = (host: HTMLElement, records: Records): void => {
   ]);
 
   section(host, t('records.best'));
+  // "Melhores" sem nenhuma descida: um travessao para tudo. Tres estrelas
+  // vazias e "0:00" liam como notas reais (a pior nota, o menor tempo).
+  const none = t('summary.stat.none');
   definitions(host, [
-    [t('records.best.stars'), stars(best.stars)],
+    [t('records.best.stars'), best.stars === 0 ? none : stars(best.stars)],
     [
       t('records.best.fastestCore'),
-      best.fastestCoreTicks === null
-        ? t('summary.stat.none')
-        : formatDuration(best.fastestCoreTicks),
+      best.fastestCoreTicks === null ? none : formatDuration(best.fastestCoreTicks),
     ],
-    [t('records.best.longestSurvival'), formatDuration(best.longestSurvivalTicks)],
+    [
+      t('records.best.longestSurvival'),
+      best.longestSurvivalTicks === 0 ? none : formatDuration(best.longestSurvivalTicks),
+    ],
     [t('records.best.masteredSeeds'), String(records.masteredSeeds.length)],
   ]);
 };
@@ -399,8 +403,7 @@ const TAB_RENDER: Record<
   discoveries: renderDiscoveriesTab,
   // A aba do historico e a unica que le `options`; as outras ignoram o
   // parametro, e a assinatura comum e o que mantem o despacho por tabela.
-  history: (host, records, _sprites, _codex, options) =>
-    renderHistoryTab(host, records, options),
+  history: (host, records, _sprites, _codex, options) => renderHistoryTab(host, records, options),
 };
 
 export const renderRecordsPanel = (

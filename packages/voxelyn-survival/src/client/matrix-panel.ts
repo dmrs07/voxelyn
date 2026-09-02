@@ -346,7 +346,9 @@ const nodeStateClass = (state: NodeState): string => {
     case 'locked':
       return ' is-locked';
     case 'missing':
-      return '';
+      // Pre-requisitos cumpridos, lastro nao: e o PROXIMO da fila, e o trilho
+      // o marca como tal — num ramo inteiro de "✕" e ele que diz "comece aqui".
+      return ' is-next';
   }
 };
 
@@ -743,11 +745,14 @@ const renderCodexTab = (
   const codex = view.codex;
   if (!codex) {
     const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
-    body.appendChild(
-      pending.key === 'matrix.loading'
-        ? el('div', 'ax-scan ax-loading', t(pending.key, pending.params))
-        : el('p', 'sub warn', t(pending.key, pending.params)),
-    );
+    if (pending.key === 'matrix.loading') {
+      body.appendChild(el('div', 'ax-scan ax-loading', t(pending.key, pending.params)));
+    } else {
+      body.appendChild(el('p', 'sub warn', t(pending.key, pending.params)));
+      // Sem conexao a aba nao pode ficar em branco: diz o que os arquivos
+      // sao e por que nao ha nenhum para ler agora.
+      body.appendChild(el('p', 'sub', t('codex.offlineHint')));
+    }
     return body;
   }
 
