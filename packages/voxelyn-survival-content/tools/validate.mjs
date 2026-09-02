@@ -19,7 +19,7 @@ const CANONICAL = {
   //
   // Todos os canvases DOBRARAM com a subdivisao da grade voxel (MODEL_SCALE):
   // mesma proporcao entre entidades e com o tile, o dobro de pixels de detalhe.
-  'player-prospector': [88, 112],
+  'player-prospector': [96, 112],
   'enemy-stalker': [64, 64],
   'enemy-spitter': [64, 64],
   'enemy-spore-bomber': [64, 64],

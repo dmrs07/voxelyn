@@ -40,7 +40,7 @@ imagens borradas/semi-realistas, personagens com perspectivas diferentes entre s
 | Tile lógico | 32×16 px lógicos (losango isométrico 2:1) = 64×32 px de atlas |
 | Altura de parede/andar | 14 px lógicos (7 unidades autoradas) |
 | Perspectiva | Isométrica 2:1 (dimétrica), câmera fixa, sem rotação |
-| Personagem padrão (Prospector) | 88×112 px de atlas |
+| Personagem padrão (Prospector) | 96×112 px de atlas |
 | Criatura pequena (stalker/spitter/bomber) | 64×64 px de atlas |
 | Criatura grande (bruiser) | 96×136 px de atlas |
 | Chefe final (guardian) | 112×128 px de atlas — o único canvas desta classe; a hierarquia de tamanho sobre o bruiser é contrato |

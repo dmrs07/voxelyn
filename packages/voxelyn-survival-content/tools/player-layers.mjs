@@ -1,5 +1,10 @@
 import { renderVoxels } from './voxel.mjs';
-import { ATTACHMENT_IDS, MODULE_ATTACHMENTS, minigunGun } from './prospector-modules.mjs';
+import {
+  ATTACHMENT_IDS,
+  MINIGUN_FAN_FRAMES,
+  MODULE_ATTACHMENTS,
+  minigunGun,
+} from './prospector-modules.mjs';
 import {
   ANCHOR_X,
   ANCHOR_Y,
@@ -210,10 +215,15 @@ export const PLAYER_LAYER_SPECS = [
     (dir, anim, frame) => renderPart(dir, anim, frame, 'lower'),
     'digitigrade locomotion layer for the Aurix PX prospector bot'
   ),
+  // O tronco tem `walk` desde que os bracos existem: o braco de extracao
+  // balanca com a passada (ver `prospectorParts`), e sem quadros proprios ele
+  // ficaria duro enquanto as pernas andam. A cadencia e a MESMA das pernas —
+  // as duas camadas leem `WALK_FPS` — para o balanco casar com o passo.
   baseLayer(
     'layer-player-prospector-upper',
     {
       idle: { frames: idleBob.length, fps: 6, loop: true },
+      walk: { frames: WALK_FRAMES, fps: WALK_FPS, loop: true },
       attack: { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'upper'),
@@ -221,10 +231,17 @@ export const PLAYER_LAYER_SPECS = [
   ),
   // Mesmas animações do tronco, quadro a quadro: a arma acompanha o coice, e
   // qualquer divergência de contagem faria o cano descolar do braço no disparo.
+  // Inclui `walk` pelo mesmo motivo: o tronco anda, e a arma tem de ter a
+  // animacao correspondente — mas de UM quadro so. O braco da arma nao
+  // balanca com a passada (o coice e a unica animacao dele, e `gunAnchor` nem
+  // le `swing`), entao os seis quadros da marcha seriam seis copias do mesmo
+  // desenho: 24 quadros por atlas, em nove atlas, para nada. Um quadro que
+  // dura a marcha inteira e a arma parada na mira enquanto o corpo se move.
   baseLayer(
     'layer-player-prospector-gun',
     {
       idle: { frames: idleBob.length, fps: 6, loop: true },
+      walk: { frames: 1, fps: WALK_FPS, loop: true },
       attack: { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'gun'),
@@ -235,10 +252,10 @@ export const PLAYER_LAYER_SPECS = [
 /**
  * As camadas de MODULO: uma por peca, com os mesmos quadros da arma.
  *
- * `idle` e `attack` e nao `walk`, exatamente como a camada da arma: o modulo
- * acompanha o TRONCO, e e o tronco que decide se o bot esta atirando. Qualquer
- * divergencia de contagem faria a peca descolar do cano no disparo — o mesmo
- * motivo pelo qual a arma ja copia esses numeros do tronco.
+ * `idle`, `walk` e `attack`, exatamente como a camada da arma: o modulo
+ * acompanha o TRONCO, e e o tronco que decide se o bot esta andando ou
+ * atirando. Qualquer divergencia de contagem faria a peca descolar do cano no
+ * disparo — o mesmo motivo pelo qual a arma ja copia esses numeros do tronco.
  *
  * A Minigun entra na mesma lista porque ela e desenhada do mesmo jeito, mas ela
  * NAO e um acoplamento: o cliente troca a camada `gun` por ela em vez de somar
@@ -249,6 +266,15 @@ export const MODULE_LAYER_SPECS = ALL_MODULE_IDS.map((id) =>
     moduleLayerId(id),
     {
       idle: { frames: idleBob.length, fps: 6, loop: true },
+      // Nada parafusado no cano balanca com a passada (ver a camada da arma),
+      // entao `walk` e um quadro so. A Minigun e a excecao pelo motivo
+      // contrario: o quadro dela e a posicao da ventoinha, que o cliente
+      // escolhe pelo angulo em QUALQUER animacao, entao o `walk` dela precisa
+      // das quatro posicoes — e de nenhuma a mais.
+      walk:
+        id === 'minigun'
+          ? { frames: MINIGUN_FAN_FRAMES, fps: WALK_FPS, loop: true }
+          : { frames: 1, fps: WALK_FPS, loop: true },
       attack: { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderModule(dir, anim, frame, id),

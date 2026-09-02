@@ -61,14 +61,22 @@ describe('profundidade entre tronco e arma do Prospector', () => {
   });
 
   /**
-   * `dr` e a direcao de folga curta: a arma fica na quina do corpo, metade a
-   * frente e metade atras, e nenhuma das duas ordens acerta todos os pixels. As
-   * outras tres sao decididas com folga, e e nelas que a arma por cima gritava.
+   * `dl` e `ul` sao decididas com folga: a arma esta do lado oposto ao da
+   * camera e o chassi a cobre quase inteira.
+   *
+   * `ur` e a direcao de folga CURTA desde que a arma passou a viver na mao do
+   * braco, fora do chassi: nessa direcao o flanco direito e o lado proximo da
+   * camera, entao o receptor disputa pixel com a quina do peito (onde ele
+   * esta a frente) e com o hardpoint traseiro (onde esta atras), e nenhuma
+   * ordem unica acerta tudo. A maioria ainda e "atras", e e ela que o runtime
+   * publica; o que este bloco cobra e que a minoria nao vire maioria sem que
+   * alguem olhe.
    */
-  it('decide as tres direcoes de costas com folga larga', () => {
+  it('decide dl e ul com folga larga, e ur pela maioria', () => {
+    const wide = { dl: 0.2, ul: 0.2, ur: 0.5 };
     for (const { dir, share } of verdicts) {
       if (dir === 'dr') continue;
-      expect(share, `direcao ${dir}`).toBeLessThan(0.2);
+      expect(share, `direcao ${dir}`).toBeLessThan(wide[dir]);
     }
   });
 });

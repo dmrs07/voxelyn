@@ -55,12 +55,12 @@ import { box } from './voxel.mjs';
 // autorada projeta 2x2x2 voxels finos, entao o frame e a ancora medem o dobro
 // de pixels. O tamanho em MUNDO nao muda — o cliente desenha com metade do
 // zoom (ATLAS_SCALE) e o bot ocupa o mesmo tile de sempre.
-export const FRAME_WIDTH = 88;
+export const FRAME_WIDTH = 96;
 export const FRAME_HEIGHT = 112;
-export const ANCHOR_X = 44;
+export const ANCHOR_X = 48;
 export const ANCHOR_Y = 108;
 /** Origem de desenho do rasterizador; o enquadramento final vem do fitToMargin. */
-export const RENDER_ANCHOR_X = 40;
+export const RENDER_ANCHOR_X = 44;
 export const RENDER_ANCHOR_Y = 100;
 
 /**
@@ -130,7 +130,11 @@ export const walkFps = (tilesPerSecond) =>
  */
 export const gunAnchor = ({ bob = 0, kick = 0, lean = 0, crouch = 0 } = {}) => {
   const up = bob - Math.max(0, Math.min(4, crouch));
-  return { x: 2, y: -1 + kick + lean, z: 6 + up + 2 + 2 };
+  // x = 3: o receptor comeca NO flanco do chassi (x[-2,3]) e fica inteiro para
+  // fora dele, na mao do braco da arma, e nao mais meio enterrado no peito.
+  // braco; o chassi so a carrega. Quem le este numero de fora — a boca do cano
+  // em `PROSPECTOR_MUZZLES` — e cobrado pelo teste de profundidade.
+  return { x: 3, y: -1 + kick + lean, z: 6 + up + 2 + 2 };
 };
 
 /**
@@ -277,18 +281,53 @@ export const prospectorParts = ({
   upper.push(box(-3, -2.5 + lean, shoulder + 1.5, 0.5, 0.5, 0.5, 'bone'));
   upper.push(box(3.5, -2.5 + lean, shoulder + 1.5, 0.5, 0.5, 0.5, 'bone'));
 
-  // BRACO DE EXTRACAO, a esquerda: coluna escura descendo ate a altura do
-  // quadril, com a garra palida na ponta. E o membro assimetrico do bot — do
-  // outro lado fica a arma — e e o que a ficha chama de ferramenta multiuso.
-  upper.push(box(-3, -1 + lean, chest - 1, 1, 2, 4, 'rockDeep'));
-  upper.push(box(-3, -2 + lean, chest - 2, 1, 2, 1, 'bone'));
+  // OS DOIS BRACOS.
+  //
+  // A primeira versao deles nao existia na tela: eram colunas escuras de um
+  // voxel, coladas ao flanco do chassi, entre a ombreira de latao em cima e a
+  // bacia escura embaixo — a esquerda ainda nascia METADE dentro da bacia.
+  // Escuro sobre escuro, rente a casca, o olho lia "chassi mais largo" e o bot
+  // parecia um tronco com uma arma flutuando ao lado e uma garra pendurada do
+  // nada. Um braco so existe nesta escala se (a) sai da silhueta do corpo e
+  // (b) troca de material em relacao ao que esta atras dele. Os dois abaixo
+  // seguem a mesma receita das pernas: latao onde e membro, escuro onde e
+  // junta, osso onde e ferramenta, e um rebite de ouro na articulacao.
+  //
+  // BRACO DE EXTRACAO, a esquerda — o membro assimetrico do bot, a ferramenta
+  // multiuso da ficha. Um voxel PARA FORA da ombreira (x -4), de modo a
+  // desenhar contorno proprio: braco de latao pendurado do ombro, antebraco
+  // escuro dobrado para a frente, garra palida na ponta.
+  //
+  // No ANDAR ele balanca em oposicao a perna do mesmo lado (a esquerda anda
+  // com `+swing`; o braco vai para `-swing`), como um pendulo preso ao ombro:
+  // o braco de cima acompanha um terco da passada, antebraco e garra dois
+  // tercos. E o que faz o bot andar em vez de deslizar com o tronco duro. O
+  // braco da arma NAO balanca: ele sustenta a mira, e o coice e a unica
+  // animacao dele.
+  const armSwing = -Math.round(swing) * 0.35;
+  // Meio passo, e nao mais: com a passada inteira a garra passava da frente da
+  // cabeca e o quadro deixava de caber com margem.
+  const handSwing = -Math.round(swing) * 0.4;
+  upper.push(box(-3, -0.5 + lean + armSwing, chest + 1, 1, 2, 3, 'rust'));
+  upper.push(box(-3.5, -1 + lean, chest + 3.5, 0.5, 0.5, 0.5, 'loot'));
+  upper.push(box(-3, -2 + lean + handSwing, chest - 1, 1, 2, 2, 'rockDeep'));
+  upper.push(box(-3, -2.5 + lean + handSwing, chest - 2, 1, 2, 1, 'bone'));
   // Garra magnetica da ficha (painel 4): a mao termina em DOIS dedos de
   // meio-passo abertos para baixo, com o vao entre eles. Antes a ferramenta era
   // um toco palido; os dedos sao o que a torna uma garra que agarra.
-  upper.push(box(-3, -2 + lean, chest - 3, 0.5, 0.5, 1, 'bone'));
-  upper.push(box(-2.5, -0.5 + lean, chest - 3, 0.5, 0.5, 1, 'bone'));
-  // Braco da arma, a direita: curto e recolhido, porque ele sustenta.
-  upper.push(box(3, -1 + lean + kick, chest + 1, 1, 2, 3, 'rockDeep'));
+  upper.push(box(-3, -2.5 + lean + handSwing, chest - 3, 0.5, 0.5, 1, 'bone'));
+  upper.push(box(-2.5, -1 + lean + handSwing, chest - 3, 0.5, 0.5, 1, 'bone'));
+  // BRACO DA ARMA, a direita: curto e recolhido, porque ele sustenta. Meio
+  // voxel para fora da ombreira, ATRAS do receptor (y >= 0): a frente e o lado
+  // de fora da arma sao os pontos de acoplagem dos modulos (sifao em x >= 4,
+  // y[-2,0]; ricochete em y <= -2), e um braco ali nasceria enterrado neles.
+  // Acompanha o coice com a arma, como sempre acompanhou.
+  upper.push(box(3.5, 0 + lean + kick, chest + 1, 1, 1.5, 3, 'rust'));
+  upper.push(box(4, 0.5 + lean + kick, chest + 3.5, 0.5, 0.5, 0.5, 'loot'));
+  // A mao: um bloco escuro por BAIXO do receptor (que fica em z[10,11]),
+  // segurando-o. Coincidir com o volume da arma poria as duas camadas em
+  // disputa de profundidade no mesmo pixel.
+  upper.push(box(3.5, -1.5 + lean + kick, chest + 1, 1, 1.5, 1, 'rockDeep'));
 
   // CABECA: bloco de sensores baixo e ESTREITO, sem pescoco, projetado a frente.
   //
@@ -336,7 +375,9 @@ export const prospectorParts = ({
   // linha de mira e quebra o bloco unico em corpo + trilho, sem engordar a
   // silhueta — o meio-passo sobe no vao entre a arma e a cabeca.
   gun.push(box(a.x, a.y - 2, a.z + 1, 2, 3, 0.5, 'rockDeep'));
-  gun.push(box(a.x, a.y - 1, a.z + 1, 1, 1, 1, 'biolum'));
+  // A camara de energia fica na face EXTERNA da arma (a.x + 1): na interna ela
+  // nascia dentro da ombreira, enterrada — um voxel aceso que ninguem via.
+  gun.push(box(a.x + 1, a.y - 1, a.z + 1, 1, 1, 1, 'biolum'));
   gun.push(box(a.x, a.y - 3, a.z, 1, 1, 1, flash ? 'loot' : 'rust'));
 
   return { lower, upper, gun };

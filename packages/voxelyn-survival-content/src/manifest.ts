@@ -311,8 +311,8 @@ export type MuzzleOffsetTiles = {
 };
 
 export const PROSPECTOR_MUZZLES: Record<'bolt' | 'minigun', MuzzleOffsetTiles> = {
-  bolt: { forward: 3.5 / 8, lateral: 2.5 / 8, height: 10.5 / 8 },
-  minigun: { forward: 6 / 8, lateral: 3 / 8, height: 11 / 8 },
+  bolt: { forward: 3.5 / 8, lateral: 3.5 / 8, height: 10.5 / 8 },
+  minigun: { forward: 6 / 8, lateral: 4 / 8, height: 11 / 8 },
 };
 
 /**
