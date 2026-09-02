@@ -53,7 +53,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'menu.dev.server': 'Server',
   'menu.dev.server.placeholder': 'auto',
   'menu.controls.tap': 'Tap to play',
-  'menu.controls.headphones': ' · use headphones: sound warns first',
+  'menu.controls.headphones': 'Use headphones: sound warns first',
   'menu.controls.keys': ' · WASD/mouse on desktop · R restarts · T backs to terminal · M mutes',
 
   // Aurix chrome (redesign doc AD-UI-2.0): decorative document labels.

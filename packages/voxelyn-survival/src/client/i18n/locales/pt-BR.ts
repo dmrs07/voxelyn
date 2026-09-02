@@ -68,7 +68,7 @@ export const PT_BR = {
   'menu.dev.server': 'Servidor',
   'menu.dev.server.placeholder': 'auto',
   'menu.controls.tap': 'Toque para jogar',
-  'menu.controls.headphones': ' · use fones: o som avisa antes',
+  'menu.controls.headphones': 'Use fones: o som avisa antes',
   'menu.controls.keys': ' · WASD/mouse no desktop · R reinicia · T volta ao terminal · M silencia',
 
   // Cromo Aurix do redesign (doc AD-UI-2.0): rótulos decorativos do documento.

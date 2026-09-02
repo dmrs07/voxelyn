@@ -2273,6 +2273,19 @@
         #menu .ax-foot-note-keys {
           display: none;
         }
+        /* "Toque para jogar" e a instrucao, nao um titulo: sem ela antes,
+           "Use fones" abre a frase sozinho. */
+        #menu .ax-foot-note-headphones::before {
+          content: ' · ';
+        }
+      }
+      /* O inverso: mouse/trackpad nunca tocam a tela, entao "Toque para
+         jogar" descreve um gesto que este ponteiro nao tem. So no toque
+         (regra acima) a frase abre com ele. */
+      @media (pointer: fine) {
+        #menu .ax-foot-note-tap {
+          display: none;
+        }
       }
       .found {
         align-items: center;
@@ -3300,8 +3313,9 @@
         <div class="ax-sheet-foot">
           <span class="ax-motto" data-i18n="aurix.motto">EXTRAIR. PROTEGER. ADAPTAR.</span>
           <span class="ax-foot-note">
-            <span data-i18n="menu.controls.tap">Toque para jogar</span
-            ><span data-i18n="menu.controls.headphones"> · use fones: o som avisa antes</span
+            <span class="ax-foot-note-tap" data-i18n="menu.controls.tap">Toque para jogar</span
+            ><span class="ax-foot-note-headphones" data-i18n="menu.controls.headphones"
+              >Use fones: o som avisa antes</span
             ><span class="ax-foot-note-keys" data-i18n="menu.controls.keys">
               · WASD/mouse no desktop · R reinicia · T volta ao terminal · M silencia</span
             >
