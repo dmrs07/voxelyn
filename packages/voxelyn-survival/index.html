@@ -3145,6 +3145,166 @@
           transition: none;
         }
       }
+
+      /* ------------------------------------------------------------------
+         Revisao de UX, segunda passada: estados com dados, telas de 320px,
+         paisagem curta e 1920px. Fica no FIM da folha de proposito — varias
+         destas regras corrigem regras de 700px acima, e vencem por ordem.
+         ------------------------------------------------------------------ */
+      .ax-sheet-brand {
+        margin-left: auto;
+        text-align: right;
+        min-width: 0;
+      }
+      /* Abas nunca sao espremidas abaixo do proprio texto: o container rola. */
+      .ax-tab {
+        flex: 0 0 auto;
+      }
+      .ax-col-short {
+        display: none;
+      }
+      /* Ranking: a propria linha do operador, pelo nome local. */
+      .ax-rank-row.is-self {
+        border-left-color: var(--ax-teal);
+        background: linear-gradient(90deg, rgba(79, 214, 201, 0.1), transparent);
+      }
+      .ax-rank-row.is-self .ax-rank-name {
+        color: var(--ax-teal-bright);
+      }
+      /* Historico: a seed nunca quebra no meio; o desfecho e quem cede. */
+      .ax-ledger-row > .sub {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .ax-ledger-row .lesson {
+        white-space: nowrap;
+      }
+      /* Arquivos trancados, agrupados por nivel: os codigos mascarados. */
+      .codex-locked-codes {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--ax-text-dead);
+        overflow-wrap: anywhere;
+      }
+      /* Fichas de modo: num monitor de 1920px, 1500px de ficha e um outdoor. */
+      .ax-modes {
+        max-width: 900px;
+      }
+      @media (hover: hover) {
+        .ax-mode:not(.is-selected):hover {
+          border-color: var(--ax-brass-strong);
+          color: var(--ax-text-bright);
+        }
+      }
+      /* Sala invalida: o erro mora no campo, nao so no banner. */
+      #room[aria-invalid='true'] {
+        border-color: var(--ax-red-line);
+        box-shadow: inset 0 0 0 1px var(--ax-red-line);
+      }
+      /* Replay no toque: 22px era um alvo de mouse. */
+      @media (pointer: coarse) {
+        .ax-replay-btn {
+          width: 36px;
+          height: 36px;
+        }
+        .ax-rank-head,
+        .ax-rank-row {
+          grid-template-columns: 34px minmax(0, 1fr) 46px 64px 54px 40px;
+        }
+      }
+      /* Banner em tela estreita: faixa de sistema de borda a borda, em vez
+         de uma caixa cobrindo metade do titulo. */
+      @media (max-width: 700px) {
+        #banner {
+          left: 0;
+          right: 0;
+          transform: none;
+          max-width: none;
+          border-left: none;
+          border-right: none;
+          text-align: center;
+        }
+      }
+      /* Paisagem ate 700px (667x375): a pilha escondia tres das quatro
+         fichas atras do carimbo, sem sinal de rolagem. Ha largura para as
+         duas colunas — a pilha e so para RETRATO. */
+      @media (max-width: 700px) and (orientation: landscape) {
+        .ax-dispatch {
+          grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+          grid-template-rows: minmax(0, 1fr);
+          overflow: hidden;
+        }
+        .ax-requisition {
+          order: 0;
+          border-right: 1px solid var(--ax-key);
+          border-bottom: none;
+          overflow-y: auto;
+        }
+        .ax-authorisation {
+          order: 0;
+          overflow-y: auto;
+        }
+      }
+      /* 320-400px: cinco abas no trilho, cabecalho e rodape do menu em duas
+         linhas, ranking com colunas que cabem. */
+      @media (max-width: 400px) {
+        .ax-rail-item {
+          font-size: 9px;
+          letter-spacing: 0.04em;
+          padding: 4px 1px;
+        }
+        #menu .ax-sheet-head {
+          flex-wrap: wrap;
+          row-gap: 2px;
+        }
+        #menu .ax-sheet-head .ax-sheet-brand {
+          flex: 1 0 100%;
+          margin-left: 0;
+          text-align: left;
+        }
+        #menu .ax-sheet-head h1 {
+          font-size: 13px;
+        }
+        #menu .ax-sheet-foot {
+          flex-wrap: wrap;
+          row-gap: 2px;
+        }
+        #menu .ax-sheet-foot .ax-foot-note {
+          flex: 1 0 100%;
+          margin-left: 0;
+          text-align: left;
+        }
+        .ax-tab {
+          padding: 0 9px;
+          letter-spacing: 0.08em;
+        }
+        .ax-rank-head,
+        .ax-rank-row {
+          grid-template-columns: 26px minmax(0, 1fr) 30px 46px 44px 30px;
+          gap: 4px;
+          padding: 5px 4px;
+        }
+        .ax-col-long {
+          display: none;
+        }
+        .ax-col-short {
+          display: inline;
+        }
+      }
+      /* 320px: seis nos de 42px cabem na linha; 44 quebrava o terminal. */
+      @media (max-width: 360px) {
+        .ax-node {
+          width: 42px;
+          height: 42px;
+        }
+        /* `flex: 1 1 3px` e nao so min-width: a BASE de 10px dos elos e o
+           que somava 302px e quebrava a linha; a base cai, o crescimento
+           continua preenchendo o que sobrar. */
+        .ax-node-link {
+          flex: 1 1 3px;
+          min-width: 3px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -3266,12 +3426,10 @@
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="menu-mark"></div>
         <span class="ax-rail-item is-active" data-i18n="aurix.rail.dispatch">Despacho</span>
-        <button id="btn-records" class="ax-rail-item" data-i18n="menu.records">Registro</button>
-        <button id="btn-matrix" class="ax-rail-item" data-i18n="menu.matrix">
-          Matriz Geracional
-        </button>
-        <button id="btn-rank" class="ax-rail-item" data-i18n="menu.rank">Ranking</button>
-        <button id="btn-options" class="ax-rail-item" data-i18n="menu.options">Opções</button>
+        <button id="btn-records" class="ax-rail-item" data-i18n="rail.records">Registro</button>
+        <button id="btn-matrix" class="ax-rail-item" data-i18n="rail.matrix">Matriz</button>
+        <button id="btn-rank" class="ax-rail-item" data-i18n="rail.rank">Ranking</button>
+        <button id="btn-options" class="ax-rail-item" data-i18n="rail.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">
@@ -3280,7 +3438,7 @@
             <div class="ax-doc-title" data-i18n="aurix.menu.docTitle">Ordem de despacho</div>
             <div class="ax-doc-code">AD-DEP-0114 · AURIX DYNAMICS</div>
           </div>
-          <div style="margin-left: auto; text-align: right; min-width: 0">
+          <div class="ax-sheet-brand">
             <h1 data-i18n="menu.title">VOXELYN SURVIVAL</h1>
             <div class="sub" style="font-style: italic" data-i18n="menu.tagline">
               o Veio está vivo — sobreviva
@@ -3398,14 +3556,12 @@
         <button id="btn-options-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
           Despacho
         </button>
-        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="rail.records">
           Registro
         </button>
-        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
-          Matriz Geracional
-        </button>
-        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
-        <span class="ax-rail-item is-active" data-i18n="menu.options">Opções</span>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="rail.matrix">Matriz</button>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="rail.rank">Ranking</button>
+        <span class="ax-rail-item is-active" data-i18n="rail.options">Opções</span>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">
@@ -3677,12 +3833,10 @@
         <button id="btn-records-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
           Despacho
         </button>
-        <span class="ax-rail-item is-active" data-i18n="menu.records">Registro</span>
-        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
-          Matriz Geracional
-        </button>
-        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
-        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <span class="ax-rail-item is-active" data-i18n="rail.records">Registro</span>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="rail.matrix">Matriz</button>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="rail.rank">Ranking</button>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="rail.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">
@@ -3707,12 +3861,12 @@
         <button id="btn-matrix-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
           Despacho
         </button>
-        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="rail.records">
           Registro
         </button>
-        <span class="ax-rail-item is-active" data-i18n="menu.matrix">Matriz Geracional</span>
-        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
-        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <span class="ax-rail-item is-active" data-i18n="rail.matrix">Matriz</span>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="rail.rank">Ranking</button>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="rail.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">
@@ -3740,14 +3894,12 @@
         <button id="btn-rank-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
           Despacho
         </button>
-        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="rail.records">
           Registro
         </button>
-        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
-          Matriz Geracional
-        </button>
-        <span class="ax-rail-item is-active" data-i18n="menu.rank">Ranking</span>
-        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="rail.matrix">Matriz</button>
+        <span class="ax-rail-item is-active" data-i18n="rail.rank">Ranking</span>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="rail.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
       <div class="ax-sheet">

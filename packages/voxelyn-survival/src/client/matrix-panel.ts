@@ -787,11 +787,30 @@ const renderCodexTab = (
 
   if (codex.unlocked.length <= 1) body.appendChild(el('p', 'sub', t('codex.empty')));
 
+  // Trancados AGRUPADOS por nivel de autorizacao: 127 fichas identicas, de
+  // tres linhas cada, eram uma parede de 40 telas que ninguem rolava ate o
+  // fim. Uma ficha por nivel diz o mesmo — quantos faltam, e a que distancia —
+  // e os codigos mascarados continuam la, em letra pequena, para quem conta.
+  const byLevel = new Map<number, typeof codex.locked>();
   for (const locked of codex.locked) {
+    const slots = byLevel.get(locked.clearanceLevel) ?? [];
+    slots.push(locked);
+    byLevel.set(locked.clearanceLevel, slots);
+  }
+  for (const [level, slots] of [...byLevel.entries()].sort((a, b) => a[0] - b[0])) {
     const card = el('article', 'codex-doc codex-locked');
-    card.appendChild(el('div', 'codex-code', locked.maskedCode));
+    card.appendChild(
+      el(
+        'div',
+        'codex-code',
+        t(slots.length === 1 ? 'codex.lockedGroup.one' : 'codex.lockedGroup.many', {
+          count: slots.length,
+          level,
+        }),
+      ),
+    );
     card.appendChild(el('div', 'sub', t('codex.locked')));
-    card.appendChild(el('div', 'sub', t('codex.clearance', { level: locked.clearanceLevel })));
+    card.appendChild(el('div', 'codex-locked-codes', slots.map((s) => s.maskedCode).join(' · ')));
     body.appendChild(card);
   }
   return body;

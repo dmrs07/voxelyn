@@ -51,6 +51,12 @@ export type RankView = {
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
   /**
+   * O nome local do operador, para destacar a propria linha. Nomes nao sao
+   * unicos (ver settings.ts), entao o destaque e uma conveniencia de leitura,
+   * nunca uma prova de autoria.
+   */
+  selfName?: string;
+  /**
    * A consulta ainda esta no ar?
    *
    * Separado de `emptyReason` porque espera e ausencia nao podem vestir a
@@ -131,7 +137,13 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     const head = el('div', 'ax-rank-head');
     head.appendChild(el('span', undefined, '#'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
-    head.appendChild(el('span', undefined, t('rank.col.cores')));
+    // "Nucleos" nao cabe na coluna de 30px de um celular de 320px: la o
+    // cabecalho vira o proprio simbolo da moeda, o mesmo do inspetor.
+    const cores = el('span');
+    cores.appendChild(el('span', 'ax-col-long', t('rank.col.cores')));
+    cores.appendChild(el('span', 'ax-col-short', '◉'));
+    cores.setAttribute('aria-label', t('rank.col.cores'));
+    head.appendChild(cores);
     head.appendChild(el('span', undefined, t('rank.col.time')));
     head.appendChild(el('span', undefined, '★'));
     // Sem rotulo: e a coluna do botao de replay, e um cabecalho vazio ainda
@@ -139,8 +151,14 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     head.appendChild(el('span'));
     host.appendChild(head);
 
+    const self = view.selfName?.trim().toLowerCase() ?? '';
     view.entries.forEach((entry, index) => {
-      const row = el('div', `ax-rank-row${index < 3 ? ' is-podium' : ''}`);
+      const isSelf = self !== '' && entry.name.trim().toLowerCase() === self;
+      const row = el(
+        'div',
+        `ax-rank-row${index < 3 ? ' is-podium' : ''}${isSelf ? ' is-self' : ''}`,
+      );
+      if (isSelf) row.title = t('rank.self');
       row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
       row.appendChild(el('span', 'ax-rank-name', entry.name));
       row.appendChild(el('span', 'ax-rank-cores', String(entry.cores ?? 0)));

@@ -2031,6 +2031,10 @@ const startOnline = (): void => {
   if (code !== '' && !isValidRoomCode(code)) {
     setBanner(t('banner.room.invalid', { code }), 'error');
     setTimeout(() => setBanner(null), 2400);
+    // O erro mora no campo: moldura vermelha e foco, para corrigir sem
+    // procurar onde foi que deu errado.
+    roomInput.setAttribute('aria-invalid', 'true');
+    roomInput.focus();
     return;
   }
   contractRun = null;
@@ -2293,6 +2297,7 @@ modeButtons.forEach((b) => {
 });
 // A sublinha do carimbo nasce traduzida: o HTML so carrega o texto em pt-BR.
 selectMode(dispatchMode);
+roomInput.addEventListener('input', () => roomInput.removeAttribute('aria-invalid'));
 document.getElementById('btn-solo')?.addEventListener('click', () => {
   switch (dispatchMode) {
     case 'online':
@@ -2992,6 +2997,7 @@ const openRankBook = (sectorCount?: number): void => {
         sectorCount: page.sectorCount,
         onSelectClass: openRankBook,
         onWatchReplay: (entry) => openReplay(url, entry),
+        selfName: playerName,
         // Duas causas, duas frases: o cliente sabe se a Aurix respondeu.
         emptyReason: t(page.unreachable ? 'rank.empty.unreachable' : 'rank.empty'),
       });

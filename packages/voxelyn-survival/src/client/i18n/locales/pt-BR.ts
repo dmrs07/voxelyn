@@ -61,6 +61,11 @@ export const PT_BR = {
   'menu.mode.online.sub': 'Sala aberta ou por código',
   'menu.mode.training.sub': 'Exercício do chassi',
   'menu.options': 'Opções',
+  // Rotulos do trilho: curtos de proposito — cinco abas cabem em 320px.
+  'rail.records': 'Registro',
+  'rail.matrix': 'Matriz',
+  'rail.rank': 'Ranking',
+  'rail.options': 'Opções',
   'menu.records': 'Registro',
   'menu.rank': 'Ranking',
   'menu.dev.seed': 'Seed',
@@ -240,6 +245,7 @@ export const PT_BR = {
   'rank.class': '{sectors} setores',
   'rank.class.entries': '{entries} expedições homologadas',
   'rank.replay': 'Assistir replay autoritativo',
+  'rank.self': 'você',
   'rank.how': 'COMO ENTRAR',
   'rank.how.1':
     'Só runs que extraíram entram. O servidor re-simula a partida a partir das teclas que você apertou: não há placar para enviar, só o que aconteceu.',
@@ -585,6 +591,8 @@ export const PT_BR = {
   'matrix.loading': 'Consultando a Aurix Dynamics…',
   'matrix.policy': 'O que retorna é homologado. O que fica no Veio nunca existiu.',
   'codex.locked': 'AUTORIZAÇÃO INSUFICIENTE',
+  'codex.lockedGroup.one': '1 arquivo · nível {level}',
+  'codex.lockedGroup.many': '{count} arquivos · nível {level}',
   'codex.clearance': 'nível {level}',
   'codex.related': 'Arquivos relacionados',
   'codex.source': 'Origem',
