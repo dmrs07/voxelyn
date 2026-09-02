@@ -3160,9 +3160,6 @@
       .ax-tab {
         flex: 0 0 auto;
       }
-      .ax-col-short {
-        display: none;
-      }
       /* Ranking: a propria linha do operador, pelo nome local. */
       .ax-rank-row.is-self {
         border-left-color: var(--ax-teal);
@@ -3284,11 +3281,14 @@
           gap: 4px;
           padding: 5px 4px;
         }
-        .ax-col-long {
-          display: none;
+        /* O texto some do olho (font-size 0) mas nao do DOM; o simbolo entra
+           por pseudo-elemento. `aria-label` nao e preciso: o texto esta la. */
+        .ax-rank-head .ax-col-cores {
+          font-size: 0;
         }
-        .ax-col-short {
-          display: inline;
+        .ax-rank-head .ax-col-cores::before {
+          content: '◉';
+          font-size: 10px;
         }
       }
       /* 320px: seis nos de 42px cabem na linha; 44 quebrava o terminal. */

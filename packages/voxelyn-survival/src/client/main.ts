@@ -2156,7 +2156,9 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
  * basta.
  *
  * A seed sobrevive aos reinicios, como qualquer seed fixada: a razao de existir um
- * contrato e tentar o MESMO mapa de novo depois de morrer nele.
+ * contrato e tentar o MESMO mapa de novo depois de morrer nele. Ela se desfaz no
+ * proximo despacho que NAO seja o contrato (ver o carimbo DESCER): descida livre
+ * volta a sortear, como a ficha promete.
  */
 /**
  * O rotulo do desafio no idioma do jogador.
@@ -2176,8 +2178,10 @@ const contractText = (contract: DeathEchoContract): string => {
 const startContract = (): void => {
   const contract = advertisedContract;
   if (!contract) return;
+  // So `forcedSeed`, nunca o campo de seed: o campo e a ferramenta de
+  // desenvolvimento, e escrever o contrato nele fazia a proxima descida livre
+  // reler o contrato como se fosse uma seed digitada.
   forcedSeed = contract.seed;
-  seedInput.value = formatSeed(contract.seed);
   setBanner(contractText(contract));
   setTimeout(() => setBanner(null), 3200);
   startSolo(contract);
@@ -2299,6 +2303,12 @@ modeButtons.forEach((b) => {
 selectMode(dispatchMode);
 roomInput.addEventListener('input', () => roomInput.removeAttribute('aria-invalid'));
 document.getElementById('btn-solo')?.addEventListener('click', () => {
+  // A seed do contrato fica retida entre reinicios de proposito (ver
+  // `startContract`) — mas so ate o operador despachar OUTRA coisa. Sem isto,
+  // "Descida livre · seed aleatoria" repetia o mapa do desafio: a ficha
+  // prometia sorteio e entregava o contrato. O campo de seed (?dev=1) volta a
+  // ser a unica fonte de seed fixada para as descidas que nao sao o contrato.
+  if (dispatchMode !== 'contract') forcedSeed = parseSeed(seedInput.value);
   switch (dispatchMode) {
     case 'online':
       withInduction(startOnline);

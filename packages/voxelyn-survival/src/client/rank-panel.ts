@@ -137,13 +137,10 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     const head = el('div', 'ax-rank-head');
     head.appendChild(el('span', undefined, '#'));
     head.appendChild(el('span', undefined, t('rank.col.operator')));
-    // "Nucleos" nao cabe na coluna de 30px de um celular de 320px: la o
-    // cabecalho vira o proprio simbolo da moeda, o mesmo do inspetor.
-    const cores = el('span');
-    cores.appendChild(el('span', 'ax-col-long', t('rank.col.cores')));
-    cores.appendChild(el('span', 'ax-col-short', '◉'));
-    cores.setAttribute('aria-label', t('rank.col.cores'));
-    head.appendChild(cores);
+    // "Nucleos" nao cabe na coluna de 30px de um celular de 320px: la o CSS
+    // troca o texto pelo simbolo da moeda (um pseudo-elemento, para o texto
+    // continuar sendo "Nucleos" para leitores de tela e para os testes).
+    head.appendChild(el('span', 'ax-col-cores', t('rank.col.cores')));
     head.appendChild(el('span', undefined, t('rank.col.time')));
     head.appendChild(el('span', undefined, '★'));
     // Sem rotulo: e a coluna do botao de replay, e um cabecalho vazio ainda
