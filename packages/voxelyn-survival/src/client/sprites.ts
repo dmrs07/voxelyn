@@ -19,6 +19,7 @@ import {
   type PropManifest,
   type TerrainManifest,
   EMISSIVE_HEX,
+  generationLayerSpriteIds,
   moduleLayerSpriteId,
 } from '@voxelyn/survival-content';
 import { armFaceLight, orderFacesForDraw } from './face-light';
@@ -89,6 +90,18 @@ import moduleSiphonNormalUrl from '@voxelyn/survival-content/assets/atlases/laye
 import moduleMinigunManifest from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.json';
 import moduleMinigunUrl from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.png?url';
 import moduleMinigunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-module-minigun.normal.png?url';
+import generationG01Manifest from '@voxelyn/survival-content/assets/atlases/layer-generation-g01.json';
+import generationG01Url from '@voxelyn/survival-content/assets/atlases/layer-generation-g01.png?url';
+import generationG01NormalUrl from '@voxelyn/survival-content/assets/atlases/layer-generation-g01.normal.png?url';
+import generationG02Manifest from '@voxelyn/survival-content/assets/atlases/layer-generation-g02.json';
+import generationG02Url from '@voxelyn/survival-content/assets/atlases/layer-generation-g02.png?url';
+import generationG02NormalUrl from '@voxelyn/survival-content/assets/atlases/layer-generation-g02.normal.png?url';
+import generationG03Manifest from '@voxelyn/survival-content/assets/atlases/layer-generation-g03.json';
+import generationG03Url from '@voxelyn/survival-content/assets/atlases/layer-generation-g03.png?url';
+import generationG03NormalUrl from '@voxelyn/survival-content/assets/atlases/layer-generation-g03.normal.png?url';
+import generationG04Manifest from '@voxelyn/survival-content/assets/atlases/layer-generation-g04.json';
+import generationG04Url from '@voxelyn/survival-content/assets/atlases/layer-generation-g04.png?url';
+import generationG04NormalUrl from '@voxelyn/survival-content/assets/atlases/layer-generation-g04.normal.png?url';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
@@ -174,6 +187,10 @@ const NORMAL_URLS: Record<string, string> = {
   'layer-module-ricochet.normal.png': moduleRicochetNormalUrl,
   'layer-module-siphon.normal.png': moduleSiphonNormalUrl,
   'layer-module-minigun.normal.png': moduleMinigunNormalUrl,
+  'layer-generation-g01.normal.png': generationG01NormalUrl,
+  'layer-generation-g02.normal.png': generationG02NormalUrl,
+  'layer-generation-g03.normal.png': generationG03NormalUrl,
+  'layer-generation-g04.normal.png': generationG04NormalUrl,
   'world-props.normal.png': worldPropsNormalUrl,
   'enemy-archcantor.normal.png': enemyArchcantorNormalUrl,
   'enemy-bellows.normal.png': enemyBellowsNormalUrl,
@@ -249,6 +266,16 @@ export type LayeredPlayerAnimation = {
    * duas transicoes que a arma existe para vender.
    */
   barrelPhase?: number;
+  /**
+   * A GERACAO do chassi (`G-00`..`G-04`), para os marcos geracionais.
+   *
+   * E a geracao em que a RUN esta sendo jogada (`RunDepthConfig.generation`),
+   * e nao a do perfil de quem assiste: e o mesmo dado para o jogador local, o
+   * parceiro (a sala decide a geracao dos dois) e o replay (a profundidade
+   * congelada carrega a de quem jogou). Ausente ou desconhecida = `G-00`, o
+   * chassi de fabrica.
+   */
+  generation?: string;
 };
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
@@ -531,6 +558,18 @@ const MODULE_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: strin
   'layer-module-ricochet': { manifest: moduleRicochetManifest as unknown as SpriteManifestEntry, url: moduleRicochetUrl },
   'layer-module-siphon': { manifest: moduleSiphonManifest as unknown as SpriteManifestEntry, url: moduleSiphonUrl },
   'layer-module-minigun': { manifest: moduleMinigunManifest as unknown as SpriteManifestEntry, url: moduleMinigunUrl },
+};
+
+/**
+ * Os atlas de GERACAO, um por marco, tambem sob demanda: uma run de G-00 (o
+ * co-op padronizado, toda primeira descida) nao carrega nenhum, e uma de G-02
+ * carrega dois. Mesmo caminho dos modulos, pelas mesmas razoes.
+ */
+const GENERATION_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'layer-generation-g01': { manifest: generationG01Manifest as unknown as SpriteManifestEntry, url: generationG01Url },
+  'layer-generation-g02': { manifest: generationG02Manifest as unknown as SpriteManifestEntry, url: generationG02Url },
+  'layer-generation-g03': { manifest: generationG03Manifest as unknown as SpriteManifestEntry, url: generationG03Url },
+  'layer-generation-g04': { manifest: generationG04Manifest as unknown as SpriteManifestEntry, url: generationG04Url },
 };
 
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
@@ -1135,7 +1174,11 @@ export class SpriteBank {
    * carregado devolve na hora, sem tocar em rede.
    */
   retryFailed(): void {
-    const again = [...SOURCES, ...Object.values(MODULE_SOURCES)].filter(
+    const again = [
+      ...SOURCES,
+      ...Object.values(MODULE_SOURCES),
+      ...Object.values(GENERATION_SOURCES),
+    ].filter(
       (source) => this.byId.get(source.manifest.id)?.failed
     );
     for (const { manifest } of again) {
@@ -1204,7 +1247,7 @@ export class SpriteBank {
    * quadro nao produz um segundo download nem um segundo `emissiveMask`.
    */
   requestModule(layerId: string): void {
-    const source = MODULE_SOURCES[layerId];
+    const source = MODULE_SOURCES[layerId] ?? GENERATION_SOURCES[layerId];
     if (source) this.loadSource(source);
   }
 
@@ -1349,6 +1392,18 @@ export class SpriteBank {
     // uma linha de HUD.
     const mounted = animation.modules ?? [];
     for (const id of mounted) this.requestModule(moduleLayerSpriteId(id));
+    // OS MARCOS GERACIONAIS: as camadas de G-01 ate a geracao da unidade,
+    // desenhadas logo depois do tronco, na pose e no deslocamento dele. Elas
+    // foram assadas com o tronco como oclusor (ver `renderVoxelsOver` no
+    // gerador), entao por cima dele elas SAO o chassi daquela geracao, pixel
+    // a pixel — o que esta atras do peito ja nao existe no atlas. Um atlas
+    // que ainda nao chegou simplesmente nao aparece: o bot continua o de
+    // fabrica ate a peca descer, nunca meio desenhado.
+    const generationIds = generationLayerSpriteIds(animation.generation ?? 'G-00');
+    for (const id of generationIds) this.requestModule(id);
+    const generationLayers = generationIds
+      .map((id) => this.get(id))
+      .filter((entry): entry is Loaded => entry !== null);
     const composition = weaponComposition(mounted);
     const minigun = composition.weapon
       ? this.get(moduleLayerSpriteId(composition.weapon))
@@ -1413,20 +1468,22 @@ export class SpriteBank {
     const upperX = footX + recoil.x;
     const upperY = footY + hipBob + recoil.y;
     const drawUpper = (): void => {
-      this.drawLoadedFrame(
-        ctx,
-        upper,
-        animation.upper.animation,
-        animation.upper.facingX,
-        animation.upper.facingY,
-        animation.upper.elapsedMs,
-        upperX,
-        upperY,
-        zoom,
-        bodyTint,
-        light,
-        faces
-      );
+      for (const layer of [upper, ...generationLayers]) {
+        this.drawLoadedFrame(
+          ctx,
+          layer,
+          animation.upper.animation,
+          animation.upper.facingX,
+          animation.upper.facingY,
+          animation.upper.elapsedMs,
+          upperX,
+          upperY,
+          zoom,
+          bodyTint,
+          light,
+          faces
+        );
+      }
     };
 
     // A arma acompanha o tronco quadro a quadro e recebe o MESMO deslocamento de

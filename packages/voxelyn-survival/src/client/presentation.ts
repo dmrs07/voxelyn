@@ -191,6 +191,7 @@ const layeredPlayerAnimation = (
   facing: FacingResolver,
   gun: { heat: number; overheated: boolean; modules: readonly ModuleId[] },
   gunView: MinigunGunView | undefined,
+  generation: string,
 ): LayeredPlayerAnimation => {
   const releaseMs = action
     ? Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000)
@@ -248,6 +249,7 @@ const layeredPlayerAnimation = (
     // bala 300, com os canos ainda em desaceleracao. A rotacao cobre os dois.
     modules: mountedModules(gun.modules, gunView),
     barrelPhase: gunView?.barrelPhase ?? 0,
+    generation,
   };
 };
 
@@ -590,6 +592,7 @@ export class EntityPresentation {
             facing,
             gunStateOf(entity, state),
             gunView,
+            state.config.depth.generation,
           );
           return {
             anim: layered,
@@ -654,6 +657,9 @@ export class EntityPresentation {
         facing,
         gunStateOf(entity, state),
         gunView,
+        // A geracao da RUN, para o jogador local, o parceiro e o replay: ver
+        // `LayeredPlayerAnimation.generation`.
+        state.config.depth.generation,
       );
       return {
         anim: layered,

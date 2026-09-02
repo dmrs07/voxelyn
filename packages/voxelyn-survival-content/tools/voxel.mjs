@@ -11,7 +11,7 @@
 // a ordem do pintor e a chave de profundidade vem do core (projectIso,
 // makeDrawKey, sortDrawCommands) — nao ha matematica isometrica duplicada aqui.
 import { makeDrawKey, projectIso, sortDrawCommands } from '@voxelyn/core';
-import { grid, set, setRgb } from './lib.mjs';
+import { clearPx, grid, set, setRgb } from './lib.mjs';
 
 /**
  * Rampas de face por material: [topo, esquerda, direita].
@@ -678,6 +678,55 @@ export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
     });
   }
   sortDrawCommands(commands); // ordem do pintor: fundo -> frente
+  for (const c of commands) c.draw();
+  return g;
+};
+
+/** Apaga os pixels de um cubo — o cubo esta la, mas nao e desta camada. */
+const eraseCube = (g, sx, sy) => {
+  for (const [dx, dy] of CUBE_CELLS) clearPx(g, sx + dx, sy + dy);
+};
+
+/**
+ * Rasteriza `boxes` COMO SE `occluders` estivessem no mesmo modelo — mas so
+ * pinta `boxes`.
+ *
+ * E o que uma camada SOBRE outra precisa: a peca da geracao vive parafusada no
+ * chassi, e o chassi e outro atlas. Desenhada sozinha, a peca das costas
+ * apareceria por cima do peito nas direcoes em que o corpo deveria escondê-la;
+ * desenhada com o corpo, o atlas carregaria uma copia do corpo por geracao.
+ * Aqui os voxels do oclusor entram na MESMA ordem do pintor, mas em vez de
+ * pintar eles APAGAM: tudo o que a peca tem atras do chassi some, tudo o que
+ * ela tem na frente fica, e o resultado composto sobre o atlas do corpo e,
+ * pixel a pixel, o modelo inteiro rasterizado de uma vez (ha teste medindo
+ * isso). A ocupacao tambem e a do modelo inteiro: a sombra de contato da peca
+ * contra a chapa sai igual a que ela teria dentro do corpo.
+ *
+ * Funciona sob `withFaceCapture` sem saber dele: apagar e apagar em qualquer
+ * modo, entao o mapa de faces sai com a silhueta identica a da cor.
+ */
+export const renderVoxelsOver = (boxes, occluders, dirIndex, w, h, anchorX, anchorY) => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
+  const g = grid(w, h);
+  const commands = [];
+  const solid = solidVoxels([...boxes, ...occluders], rotation);
+  for (const v of shellVoxels(boxes, rotation)) {
+    const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
+    const ramp = shadedRamp(solid, v);
+    commands.push({
+      key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
+      draw: () => cube(g, Math.round(anchorX + sx), Math.round(anchorY + sy), ramp),
+    });
+  }
+  for (const v of shellVoxels(occluders, rotation)) {
+    const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
+    commands.push({
+      key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
+      draw: () => eraseCube(g, Math.round(anchorX + sx), Math.round(anchorY + sy)),
+    });
+  }
+  sortDrawCommands(commands);
   for (const c of commands) c.draw();
   return g;
 };

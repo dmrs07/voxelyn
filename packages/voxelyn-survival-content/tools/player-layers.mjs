@@ -1,4 +1,5 @@
-import { renderVoxels } from './voxel.mjs';
+import { renderVoxels, renderVoxelsOver } from './voxel.mjs';
+import { GENERATION_ALLEGORIES, GENERATION_IDS, generationLayerId } from './prospector-generations.mjs';
 import {
   ATTACHMENT_IDS,
   MINIGUN_FAN_FRAMES,
@@ -136,6 +137,26 @@ const renderPart = (dir, anim, frame, part) =>
     RENDER_ANCHOR_Y
   );
 
+/**
+ * Um MARCO GERACIONAL, neste quadro: as pecas da geracao rasterizadas com o
+ * tronco como OCLUSOR. A peca vive parafusada no chassi, entao e o tronco (e
+ * so ele) que decide o que dela aparece — o cliente desenha a camada logo
+ * depois do tronco, na mesma pose e no mesmo deslocamento. Ver
+ * `renderVoxelsOver`.
+ */
+const renderGeneration = (dir, anim, frame, generation) => {
+  const pose = poseArgsFor(anim, frame);
+  return renderVoxelsOver(
+    GENERATION_ALLEGORIES[generation](pose),
+    prospectorParts(pose).upper,
+    DIR_INDEX[dir],
+    FRAME_WIDTH,
+    FRAME_HEIGHT,
+    RENDER_ANCHOR_X,
+    RENDER_ANCHOR_Y
+  );
+};
+
 /** Todo modulo que tem camada propria: os seis acoplados mais a Minigun. */
 export const ALL_MODULE_IDS = [...ATTACHMENT_IDS, 'minigun'];
 
@@ -172,8 +193,14 @@ const fitReference = () => {
         const withModules = [
           ...ALL_MODULE_IDS.flatMap((id) => moduleBoxes(id, anim, frame)),
         ];
+        // Os marcos geracionais entram pela mesma razao: a gaiola do G-02 e a
+        // linha mais alta do bot, e uma uniao sem ela enquadraria o corpo um
+        // pixel mais para baixo do que a camada que a carrega.
+        const withGenerations = GENERATION_IDS.flatMap((g) =>
+          GENERATION_ALLEGORIES[g](poseArgsFor(anim, frame))
+        );
         frames.push(renderVoxels(
-          [...pose.lower, ...pose.upper, ...pose.gun, ...withModules],
+          [...pose.lower, ...pose.upper, ...pose.gun, ...withModules, ...withGenerations],
           DIR_INDEX[dir],
           FRAME_WIDTH,
           FRAME_HEIGHT,
@@ -281,5 +308,28 @@ export const MODULE_LAYER_SPECS = ALL_MODULE_IDS.map((id) =>
     id === 'minigun'
       ? 'rotary cannon weapon layer replacing the shard driver on the Aurix PX prospector bot'
       : `${id.replace(/_/g, ' ')} module hardware bolted onto the shard driver of the Aurix PX prospector bot`
+  )
+);
+
+/**
+ * As camadas de GERACAO: uma por marco, empilhadas pelo cliente de G-01 ate a
+ * geracao da unidade. Ver `prospector-generations.mjs`.
+ *
+ * `idle` respira com o tronco (as pecas sobem com o `bob`); `walk` e `attack`
+ * tem UM quadro cada, porque nada no chassi se move na passada nem no coice —
+ * o braco de extracao balanca e a arma recua, mas as pecas estao presas a
+ * chapa, e o mesmo desenho serve o ciclo inteiro. Quatro atlas de 24 quadros:
+ * menos que uma camada de modulo cada.
+ */
+export const GENERATION_LAYER_SPECS = GENERATION_IDS.map((generation) =>
+  baseLayer(
+    generationLayerId(generation),
+    {
+      idle: { frames: idleBob.length, fps: 6, loop: true },
+      walk: { frames: 1, fps: WALK_FPS, loop: true },
+      attack: { frames: 1, fps: 12, loop: false },
+    },
+    (dir, anim, frame) => renderGeneration(dir, anim, frame, generation),
+    `generation ${generation} chassis hardware layer bolted onto the Aurix PX prospector bot`
   )
 );

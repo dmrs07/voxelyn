@@ -1,0 +1,85 @@
+{
+  "id": "layer-generation-g03",
+  "version": 7,
+  "atlas": "layer-generation-g03.png",
+  "normalAtlas": "layer-generation-g03.normal.png",
+  "normalScale": 2,
+  "frameWidth": 96,
+  "frameHeight": 112,
+  "columns": 24,
+  "anchorX": 48,
+  "anchorY": 108,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.68,
+    "h": 1
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2f6b4f",
+    "#59f2c2",
+    "#66c28a",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 1,
+      "fps": 18.4,
+      "loop": true
+    },
+    "attack": {
+      "frames": 1,
+      "fps": 12,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 5
+    },
+    "dl": {
+      "idle": 6,
+      "walk": 10,
+      "attack": 11
+    },
+    "ur": {
+      "idle": 12,
+      "walk": 16,
+      "attack": 17
+    },
+    "ul": {
+      "idle": 18,
+      "walk": 22,
+      "attack": 23
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "generation G-03 chassis hardware layer bolted onto the Aurix PX prospector bot",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

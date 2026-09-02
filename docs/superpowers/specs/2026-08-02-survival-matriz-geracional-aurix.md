@@ -650,12 +650,21 @@ oposto, e pela razão simétrica: os dois são **centralizados** em `damageEntit
 novo que esquecesse o multiplicador apareceria como bug de balanceamento; assim
 ele aparece no `if`.
 
-### 14.4 A evolução visual é overlay de runtime
+### 14.4 A evolução visual é uma camada de atlas por marco
 
 Um atlas por protocolo seriam 24 conjuntos completos de animação por direção, e a
 silhueta — o requisito mais duro da direção de arte — quebra antes disso. Ficaram
-cinco marcos cumulativos desenhados sobre o sprite, sem tocar hitbox, com os
-atlases finais registrados como trabalho futuro.
+cinco marcos cumulativos, sem tocar hitbox.
+
+A primeira entrega os desenhava em runtime, por cima do sprite, em coordenadas de
+tela; foram medidos para um corpo mais baixo que o sprite atual e liam como glitch.
+Hoje cada marco é uma **camada de atlas** (`layer-generation-g01`..`g04`), assada
+pelo mesmo rasterizador do Prospector, na mesma pose do tronco e com o tronco como
+oclusor — o que fica atrás do chassi já não existe no atlas. O cliente empilha as
+camadas de G-01 até a geração da run (`RunDepthConfig.generation`), logo depois
+do tronco; G-00 não carrega nenhuma. As alegorias (placa de matrícula e alça de
+içamento, gaiola de proteção, berço duplo, pilha de reator e placas peitorais)
+estão documentadas em `prospector-generations.mjs` no pacote de conteúdo.
 
 ## 15. O que ficou de fora desta entrega
 
@@ -665,7 +674,6 @@ atlases finais registrados como trabalho futuro.
   schema da tabela, e não cabia junto com o resto. A estrutura para isso está
   pronta: a liquidação já loga `phase`, `ore`, `cores` e duração de forma
   estruturada.
-- **Atlases finais dos marcos geracionais** (§14.4).
 - **Co-op geracional.** O co-op continua padronizado em G-00, como a spec previa
   para a primeira entrega.
 

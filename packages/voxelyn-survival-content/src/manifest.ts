@@ -219,8 +219,39 @@ export const MODULE_LAYER_SPRITE_IDS = [
 export const moduleLayerSpriteId = (moduleId: string): string =>
   `layer-module-${moduleId.replace(/_/g, '-')}`;
 
+/**
+ * As camadas de GERACAO, uma por marco da Matriz Geracional acima do G-00.
+ *
+ * Mesmo quadro e mesma ancora do tronco, assadas com o tronco como oclusor
+ * (ver `renderVoxelsOver` no gerador): o cliente as desenha logo depois do
+ * tronco, na mesma pose, e empilha de G-01 ate a geracao da unidade — o
+ * acumulo e a pilha, nao um atlas por geracao que repete as anteriores.
+ *
+ * A lista e literal pela mesma razao da de modulos: este pacote nao conhece
+ * `ProspectorGeneration`. Quem cobre a divergencia e um teste do cliente.
+ */
+export const GENERATION_LAYER_SPRITE_IDS = [
+  'layer-generation-g01',
+  'layer-generation-g02',
+  'layer-generation-g03',
+  'layer-generation-g04',
+] as const;
+
+/**
+ * As camadas que uma geracao EMPILHA sobre o chassi de fabrica, de baixo para
+ * cima. `G-00` e qualquer etiqueta desconhecida dao a lista vazia: o Prospector
+ * de sempre, que e o unico desfecho seguro para um dado que o cliente nao
+ * reconhece.
+ */
+export const generationLayerSpriteIds = (generation: string): readonly string[] => {
+  const index = /^G-0([1-4])$/.exec(generation);
+  if (!index) return [];
+  return GENERATION_LAYER_SPRITE_IDS.slice(0, Number(index[1]));
+};
+
 export const FIRST_PACK_IDS = [
   ...MODULE_LAYER_SPRITE_IDS,
+  ...GENERATION_LAYER_SPRITE_IDS,
   ...CHARACTER_SPRITE_IDS,
   ...PLAYER_LAYER_SPRITE_IDS,
   'fx-projectile-bolt',

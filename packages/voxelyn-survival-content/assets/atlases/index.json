@@ -41,6 +41,10 @@
     "layer-module-return-disc",
     "layer-module-ricochet",
     "layer-module-siphon",
-    "layer-module-minigun"
+    "layer-module-minigun",
+    "layer-generation-g01",
+    "layer-generation-g02",
+    "layer-generation-g03",
+    "layer-generation-g04"
   ]
 }
