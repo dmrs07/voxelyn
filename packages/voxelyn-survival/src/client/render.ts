@@ -157,7 +157,6 @@ import {
 import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
-import { drawGenerationMarks, marksFor } from './prospector-generation';
 import { chassisFault, drawShortArc } from './chassis-fault';
 import { drawBatteryGlyph } from './battery-glyph';
 import {
@@ -184,7 +183,6 @@ import {
   drawCombatSenseWorld,
   hasCombatSense,
 } from './combat-assist';
-import type { ProspectorGeneration } from '@voxelyn/survival-sim';
 import {
   describeCause,
   describeOutcome,
@@ -1508,17 +1506,6 @@ export class SurvivalRenderer {
   private coresChangedAtMs = -1e9;
   /** Quando o Prospector local gastou a ultima Celula de Purga. */
   private purgeUsedAtMs = -1e9;
-  /**
-   * A geracao do Prospector LOCAL, para os marcos visuais.
-   *
-   * Vem do perfil autoritativo, e nao da run: a run nao carrega a arvore, so o
-   * tuning derivado dela. Isso mantem o desenho ignorante de metaprogressao — ele
-   * recebe uma etiqueta e desenha.
-   *
-   * O parceiro do co-op continua em G-00 enquanto o modo for padronizado; quando
-   * a geracao viajar no protocolo, e aqui que ela entra.
-   */
-  private localGeneration: ProspectorGeneration = 'G-00';
   /** Salões já atravessados neste setor, para SV-04. */
   private readonly route = new RouteMemory();
   /** Estimador de velocidade de alvo, para o marcador de antecipação (IA-03). */
@@ -1737,11 +1724,6 @@ export class SurvivalRenderer {
     this.lastSector = state.sector;
     this.sectorEnteredAtMs = nowMs;
     this.route.reset();
-  }
-
-  /** A geracao do chassi local. Puramente cosmetica: nao toca hitbox nem sim. */
-  setProspectorGeneration(generation: ProspectorGeneration): void {
-    this.localGeneration = generation;
   }
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
@@ -4075,22 +4057,15 @@ export class SurvivalRenderer {
                 ctx.fillRect(psx - size * 1.3, lineY - z, size * 2.6, Math.max(1, z * 1.2));
                 ctx.restore();
               }
-              // Os marcos geracionais vao DEPOIS do corpo, por cima dele, e so
-              // no Prospector local: o parceiro do co-op e padronizado enquanto
-              // o modo for G-00, e desenhar a geracao de quem nao a tem seria
-              // mentir sobre o que aquela unidade pode fazer.
-              //
-              // Nada aqui toca `pl.radius` — a colisao e a mesma em G-00 e G-04.
+              // Os marcos geracionais (ombreiras, antena, placa, pistoes,
+              // halo) NAO sao mais desenhados. Eram tracos de runtime medidos
+              // para um corpo mais baixo que o sprite atual — caiam na
+              // cintura em vez do ombro — e presos aos pes, sem acompanhar
+              // andar, esquiva nem tremor. Liam como glitch, e nao como
+              // geracao. A geracao continua legivel na Matriz; o chassi em
+              // campo volta a ter uma silhueta so, ate existirem atlases
+              // proprios por geracao (spec da Matriz Geracional, §14.4).
               if (isLocal) {
-                drawGenerationMarks(
-                  ctx,
-                  marksFor(this.localGeneration),
-                  psx,
-                  psy,
-                  z,
-                  presented.facingX,
-                  nowMs,
-                );
                 // Levantamento: instrumentacao, e nao mapa. Sai depois do corpo
                 // porque as setas partem DELE, e so para o Prospector local — a
                 // arvore e de quem a comprou.

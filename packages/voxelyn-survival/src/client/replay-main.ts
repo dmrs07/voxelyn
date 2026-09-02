@@ -129,11 +129,6 @@ const runReplay = (
   const renderer = new SurvivalRenderer(canvas);
   renderer.setLocalPlayerId(1);
   renderer.setQuality(loadQuality());
-  // O chassi e da GERACAO que jogou, e nao da geracao de quem assiste — nem do
-  // G-00 default. A profundidade congelada da run carrega esse dado (ver
-  // `RunDepthConfig.generation`), e sem esta linha toda descida de G-01 para
-  // cima seria replayada com as marcas do chassi errado.
-  if (depth) renderer.setProspectorGeneration(depth.generation);
   // Nunca `attach()`: o replay nao le teclado nem toque — o unico "input" dele
   // e o log. A instancia serve so para dar a `render()` o `InputState` default
   // que o desenho do HUD de toque espera.
