@@ -7,10 +7,13 @@
 //
 // O laco de jogo abaixo e um recorte deliberado do de `main.ts`: mesma
 // simulacao (`stepRun` a 20 Hz, `LocalPlayout` interpolando para o desenho),
-// mesmo `SurvivalRenderer`/`SurvivalInput`, mesma assistencia de combate — o
-// que sobra de fora e tudo que pertence a EXPEDICAO (ticket do servidor,
-// gravacao de log, homologacao, Ecos de morte, som): nada disso faz sentido
-// para uma arena que existe so para testar uma luta isolada.
+// mesmo `SurvivalRenderer`/`SurvivalInput`, mesma assistencia de combate, e o
+// MESMO `AudioDirector` (tiros, impactos, telegrafos de chefe, ambiencia) —
+// o que sobra de fora e so o que pertence a EXPEDICAO (ticket do servidor,
+// gravacao de log, homologacao, Ecos de morte): nada disso faz sentido para
+// uma arena que existe so para testar uma luta isolada. O volume/mudo segue
+// o que o jogador ja configurou na run normal (mesmo localStorage) — a
+// arena nao tem sliders proprios de proposito, e uma ferramenta de playtest.
 import { TICK_MS, stepRun } from '@voxelyn/survival-sim';
 import type { AbilityId, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalInput, type TouchSafeArea } from './input';
@@ -19,7 +22,8 @@ import { SurvivalRenderer } from './render';
 import { LocalPlayout } from './local-playout';
 import { TickEventQueue } from './playout';
 import { TouchCooldownOverlay } from './cooldown-overlay';
-import { loadQuality } from './settings';
+import { loadAudioSettings, loadQuality } from './settings';
+import { audio } from './audio';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from './arena-catalog';
 import { arenaOutcomeFor, type ArenaOutcome } from './arena-outcome';
 import { createArenaConclusionGuard } from './arena-conclusion';
@@ -138,6 +142,22 @@ const input = new SurvivalInput(canvas);
 const cooldownOverlay = new TouchCooldownOverlay(canvas);
 input.attach();
 
+// ---------------------------------------------------------------------------
+// Audio — mesmas preferencias (volume/mudo/trilha) da run normal, lidas do
+// mesmo localStorage. O contexto so nasce num gesto do usuario (unlock),
+// entao a rede de seguranca abaixo destrava no primeiro toque/tecla mesmo
+// que o testador nunca clique em "Entrar na arena" pelo mouse.
+// ---------------------------------------------------------------------------
+const audioSettings = loadAudioSettings();
+audio.setVolume(audioSettings.volume);
+audio.setMusicVolume(audioSettings.musicVolume);
+audio.setSfxVolume(audioSettings.sfxVolume);
+audio.setMuted(audioSettings.muted);
+audio.setMusicSource(audioSettings.musicSource);
+for (const evt of ['pointerdown', 'keydown'] as const) {
+  window.addEventListener(evt, () => audio.unlock(), { once: true, passive: true });
+}
+
 const readCssPixels = (name: string): number => {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
   const value = Number.parseFloat(raw);
@@ -213,6 +233,8 @@ const runArena = (conditions: ArenaConditions): void => {
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
+  audio.setLocalPlayerId(1);
+  audio.reset();
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -222,6 +244,7 @@ const runArena = (conditions: ArenaConditions): void => {
   let frameNow = lastTime;
   const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
     renderer.ingestEvents(events, frameNow);
+    audio.ingest(events, frameNow, state);
   });
   let queuedChoice: 0 | 1 | null = null;
   let ended = false;
@@ -249,6 +272,10 @@ const runArena = (conditions: ArenaConditions): void => {
     const outcome = guard.current();
     if (outcome) {
       eventQueue.flush(Number.POSITIVE_INFINITY);
+      // Segue chamando update() mesmo parado: e o que faz ambiencia/musica/
+      // motor da minigun APAGAREM em rampa (approachLevels, silence()) em vez
+      // de travarem no ultimo ganho que tinham quando a luta se decidiu.
+      audio.update(state, now);
       renderer.render(state, 1, input.state, now);
       // `renderEnd` e a tela de fim NATIVA da sim (morte/extracao); vitoria
       // contra o chefe nao passa por `state.phase`, entao nao ha nada la para
@@ -288,6 +315,7 @@ const runArena = (conditions: ArenaConditions): void => {
     const alpha = accumulator / TICK_MS;
     const view = guard.current() ? state : (playout.sample(state, alpha) ?? state);
     eventQueue.flush(view.tick);
+    audio.update(view, now);
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
@@ -312,11 +340,17 @@ let currentConditions: ArenaConditions = readConditions();
 
 formEl.addEventListener('submit', (ev) => {
   ev.preventDefault();
+  // O clique que entra na arena e o gesto que destrava o audio, exatamente
+  // como o clique que inicia uma descida em main.ts.
+  audio.unlock();
+  audio.ui();
   currentConditions = readConditions();
   runArena(currentConditions);
 });
 
 btnRetry.addEventListener('click', () => {
+  audio.unlock();
+  audio.ui();
   stopLoop?.();
   runArena(currentConditions);
 });
@@ -326,6 +360,11 @@ btnReconfigure.addEventListener('click', () => {
   // de simplesmente sumir sem desfecho nenhum.
   abandonActiveRun?.();
   stopLoop?.();
+  // O laco de quadros para AQUI: sem mais update(), ambiencia/musica/motor da
+  // minigun ficariam presos no ultimo ganho que tinham. reset() os cala na
+  // hora, do mesmo jeito que main.ts faz ao voltar para o menu.
+  audio.reset();
+  audio.ui();
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');
   endOverlay.classList.add('hidden');
