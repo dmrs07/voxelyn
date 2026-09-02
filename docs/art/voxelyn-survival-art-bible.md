@@ -155,13 +155,6 @@ packages/voxelyn-survival-content/assets/
   `enemy-spore-bomber`, `enemy-guardian`, `prop-terminal`, `prop-portal`, `prop-crystal`,
   `prop-fungal-cluster`, `prop-exit-core`, `fx-projectile-bolt`, `fx-impact-burst`,
   `loot-cache`.
-- Camadas do Prospector, com prefixo `layer-`: o corpo em três (`layer-player-prospector-lower`,
-  `-upper`, `-gun`), uma por módulo acoplável (`layer-module-<id>`) e uma por marco geracional
-  (`layer-generation-g01`..`g04`). Todas partilham quadro (96×112), âncora e enquadramento com
-  o corpo; o cliente as empilha na ordem de profundidade que o pacote de conteúdo mede nos
-  voxels. As camadas de geração são assadas com o tronco como oclusor (`renderVoxelsOver`):
-  o que fica atrás do chassi já não existe no atlas, e uma camada sobre o tronco é, pixel a
-  pixel, o modelo inteiro rasterizado de uma vez.
 - Nome de frame dentro do atlas: `<id>/<anim>/<dir>/<frame>` (ex.: `enemy-stalker/walk/dr/003`).
 - Proibido nome opaco (o caso `9+BtwY.png` do baseline é o anti-exemplo canônico).
 
