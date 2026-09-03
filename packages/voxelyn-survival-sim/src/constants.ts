@@ -2026,11 +2026,73 @@ export const ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS = 3;
 /**
  * O corredor que cada voz abre, em tiles, para FORA da formacao.
  *
- * Estreito (uma celula) e cardinal: os quatro corredores desenham uma cruz e as
- * diagonais ficam seguras. E a mesma geometria que a orbita ja promete de
- * olhar, e por isso o aviso e a formacao — nao um circulo no chao.
+ * Cardinal: os quatro corredores desenham uma cruz e as diagonais ficam
+ * seguras. E a mesma geometria que a orbita ja promete de olhar, e por isso o
+ * aviso e a formacao — nao um circulo no chao.
+ *
+ * Doze, e nao sete. Com sete o corredor morria a 9,5 tiles do corpo e o canto
+ * alcancava 14: existia uma faixa inteira da nave em que a cruz era decorativa
+ * e so a cadeia de cristal cobrava — e a cadeia so cobra de quem esta colado
+ * num cristal. O playtest fez o obvio: ficou a dez tiles, em chao aberto, e
+ * atirou. Doze poe a ponta do corredor (2,5 + 12) onde o canto termina.
  */
-export const ARCHCANTOR_CHOIR_LANCE_LENGTH = 7;
+export const ARCHCANTOR_CHOIR_LANCE_LENGTH = 12;
+/**
+ * Meia-largura do corredor, em celulas: 1 = tres celulas de largura.
+ *
+ * Uma celula so era um fio: a descarga cobra UMA vez, no tick em que sai, de
+ * quem estiver exatamente na celula — e atravessar um fio no tick errado e um
+ * acidente, nao uma decisao. Tres celulas e uma faixa que se le como faixa: da
+ * para ver que se esta dentro dela e sair, e da para ficar fora dela de
+ * proposito. As diagonais continuam abertas.
+ */
+export const ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH = 1;
+/**
+ * O ECO: quantos ticks depois da resposta cada corredor cobra de novo.
+ *
+ * A descarga e instantanea — cobra so no tick em que sai. Sem o eco, um
+ * corredor que acabou de piscar era o lugar mais seguro da sala pelos cinco
+ * segundos seguintes, e "reverberar" era so uma palavra. Com o eco, ficar
+ * dentro da faixa depois do primeiro clarao e a segunda cobranca; sair dela e
+ * a resposta, e a resposta tem de ser feita nos 12 ticks entre um e outro.
+ * Multiplo de 3 para nao cair em cima da resposta de outra voz.
+ */
+export const ARCHCANTOR_CHOIR_ECHO_TICKS = 12;
+/**
+ * A CATEDRAL REPOE A VOZ: quantos ticks depois de uma vaga abrir o cristal
+ * mais proximo cristaliza num Ressonante novo.
+ *
+ * A regra antiga era "buraco permanente ate outro Ressonante da sala ocupar",
+ * e na pratica era permanente e ponto: o setor tem dois Ressonantes soltos, em
+ * geral longe da camara. O coro caia uma vez e a luta virava a luta antiga.
+ *
+ * A reposicao NAO desfaz o progresso, porque nao e gratis: cada voz nova custa
+ * um cristal da nave — que e a luz, o recurso e a rede do canto. O chefe
+ * consome a propria Catedral para manter o acorde, de dentro para fora (o
+ * cristal mais proximo primeiro, que e a camada zero da cadeia). Uma sala sem
+ * cristal nao repoe ninguem, e quebrar cristal continua sendo o contra-jogo —
+ * agora pelas duas razoes.
+ *
+ * Quatro segundos por vaga, uma vaga por vez: derrubar os quatro compra
+ * dezesseis segundos de corpo exposto, e cada segundo desses custou 95 de vida
+ * de guarda. E uma janela, nao uma falha.
+ */
+export const ARCHCANTOR_CHOIR_RECRUIT_TICKS = 80;
+/**
+ * Ate onde, a partir do corpo, um cristal pode ser chamado a virar voz. O mesmo
+ * alcance do canto: o que o canto alcanca, o canto recruta.
+ */
+export const ARCHCANTOR_CHOIR_RECRUIT_REACH = 14;
+/**
+ * Quantos SOLISTAS a Catedral sustenta ao mesmo tempo.
+ *
+ * Com o acorde cheio, cada VOLTA COMPLETA da danca cristaliza uma voz que nao
+ * cabe — e a cospe na diagonal. E o que fecha a saida facil do encontro: as
+ * diagonais sao a seguranca contra a cruz, e sao exatamente por onde o solista
+ * vem. Dois e o teto porque tres bispos de xadrez numa nave estreita deixam de
+ * ser uma pressao legivel e viram uma parede que anda.
+ */
+export const ARCHCANTOR_SOLOIST_CAP = 2;
 
 /**
  * O SOLISTA: o Ressonante que chegou tarde e nao coube no acorde.

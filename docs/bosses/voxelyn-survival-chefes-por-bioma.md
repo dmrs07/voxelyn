@@ -496,29 +496,42 @@ _literalmente_ na trajetória do tiro mirado no chefe — e isso é melhor que q
 número: perfuração continua valendo, ricochete abre jogada, o ângulo passa a ser uma
 decisão, e matar uma voz abre uma janela de tiro **visível**, sem ícone de escudo nenhum.
 
-**O canto vira arpejo.** Na execução, as quatro vozes respondem _uma a uma_ — na ordem da
-órbita (N, L, S, O), a cada `ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS` (3 ticks). Os cantos
-alternam duas geometrias: primeiro a **cruz cardinal**, emitida para fora de cada guarda;
-depois o **xis diagonal**, cujo raio nasce no ponto médio entre dois guardas adjacentes.
-O halo do telegrafo identifica qual desenho vem a seguir, portanto nenhuma direção é uma
-segurança permanente. Derrubar uma voz apaga seu braço da cruz e também as duas diagonais
-que dependiam daquele par. Só depois do arpejo a rede de cristal continua propagando em
-camadas, com um halo circular reverberando em cada cristal alcançado.
+**O canto vira arpejo — e reverbera.** Na execução, as quatro vozes respondem _uma a uma_
+— na ordem da órbita (N, L, S, O), a cada `ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS` (3 ticks).
+Os cantos alternam duas geometrias: primeiro a **cruz cardinal**, emitida para fora de cada
+guarda; depois o **xis diagonal**, cujo raio nasce no ponto médio entre dois guardas
+adjacentes. O halo do telegrafo identifica qual desenho vem a seguir, portanto nenhuma
+direção é uma segurança permanente. Cada corredor é uma **faixa**: três células de largura
+(`_LANCE_HALF_WIDTH` 1) e alcance euclidiano de doze (`_LANCE_LENGTH`), o que põe a ponta
+dos dois desenhos onde o canto termina. Um compasso depois (`_ECHO_TICKS`, 12) cada corredor
+cobra **de novo**, na mesma ordem — a descarga é instantânea, e sem o eco o corredor
+recém-piscado era o lugar mais seguro da sala; o desenho só troca **depois** do eco, para a
+segunda cobrança nunca sair de uma geometria que ninguém anunciou. Derrubar uma voz apaga
+seu braço da cruz e também as duas diagonais que dependiam daquele par. Só depois do arpejo
+a rede de cristal continua propagando em camadas, com um halo circular reverberando em cada
+cristal alcançado.
 
-**Reforço é finito.** Um guarda abatido deixa um **buraco permanente**: não há
-recomposição por cooldown, porque desmontar o coro precisa representar progresso. A vaga
-só volta a ser preenchida por um Ressonante que já estava na Catedral e entrou no raio de
-atração (`ARCHCANTOR_CHOIR_ATTRACT_RADIUS`, 8 tiles) — ou seja, por um recurso que o
-jogador também pode gastar antes.
+**Reforço custa a sala.** Um guarda abatido abre uma vaga, e `ARCHCANTOR_CHOIR_RECRUIT_TICKS`
+(80 ticks, 4 s) depois a Catedral responde: o **cristal mais próximo do corpo cristaliza**
+num Ressonante novo, que corre para o posto — e o cristal **deixa de existir**. Ele era
+luz, recurso e nó da rede do canto; o chefe consome a própria nave para manter o acorde, de
+dentro para fora (a camada zero da cadeia primeiro). É assim que repor preserva o progresso
+em vez de apagá-lo: uma sala sem cristal não repõe ninguém, e quebrar cristal continua sendo
+o contra-jogo — agora pelas duas razões. Uma vaga por vez: derrubar os quatro compra
+dezesseis segundos de corpo exposto. Um Ressonante _solto_ que entre no raio de atração
+(`_ATTRACT_RADIUS`, 8) também ocupa a vaga, sem custar cristal.
 
 **O Solista.** Com os quatro postos ocupados, quem chega é _expulso_ por uma das
-diagonais. Ele deixa de operar a regra da
-Catedral e passa a se mover como um **bispo de xadrez**: só diagonal, comprometido com a
-diagonal escolhida até bater em alguma coisa ou até o relógio (`_RETARGET_TICKS`) permitir
-trocar. O compromisso é o bicho inteiro — um solista que corrigisse o rumo a cada tick
-seria um perseguidor comum com animação torta, e a resposta a ele deixaria de ser
-geométrica. Chegando perto, ele solta uma descarga curta telegrafada e **recua** por outra
-diagonal.
+diagonais. E com o acorde cheio a Catedral **continua respondendo**: a cada **volta
+completa** da dança um cristal cristaliza numa voz que não cabe, e ela é cuspida na diagonal
+(teto de `ARCHCANTOR_SOLOIST_CAP`, 2). É o que fecha a saída fácil do encontro: quem
+descobriu o lugar seguro contra o desenho da vez ganha um problema que anda exatamente por
+ali. Ele deixa de operar a regra da Catedral e passa a se mover como um **bispo de xadrez**:
+só diagonal, comprometido com a diagonal escolhida até bater em alguma coisa ou até o
+relógio (`_RETARGET_TICKS`) permitir trocar. O compromisso é o bicho inteiro — um solista
+que corrigisse o rumo a cada tick seria um perseguidor comum com animação torta, e a
+resposta a ele deixaria de ser geométrica. Chegando perto, ele solta uma descarga curta
+telegrafada e **recua** por outra diagonal.
 
 **Som.** Cada posição cardinal tem uma nota — fundamental, terça _menor_, quinta e nona —,
 e a nota sai da **posição**, não de quem está nela. É isso que faz um coro incompleto soar
@@ -527,12 +540,15 @@ incompleto: a voz que falta simplesmente não emite, e o buraco no acorde é o b
 material sonoro _errado_ (trítono, ritmo quebrado). Quando a última fonte cai, entra o cue
 de silêncio que já existia.
 
-**Estado.** Três campos em `BossRuntime` (`choir`, `choirRotation`, `choirRotateAt`) e um
-papel na entidade (`RESONANT_WILD` / `RESONANT_CHOIR` / `RESONANT_SOLOIST`, em `mood`). A
-posição desejada é **derivada** — corpo + raio + assento + rotação — e não sincronizada:
-guardar quatro coordenadas seria guardar números que já se sabem calcular, com quatro
-formas novas de discordar deles. Matar o regente **dissolve a regência**, não o coro: os
-guardas voltam a ser Ressonantes soltos.
+**Estado.** Quatro campos em `BossRuntime` (`choir`, `choirRotation`, `choirRotateAt`,
+`choirRecruitAt`) e um papel na entidade (`RESONANT_WILD` / `RESONANT_CHOIR` /
+`RESONANT_SOLOIST`, em `mood`) — todos no hash autoritativo, o papel inclusive, porque ele
+decide o próximo tick de qualquer inimigo com postura. A posição desejada é **derivada** —
+corpo + raio + assento + rotação — e não sincronizada: guardar quatro coordenadas seria
+guardar números que já se sabem calcular, com quatro formas novas de discordar deles.
+Assumir um papel **cancela a ação em voo** (com `action_end`): um Ressonante promovido no
+meio do próprio pulso não pode soltá-lo como guarda. Matar o regente **dissolve a
+regência**, não o coro: os guardas voltam a ser Ressonantes soltos.
 
 ### Os arcos de entendimento
 

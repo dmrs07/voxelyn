@@ -208,6 +208,9 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
     // uma tabela por momento so sabe devolver uma voz (ver o ramo em cues).
     choir_rotate: 'archcantorChoirStep',
     dissonance: 'archcantorDissonance',
+    // A Catedral REPONDO uma voz: e um cristal da nave respondendo ao chamado,
+    // entao e a voz do cristal — a mesma da ressonancia — e soa no cristal.
+    choir_call: 'archcantorResonance',
   },
 };
 

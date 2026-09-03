@@ -782,6 +782,14 @@ export type BossRuntime = {
   /** O tick do proximo passo da danca. */
   choirRotateAt: number;
   /**
+   * O tick em que a Catedral REPOE a proxima vaga (ver
+   * ARCHCANTOR_CHOIR_RECRUIT_TICKS). Empurrado para a frente a cada tick em que
+   * nao ha vaga, entao a contagem so corre depois de um guarda cair — e uma
+   * voz nova custa quatro segundos E um cristal da nave. Entra no hash: decide
+   * QUANDO um corpo nasce e QUAL cristal deixa de existir.
+   */
+  choirRecruitAt: number;
+  /**
    * Tick da ultima vez em que a broca do Diamandis ANUNCIOU parede
    * ("OBSTRUCAO"), ou -1. A broca abre dezenas de celulas por passagem e o
    * anuncio e por PASSAGEM, nao por celula: uma ordem de servico por obra.
@@ -873,6 +881,9 @@ export type BossMoment =
   // voz que falta simplesmente nao emite.
   | 'choir_rotate'
   | 'choir_voice'
+  // A Catedral respondendo ao chamado: um cristal da nave cristalizando numa
+  // voz nova. Soa NO cristal, e nao no chefe — e a sala que esta pagando.
+  | 'choir_call'
   // O SOLISTA: a voz que nao coube no acorde. Tritono, e no lugar errado.
   | 'dissonance'
   // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.

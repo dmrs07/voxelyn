@@ -25,6 +25,11 @@ import {
   ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
   ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS,
   ARCHCANTOR_CHOIR_LANCE_LENGTH,
+  ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+  ARCHCANTOR_CHOIR_ECHO_TICKS,
+  ARCHCANTOR_CHOIR_RECRUIT_TICKS,
+  ARCHCANTOR_CHOIR_RECRUIT_REACH,
+  ARCHCANTOR_SOLOIST_CAP,
   ARCHCANTOR_SOLOIST_SPEED,
   ARCHCANTOR_SOLOIST_RETARGET_TICKS,
   ARCHCANTOR_SOLOIST_ATTACK_RANGE,
@@ -295,6 +300,7 @@ import {
 } from './constants.js';
 import {
   breakSolid,
+  markDirty,
   canRip,
   chargeCells,
   closeArena,
@@ -3931,8 +3937,20 @@ const archcantorChainStride = (
   // corredores sao exatamente os que o jogador viu ao decidir onde ficar.
   if (elapsed % ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS === 0) {
     const voice = elapsed / ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS;
+    if (voice < ARCHCANTOR_CHOIR_SLOTS) archcantorChoirAnswer(state, voice, events);
+  }
+  // O ECO: cada corredor cobra de novo, na mesma ordem, um compasso depois. A
+  // descarga e instantanea, entao sem isto o corredor recem-piscado era o
+  // lugar mais seguro da sala; com isto, ficar dentro dele depois do primeiro
+  // clarao e a segunda cobranca, e sair e a resposta.
+  const echoed = elapsed - ARCHCANTOR_CHOIR_ECHO_TICKS;
+  if (echoed >= 0 && echoed % ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS === 0) {
+    const voice = echoed / ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS;
     if (voice < ARCHCANTOR_CHOIR_SLOTS) {
       archcantorChoirAnswer(state, voice, events);
+      // O DESENHO so troca depois da ultima voz do eco. O eco e o MESMO
+      // corredor cobrando de novo; trocar cruz por xis entre a resposta e o
+      // eco faria a segunda cobranca sair de um desenho que ninguem anunciou.
       if (voice === ARCHCANTOR_CHOIR_SLOTS - 1) {
         state.bossRuntime.choirPattern = 1 - state.bossRuntime.choirPattern;
       }
@@ -4079,6 +4097,41 @@ const archcantorDisbandChoir = (state: SurvivalState): void => {
   }
 };
 
+/**
+ * Um Ressonante ASSUME um papel, e larga o que estava fazendo.
+ *
+ * So trocar `mood` nao bastava: um Ressonante solto no meio do proprio pulso
+ * (telegrafo ou recuperacao) entrava no coro com a acao viva, e como
+ * `advanceAction` roda ANTES do ramo do coro, o guarda novo ficava parado
+ * longe do posto e ainda soltava o `resonantPulse` — armando cristal por conta
+ * propria, que e exatamente o que o papel proibe. A acao e cancelada aqui, com
+ * o `action_end` que avisa o cliente de que o telegrafo anunciado nao vai se
+ * cumprir.
+ */
+const assumeResonantRole = (
+  state: SurvivalState,
+  enemy: Entity,
+  role: number,
+  events: SemanticEvent[],
+): void => {
+  enemy.mood = role;
+  enemy.vx = 0;
+  enemy.vy = 0;
+  if (enemy.action) {
+    enemy.action = undefined;
+    events.push({ t: 'action_end', entity: enemy.id });
+  }
+};
+
+/** Os solistas vivos: quem a formacao ja cuspiu e ainda esta em campo. */
+const soloistCount = (state: SurvivalState): number => {
+  let count = 0;
+  for (const enemy of state.enemies) {
+    if (enemy.alive && enemy.archetype === 'resonant' && enemy.mood === RESONANT_SOLOIST) count++;
+  }
+  return count;
+};
+
 /** Um Ressonante SOLTO — nem regido, nem expulso. */
 const isWildResonant = (enemy: Entity): boolean =>
   enemy.alive && enemy.archetype === 'resonant' && (enemy.mood ?? RESONANT_WILD) === RESONANT_WILD;
@@ -4134,7 +4187,7 @@ const archcantorEjectSoloist = (
   enemy: Entity,
   events: SemanticEvent[],
 ): void => {
-  enemy.mood = RESONANT_SOLOIST;
+  assumeResonantRole(state, enemy, RESONANT_SOLOIST, events);
   enemy.rangedReadyAt = Math.max(enemy.rangedReadyAt, state.tick + ARCHCANTOR_SOLOIST_WINDUP_TICKS);
   soloistCommit(state, enemy, nearestTarget(state, enemy.x, enemy.y), false);
   events.push({
@@ -4145,6 +4198,73 @@ const archcantorEjectSoloist = (
     y: enemy.y,
     intensity: 0,
   });
+};
+
+/**
+ * A CATEDRAL RESPONDE: o cristal mais proximo do corpo vira um Ressonante.
+ *
+ * E daqui que saem as vozes de reposicao e os solistas, e o preco e o mesmo
+ * para os dois: o cristal DEIXA DE EXISTIR. Ele era luz, era recurso e era um
+ * no da rede do canto; o chefe gasta a propria nave para manter o acorde, e
+ * gasta de dentro para fora — o cristal mais proximo e da camada zero da
+ * cadeia. Uma sala sem cristal nao responde, e e assim que a reposicao
+ * preserva o progresso em vez de apaga-lo.
+ *
+ * A escolha e por menor distancia com o indice como desempate, e o cristal so
+ * serve se o corpo COUBER onde ele estava (`circleBlocked` com a celula ja
+ * aberta): um Ressonante nascido com um canto dentro da pedra nao sai dali
+ * nunca. Sem `breakSolid` de proposito — aquele conta como destruicao do
+ * jogador e solta a descarga do cristal, que cairia em cima do recem-nascido.
+ * O `break` sai igual para o cliente desenhar a lasca.
+ */
+const archcantorCrystallize = (
+  state: SurvivalState,
+  boss: Entity,
+  events: SemanticEvent[],
+): Entity | null => {
+  if (state.enemies.length >= MAX_ENEMIES) return null;
+  const w = state.config.width;
+  const h = state.config.height;
+  const def = ARCHETYPES.resonant;
+  const r = ARCHCANTOR_CHOIR_RECRUIT_REACH;
+  const cx = Math.floor(boss.x);
+  const cy = Math.floor(boss.y);
+  let best = -1;
+  let bestDist = Infinity;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r * r || d2 >= bestDist) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_CRYSTAL) continue;
+      state.solid[i] = SOLID_NONE;
+      const fits = !circleBlocked(state, x + 0.5, y + 0.5, def.radius);
+      state.solid[i] = SOLID_CRYSTAL;
+      if (!fits) continue;
+      best = i;
+      bestDist = d2;
+    }
+  }
+  if (best < 0) return null;
+  const x = best % w;
+  const y = (best - x) / w;
+  state.solid[best] = SOLID_NONE;
+  markDirty(state, x, y);
+  events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid: SOLID_CRYSTAL });
+  const voice = spawnEnemy(state, 'resonant', x, y, false);
+  events.push({ t: 'pulse', x: voice.x, y: voice.y, radius: 1.5 });
+  events.push({
+    t: 'boss_state',
+    archetype: 'archcantor',
+    state: 'choir_call',
+    x: voice.x,
+    y: voice.y,
+    intensity: 1,
+  });
+  return voice;
 };
 
 /**
@@ -4204,13 +4324,7 @@ const archcantorChoirTick = (state: SurvivalState, events: SemanticEvent[]): voi
       }
     }
     if (!best) continue;
-    // A promocao troca o repertorio inteiro do Ressonante. Se ele chegou aqui
-    // durante o windup/recuperacao do pulso selvagem, conservar a acao faria
-    // o novo guarda disparar a habilidade antiga antes de tomar o posto.
-    best.action = undefined;
-    best.vx = 0;
-    best.vy = 0;
-    best.mood = RESONANT_CHOIR;
+    assumeResonantRole(state, best, RESONANT_CHOIR, events);
     runtime.choir[seat] = best.id;
   }
   for (const candidate of state.enemies) {
@@ -4219,6 +4333,23 @@ const archcantorChoirTick = (state: SurvivalState, events: SemanticEvent[]): voi
       continue;
     }
     archcantorEjectSoloist(state, candidate, events);
+  }
+
+  // 3b. A CATEDRAL REPOE. A contagem so corre enquanto ha vaga: sem vaga o
+  //     prazo e empurrado a cada tick, entao um guarda que cai hoje custa os
+  //     quatro segundos inteiros — e um cristal — para ser reposto. Uma vaga
+  //     por vez, a de menor assento primeiro. Sem cristal ao alcance, a vaga
+  //     fica: a sala e o recurso, e a sala acabou.
+  const vacancy = runtime.choir.indexOf(0);
+  if (vacancy < 0) {
+    runtime.choirRecruitAt = state.tick + ARCHCANTOR_CHOIR_RECRUIT_TICKS;
+  } else if (state.tick >= runtime.choirRecruitAt) {
+    runtime.choirRecruitAt = state.tick + ARCHCANTOR_CHOIR_RECRUIT_TICKS;
+    const voice = archcantorCrystallize(state, boss, events);
+    if (voice) {
+      voice.mood = RESONANT_CHOIR;
+      runtime.choir[vacancy] = voice.id;
+    }
   }
 
   // 4. A DANCA. A formacao TRAVA enquanto o canto esta no ar: a cruz de
@@ -4237,6 +4368,21 @@ const archcantorChoirTick = (state: SurvivalState, events: SemanticEvent[]): voi
       y: boss.y,
       intensity: runtime.choirRotation / (ARCHCANTOR_CHOIR_SLOTS - 1),
     });
+  }
+  // 5. A VOLTA COMPLETA. Com o acorde cheio, a Catedral continua respondendo
+  //    ao chamado — e a voz que chega nao cabe. Ela e cristalizada e cuspida
+  //    na diagonal: e o que vai atras de quem descobriu que a diagonal e o
+  //    lugar seguro contra a cruz. Sai do relogio da danca, e nao de um
+  //    relogio proprio, porque a volta e o tempo que a formacao leva para
+  //    mostrar as quatro configuracoes — quem ainda nao resolveu nenhuma
+  //    delas ganha um problema a mais, e nao antes disso.
+  if (
+    runtime.choirRotation === 0 &&
+    runtime.choir.indexOf(0) < 0 &&
+    soloistCount(state) < ARCHCANTOR_SOLOIST_CAP
+  ) {
+    const voice = archcantorCrystallize(state, boss, events);
+    if (voice) archcantorEjectSoloist(state, voice, events);
   }
 };
 
@@ -4344,14 +4490,43 @@ const archcantorChoirAnswer = (
     : CHOIR_CARDINALS[cardinal];
   const originX = diagonal ? (guard.x + nextGuard!.x) * 0.5 : guard.x;
   const originY = diagonal ? (guard.y + nextGuard!.y) * 0.5 : guard.y;
-  const cells: number[] = [];
-  for (let step = 1; step <= ARCHCANTOR_CHOIR_LANCE_LENGTH; step++) {
-    const x = Math.floor(originX + dir.x * step);
-    const y = Math.floor(originY + dir.y * step);
-    if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
-    const i = y * w + x;
-    if (state.solid[i] !== SOLID_NONE) break;
-    cells.push(i);
+  // A FAIXA: a celula do eixo e as que a flanqueiam. O eixo manda — parede no
+  // eixo encerra o corredor, porque atras dela nao ha corredor; um flanco
+  // bloqueado so tira aquela celula, e a faixa segue estreita por ali.
+  //
+  // Na cruz os flancos sao a perpendicular. No xis sao as duas celulas que
+  // completam o degrau da diagonal — e o que faz a banda diagonal ser cheia em
+  // vez de uma escada com buracos por onde um corpo passa sem tocar.
+  const flanks: Vec2[] = diagonal
+    ? [
+        { x: dir.x, y: 0 },
+        { x: 0, y: dir.y },
+      ]
+    : [
+        { x: -dir.y, y: dir.x },
+        { x: dir.y, y: -dir.x },
+      ];
+  // O alcance e EUCLIDIANO: um passo diagonal anda raiz de dois, entao o xis
+  // da menos passos para chegar a mesma distancia. A ponta dos dois desenhos
+  // termina onde o canto termina.
+  const steps = Math.floor(ARCHCANTOR_CHOIR_LANCE_LENGTH / Math.hypot(dir.x, dir.y));
+  const cells = new Set<number>();
+  for (let step = 1; step <= steps; step++) {
+    const ax = Math.floor(originX + dir.x * step);
+    const ay = Math.floor(originY + dir.y * step);
+    if (ax <= 0 || ay <= 0 || ax >= w - 1 || ay >= h - 1) break;
+    if (state.solid[ay * w + ax] !== SOLID_NONE) break;
+    cells.add(ay * w + ax);
+    for (let k = 1; k <= ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH; k++) {
+      for (const flank of flanks) {
+        const x = ax + flank.x * k;
+        const y = ay + flank.y * k;
+        if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        cells.add(i);
+      }
+    }
   }
   // SEM ponto de entrada, e essa e a diferenca entre um corredor e um sopro.
   //
@@ -4360,8 +4535,8 @@ const archcantorChoirAnswer = (
   // piso — o aviso prometeria uma faixa mortal e entregaria uma faixa que
   // coca. O corredor cobra igual de ponta a ponta, como toda descarga do canto
   // sempre cobrou: sair dele e a resposta, e nao ficar longe dentro dele.
-  if (cells.length > 0) {
-    chargeCells(state, cells, events, { source: 'enemy', owner: guard.id });
+  if (cells.size > 0) {
+    chargeCells(state, [...cells], events, { source: 'enemy', owner: guard.id });
   }
   events.push({
     t: 'boss_state',
