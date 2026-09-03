@@ -2078,6 +2078,8 @@ export const ARCHCANTOR_CHOIR_ECHO_TICKS = 12;
  * de guarda. E uma janela, nao uma falha.
  */
 export const ARCHCANTOR_CHOIR_RECRUIT_TICKS = 80;
+/** Ultimo segundo da reposicao: o cristal escolhido brilha antes de virar voz. */
+export const ARCHCANTOR_CHOIR_METAMORPH_TICKS = 20;
 /**
  * Ate onde, a partir do corpo, um cristal pode ser chamado a virar voz. O mesmo
  * alcance do canto: o que o canto alcanca, o canto recruta.

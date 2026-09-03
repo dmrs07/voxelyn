@@ -884,6 +884,7 @@ export type BossMoment =
   // A Catedral respondendo ao chamado: um cristal da nave cristalizando numa
   // voz nova. Soa NO cristal, e nao no chefe — e a sala que esta pagando.
   | 'choir_call'
+  | 'choir_metamorphosis'
   // O SOLISTA: a voz que nao coube no acorde. Tritono, e no lugar errado.
   | 'dissonance'
   // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.

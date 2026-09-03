@@ -28,6 +28,7 @@ import {
   ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
   ARCHCANTOR_CHOIR_ECHO_TICKS,
   ARCHCANTOR_CHOIR_RECRUIT_TICKS,
+  ARCHCANTOR_CHOIR_METAMORPH_TICKS,
   ARCHCANTOR_CHOIR_RECRUIT_REACH,
   ARCHCANTOR_SOLOIST_CAP,
   ARCHCANTOR_SOLOIST_SPEED,
@@ -4217,12 +4218,7 @@ const archcantorEjectSoloist = (
  * jogador e solta a descarga do cristal, que cairia em cima do recem-nascido.
  * O `break` sai igual para o cliente desenhar a lasca.
  */
-const archcantorCrystallize = (
-  state: SurvivalState,
-  boss: Entity,
-  events: SemanticEvent[],
-): Entity | null => {
-  if (state.enemies.length >= MAX_ENEMIES) return null;
+const archcantorCrystalCandidate = (state: SurvivalState, boss: Entity): number => {
   const w = state.config.width;
   const h = state.config.height;
   const def = ARCHETYPES.resonant;
@@ -4248,6 +4244,17 @@ const archcantorCrystallize = (
       bestDist = d2;
     }
   }
+  return best;
+};
+
+const archcantorCrystallize = (
+  state: SurvivalState,
+  boss: Entity,
+  events: SemanticEvent[],
+): Entity | null => {
+  if (state.enemies.length >= MAX_ENEMIES) return null;
+  const w = state.config.width;
+  const best = archcantorCrystalCandidate(state, boss);
   if (best < 0) return null;
   const x = best % w;
   const y = (best - x) / w;
@@ -4343,12 +4350,30 @@ const archcantorChoirTick = (state: SurvivalState, events: SemanticEvent[]): voi
   const vacancy = runtime.choir.indexOf(0);
   if (vacancy < 0) {
     runtime.choirRecruitAt = state.tick + ARCHCANTOR_CHOIR_RECRUIT_TICKS;
-  } else if (state.tick >= runtime.choirRecruitAt) {
-    runtime.choirRecruitAt = state.tick + ARCHCANTOR_CHOIR_RECRUIT_TICKS;
-    const voice = archcantorCrystallize(state, boss, events);
-    if (voice) {
-      voice.mood = RESONANT_CHOIR;
-      runtime.choir[vacancy] = voice.id;
+  } else {
+    const remaining = runtime.choirRecruitAt - state.tick;
+    if (remaining > 0 && remaining <= ARCHCANTOR_CHOIR_METAMORPH_TICKS && remaining % 4 === 0) {
+      const crystal = archcantorCrystalCandidate(state, boss);
+      if (crystal >= 0) {
+        const x = crystal % state.config.width;
+        const y = Math.floor(crystal / state.config.width);
+        events.push({
+          t: 'boss_state',
+          archetype: 'archcantor',
+          state: 'choir_metamorphosis',
+          x: x + 0.5,
+          y: y + 0.5,
+          intensity: 1 - remaining / ARCHCANTOR_CHOIR_METAMORPH_TICKS,
+        });
+      }
+    }
+    if (state.tick >= runtime.choirRecruitAt) {
+      runtime.choirRecruitAt = state.tick + ARCHCANTOR_CHOIR_RECRUIT_TICKS;
+      const voice = archcantorCrystallize(state, boss, events);
+      if (voice) {
+        voice.mood = RESONANT_CHOIR;
+        runtime.choir[vacancy] = voice.id;
+      }
     }
   }
 

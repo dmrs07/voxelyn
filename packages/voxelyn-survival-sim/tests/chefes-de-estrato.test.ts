@@ -57,6 +57,7 @@ import {
   ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
   ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
   ARCHCANTOR_CHOIR_RECRUIT_TICKS,
+  ARCHCANTOR_CHOIR_METAMORPH_TICKS,
   ARCHCANTOR_SOLOIST_CAP,
   TICK_HZ,
   DELUGE_HP_FRACTION,
@@ -574,14 +575,26 @@ describe('Arquicantor — o Coro Cardinal', () => {
 
     // A contagem so comeca com a vaga aberta: antes do prazo, nada nasce e o
     // cristal continua de pe.
+    const metamorphosis: number[] = [];
     for (let t = 0; t < ARCHCANTOR_CHOIR_RECRUIT_TICKS - 5; t++) {
-      stepRun(state, [emptyCommand()]);
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'boss_state' || ev.state !== 'choir_metamorphosis') continue;
+        expect(ev.x).toBe((idx % w) + 0.5);
+        expect(ev.y).toBe(Math.floor(idx / w) + 0.5);
+        expect(state.solid[idx], 'o brilho consumiu o cristal antes da metamorfose').toBe(
+          SOLID_CRYSTAL,
+        );
+        metamorphosis.push(ev.intensity ?? -1);
+      }
       state.player.hp = state.player.maxHp;
     }
     expect(choirGuards(state), 'a voz nasceu antes do prazo').toHaveLength(
       ARCHCANTOR_CHOIR_SLOTS - 1,
     );
     expect(state.solid[idx]).toBe(SOLID_CRYSTAL);
+    expect(metamorphosis.length, 'o cristal nao brilhou antes de virar voz').toBeGreaterThan(0);
+    expect(metamorphosis.at(-1)!).toBeGreaterThan(metamorphosis[0]);
+    expect(ARCHCANTOR_CHOIR_METAMORPH_TICKS).toBeLessThan(ARCHCANTOR_CHOIR_RECRUIT_TICKS);
 
     expect(
       advanceUntil(state, () => choirGuards(state).length === ARCHCANTOR_CHOIR_SLOTS, 40),

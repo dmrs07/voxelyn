@@ -410,6 +410,11 @@ export class VoxelParticles {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(8, n(14)), 1.35, 420, 82, 0.3);
           } else if (ev.state === 'resonance_halo') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(6, n(10)), 0.9, 520, 83, 0.25);
+          } else if (ev.state === 'choir_metamorphosis') {
+            const power = 0.45 + (ev.intensity ?? 0) * 0.75;
+            this.ring(ev.x, ev.y, 'crystalShard', Math.max(10, n(18)), power, 300, 96, 0.35);
+            this.ring(ev.x, ev.y, 'spark', Math.max(6, n(10)), power * 0.62, 260, 97, 0.55);
+            this.burst(ev.x, ev.y, 'crystalShard', n(5), 0.45, 1.5, 360, 98, 0.4);
           }
           break;
         case 'leviathan_discharge':

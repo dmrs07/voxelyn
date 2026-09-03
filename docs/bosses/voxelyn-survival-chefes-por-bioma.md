@@ -517,7 +517,9 @@ num Ressonante novo, que corre para o posto — e o cristal **deixa de existir**
 luz, recurso e nó da rede do canto; o chefe consome a própria nave para manter o acorde, de
 dentro para fora (a camada zero da cadeia primeiro). É assim que repor preserva o progresso
 em vez de apagá-lo: uma sala sem cristal não repõe ninguém, e quebrar cristal continua sendo
-o contra-jogo — agora pelas duas razões. Uma vaga por vez: derrubar os quatro compra
+o contra-jogo — agora pelas duas razões. No último segundo, o cristal escolhido entra num
+**brilho de metamorfose** crescente antes de virar corpo; quebrá-lo durante o aviso força a
+Catedral a procurar outro cristal. Uma vaga por vez: derrubar os quatro compra
 dezesseis segundos de corpo exposto. Um Ressonante _solto_ que entre no raio de atração
 (`_ATTRACT_RADIUS`, 8) também ocupa a vaga, sem custar cristal.
 
