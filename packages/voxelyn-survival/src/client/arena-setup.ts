@@ -18,6 +18,7 @@
 import {
   CONTAMINATION_WAVES,
   DEFAULT_PLAYER_TUNING,
+  SOLID_CRYSTAL,
   SOLID_NONE,
   SOLID_FRAGILE,
   SOLID_ROCK,
@@ -214,8 +215,16 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   let kept = 0;
   for (let i = 0; i < dist.length; i++) if (dist[i] >= 0) kept++;
   if (kept < ARENA_MIN_FLOOR) {
-    for (let y = Math.max(2, by - ARENA_MIN_RADIUS); y <= Math.min(h - 3, by + ARENA_MIN_RADIUS); y++) {
-      for (let x = Math.max(2, bx - ARENA_MIN_RADIUS); x <= Math.min(w - 3, bx + ARENA_MIN_RADIUS); x++) {
+    for (
+      let y = Math.max(2, by - ARENA_MIN_RADIUS);
+      y <= Math.min(h - 3, by + ARENA_MIN_RADIUS);
+      y++
+    ) {
+      for (
+        let x = Math.max(2, bx - ARENA_MIN_RADIUS);
+        x <= Math.min(w - 3, bx + ARENA_MIN_RADIUS);
+        x++
+      ) {
         if (Math.hypot(x - bx, y - by) > ARENA_MIN_RADIUS) continue;
         const i = y * w + x;
         if (state.solid[i] === SOLID_ROCK || state.solid[i] === SOLID_FRAGILE) {
@@ -258,6 +267,11 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   // despejam aqui dentro, e o Diluvio voltava a brotar do corpo do chefe.
   for (let i = 0; i < state.solid.length; i++) {
     if (dist[i] >= 0) continue;
+    if (bossArchetype === 'archcantor' && state.solid[i] === SOLID_CRYSTAL) {
+      const x = i % w;
+      const y = Math.floor(i / w);
+      if (Math.hypot(x + 0.5 - boss.x, y + 0.5 - boss.y) <= 10) continue;
+    }
     if (isPipe(state.solid[i])) {
       const [dx, dy] = PIPE_MOUTH[state.solid[i]];
       const mouth = (Math.floor(i / w) + dy) * w + (i % w) + dx;

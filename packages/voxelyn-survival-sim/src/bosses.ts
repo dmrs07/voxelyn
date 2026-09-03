@@ -83,6 +83,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   // setor 5 herdar os guardas mortos do setor 3.
   choir: [0, 0, 0, 0],
   choirRotation: 0,
+  choirPattern: 0,
   // Zero e "a danca ainda nao comecou". Quem a inicia e a formacao inicial, e
   // e ela que carimba o primeiro prazo — sem isso o primeiro tick acordado ja
   // giraria a formacao antes de ela existir.

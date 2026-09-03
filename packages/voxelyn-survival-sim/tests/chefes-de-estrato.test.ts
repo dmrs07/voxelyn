@@ -6,9 +6,29 @@
 // forma de isso acontecer sem ninguem perceber e a mecanica de bioma parar de
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, resolveChainedEvents, stepRun } from '../src/run';
-import { ARCHETYPES, damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy, surfaceSpeedMul } from '../src/entities';
-import { breakSolid, canRip, dischargeAt, isConductiveSurface, isDeluged, setSurface } from '../src/cells';
+import {
+  createRun,
+  emptyCommand,
+  hashAuthoritativeState,
+  resolveChainedEvents,
+  stepRun,
+} from '../src/run';
+import {
+  ARCHETYPES,
+  damageEntity,
+  furnaceOverheatingAt,
+  furnaceSweepAt,
+  spawnEnemy,
+  surfaceSpeedMul,
+} from '../src/entities';
+import {
+  breakSolid,
+  canRip,
+  dischargeAt,
+  isConductiveSurface,
+  isDeluged,
+  setSurface,
+} from '../src/cells';
 import { generateWorld } from '../src/worldgen';
 import { biomeProfile } from '../src/strata';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
@@ -127,7 +147,6 @@ const paint = (state: SurvivalState, cx: number, cy: number, r: number, kind: nu
   }
 };
 
-
 /**
  * Anda a simulacao ate `ready()`, com teto e o jogador de pe.
  *
@@ -186,7 +205,9 @@ describe('a tabela de chefes esta completa', () => {
   });
 
   it('cada bioma limpo entrega o chefe do proprio estrato', () => {
-    const expected: Array<[Parameters<typeof bossArchetypeForBiome>[0]['stratum'], EnemyArchetype]> = [
+    const expected: Array<
+      [Parameters<typeof bossArchetypeForBiome>[0]['stratum'], EnemyArchetype]
+    > = [
       ['basalt', 'guardian'],
       ['prismatic', 'archcantor'],
       ['aquifer', 'sheet_leviathan'],
@@ -197,8 +218,10 @@ describe('a tabela de chefes esta completa', () => {
       ['ferric', 'magnetarch'],
     ];
     for (const [stratum, archetype] of expected) {
-      expect(bossArchetypeForBiome({ stratum, occupation: 'none', lineage: 'mineral' }), stratum)
-        .toBe(archetype);
+      expect(
+        bossArchetypeForBiome({ stratum, occupation: 'none', lineage: 'mineral' }),
+        stratum,
+      ).toBe(archetype);
     }
   });
 });
@@ -286,7 +309,12 @@ describe('Arquicantor — a Catedral responde', () => {
   };
 
   /** O tick em que alguma celula ALEM do raio do canto descarregou, ou -1. */
-  const farDischargeTick = (state: SurvivalState, px: number, py: number, ticks: number): number => {
+  const farDischargeTick = (
+    state: SurvivalState,
+    px: number,
+    py: number,
+    ticks: number,
+  ): number => {
     const w = state.config.width;
     for (let t = 0; t < ticks; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
@@ -307,8 +335,10 @@ describe('Arquicantor — a Catedral responde', () => {
     // o chefe ficava fora da propria mecanica.
     const { state, px, py } = duel(604, 'archcantor', 4);
     crystalLine(state, px, py, 2, ARCHCANTOR_PULSE_RADIUS + 10);
-    expect(farDischargeTick(state, px, py, 400), 'a cadeia nao saiu do raio do corpo')
-      .toBeGreaterThan(0);
+    expect(
+      farDischargeTick(state, px, py, 400),
+      'a cadeia nao saiu do raio do corpo',
+    ).toBeGreaterThan(0);
   });
 
   it('o ORCAMENTO vale desde a camada zero, e nao so nas cadeias', () => {
@@ -332,8 +362,9 @@ describe('Arquicantor — a Catedral responde', () => {
         crystals++;
       }
     }
-    expect(crystals, 'a cena nao tem cristal suficiente para estourar o teto')
-      .toBeGreaterThan(ARCHCANTOR_CRYSTAL_BUDGET);
+    expect(crystals, 'a cena nao tem cristal suficiente para estourar o teto').toBeGreaterThan(
+      ARCHCANTOR_CRYSTAL_BUDGET,
+    );
 
     let widest = 0;
     for (let t = 0; t < 400; t++) {
@@ -344,8 +375,9 @@ describe('Arquicantor — a Catedral responde', () => {
     }
     expect(widest, 'o canto nao chegou a sair').toBeGreaterThan(0);
     // Cada cristal armado carrega no maximo as quatro aberturas coladas nele.
-    expect(widest, `um unico passo carregou ${widest} celulas`)
-      .toBeLessThanOrEqual(ARCHCANTOR_CRYSTAL_BUDGET * 4);
+    expect(widest, `um unico passo carregou ${widest} celulas`).toBeLessThanOrEqual(
+      ARCHCANTOR_CRYSTAL_BUDGET * 4,
+    );
   });
 
   it('CORTAR a cadeia desliga tudo o que vinha depois do corte', () => {
@@ -536,6 +568,49 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(recruit.mood).toBe(RESONANT_CHOIR);
   });
 
+  it('promover um Ressonante cancela o pulso selvagem que estava em voo', () => {
+    const { state, boss } = duel(6261, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const victim = choirGuards(state)[0];
+    const seat = state.bossRuntime.choir.indexOf(victim.id);
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.choir[seat]).toBe(0);
+
+    const recruit = spawnEnemy(
+      state,
+      'resonant',
+      Math.floor(boss.x) + ARCHCANTOR_CHOIR_ATTRACT_RADIUS - 2,
+      Math.floor(boss.y),
+      false,
+    );
+    recruit.action = {
+      kind: 'pulse',
+      phase: 'windup',
+      startedAt: state.tick,
+      releaseAt: state.tick + 10,
+      endsAt: state.tick + 18,
+      direction: { x: 1, y: 0 },
+    };
+    recruit.vx = 3;
+    recruit.vy = -2;
+
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.choir[seat]).toBe(recruit.id);
+    expect(recruit.mood).toBe(RESONANT_CHOIR);
+    expect(recruit.action, 'o guarda conservou o pulso da vida selvagem').toBeUndefined();
+    expect(recruit.vx).toBe(0);
+    expect(recruit.vy).toBe(0);
+  });
+
+  it('o papel do Ressonante participa do hash autoritativo', () => {
+    const { state, boss } = duel(6262, 'archcantor', 5);
+    const extra = spawnEnemy(state, 'resonant', Math.floor(boss.x) + 4, Math.floor(boss.y), false);
+    extra.mood = RESONANT_WILD;
+    const wild = hashAuthoritativeState(state);
+    extra.mood = RESONANT_SOLOIST;
+    expect(hashAuthoritativeState(state)).not.toBe(wild);
+  });
   it('com o acorde CHEIO, quem chega e cuspido como SOLISTA e anda so na diagonal', () => {
     // O compromisso com a diagonal e o bicho inteiro: um solista que corrigisse
     // o rumo a cada tick seria um perseguidor comum com animacao torta, e a
@@ -587,39 +662,66 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(voices).toEqual([0, 1 / 3, 2 / 3, 1]);
   });
 
-  it('as vozes abrem uma CRUZ de corredores, e as diagonais sao a saida', () => {
-    // O aviso e a formacao, e nao um circulo no chao: os quatro corpos em orbita
-    // JA desenham para onde a descarga vai. Se a geometria da carga nao fosse a
-    // da formacao, o encontro cobraria por uma leitura que nunca ofereceu.
+  it('alterna a CRUZ e o X: nenhuma diagonal fica segura para sempre', () => {
     const { state, boss, w } = duel(632, 'archcantor', 5);
     expect(
       state.solid[(Math.floor(boss.y) + 2) * w + Math.floor(boss.x) + 2],
       'a arena nao esta limpa',
     ).toBe(SOLID_NONE);
 
-    let charged = 0;
-    let offAxis = 0;
-    for (let t = 0; t < 200; t++) {
+    let pattern: 'cross' | 'diagonal' | null = null;
+    let crossCells = 0;
+    let diagonalCells = 0;
+    let invalidCross = 0;
+    let invalidDiagonal = 0;
+    const telegraphs: string[] = [];
+    for (let t = 0; t < 400 && telegraphs.length < 3; t++) {
       const events = stepRun(state, [emptyCommand()]).events;
-      // O eixo e lido NO TICK: o chefe anda entre um canto e outro, e a cruz e
-      // ancorada no corpo dele — nao no lugar onde o encontro comecou.
       const bx = Math.floor(boss.x);
       const by = Math.floor(boss.y);
       for (const ev of events) {
+        if (ev.t === 'boss_state' && ev.state === 'choir_cross') {
+          pattern = 'cross';
+          telegraphs.push(ev.state);
+        }
+        if (ev.t === 'boss_state' && ev.state === 'choir_diagonal') {
+          pattern = 'diagonal';
+          telegraphs.push(ev.state);
+        }
         if (ev.t !== 'discharge') continue;
         for (const cell of ev.cells) {
-          charged++;
           const cx = cell % w;
           const cy = (cell - cx) / w;
-          if (cx !== bx && cy !== by) offAxis++;
+          if (pattern === 'cross') {
+            crossCells++;
+            if (cx !== bx && cy !== by) invalidCross++;
+          } else if (pattern === 'diagonal') {
+            diagonalCells++;
+            if (cx === bx || cy === by) invalidDiagonal++;
+          }
         }
       }
       state.player.hp = state.player.maxHp;
     }
-    expect(charged, 'o coro nao abriu corredor nenhum').toBeGreaterThan(0);
-    expect(offAxis, 'uma carga saiu fora da cruz: a diagonal deixou de ser saida').toBe(0);
-    // E a cruz e um corredor com comprimento, nao um anel colado neles.
-    expect(charged).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+    expect(telegraphs.slice(0, 3)).toEqual(['choir_cross', 'choir_diagonal', 'choir_cross']);
+    expect(crossCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+    expect(diagonalCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+    expect(invalidCross, 'a cruz vazou para fora dos eixos').toBe(0);
+    expect(invalidDiagonal, 'o xis vazou para um eixo cardinal').toBe(0);
+  });
+
+  it('o canto vira HALO no chefe e reverbera em cada cristal da cadeia', () => {
+    const { state, boss, w } = duel(633, 'archcantor', 5);
+    state.solid[Math.floor(boss.y) * w + Math.floor(boss.x) + 4] = SOLID_CRYSTAL;
+    const seen = new Set<string>();
+    for (let t = 0; t < 200; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_state') seen.add(ev.state);
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(seen).toContain('song_halo');
+    expect(seen).toContain('resonance_halo');
   });
 
   it('a voz que falta nao emite: um coro incompleto responde incompleto', () => {
@@ -781,7 +883,8 @@ describe('Leviata do Lencol — a lamina e o territorio', () => {
     let breached = false;
     for (let t = 0; t < 500 && !breached; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') breached = true;
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt')
+          breached = true;
       }
       state.player.hp = state.player.maxHp;
     }
@@ -838,7 +941,9 @@ describe('Pulmao-Matriz — a respiracao da Fenda', () => {
   it('fogo encostado nele durante a expiracao QUEIMA a coluna de volta', () => {
     // A unica janela de dano do jogo que o jogador abre — e ela custa terreno.
     const { state, boss, w } = duel(622, 'lung_matrix', 6);
-    expect(advanceUntil(state, () => Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1),
+    ).toBe(true);
     expect(boss.mood).toBe(LUNG_EXHALING);
     const hpBefore = boss.hp;
     const mouth = Math.floor(boss.y) * w + Math.floor(boss.x);
@@ -866,7 +971,9 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
 
   it('superaquecido, acende a arena em setores', () => {
     const { state, boss, w } = duel(632, 'furnace_heart', 6);
-    expect(advanceUntil(state, () => Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2 === 0)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2 === 0),
+    ).toBe(true);
     expect(boss.mood).toBe(FURNACE_OVERHEATING);
     for (let t = 0; t < 60; t++) {
       stepRun(state, [emptyCommand()]);
@@ -947,10 +1054,15 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
     for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS * 8; t++) {
       stepRun(state, [emptyCommand()]);
       state.player.hp = state.player.maxHp;
-      worst = Math.max(worst, state.enemies.filter((e) => e.alive && e.archetype === 'scoriac').length);
+      worst = Math.max(
+        worst,
+        state.enemies.filter((e) => e.alive && e.archetype === 'scoriac').length,
+      );
     }
-    expect(boss.hp, 'o chefe cruzou o colapso: isto nao mede mais a fase de leitura')
-      .toBeGreaterThan(boss.maxHp * FURNACE_HEART_OVERHEAT_HP);
+    expect(
+      boss.hp,
+      'o chefe cruzou o colapso: isto nao mede mais a fase de leitura',
+    ).toBeGreaterThan(boss.maxHp * FURNACE_HEART_OVERHEAT_HP);
     expect(worst, `chegou a ${worst} Escoriaceos antes do colapso`).toBe(1);
   });
 
@@ -993,8 +1105,10 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
     }
     const burning = scan(SURF_FIRE);
     expect(burning, 'a varredura parou de acender: a mecanica morreu').toBeGreaterThan(0);
-    expect(burning / open, `${((burning / open) * 100) | 0}% da camara acesa de uma vez`)
-      .toBeLessThan(0.4);
+    expect(
+      burning / open,
+      `${((burning / open) * 100) | 0}% da camara acesa de uma vez`,
+    ).toBeLessThan(0.4);
     // E o rastro tem de ser LEGIVEL como rastro: onde ja passou fica cinza, que
     // e a superficie mais escura do jogo.
     expect(scan(SURF_SCORCHED), 'a onda nao deixou chao apagado atras dela').toBeGreaterThan(0);
@@ -1226,7 +1340,8 @@ describe('Rainha da Geada — a couraça e o estrato', () => {
     let froze = false;
     for (let t = 0; t < 300 && !froze; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'freeze') froze = true;
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'freeze')
+          froze = true;
       }
       state.player.hp = state.player.maxHp;
     }
@@ -1265,7 +1380,9 @@ describe('Magnetarca — a faixa troca de lado', () => {
     boss.mood = MAGNET_ATTRACT;
     // Congela a fase para medir uma coisa de cada vez: o ciclo sai do relogio,
     // entao o teste anda a simulacao ate a janela que quer.
-    expect(advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0),
+    ).toBe(true);
     const startPull = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1273,7 +1390,9 @@ describe('Magnetarca — a faixa troca de lado', () => {
     }
     expect(Math.abs(state.player.x - boss.x), 'atraindo, nao puxou').toBeLessThan(startPull);
 
-    expect(advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1),
+    ).toBe(true);
     const startPush = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1286,7 +1405,10 @@ describe('Magnetarca — a faixa troca de lado', () => {
     const near = duel(653, 'magnetarch', 2);
     near.boss.mood = MAGNET_ATTRACT;
     expect(
-      advanceUntil(near.state, () => Math.floor(near.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0),
+      advanceUntil(
+        near.state,
+        () => Math.floor(near.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0,
+      ),
     ).toBe(true);
     near.state.player.x = near.boss.x - MAGNETARCH_CRUSH_RANGE + 1;
     const nearHp = near.state.player.hp;
@@ -1315,7 +1437,9 @@ describe('as Descobertas de estrato exigem o entendimento, e nao o abate', () =>
     const { state, boss, px, py, w } = duel(661, 'archcantor', 5);
     for (const dy of [-2, 2]) state.solid[(py + dy) * w + px + 5] = SOLID_CRYSTAL;
     damageEntity(state, boss, 10, [], { kind: 'player_shot' });
-    expect(state.stats.discoveries & DISCOVERY_CATHEDRAL_SILENCED, 'acendeu com a rede de pe').toBe(0);
+    expect(state.stats.discoveries & DISCOVERY_CATHEDRAL_SILENCED, 'acendeu com a rede de pe').toBe(
+      0,
+    );
 
     for (const dy of [-2, 2]) state.solid[(py + dy) * w + px + 5] = SOLID_NONE;
     damageEntity(state, boss, 10, [], { kind: 'player_shot' });
@@ -1346,7 +1470,9 @@ describe('as Descobertas de estrato exigem o entendimento, e nao o abate', () =>
 
   it('Pulmao: so acende quando a coluna acesa cobra dele', () => {
     const { state, boss, w } = duel(664, 'lung_matrix', 6);
-    expect(advanceUntil(state, () => Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1),
+    ).toBe(true);
     expect(state.stats.discoveries & DISCOVERY_LUNG_IGNITED, 'acendeu so por ele expelir').toBe(0);
 
     const mouth = Math.floor(boss.y) * w + Math.floor(boss.x);
@@ -1361,7 +1487,9 @@ describe('as Descobertas de estrato exigem o entendimento, e nao o abate', () =>
 
   it('Magnetarca: acende ao ficar na FAIXA, e nao em nenhuma das bordas', () => {
     const { state, boss } = duel(665, 'magnetarch', 6);
-    expect(advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0)).toBe(true);
+    expect(
+      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0),
+    ).toBe(true);
     // Dentro do campo, fora do esmagamento: a faixa.
     state.player.x = boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
     state.player.y = boss.y;
@@ -1445,14 +1573,16 @@ describe('Leviata do Lencol — o DILUVIO', () => {
     // dele apaga a unica coisa que o segurava.
     const { state, boss, px, py } = duel(624, 'sheet_leviathan', 6);
     const w = state.config.width;
-    expect(isConductiveSurface(state.surface[py * w + px]), 'a camara ja comecou molhada')
-      .toBe(false);
+    expect(isConductiveSurface(state.surface[py * w + px]), 'a camara ja comecou molhada').toBe(
+      false,
+    );
     stepRun(state, [emptyCommand()]);
     boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
     let breached = false;
     for (let t = 0; t < 600 && !breached; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') breached = true;
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt')
+          breached = true;
       }
       state.player.hp = state.player.maxHp;
     }
@@ -1520,8 +1650,9 @@ describe('Leviata do Lencol — o DILUVIO', () => {
     const close = hurt(1);
     const far = hurt(9);
     expect(close, 'a descarga nao chegou nem de perto').toBeGreaterThan(0);
-    expect(far, 'a corrente nao alcancou longe: ela deve alcancar, e nao machucar')
-      .toBeGreaterThan(0);
+    expect(far, 'a corrente nao alcancou longe: ela deve alcancar, e nao machucar').toBeGreaterThan(
+      0,
+    );
     expect(far, `perto ${close.toFixed(1)} vs longe ${far.toFixed(1)}`).toBeLessThan(close * 0.5);
   });
 });
@@ -1552,7 +1683,10 @@ describe('Os DUTOS do Aquifero — as fontes do Diluvio', () => {
       WORLD_H,
       biomeProfile({ stratum: 'basalt', occupation: 'none', lineage: 'basaltic' }, 3),
     );
-    expect(basalt!.solid.some((v) => isPipe(v)), 'o basalto ganhou encanamento').toBe(false);
+    expect(
+      basalt!.solid.some((v) => isPipe(v)),
+      'o basalto ganhou encanamento',
+    ).toBe(false);
   });
 
   it('o duto nao cede: nem quebra nem e arrancado', () => {

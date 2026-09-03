@@ -3358,6 +3358,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // inimigos, como as de qualquer corpo.
   for (const seat of state.bossRuntime.choir) mix(seat);
   mix(state.bossRuntime.choirRotation);
+  mix(state.bossRuntime.choirPattern);
   mix(state.bossRuntime.choirRotateAt);
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
@@ -3392,6 +3393,10 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(enemy.hp * 100));
     mix(enemy.stunnedUntil);
     mix(enemy.alive ? 1 : 0);
+    // mood e estado autoritativo: no Ressonante ele escolhe entre o pulso
+    // selvagem, a orbita do coro e o ataque diagonal do Solista. Dois estados
+    // com papeis diferentes precisam divergir ANTES do proximo movimento.
+    mix(enemy.mood ?? 0);
     if (enemy.action) {
       mixString(enemy.action.kind);
       mix(enemy.action.startedAt);

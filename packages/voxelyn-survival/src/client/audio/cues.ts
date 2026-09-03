@@ -199,6 +199,10 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
   archcantor: {
     idle_note: 'archcantorNote',
     resonance: 'archcantorResonance',
+    // A cruz confirma consonancia; o xis entra com o tritono do material
+    // dissonante. O jogador distingue a geometria mesmo fora da tela.
+    choir_cross: 'archcantorChoirStep',
+    choir_diagonal: 'archcantorDissonance',
     // A danca confirma a geometria nova; a dissonancia e o solista chegando.
     // `choir_voice` NAO entra aqui: a nota dele depende da posicao cardinal, e
     // uma tabela por momento so sabe devolver uma voz (ver o ramo em cues).

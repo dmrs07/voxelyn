@@ -160,7 +160,12 @@ describe('createArenaRun — o recorte da arena', () => {
         const cell = queue[head];
         const cx = cell % w;
         const cy = (cell - cx) / w;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
           const i = (cy + dy) * w + (cx + dx);
           if (state.solid[i] !== SOLID_NONE || seen.has(i)) continue;
           seen.add(i);
@@ -217,7 +222,9 @@ describe('createArenaRun — o recorte da arena', () => {
         }
       }
       const ratio = wide / cells;
-      expect(ratio, `arena de ${boss}: so ${(ratio * 100) | 0}% de chao largo`).toBeGreaterThan(0.35);
+      expect(ratio, `arena de ${boss}: so ${(ratio * 100) | 0}% de chao largo`).toBeGreaterThan(
+        0.35,
+      );
     }
   });
 
@@ -250,5 +257,34 @@ describe('createArenaRun — o recorte da arena', () => {
     }
     expect(water, 'a camara do Leviata nasceu seca').toBeGreaterThan(80);
     expect(pipes, 'a camara do Leviata nasceu sem duto').toBeGreaterThan(0);
+  });
+});
+
+describe('arena.html — Catedral Prismatica', () => {
+  it('preserva a rotunda aberta e muitos cristais no recorte do Arquicantor', () => {
+    const state = createArenaRun({ boss: 'archcantor', maxHp: 200, ability: 'pulse', modules: [] });
+    const boss = state.enemies.find((e) => e.archetype === 'archcantor');
+    expect(boss).toBeDefined();
+    const w = state.config.width;
+    let openCore = 0;
+    let crystals = 0;
+    for (let y = Math.floor(boss!.y) - 10; y <= Math.floor(boss!.y) + 10; y++) {
+      for (let x = Math.floor(boss!.x) - 10; x <= Math.floor(boss!.x) + 10; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+        const d = Math.hypot(x + 0.5 - boss!.x, y + 0.5 - boss!.y);
+        const material = state.solid[y * w + x];
+        if (d <= 5 && material === SOLID_NONE) openCore++;
+        if (d <= 10 && material === SOLID_CRYSTAL) crystals++;
+      }
+    }
+    expect(openCore, 'arena.html apertou a danca do coro').toBeGreaterThan(55);
+    expect(crystals, 'arena.html perdeu a rede da Catedral').toBeGreaterThanOrEqual(16);
+    state.player.x = boss!.x + 2;
+    state.player.y = boss!.y;
+    for (let tick = 0; tick < 12; tick++) stepRun(state, [emptyCommand()]);
+    expect(
+      state.bossRuntime.choir.filter((id) => id !== 0),
+      'arena.html nao chamou o quarteto',
+    ).toHaveLength(4);
   });
 });
