@@ -250,6 +250,13 @@ barramento de efeitos. O resto do banco continua limpo de propósito: um telegra
 amarrotado seria um aviso mais difícil de ler. O chefe pode assustar porque o aviso dele
 continua sendo um windup de prioridade 10 com forma própria — o amarrotado é textura.
 
+**Trilha de encontro.** O Diamandis tem música própria (`BOSS_SOUNDTRACK_URL`, terceiro
+slot do pipeline de trilha): toca em loop enquanto o dono do setor é ele, acordou e está de
+pé; a trilha da run (composta ou procedural) cala e volta quando ele cai, e o sting do
+desligamento soa sobre o silêncio dela. Mesmo bus, mesmo teto, mesmo ducking. É o único
+asset de áudio lossy do jogo, de propósito: o master só existe em mp3. `bossTrackPlaying`
+é a decisão, pura; `BOSS_SOUNDTRACKS` é a tabela onde o próximo chefe com música entra.
+
 **Fora do primeiro recorte**, e por quê: o zumbido contínuo do campo do Magnetarca e a
 modulação periódica dos ciclones da Fornalha (leitos a mais, cada um um par de nós permanentes
 para um chefe que aparece uma vez por run — só quando a fase pedir modulação contínua); a

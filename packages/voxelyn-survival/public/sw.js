@@ -46,6 +46,7 @@ const OPTIONAL = [
   './icon-512.png',
   './audio/voxelyn-survival-theme.flac',
   './audio/voxelyn-survival-menu.flac',
+  './audio/voxelyn-survival-diamandis.mp3',
   './boot/keyart-1600.webp',
   './ident/developer-mark.webp',
   './ident/danitools-sound-logo.mp3',

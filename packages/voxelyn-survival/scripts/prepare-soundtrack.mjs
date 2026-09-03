@@ -21,17 +21,23 @@
 // compositor pedir uma emenda de loop justa.
 //
 // Uso:
-//   node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu] [--out <caminho>] [--trim-silence]
+//   node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis] [--out <caminho>] [--trim-silence] [--copy]
 //
 // --slot escolhe o destino no pipeline: 'run' (padrao) e a trilha da descida
 // (public/audio/voxelyn-survival-theme.flac, COMPOSED_TRIM); 'menu' e a
-// trilha de abertura do terminal (voxelyn-survival-menu.flac, MENU_TRIM).
+// trilha de abertura do terminal (voxelyn-survival-menu.flac, MENU_TRIM);
+// 'diamandis' e a trilha do encontro (voxelyn-survival-diamandis, BOSS_TRIM).
+//
+// --copy grava a entrada COMO ESTA (extensao preservada) em vez de FLAC. E o
+// caminho certo quando o master so existe em formato lossy: reempacotar mp3
+// em FLAC nao devolve nada e multiplica o precache por dez. A analise e o
+// trim rodam do mesmo jeito; so a etapa 5 muda.
 //
 // Precisa de ffmpeg/ffprobe no PATH (ou FFMPEG/FFPROBE no ambiente).
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, statSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
+import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -80,7 +86,9 @@ const dB = (linear) => 20 * Math.log10(linear);
 const argv = process.argv.slice(2);
 const slotFlag = argv.indexOf('--slot');
 const slot = slotFlag >= 0 ? argv[slotFlag + 1] : 'run';
-if (slot !== 'run' && slot !== 'menu') die(`--slot invalido: ${slot} (use run ou menu)`);
+if (slot !== 'run' && slot !== 'menu' && slot !== 'diamandis') {
+  die(`--slot invalido: ${slot} (use run, menu ou diamandis)`);
+}
 // Valores de flags nao sao "o arquivo sem --": exclui-los da busca pela
 // entrada — por INDICE, nao por valor (indexOf ausente daria -1 e o +1
 // apontaria para o proprio argv[0]).
@@ -90,40 +98,68 @@ for (const flag of ['--slot', '--out']) {
   if (i >= 0) flagValueIdx.add(i + 1);
 }
 const input = argv.find((a, i) => !a.startsWith('--') && !flagValueIdx.has(i));
-if (!input) die('uso: node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu] [--out <caminho>] [--trim-silence]');
+if (!input)
+  die(
+    'uso: node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis] [--out <caminho>] [--trim-silence] [--copy]',
+  );
 if (!existsSync(input)) die(`entrada nao existe: ${input}`);
 const SLOTS = {
   run: { file: 'voxelyn-survival-theme.flac', trimConst: 'COMPOSED_TRIM' },
   menu: { file: 'voxelyn-survival-menu.flac', trimConst: 'MENU_TRIM' },
+  diamandis: { file: 'voxelyn-survival-diamandis.flac', trimConst: 'BOSS_TRIM' },
 };
+const copyAsIs = argv.includes('--copy');
 const outFlag = argv.indexOf('--out');
 const output =
   outFlag >= 0
     ? resolve(argv[outFlag + 1])
-    : resolve(__dirname, `../public/audio/${SLOTS[slot].file}`);
+    : resolve(
+        __dirname,
+        // Com --copy a extensao e a da ENTRADA: o arquivo nao muda de formato.
+        `../public/audio/${copyAsIs ? SLOTS[slot].file.replace(/\.flac$/, extname(input)) : SLOTS[slot].file}`,
+      );
 const trimSilence = argv.includes('--trim-silence');
 
 // --- 1. o que o arquivo E ----------------------------------------------------
 
 const probe = run(FFPROBE, [
-  '-v', 'error',
-  '-select_streams', 'a:0',
-  '-show_entries', 'stream=codec_name,sample_rate,channels,bits_per_raw_sample,duration',
-  '-of', 'json',
+  '-v',
+  'error',
+  '-select_streams',
+  'a:0',
+  '-show_entries',
+  'stream=codec_name,sample_rate,channels,bits_per_raw_sample,duration',
+  '-of',
+  'json',
   input,
 ]);
 const stream = JSON.parse(probe.stdout || '{}').streams?.[0];
 if (!stream) die('nenhum stream de audio encontrado na entrada');
 
-const LOSSLESS = new Set(['flac', 'alac', 'wav', 'pcm_s16le', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le', 'aiff']);
-const isLossless = [...LOSSLESS].some((c) => (stream.codec_name ?? '').startsWith(c.split('_')[0]) || stream.codec_name === c);
+const LOSSLESS = new Set([
+  'flac',
+  'alac',
+  'wav',
+  'pcm_s16le',
+  'pcm_s24le',
+  'pcm_s32le',
+  'pcm_f32le',
+  'aiff',
+]);
+const isLossless = [...LOSSLESS].some(
+  (c) => (stream.codec_name ?? '').startsWith(c.split('_')[0]) || stream.codec_name === c,
+);
 const durationSec = Number(stream.duration ?? 0);
 
 console.log('== arquivo do compositor ==');
-console.log(`codec: ${stream.codec_name}  sample rate: ${stream.sample_rate} Hz  canais: ${stream.channels}`);
+console.log(
+  `codec: ${stream.codec_name}  sample rate: ${stream.sample_rate} Hz  canais: ${stream.channels}`,
+);
 console.log(`duracao: ${durationSec.toFixed(2)} s`);
 if (stream.channels !== 2) {
-  console.warn('AVISO: a trilha nao e estereo — o contrato do compositor (laterais ocupadas, centro livre) pressupoe 2 canais.');
+  console.warn(
+    'AVISO: a trilha nao e estereo — o contrato do compositor (laterais ocupadas, centro livre) pressupoe 2 canais.',
+  );
 }
 if (!isLossless) {
   console.warn('');
@@ -137,7 +173,17 @@ if (!isLossless) {
 
 // ebur128 imprime o resumo no stderr; e a medida certa para "quao alto soa",
 // que e o que o trim precisa (pico nao diz nada sobre percepcao).
-const loud = run(FFMPEG, ['-hide_banner', '-nostats', '-i', input, '-af', 'ebur128=peak=true', '-f', 'null', '-']);
+const loud = run(FFMPEG, [
+  '-hide_banner',
+  '-nostats',
+  '-i',
+  input,
+  '-af',
+  'ebur128=peak=true',
+  '-f',
+  'null',
+  '-',
+]);
 const loudText = loud.stderr;
 // O ebur128 loga o I: PROGRESSIVO a cada 100 ms e so o ultimo bloco (Summary)
 // tem o valor integrado da faixa inteira: pegar a PRIMEIRA ocorrencia leria o
@@ -153,7 +199,9 @@ console.log('== loudness ==');
 console.log(`LUFS integrado: ${Number.isNaN(inputLufs) ? 'nao medido' : inputLufs.toFixed(1)}`);
 console.log(`true peak: ${Number.isNaN(truePeak) ? 'nao medido' : truePeak.toFixed(1)} dBTP`);
 if (!Number.isNaN(truePeak) && truePeak > -0.3) {
-  console.warn('AVISO: true peak acima de -0.3 dBTP — risco de clip intersample no decode. Vale pedir ao compositor 0.5-1 dB de teto no master.');
+  console.warn(
+    'AVISO: true peak acima de -0.3 dBTP — risco de clip intersample no decode. Vale pedir ao compositor 0.5-1 dB de teto no master.',
+  );
 }
 
 // --- 3. imagem estereo (o contrato das laterais) ----------------------------
@@ -173,19 +221,27 @@ if (stream.channels === 2) {
   const sideLowRms = rmsOf('0.5*c0+-0.5*c1', ',lowpass=f=120');
 
   console.log('== imagem estereo ==');
-  console.log(`mid: ${midRms.toFixed(1)} dBFS  side: ${sideRms.toFixed(1)} dBFS  (side-mid: ${(sideRms - midRms).toFixed(1)} dB)`);
-  console.log(`graves <120 Hz — mid: ${midLowRms.toFixed(1)} dBFS  side: ${sideLowRms.toFixed(1)} dBFS`);
+  console.log(
+    `mid: ${midRms.toFixed(1)} dBFS  side: ${sideRms.toFixed(1)} dBFS  (side-mid: ${(sideRms - midRms).toFixed(1)} dB)`,
+  );
+  console.log(
+    `graves <120 Hz — mid: ${midLowRms.toFixed(1)} dBFS  side: ${sideLowRms.toFixed(1)} dBFS`,
+  );
   // O compositor mixou a musica nas LATERAIS com o centro livre para os SFX:
   // side proximo ou acima do mid e o esperado. Um side 10+ dB ABAIXO do mid
   // significaria uma trilha quase mono — que brigaria com os SFX no centro.
   if (sideRms - midRms < -10) {
-    console.warn('AVISO: energia lateral muito abaixo do centro — a trilha esta quase mono e vai disputar o centro com os SFX. Conversar com o compositor.');
+    console.warn(
+      'AVISO: energia lateral muito abaixo do centro — a trilha esta quase mono e vai disputar o centro com os SFX. Conversar com o compositor.',
+    );
   }
   // Grave em anti-fase pura (side >> mid abaixo de 120 Hz) some em mono
   // (celular com um alto-falante). As DUAS camadas de graves coexistirem em
   // qualquer caixa e promessa do compositor; este numero e o cheque.
   if (sideLowRms - midLowRms > 3) {
-    console.warn('AVISO: graves dominados pelo canal side — em playback mono (celular deitado) as camadas de grave podem sumir. Checar com o compositor.');
+    console.warn(
+      'AVISO: graves dominados pelo canal side — em playback mono (celular deitado) as camadas de grave podem sumir. Checar com o compositor.',
+    );
   }
 }
 
@@ -202,14 +258,26 @@ const edgePeak = (trimExpr) => {
 const headPeak = edgePeak('atrim=end=0.01');
 const tailPeak = edgePeak(`atrim=start=${Math.max(0, durationSec - 0.01)}`);
 console.log('== emenda do loop ==');
-console.log(`pico nos 10 ms iniciais: ${headPeak.toFixed(1)} dBFS  finais: ${tailPeak.toFixed(1)} dBFS`);
+console.log(
+  `pico nos 10 ms iniciais: ${headPeak.toFixed(1)} dBFS  finais: ${tailPeak.toFixed(1)} dBFS`,
+);
 if (headPeak > -40 || tailPeak > -40) {
-  console.warn('AVISO: as bordas nao chegam perto do silencio — a volta do loop pode estalar. Se a emenda foi desenhada assim (frase que continua), ignore; senao, pedir bordas em zero-crossing ao compositor.');
+  console.warn(
+    'AVISO: as bordas nao chegam perto do silencio — a volta do loop pode estalar. Se a emenda foi desenhada assim (frase que continua), ignore; senao, pedir bordas em zero-crossing ao compositor.',
+  );
 }
 
 // --- 5. empacotar FLAC (sem perda) ------------------------------------------
 
 mkdirSync(dirname(output), { recursive: true });
+if (copyAsIs) {
+  // Passagem direta: nada de transcode. O que chegou e o que o jogo toca.
+  copyFileSync(input, output);
+  console.log('== saida ==');
+  console.log(
+    `${output} (${(statSync(output).size / 1024 / 1024).toFixed(1)} MB, copiado sem transcode)`,
+  );
+}
 const encodeArgs = ['-hide_banner', '-y', '-i', input, '-map_metadata', '-1', '-vn'];
 if (trimSilence) {
   // Opt-in: so silencio DIGITAL nas bordas (abaixo de -80 dBFS), nada dentro.
@@ -218,12 +286,14 @@ if (trimSilence) {
     'silenceremove=start_periods=1:start_threshold=-80dB,areverse,silenceremove=start_periods=1:start_threshold=-80dB,areverse',
   );
 }
-encodeArgs.push('-c:a', 'flac', '-compression_level', '8', output);
-const enc = run(FFMPEG, encodeArgs);
-if (enc.status !== 0) die(`ffmpeg falhou ao encodar:\n${enc.stderr.slice(-2000)}`);
-const outSize = statSync(output).size;
-console.log('== saida ==');
-console.log(`${output} (${(outSize / 1024 / 1024).toFixed(1)} MB, FLAC lossless)`);
+if (!copyAsIs) {
+  encodeArgs.push('-c:a', 'flac', '-compression_level', '8', output);
+  const enc = run(FFMPEG, encodeArgs);
+  if (enc.status !== 0) die(`ffmpeg falhou ao encodar:\n${enc.stderr.slice(-2000)}`);
+  const outSize = statSync(output).size;
+  console.log('== saida ==');
+  console.log(`${output} (${(outSize / 1024 / 1024).toFixed(1)} MB, FLAC lossless)`);
+}
 
 // --- 6. calibrar o trim ------------------------------------------------------
 
@@ -237,7 +307,9 @@ if (!Number.isNaN(inputLufs)) {
     `alvo no jogo: ${TARGET_INGAME_LUFS} LUFS  ->  ${SLOTS[slot].trimConst} = ${clamped.toFixed(2)}`,
   );
   if (clamped !== trim) {
-    console.warn(`(valor bruto ${trim.toFixed(2)} saturado na faixa [${TRIM_MIN}, ${TRIM_MAX}] — se saturou, o master esta muito longe do leito e vale conversar com o compositor em vez de forcar ganho)`);
+    console.warn(
+      `(valor bruto ${trim.toFixed(2)} saturado na faixa [${TRIM_MIN}, ${TRIM_MAX}] — se saturou, o master esta muito longe do leito e vale conversar com o compositor em vez de forcar ganho)`,
+    );
   }
   console.log(
     `Cole em src/client/audio/soundtrack.ts: export const ${SLOTS[slot].trimConst} = ${clamped.toFixed(2)};`,

@@ -31,8 +31,11 @@ import { MinigunBus } from './minigun-bus';
 import { CueMixer, NEAR_CUTOFF_HZ, distanceGain } from './mixer';
 import { MusicBus } from './music-bus';
 import {
+  BOSS_SOUNDTRACK_URL,
   MENU_SOUNDTRACK_URL,
   SOUNDTRACK_URL,
+  bossBaseGain,
+  bossTrackPlaying,
   menuBaseGain,
   resolveMusicSource,
   type MusicSource,
@@ -116,6 +119,12 @@ export class AudioDirector {
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
+  /**
+   * A trilha de ENCONTRO (hoje, o Diamandis). Assume enquanto o dono do setor
+   * com trilha esta acordado e de pe; a trilha da run cala e volta quando ele
+   * cai. Mesmo bus, mesmo contrato; so o ciclo de vida e outro.
+   */
+  private bossTrackBus: SoundtrackBus | null = null;
 
   /** A virgula sonora decodificada (ou a promessa dela). Ver `prepareIdentitySting`. */
   private identSting: Promise<AudioBuffer | null> | null = null;
@@ -202,6 +211,7 @@ export class AudioDirector {
       this.musicBus?.silence();
       this.soundtrackBus?.silence();
       this.menuTrackBus?.silence();
+      this.bossTrackBus?.silence();
     } else if (this.screen === 'menu') {
       // Desmutou no terminal: a trilha de menu volta sozinha — nao ha
       // update() de run para religa-la, entao o religamento mora aqui.
@@ -215,6 +225,7 @@ export class AudioDirector {
     this.musicBus?.setVolume(this.musicVolume);
     this.soundtrackBus?.setVolume(this.musicVolume);
     this.menuTrackBus?.setVolume(this.musicVolume);
+    this.bossTrackBus?.setVolume(this.musicVolume);
   }
 
   /**
@@ -432,6 +443,12 @@ export class AudioDirector {
       this.menuTrackBus.setVolume(this.musicVolume);
       void this.menuTrackBus.load(MENU_SOUNDTRACK_URL);
       if (this.screen === 'menu' && !this.muted) this.menuTrackBus.wake();
+      // A trilha de encontro nasce calada e carrega em prioridade baixa como
+      // as outras: ate decodificar, o encontro segue com a trilha da run.
+      this.bossTrackBus = new SoundtrackBus(ctx, master, bossBaseGain);
+      this.bossTrackBus.start();
+      this.bossTrackBus.setVolume(this.musicVolume);
+      void this.bossTrackBus.load(BOSS_SOUNDTRACK_URL);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -460,7 +477,17 @@ export class AudioDirector {
     if (this.lastPhase === 'running' && state.phase === 'dead') this.ui('died');
     this.lastPhase = state.phase;
 
-    if (state.phase === 'running') {
+    if (state.phase === 'running' && this.bossTrackActive(state)) {
+      // O ENCONTRO tem trilha propria: ela assume e as duas da run calam. As
+      // rampas de cada bus fazem o crossfade; `activeSource` fica como esta,
+      // para a trilha da run voltar exatamente de onde saiu quando o chefe
+      // cair (o `wake` por quadro abaixo e idempotente).
+      this.menuTrackBus?.silence();
+      this.musicBus?.silence();
+      this.soundtrackBus?.silence();
+      this.bossTrackBus?.wake();
+    } else if (state.phase === 'running') {
+      this.bossTrackBus?.silence();
       // Cinto de seguranca: update() com run correndo implica tela de run —
       // se algum caminho novo esquecer o setScreen, a trilha de menu nao
       // pode vazar por baixo da descida. silence() ja silenciado e gratis.
@@ -507,6 +534,7 @@ export class AudioDirector {
       // (`died`/`extracted`) soa sozinho, e o silencio e o efeito.
       this.musicBus?.silence();
       this.soundtrackBus?.silence();
+      this.bossTrackBus?.silence();
     }
 
     // O MOTOR do canhao rotativo segue o ESTADO autoritativo do jogador local,
@@ -567,7 +595,19 @@ export class AudioDirector {
     this.silenceBossBeds();
     this.musicBus?.silence();
     this.soundtrackBus?.silence();
+    this.bossTrackBus?.silence();
     this.activeSource = null;
+  }
+
+  /** A trilha de encontro deve soar neste quadro? Ver `bossTrackPlaying`. */
+  private bossTrackActive(state: SurvivalState): boolean {
+    const boss = this.sectorBossBody(state);
+    return bossTrackPlaying(
+      state.sectorBoss.archetype,
+      state.bossRuntime.awake,
+      boss !== null,
+      this.bossTrackBus?.ready ?? false,
+    );
   }
 
   private silenceBossBeds(): void {
@@ -684,6 +724,7 @@ export class AudioDirector {
       // inocuo — mais simples que perguntar qual esta ativo.
       this.musicBus?.duck();
       this.soundtrackBus?.duck();
+      this.bossTrackBus?.duck();
     }
 
     const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD;
