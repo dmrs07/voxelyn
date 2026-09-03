@@ -216,7 +216,12 @@ describe('impressao digital da geracao', () => {
     // O contrato de alcancabilidade e o de pureza seguem intactos: a gravacao
     // continua trocando so rocha por rocha depois das provas, e o terreno de
     // (seed, setor) continua identico em qualquer geracao.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1082481898);
+    // 4034336067, na SIMULATION_VERSION 53: a Catedral Prismatica passou a
+    // recuar a rotunda para dentro da moldura quando o Nucleo nasce perto da
+    // borda. A mudanca e intencional: garante espaco para a orbita inteira e
+    // os sete tiles de cada braco do canto do Arquicantor. O mesmo bump tambem
+    // cobre a abertura da arena e a rede cristalina acrescentadas neste rework.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(4034336067);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {
