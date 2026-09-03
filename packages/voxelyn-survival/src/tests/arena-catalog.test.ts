@@ -252,3 +252,25 @@ describe('createArenaRun — o recorte da arena', () => {
     expect(pipes, 'a camara do Leviata nasceu sem duto').toBeGreaterThan(0);
   });
 });
+
+describe('arena.html — Catedral Prismatica', () => {
+  it('preserva a rotunda aberta e muitos cristais no recorte do Arquicantor', () => {
+    const state = createArenaRun({ boss: 'archcantor', maxHp: 200, ability: 'pulse', modules: [] });
+    const boss = state.enemies.find((e) => e.archetype === 'archcantor');
+    expect(boss).toBeDefined();
+    const w = state.config.width;
+    let openCore = 0;
+    let crystals = 0;
+    for (let y = Math.floor(boss!.y) - 10; y <= Math.floor(boss!.y) + 10; y++) {
+      for (let x = Math.floor(boss!.x) - 10; x <= Math.floor(boss!.x) + 10; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+        const d = Math.hypot(x + 0.5 - boss!.x, y + 0.5 - boss!.y);
+        const material = state.solid[y * w + x];
+        if (d <= 5 && material === SOLID_NONE) openCore++;
+        if (d <= 10 && material === SOLID_CRYSTAL) crystals++;
+      }
+    }
+    expect(openCore, 'arena.html apertou a danca do coro').toBeGreaterThan(55);
+    expect(crystals, 'arena.html perdeu a rede da Catedral').toBeGreaterThanOrEqual(16);
+  });
+});
