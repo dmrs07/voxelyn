@@ -10,8 +10,22 @@
 // permite testar a parte que importa — QUE som sai e de ONDE — num ambiente
 // Node, sem AudioContext.
 
-import { SOLID_CRYSTAL, SOLID_CRYSTAL_DULL } from '@voxelyn/survival-sim';
-import type { EntityActionKind, SemanticEvent } from '@voxelyn/survival-sim';
+import {
+  BOSS_PHASE_OVERHEAT,
+  BOSS_PHASE_REACTOR,
+  BOSS_PHASE_SUMMON,
+  BOSS_PHASE_UNSTABLE,
+  SOLID_CRYSTAL,
+  SOLID_CRYSTAL_DULL,
+  isBossArchetype,
+} from '@voxelyn/survival-sim';
+import type {
+  BossAbility,
+  BossMoment,
+  EnemyArchetype,
+  EntityActionKind,
+  SemanticEvent,
+} from '@voxelyn/survival-sim';
 import type { VoiceId } from './voices';
 
 export type Cue = {
@@ -84,6 +98,157 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   leap: null,
 };
 
+// ---------------------------------------------------------------------------
+// OS CHEFES
+//
+// A gramatica: cada chefe tem uma assinatura, e cada habilidade a usa para
+// tres momentos — preparacao (`boss_windup`), execucao (`boss_attack`) e
+// consequencia/presenca (`boss_state`), mais a janela de dano
+// (`boss_vulnerable`). As tabelas abaixo sao a assinatura inteira; a
+// simulacao so diz QUEM fez O QUE. O que nao esta na tabela cai no
+// telegrafo generico (preparacao) ou no silencio (execucao) — nunca num
+// bipe inventado.
+// ---------------------------------------------------------------------------
+
+type BossVoiceTable<K extends string> = Partial<
+  Record<EnemyArchetype, Partial<Record<K, VoiceId>>>
+>;
+
+const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
+  guardian: {
+    salvo: 'guardianSalvoCrack',
+    slam: 'guardianCompress',
+    charge: 'guardianCompress',
+    contact: 'guardianCompress',
+  },
+  bishop: { nova: 'bishopNovaCharge' },
+  diamandis: {
+    drill: 'diamandisDrillSpin',
+    demolish: 'diamandisChargeArmed',
+    beam: 'diamandisBeamScan',
+  },
+  white_devourer: { erupt: 'devourerEmergeWarning' },
+  archcantor: { song: 'archcantorPhrase' },
+  sheet_leviathan: {
+    breach: 'leviathanBreach',
+    deluge: 'leviathanDelugeRise',
+    massive_shock: 'leviathanShockCharge',
+  },
+  furnace_heart: { wave: 'furnaceWedgeWarn' },
+  frost_queen: { freeze: 'frostQueenFreezeCharge' },
+};
+
+/**
+ * O que um chefe SEM assinatura para aquela habilidade diz na preparacao: o
+ * telegrafo generico da acao equivalente, pelo mesmo criterio de sempre — a
+ * voz diz o que fazer, nao quem esta fazendo. `null` e "esta preparacao nao
+ * avisa por voz propria" (a cunha da Fornalha e o Diluvio tem assinatura;
+ * sem ela nao haveria o que dizer).
+ */
+const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
+  salvo: 'telegraphRanged',
+  slam: 'telegraphSlam',
+  charge: 'telegraphCharge',
+  contact: 'telegraphCharge',
+  nova: 'telegraphPulse',
+  drill: 'telegraphCharge',
+  demolish: 'telegraphDetonate',
+  beam: 'telegraphHurl',
+  erupt: 'telegraphCharge',
+  maw: null,
+  song: 'telegraphPulse',
+  breach: 'telegraphCharge',
+  deluge: null,
+  massive_shock: 'telegraphPulse',
+  wave: null,
+  freeze: 'telegraphPulse',
+  crush: null,
+  tether: null,
+};
+
+/**
+ * A voz corporativa que acompanha cada ferramenta do Diamandis. A ordem de
+ * trabalho sai JUNTO do som da ferramenta: "AFASTE-SE" com o motor da broca
+ * subindo, "CARGA ARMADA" com os bipes, "SONDAGEM" com o scanner.
+ */
+const DIAMANDIS_WINDUP_LINE: Partial<Record<BossAbility, VoiceId>> = {
+  drill: 'diamandisVoiceStandClear',
+  demolish: 'diamandisVoiceArmed',
+  beam: 'diamandisVoiceSurvey',
+};
+
+const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
+  // A salva NAO esta aqui: cada pedra ja sai como `shot`. O contato e o
+  // mesmo golpe de massa, menor.
+  guardian: { slam: 'guardianSlam', charge: 'guardianSlam', contact: 'guardianSlam' },
+  diamandis: {
+    drill: 'diamandisDrillImpact',
+    demolish: 'diamandisImplosion',
+    beam: 'diamandisBeamLocked',
+  },
+  white_devourer: { erupt: 'devourerEmerge' },
+  // O canto e decidido por intensidade (acorde ou tritono) — ver abaixo.
+  sheet_leviathan: { massive_shock: 'leviathanShockRelease' },
+  furnace_heart: { wave: 'furnaceWave' },
+  frost_queen: { freeze: 'frostQueenFreeze' },
+  magnetarch: { crush: 'magnetarchCrush', tether: 'magnetarchArc' },
+};
+
+const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
+  guardian: { step: 'guardianStep', strain: 'guardianStrain', chip: 'guardianChip' },
+  white_devourer: {
+    burrow: 'devourerBurrow',
+    maw_open: 'devourerMawOpen',
+    maw_close: 'devourerMawClose',
+  },
+  sheet_leviathan: { call: 'leviathanCall', recover: 'leviathanShockRecover' },
+  // A inspiracao em si e o leito (lung-breath-bus); o que a virada para
+  // inspirar TOCA e a valvula fechando.
+  lung_matrix: { hold: 'lungHold', exhale: 'lungExhale', inhale: 'lungClose', wound: 'lungWound' },
+  frost_queen: { wraiths: 'frostQueenWraithRise', armor_hit: 'frostQueenArmorHit' },
+  archcantor: { idle_note: 'archcantorNote', resonance: 'archcantorResonance' },
+};
+
+/**
+ * A janela de dano abrindo (`open`) e fechando. Fechar e quase sempre mudo:
+ * o que fechou a janela ja soou (o congelamento refez o lago, a boca
+ * fechou com a propria mordida). As duas excecoes sao da SALA: a Fornalha
+ * reaquecendo e a Catedral voltando a responder.
+ */
+const BOSS_VULNERABLE_VOICE: Partial<
+  Record<EnemyArchetype, { open: VoiceId; close: VoiceId | null }>
+> = {
+  white_devourer: { open: 'devourerVulnerable', close: null },
+  archcantor: { open: 'archcantorSilenced', close: 'archcantorNote' },
+  furnace_heart: { open: 'furnaceCooling', close: 'furnaceReheat' },
+  frost_queen: { open: 'frostQueenArmorBreak', close: null },
+  lung_matrix: { open: 'lungIgnite', close: null },
+};
+
+/**
+ * A morte de cada chefe. Quem nao tem voz propria cai no fim de ato do
+ * Guardiao — e o mesmo papel (a run muda de ato), e o jogador acabou de
+ * passar minutos olhando para o que caiu. As tres que tem voz propria a tem
+ * porque a morte E a assinatura invertida: a maquina desligando por
+ * subsistemas, o gelo se desfazendo do grave para o agudo, o acorde
+ * perdendo notas uma a uma.
+ */
+const BOSS_DEATH_VOICE: Partial<Record<EnemyArchetype, VoiceId>> = {
+  diamandis: 'diamandisShutdown',
+  frost_queen: 'frostQueenShatter',
+  archcantor: 'archcantorDeath',
+};
+
+/** Ate onde, em tiles, o cue da cunha da Fornalha se desloca no rumo dela. */
+const FURNACE_WEDGE_CUE_OFFSET = 6;
+
+/**
+ * A intensidade do canto a partir da qual a terceira nota vira TRITONO. Meio
+ * da rede: uma Catedral que responde inteira e o golpe grande, e a frase
+ * sem resolucao e o que diz isso antes de a onda chegar.
+ */
+const ARCHCANTOR_TRITONE_INTENSITY = 0.5;
+
 /** Centro geometrico de uma descarga, em tiles. */
 const dischargeCentroid = (
   cells: readonly number[],
@@ -125,10 +290,149 @@ export type CueContext = {
 export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
   switch (ev.t) {
     case 'action_start': {
+      // Um CHEFE nao fala pelo generico: o `boss_windup` que sai no mesmo
+      // tick e quem fala por ele (com a assinatura dele, ou com este mesmo
+      // telegrafo generico como reserva — ver GENERIC_WINDUP_VOICE). Deixar
+      // os dois soarem daria dois avisos para um golpe.
+      if (ev.archetype && isBossArchetype(ev.archetype)) return [];
       const voice = TELEGRAPH_VOICE[ev.action];
       if (!voice) return [];
       return [{ voice, x: ev.x, y: ev.y, scale: 1 }];
     }
+
+    case 'boss_windup': {
+      const own = BOSS_WINDUP_VOICE[ev.archetype]?.[ev.ability];
+      const voice = own ?? GENERIC_WINDUP_VOICE[ev.ability];
+      const cues: Cue[] = [];
+      if (voice) {
+        // A cunha da Fornalha soa NO RUMO dela, e nao no corpo: e o
+        // paneamento que diz de que lado vem a varredura.
+        const offset = ev.archetype === 'furnace_heart' ? FURNACE_WEDGE_CUE_OFFSET : 0;
+        cues.push({
+          voice,
+          x: ev.x + (ev.dx ?? 0) * offset,
+          y: ev.y + (ev.dy ?? 0) * offset,
+          scale: 1,
+        });
+      }
+      if (ev.archetype === 'diamandis') {
+        const line = DIAMANDIS_WINDUP_LINE[ev.ability];
+        if (line) cues.push({ voice: line, x: ev.x, y: ev.y, scale: 1 });
+      }
+      return cues;
+    }
+
+    case 'boss_attack': {
+      if (ev.archetype === 'archcantor' && ev.ability === 'song') {
+        const dangerous = (ev.intensity ?? 0) >= ARCHCANTOR_TRITONE_INTENSITY;
+        return [
+          {
+            voice: dangerous ? 'archcantorTritone' : 'archcantorChord',
+            x: ev.x,
+            y: ev.y,
+            scale: 1,
+          },
+        ];
+      }
+      const voice = BOSS_ATTACK_VOICE[ev.archetype]?.[ev.ability];
+      if (!voice) return [];
+      const offset = ev.archetype === 'furnace_heart' ? FURNACE_WEDGE_CUE_OFFSET : 0;
+      return [
+        {
+          voice,
+          x: ev.x + (ev.dx ?? 0) * offset,
+          y: ev.y + (ev.dy ?? 0) * offset,
+          // O contato do Guardiao e o mesmo golpe de massa, menor.
+          scale: ev.ability === 'contact' ? 0.7 : 1,
+        },
+      ];
+    }
+
+    case 'boss_state': {
+      // A polaridade do Magnetarca e duas vozes: o rele invertendo e a
+      // polaridade que entrou — e as duas sao globais, porque a resposta
+      // certa depende de saber qual vale sem olhar para nada.
+      if (ev.archetype === 'magnetarch') {
+        if (ev.state === 'attract' || ev.state === 'repel') {
+          return [
+            { voice: 'magnetarchFlip', x: ev.x, y: ev.y, scale: 1 },
+            {
+              voice: ev.state === 'attract' ? 'magnetarchAttract' : 'magnetarchRepel',
+              x: ev.x,
+              y: ev.y,
+              scale: 1,
+            },
+          ];
+        }
+        return [];
+      }
+      const voice = BOSS_STATE_VOICE[ev.archetype]?.[ev.state];
+      if (!voice) return [];
+      // A ressonancia cai com a camada: a nota de fora e a mais fraca, e e a
+      // que o jogador consegue cortar a tempo.
+      const scale = ev.state === 'resonance' ? 0.55 + 0.45 * (ev.intensity ?? 1) : 1;
+      return [{ voice, x: ev.x, y: ev.y, scale }];
+    }
+
+    case 'boss_vulnerable': {
+      const pair = BOSS_VULNERABLE_VOICE[ev.archetype];
+      if (!pair) return [];
+      const voice = ev.open ? pair.open : pair.close;
+      if (!voice) return [];
+      return [{ voice, x: ev.x, y: ev.y, scale: ev.open ? 1 : 0.8 }];
+    }
+
+    case 'boss_phase': {
+      const x = ev.x ?? 0;
+      const y = ev.y ?? 0;
+      switch (ev.archetype) {
+        case 'diamandis':
+          if (ev.phase === BOSS_PHASE_REACTOR) {
+            return [
+              { voice: 'diamandisReactorFail', x, y, scale: 1 },
+              { voice: 'diamandisVoiceFault', x, y, scale: 1 },
+            ];
+          }
+          return [];
+        case 'furnace_heart':
+          if (ev.phase === BOSS_PHASE_OVERHEAT) return [{ voice: 'furnaceCrack', x, y, scale: 1 }];
+          if (ev.phase === BOSS_PHASE_UNSTABLE)
+            return [{ voice: 'furnaceUnstable', x, y, scale: 1 }];
+          return [];
+        case 'guardian':
+          // A matilha: a massa se deslocando de novo — o mesmo subgrave do
+          // despertar, mais baixo. Ele nao ganha um sting novo para dizer
+          // "segunda fase"; ganha o rangido continuo que comeca aqui.
+          if (ev.phase === BOSS_PHASE_SUMMON) return [{ voice: 'guardianAwake', x, y, scale: 0.7 }];
+          return [];
+        default:
+          // O Diluvio ja soou pelo proprio `boss_windup`.
+          return [];
+      }
+    }
+
+    // A sala esfriando de vez: o mesmo alivio do resfriamento, inteiro.
+    case 'furnace_cooled':
+      return [{ voice: 'furnaceCooling', x: ev.x, y: ev.y, scale: 1.2 }];
+
+    // A estalactite MARCADA: detritos onde o teto vai cair, antes de cair. A
+    // queda em si ja soa pelo `pulse` que a simulacao emite ao chegar.
+    case 'stalactite':
+      return [{ voice: 'furnaceDebris', x: ev.x, y: ev.y, scale: 1 }];
+
+    // A descarga do Leviata ja soou pelo `boss_attack` (massive_shock); este
+    // evento e das particulas e da carcaca.
+    case 'leviathan_discharge':
+      return [];
+
+    case 'boss_module':
+      // "UNIDADE NAO RECUPERAVEL": a peca arrancada, ou perdida de vez. A
+      // exposicao e a queda ao chao sao silenciosas — o clarao e a marca no
+      // chao ja dizem, e uma frase para cada estado viraria um narrador.
+      if (ev.state === 'detached' || ev.state === 'lost') {
+        return [{ voice: 'diamandisVoiceLost', x: ev.x, y: ev.y, scale: 1 }];
+      }
+      return [];
 
     case 'shot':
       return [{ voice: 'shot', x: ev.x, y: ev.y, scale: 1 }];
@@ -170,9 +474,16 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // alguem que estava trabalhando soa igual a estourar um bomber — e tudo
       // no encontro dele existe para dizer o contrario.
       if (ev.archetype === 'miner') return [{ voice: 'deathMiner', x: ev.x, y: ev.y, scale: 1 }];
-      return ev.archetype === 'guardian' || ev.archetype === 'bishop'
-        ? [{ voice: 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }]
-        : [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
+      // A ninhada do Devorador nao morre: e ENGOLIDA. Estalos agudos
+      // desaparecendo dentro do grave — e o que ensina o raio da boca.
+      if (ev.archetype === 'devourer_brood') {
+        return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 1 }];
+      }
+      if (isBossArchetype(ev.archetype as EnemyArchetype)) {
+        const own = BOSS_DEATH_VOICE[ev.archetype as EnemyArchetype];
+        return [{ voice: own ?? 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }];
+      }
+      return [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
 
     // A cura do bispo E a informacao da luta. Sem som, o jogador so descobre que
     // nao esta progredindo comparando a barra de vida com a memoria do que ela
@@ -332,6 +643,16 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       return [{ voice: 'moduleExpired', x: 0, y: 0, scale: 1 }];
 
     case 'boss_awake':
+      // O Diamandis nao acorda: LIGA. Subsistemas subindo e a primeira ordem
+      // de trabalho — "AREA NAO MAPEADA" — de onde a maquina esta. Todos os
+      // outros dividem o subgrave tectonico: e "algo enorme notou voce", e
+      // esse aviso e o mesmo para um lago, uma sala ou uma pedra.
+      if (ev.archetype === 'diamandis') {
+        return [
+          { voice: 'diamandisBoot', x: 0, y: 0, scale: 1 },
+          { voice: 'diamandisVoiceUnmapped', x: ev.x ?? 0, y: ev.y ?? 0, scale: 1 },
+        ];
+      }
       return [{ voice: 'guardianAwake', x: 0, y: 0, scale: 1 }];
 
     case 'player_down':

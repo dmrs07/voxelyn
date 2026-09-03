@@ -74,6 +74,8 @@ export const emptyBossRuntime = (): BossRuntime => ({
   leviathanShockRecoverAt: -1,
   leviathanShockSeq: 0,
   protectiveBubbles: [],
+  frostArmored: -1,
+  archcantorSilent: false,
 });
 
 /**

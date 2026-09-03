@@ -580,6 +580,14 @@ export const GUARDIAN_VOLLEY_SHOTS = 3;
 export const GUARDIAN_VOLLEY_INTERVAL_TICKS = 7;
 /** Recarga da salva (leque ou rajada). O valor historico do ranged dele. */
 export const GUARDIAN_SALVO_COOLDOWN_TICKS = 44;
+/**
+ * Cadencia dos cues de PRESENCA do Guardiao: o passo pesado enquanto anda
+ * (`step`) e o rangido estrutural da fase final (`strain`). O passo a cada
+ * 8 ticks casa com a velocidade dele (~um tile por passo); o rangido e
+ * esparso de proposito — e um leito, nao um alarme.
+ */
+export const GUARDIAN_STEP_INTERVAL_TICKS = 8;
+export const GUARDIAN_STRAIN_INTERVAL_TICKS = 40;
 
 // ---------------------------------------------------------------------------
 // DIAMANDIS — o chefe da Cicatriz Aurix
@@ -942,8 +950,7 @@ export const DEVOURER_MAW_OPEN_DELAY_TICKS = 24;
 /**
  * Do terceiro pouso ate a boca: o corpo enterra, e entao o chao espera.
  */
-export const DEVOURER_MAW_SETTLE_TICKS =
-  DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS;
+export const DEVOURER_MAW_SETTLE_TICKS = DEVOURER_MAW_BURY_TICKS + DEVOURER_MAW_OPEN_DELAY_TICKS;
 /**
  * A BOCA: a janela de dano do encontro inteiro, e o unico momento em que ele
  * puxa.
@@ -1117,6 +1124,15 @@ export const DEVOURER_MAW_PULL_STEP = 0.15;
  * continuam cercando o alvo de perto, mas cada uma cobra um passo diferente.
  */
 export const DEVOURER_REPEAT_MIN_GAP = 4;
+/**
+ * Cadencia do cue de deslocamento sob a silica (`boss_state: burrow`).
+ *
+ * Duas vezes por segundo, com a posicao do corpo: e o que transforma o audio
+ * em informacao espacial — o atrito passa da esquerda para a direita conforme
+ * a rota — sem transmitir um evento por tick. A faixa de silica e o aviso
+ * visual; este e o mesmo aviso para quem esta olhando para outro lugar.
+ */
+export const DEVOURER_BURROW_CUE_INTERVAL_TICKS = 10;
 export const DEVOURER_ERUPT_WINDUP_TICKS = 24;
 export const DEVOURER_ERUPT_RADIUS = 2.8;
 export const DEVOURER_ERUPT_DAMAGE = 30;
@@ -1935,6 +1951,11 @@ export const ARCHCANTOR_WINDUP_TICKS = 34;
  * atravessar de graca.
  */
 export const ARCHCANTOR_COOLDOWN_TICKS = 110;
+/**
+ * A NOTA ISOLADA do Arquicantor entre um canto e outro (`boss_state: note`).
+ * Ele nao ruge — afina. Esparsa (3,5 s) para ser presenca, e nao musica.
+ */
+export const ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS = 70;
 /** Quanto a rede vazia o enfraquece: sem cristal, o canto nao tem quem responda. */
 export const ARCHCANTOR_SILENT_ARMOR = 1.5;
 
@@ -1959,6 +1980,14 @@ export const LEVIATHAN_BREACH_RADIUS = 3;
 export const LEVIATHAN_BREACH_DAMAGE = 28;
 export const LEVIATHAN_BREACH_SEARCH = 7;
 export const LEVIATHAN_LEAD_SECONDS = 0.8;
+/**
+ * De quanto em quanto tempo o Leviata submerso CHAMA (`boss_state: call`).
+ *
+ * Quatro segundos: espacado o bastante para ler como um animal enorme
+ * navegando fora da camera, e nao como um alarme. O chamado cala durante a
+ * carga da descarga — o silencio subito e parte do aviso.
+ */
+export const LEVIATHAN_CALL_INTERVAL_TICKS = 80;
 /**
  * A ENCHENTE: o lencol sobe atras de quem subiu na margem.
  *
@@ -2154,6 +2183,16 @@ export const LUNG_MATRIX_EXHALE_LENGTH = 12;
 export const LUNG_MATRIX_EXHALE_WIDTH = 1;
 /** Dano por celula de gas acesa encostada nele durante a expiracao. */
 export const LUNG_MATRIX_BURN_DAMAGE = 26;
+/**
+ * O PULMAO CHEIO: quantos ticks antes da expiracao a inspiracao "segura".
+ *
+ * A simulacao nao tem uma fase de retencao — inspira ate o relogio virar e
+ * expele. Mas o instante e DELA: e a partir deste numero que o cliente sabe
+ * quando parar a succao e deixar meio segundo de pressao antes do jato, e
+ * meio segundo de silencio e o que transforma o ciclo num aviso que se
+ * aprende. Presentacional, entao nao entra no hash.
+ */
+export const LUNG_MATRIX_HOLD_TICKS = 12;
 
 /**
  * CORACAO DA FORNALHA (Fornalha Abissal) — o nucleo igneo parcialmente exposto.

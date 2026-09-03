@@ -3,6 +3,12 @@ import {
   BIOFLUID_SLOW,
   WITNESS_RANGE,
   ARCHCANTOR_COOLDOWN_TICKS,
+  ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS,
+  DEVOURER_BURROW_CUE_INTERVAL_TICKS,
+  GUARDIAN_STEP_INTERVAL_TICKS,
+  GUARDIAN_STRAIN_INTERVAL_TICKS,
+  LEVIATHAN_CALL_INTERVAL_TICKS,
+  LUNG_MATRIX_HOLD_TICKS,
   ARCHCANTOR_CRYSTAL_BUDGET,
   ARCHCANTOR_CHAIN_REACH,
   ARCHCANTOR_CHAIN_LAYERS,
@@ -335,6 +341,7 @@ import {
   SCORIAC_HOT,
 } from './types.js';
 import type {
+  BossAbility,
   DamageCause,
   EffectOrigin,
   Entity,
@@ -904,9 +911,31 @@ export const damageEntity = (
     else markDiscovery(state.stats, DISCOVERY_FURNACE_COOLED);
   }
   if (ent.archetype === 'frost_queen') {
-    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD)
+    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) {
       amount *= FROST_QUEEN_ICE_ARMOR;
-    else markDiscovery(state.stats, DISCOVERY_QUEEN_THAWED);
+      // O tiro ABSORVIDO tem de ser ouvido como absorvido: e a unica coisa que
+      // diz ao jogador que a barra nao esta mexendo por causa do gelo, e nao
+      // por causa da mira. Nao no dano por tick do chao — isso e pressao, nao
+      // um tiro que a couraça engoliu.
+      if (!hazard) {
+        events.push({
+          t: 'boss_state',
+          archetype: 'frost_queen',
+          state: 'armor_hit',
+          x: ent.x,
+          y: ent.y,
+        });
+      }
+    } else markDiscovery(state.stats, DISCOVERY_QUEEN_THAWED);
+  }
+  // Dano RECEBIDO com voz propria, nos dois chefes em que o que sai do corpo
+  // nao e um gemido: o Guardiao solta lasca, o Pulmao vaza como um fole
+  // furado. `hazard` fora pelo mesmo motivo da couraça da Rainha.
+  if (!hazard && ent.archetype === 'guardian') {
+    events.push({ t: 'boss_state', archetype: 'guardian', state: 'chip', x: ent.x, y: ent.y });
+  }
+  if (!hazard && ent.archetype === 'lung_matrix') {
+    events.push({ t: 'boss_state', archetype: 'lung_matrix', state: 'wound', x: ent.x, y: ent.y });
   }
   if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
     amount *= ARCHCANTOR_SILENT_ARMOR;
@@ -1266,6 +1295,43 @@ const nearestTarget = (state: SurvivalState, x: number, y: number): Entity | nul
   return best;
 };
 
+/**
+ * Que HABILIDADE DE CHEFE uma acao telegrafada e, para quem a executa.
+ *
+ * `null` quando o ator nao e chefe, ou quando a acao nao e um golpe que se
+ * anuncia (o arco do Devorador ja foi anunciado pela decolagem). A mesma acao
+ * vira habilidades diferentes conforme o corpo — `erupt` e a emergencia do
+ * Devorador E a rompida do Leviata; `pulse` e o canto do Arquicantor E a
+ * Supernova do Bispo — e e exatamente por isso que o cliente nao pode
+ * adivinhar a partir de `action_start`.
+ */
+const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbility | null => {
+  const archetype = enemy.archetype as EnemyArchetype;
+  if (!isBossArchetype(archetype)) return null;
+  switch (action) {
+    case 'ranged':
+      return 'salvo';
+    case 'slam':
+      return 'slam';
+    case 'charge':
+      return 'charge';
+    case 'contact':
+      return 'contact';
+    case 'pulse':
+      return archetype === 'archcantor' ? 'song' : 'nova';
+    case 'drill':
+    case 'demolish':
+    case 'beam':
+    case 'freeze':
+    case 'massive_shock':
+      return action;
+    case 'erupt':
+      return archetype === 'sheet_leviathan' ? 'breach' : 'erupt';
+    default:
+      return null;
+  }
+};
+
 const startAction = (
   state: SurvivalState,
   enemy: Entity,
@@ -1275,6 +1341,8 @@ const startAction = (
   recoveryTicks: number,
   events: SemanticEvent[],
   target?: number,
+  /** Ver `boss_windup.intensity`. So os chefes o preenchem, e nem todos. */
+  intensity?: number,
 ): void => {
   const releaseAt = state.tick + windupTicks;
   enemy.action = {
@@ -1291,6 +1359,7 @@ const startAction = (
     t: 'action_start',
     entity: enemy.id,
     action,
+    archetype: enemy.archetype as EnemyArchetype,
     x: enemy.x,
     y: enemy.y,
     dx: direction.x,
@@ -1299,6 +1368,24 @@ const startAction = (
     releaseTick: releaseAt,
     endTick: releaseAt + recoveryTicks,
   });
+  // A PREPARACAO de um chefe e um evento proprio, alem do `action_start`: o
+  // renderer continua lendo a pose pelo generico; o audio le a assinatura
+  // por este. Os dois saem no mesmo tick, e o cliente cala o telegrafo
+  // generico quando ve `archetype` de chefe — ver cues.ts.
+  const ability = bossAbilityOfAction(enemy, action);
+  if (ability) {
+    events.push({
+      t: 'boss_windup',
+      archetype: enemy.archetype as EnemyArchetype,
+      ability,
+      x: enemy.x,
+      y: enemy.y,
+      dx: direction.x,
+      dy: direction.y,
+      releaseTick: releaseAt,
+      ...(intensity !== undefined ? { intensity } : {}),
+    });
+  }
 };
 
 /** Gira um vetor unitario por `angle` radianos. */
@@ -1529,6 +1616,27 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       : (state.players.find(
           (p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed,
         ) ?? null);
+
+  // A EXECUCAO do golpe de um chefe, antes das consequencias (a explosao, a
+  // descarga, o `hit`) que o ramo especifico produz: o "aconteceu agora" e
+  // um evento, e o que ele causou no mundo sao outros.
+  const bossAbility = bossAbilityOfAction(enemy, action.kind);
+  if (bossAbility) {
+    events.push({
+      t: 'boss_attack',
+      archetype: enemy.archetype as EnemyArchetype,
+      ability: bossAbility,
+      x: enemy.x,
+      y: enemy.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+      // O canto do Arquicantor carrega o tamanho da rede que vai responder:
+      // e a diferenca entre uma frase que resolve e um tritono.
+      ...(enemy.archetype === 'archcantor'
+        ? { intensity: archcantorSongIntensity(state, enemy) }
+        : {}),
+    });
+  }
 
   if (action.kind === 'pulse') {
     if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
@@ -2557,7 +2665,12 @@ const diverEngaged = (
   if (distTo(enemy, player) > def.aggroRange && state.tick >= enemy.alertedUntil) return false;
   state.bossRuntime.awake = true;
   enemy.nextActionAt = Math.max(enemy.nextActionAt, state.tick + leadTicks);
-  events.push({ t: 'boss_awake' });
+  events.push({
+    t: 'boss_awake',
+    archetype: enemy.archetype as EnemyArchetype,
+    x: enemy.x,
+    y: enemy.y,
+  });
   return true;
 };
 
@@ -2652,7 +2765,6 @@ const broodStep = (
     // esmagados" e metade do que eles sao.
     moveEntity(state, enemy, (mx / len) * step, (my / len) * step);
   }
-
 };
 
 /**
@@ -2951,6 +3063,23 @@ const devourerStep = (
     setSurface(state, i, SURF_SILT, 0);
   }
 
+  // O DESLOCAMENTO sob a silica, como som: duas vezes por segundo, com a
+  // posicao do corpo. E a faixa de areia para quem esta olhando para outro
+  // lugar — o atrito passa de um lado a outro do estereo conforme a rota.
+  if (
+    state.bossRuntime.awake &&
+    travel > 0.0001 &&
+    state.tick % DEVOURER_BURROW_CUE_INTERVAL_TICKS === 0
+  ) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'white_devourer',
+      state: 'burrow',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
+
   if (state.tick < enemy.nextActionAt) return;
 
   // A RAJADA ACABOU: o que vem depois da espera nao e outro arco, e a BOCA.
@@ -3172,6 +3301,22 @@ const devourerOpenMaw = (state: SurvivalState, enemy: Entity, events: SemanticEv
   // mesma rampa a partir deste unico numero (ver `maw.ts`).
   state.bossRuntime.mawOpenedAt = state.tick;
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+  // A boca e as duas coisas ao mesmo tempo, e as duas viajam: o golpe (o
+  // vortice que arrasta) e a JANELA DE DANO (o corpo fora do elemento dele).
+  events.push({
+    t: 'boss_state',
+    archetype: 'white_devourer',
+    state: 'maw_open',
+    x: enemy.x,
+    y: enemy.y,
+  });
+  events.push({
+    t: 'boss_vulnerable',
+    archetype: 'white_devourer',
+    x: enemy.x,
+    y: enemy.y,
+    open: true,
+  });
 };
 
 /**
@@ -3205,6 +3350,20 @@ export const devourerMawTick = (
     state.bossRuntime.mawOpenedAt = -1;
     state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
     enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    events.push({
+      t: 'boss_state',
+      archetype: 'white_devourer',
+      state: 'maw_close',
+      x: enemy.x,
+      y: enemy.y,
+    });
+    events.push({
+      t: 'boss_vulnerable',
+      archetype: 'white_devourer',
+      x: enemy.x,
+      y: enemy.y,
+      open: false,
+    });
     return;
   }
   devourerMawStep(state, enemy, events);
@@ -3646,6 +3805,15 @@ const archcantorLayerCells = (state: SurvivalState, layer: readonly number[]): n
   return [...charged];
 };
 
+/**
+ * Quao GRANDE e a frase que vai sair: a fracao das camadas que a rede
+ * alcanca. Viaja em `boss_windup`/`boss_attack.intensity` para o cliente
+ * escolher entre a frase que resolve e o tritono — uma Catedral quase vazia
+ * canta curto; uma cheia canta a nave inteira, e o som tem de prometer isso.
+ */
+const archcantorSongIntensity = (state: SurvivalState, enemy: Entity): number =>
+  Math.min(1, archcantorChain(state, enemy).length / ARCHCANTOR_CHAIN_LAYERS);
+
 const archcantorPulse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   // O release descarrega so a camada ZERO — os cristais que o corpo dele
   // alcanca. As de fora saem uma por vez em `archcantorChainStride`, e e isso
@@ -3686,6 +3854,19 @@ const archcantorChainStride = (
   const cells = archcantorLayerCells(state, layers[layer]);
   if (cells.length === 0) return;
   chargeCells(state, cells, events, { source: 'enemy', owner: enemy.id });
+  // CADA CAMADA que responde e uma nota do acorde. A posicao e a de um
+  // cristal da camada (o primeiro), para o som andar pela nave junto com a
+  // onda; `intensity` cai com a distancia do corpo — a camada de fora e a
+  // nota mais fraca, e e a que o jogador consegue cortar a tempo.
+  const w = state.config.width;
+  events.push({
+    t: 'boss_state',
+    archetype: 'archcantor',
+    state: 'resonance',
+    x: (cells[0] % w) + 0.5,
+    y: Math.floor(cells[0] / w) + 0.5,
+    intensity: 1 - layer / ARCHCANTOR_CHAIN_LAYERS,
+  });
 };
 
 /** Ha cristal ao alcance do canto? A rede vazia e o que o desarma. */
@@ -3850,6 +4031,15 @@ const leviathanMassiveDischarge = (
   state.bossRuntime.protectiveBubbles = [];
   state.bossRuntime.leviathanShockAt = -1;
   state.bossRuntime.leviathanShockRecoverAt = state.tick + LEVIATHAN_SHOCK_COOLDOWN_TICKS;
+  // A RECUPERACAO: bolhas escapando e um chamado quebrado, descendente. E o
+  // "o mundo mudou" da descarga — ela ja passou, e ele esta gasto.
+  events.push({
+    t: 'boss_state',
+    archetype: 'sheet_leviathan',
+    state: 'recover',
+    x: enemy.x,
+    y: enemy.y,
+  });
 };
 
 const startLeviathanMassiveShock = (
@@ -3927,6 +4117,19 @@ const leviathanStep = (
 
   if (!player) return;
   if (!diverEngaged(state, enemy, player, LEVIATHAN_DIVE_MIN_TICKS, events)) return;
+  // A PRESENCA: chamados longos, graves e espacados, de algo enorme
+  // navegando fora da camera. O canto CALA durante a carga da descarga — o
+  // silencio subito e parte do aviso, e por isso o portao esta aqui e nao no
+  // cliente.
+  if (state.bossRuntime.leviathanShockAt < 0 && state.tick % LEVIATHAN_CALL_INTERVAL_TICKS === 0) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'sheet_leviathan',
+      state: 'call',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
   const toward = normalized(player.x - enemy.x, player.y - enemy.y);
   enemy.facing = { ...toward };
   // Submerso ele anda pela LAMINA, e nao pelo chao: passos que continuem em
@@ -4017,9 +4220,26 @@ const leviathanDeluge = (state: SurvivalState, enemy: Entity, events: SemanticEv
   state.bossRuntime.delugeAt = state.tick + DELUGE_WINDUP_TICKS;
   state.bossRuntime.delugeX = enemy.x;
   state.bossRuntime.delugeY = enemy.y;
-  events.push({ t: 'boss_phase', archetype: 'sheet_leviathan', phase: BOSS_PHASE_DELUGE });
+  events.push({
+    t: 'boss_phase',
+    archetype: 'sheet_leviathan',
+    phase: BOSS_PHASE_DELUGE,
+    x: enemy.x,
+    y: enemy.y,
+  });
   events.push({ t: 'message', key: 'sim.delugeRising' });
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 4 });
+  // O INICIO do Diluvio e uma preparacao: a agua so comeca a subir em
+  // `delugeAt`, e o que se ouve ate la e o chamado ascendente e o
+  // deslocamento de agua — um som continuo, nao uma serie de respingos.
+  events.push({
+    t: 'boss_windup',
+    archetype: 'sheet_leviathan',
+    ability: 'deluge',
+    x: enemy.x,
+    y: enemy.y,
+    releaseTick: state.bossRuntime.delugeAt,
+  });
 };
 
 /** Ordem FIXA de vizinhanca: o que torna a frente da enchente determinista. */
@@ -4155,7 +4375,36 @@ const lungMatrixStep = (
   const w = state.config.width;
   const h = state.config.height;
   const phase = Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2;
+  const wasInhaling = enemy.mood === LUNG_INHALING;
   enemy.mood = phase === 0 ? LUNG_INHALING : LUNG_EXHALING;
+
+  // O CICLO RESPIRATORIO como eventos: a virada para expirar (a membrana
+  // abre), a virada para inspirar (a valvula fecha) e o pulmao CHEIO — a
+  // pausa de pressao pouco antes do jato. Nenhum dos tres muda a mecanica;
+  // os tres sao o relogio da luta, dito em voz alta. A virada e comparada
+  // com o humor ANTERIOR e nao com o relogio, para o primeiro tick de um
+  // corpo recem-nascido nao anunciar uma transicao que nao houve.
+  const inhaling = enemy.mood === LUNG_INHALING;
+  if (inhaling !== wasInhaling) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'lung_matrix',
+      state: inhaling ? 'inhale' : 'exhale',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  } else if (
+    inhaling &&
+    state.tick % LUNG_MATRIX_CYCLE_TICKS === LUNG_MATRIX_CYCLE_TICKS - LUNG_MATRIX_HOLD_TICKS
+  ) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'lung_matrix',
+      state: 'hold',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
 
   if (state.tick >= enemy.nextActionAt) {
     enemy.nextActionAt = state.tick + LUNG_MATRIX_BREATH_INTERVAL_TICKS;
@@ -4204,6 +4453,15 @@ const lungMatrixStep = (
         });
         markDiscovery(state.stats, DISCOVERY_LUNG_IGNITED);
         events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
+        // A expiracao ACESA e a unica janela de dano que o jogador abre: soa
+        // como vulnerabilidade, nao como a explosao comum.
+        events.push({
+          t: 'boss_vulnerable',
+          archetype: 'lung_matrix',
+          x: enemy.x,
+          y: enemy.y,
+          open: true,
+        });
       }
     }
   }
@@ -4233,7 +4491,43 @@ const lungMatrixBurning = (state: SurvivalState, enemy: Entity): boolean => {
  * ser pego por ela.
  */
 const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const wasOverheating = enemy.mood === FURNACE_OVERHEATING;
   enemy.mood = furnaceOverheatingAt(state.tick) ? FURNACE_OVERHEATING : FURNACE_COOLING;
+  // A VIRADA da blindagem e a informacao central do encontro ("bata agora"),
+  // e ela viaja como evento porque o instante importa: um cliente lendo o
+  // humor no snapshot comecaria a apresentacao do resfriamento com o atraso
+  // da rede. `open` = esfriou = a janela de dano abriu.
+  const overheating = enemy.mood === FURNACE_OVERHEATING;
+  if (overheating !== wasOverheating) {
+    events.push({
+      t: 'boss_vulnerable',
+      archetype: 'furnace_heart',
+      x: enemy.x,
+      y: enemy.y,
+      open: !overheating,
+    });
+  }
+  // O AVISO da cunha: o setor que vai queimar daqui a WARNING_WAVES ondas
+  // (1,8 s), no rumo que a mesma conta do cliente desenha. Sai no relogio
+  // das ondas e tambem DURANTE o resfriamento — as primeiras ondas de cada
+  // superaquecimento sao avisadas antes de ele comecar, exatamente como a
+  // cunha visual ja faz — e so quando a onda prometida existe (`warnFires`).
+  if (state.tick % FURNACE_HEART_WAVE_INTERVAL_TICKS === 0) {
+    const sweep = furnaceSweepAt(enemy.x, enemy.y, state.tick);
+    if (sweep.warnFires) {
+      events.push({
+        t: 'boss_windup',
+        archetype: 'furnace_heart',
+        ability: 'wave',
+        x: enemy.x,
+        y: enemy.y,
+        dx: sweep.warnDx,
+        dy: sweep.warnDy,
+        releaseTick:
+          state.tick + FURNACE_HEART_WAVE_WARNING_WAVES * FURNACE_HEART_WAVE_INTERVAL_TICKS,
+      });
+    }
+  }
   // A escalada roda ANTES do ciclo: os dois limiares mudam o que este mesmo
   // tick faz, e o colapso continua acontecendo durante o RESFRIAMENTO — o teto
   // nao para de cair so porque a blindagem dele abriu.
@@ -4328,6 +4622,16 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
     dy: dirY,
     length: r,
     powered: true,
+  });
+  // A ONDA em si: combustao larga, no rumo do setor que acendeu.
+  events.push({
+    t: 'boss_attack',
+    archetype: 'furnace_heart',
+    ability: 'wave',
+    x: enemy.x,
+    y: enemy.y,
+    dx: dirX,
+    dy: dirY,
   });
 };
 
@@ -4444,7 +4748,13 @@ const furnaceHeartEscalate = (
   const fire = (bit: number, message: SimMessageKey): void => {
     if ((state.bossRuntime.phasesFired & bit) !== 0) return;
     state.bossRuntime.phasesFired |= bit;
-    events.push({ t: 'boss_phase', archetype: 'furnace_heart', phase: bit });
+    events.push({
+      t: 'boss_phase',
+      archetype: 'furnace_heart',
+      phase: bit,
+      x: enemy.x,
+      y: enemy.y,
+    });
     events.push({ t: 'message', key: message });
   };
   if (fraction <= FURNACE_HEART_OVERHEAT_HP) fire(BOSS_PHASE_OVERHEAT, 'sim.ceilingCollapsing');
@@ -4735,6 +5045,7 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
     }
   }
   // Os Espectros saem do gelo, em volta dela.
+  let risen = 0;
   for (let k = 0; k < FROST_QUEEN_WRAITHS; k++) {
     const angle = (k / FROST_QUEEN_WRAITHS) * Math.PI * 2;
     const wx = Math.floor(enemy.x + Math.cos(angle) * 3);
@@ -4746,8 +5057,20 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
     // Extensoes, e nao uma matilha: nascem parciais e caem depressa.
     wraith.maxHp = Math.max(1, Math.floor(wraith.maxHp * FROST_QUEEN_WRAITH_HP_FRACTION));
     wraith.hp = wraith.maxHp;
+    risen++;
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+  // Os Espectros SAINDO do gelo sao a consequencia do congelamento, e soam
+  // como tal — so quando algum de fato saiu.
+  if (risen > 0) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'frost_queen',
+      state: 'wraiths',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
 };
 
 /**
@@ -4769,7 +5092,21 @@ const magnetarchStep = (
   events: SemanticEvent[],
 ): void => {
   const phase = Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2;
+  const wasAttracting = enemy.mood === MAGNET_ATTRACT;
   enemy.mood = phase === 0 ? MAGNET_ATTRACT : MAGNET_REPEL;
+  // A TROCA DE POLARIDADE e a unica coisa que o jogador precisa saber sem
+  // olhar para o HUD nem para o chefe: atracao e repulsao pedem respostas
+  // opostas. Comparada com o humor anterior, pelo mesmo motivo do Pulmao.
+  const attracting = enemy.mood === MAGNET_ATTRACT;
+  if (attracting !== wasAttracting) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'magnetarch',
+      state: attracting ? 'attract' : 'repel',
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
   if (!player) return;
   const dist = distTo(enemy, player);
   enemy.facing = normalized(player.x - enemy.x, player.y - enemy.y);
@@ -4788,6 +5125,13 @@ const magnetarchStep = (
       elite: enemy.elite,
     });
     events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MAGNETARCH_CRUSH_RANGE });
+    events.push({
+      t: 'boss_attack',
+      archetype: 'magnetarch',
+      ability: 'crush',
+      x: enemy.x,
+      y: enemy.y,
+    });
   } else if (enemy.mood === MAGNET_REPEL && dist > MAGNETARCH_TETHER_RANGE) {
     damageEntity(state, player, MAGNETARCH_TETHER_DAMAGE, events, {
       kind: 'enemy_contact',
@@ -4795,6 +5139,14 @@ const magnetarchStep = (
       elite: enemy.elite,
     });
     events.push({ t: 'pulse', x: player.x, y: player.y, radius: 1.4 });
+    // O arco de retorno soa ONDE fecha — no jogador, longe do corpo.
+    events.push({
+      t: 'boss_attack',
+      archetype: 'magnetarch',
+      ability: 'tether',
+      x: player.x,
+      y: player.y,
+    });
   } else {
     // Dentro do campo e fora das duas bordas: o jogador ACHOU a faixa. E a
     // unica das seis Descobertas que marca uma ausencia de dano — porque aqui
@@ -5422,7 +5774,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // condicao seria documentacao de uma ordem de eventos impossivel.
       if (dist < 7 || state.tick < enemy.alertedUntil) {
         state.bossRuntime.awake = true;
-        events.push({ t: 'boss_awake' });
+        events.push({
+          t: 'boss_awake',
+          archetype: enemy.archetype as EnemyArchetype,
+          x: enemy.x,
+          y: enemy.y,
+        });
       } else continue;
     }
 
@@ -5699,24 +6056,40 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // ARQUICANTOR: canta, e a Catedral responde. Sem cristal ao alcance ele
       // nao tem quem responda — a sala esvaziada E o contra-jogo, entao a
       // checagem tem de ser real.
-      if (
-        enemy.archetype === 'archcantor' &&
-        state.tick >= enemy.rangedReadyAt &&
-        dist <= ARCHCANTOR_PULSE_RADIUS + 1.5 &&
-        archcantorHasNetwork(state, enemy)
-      ) {
-        enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
-        startAction(
-          state,
-          enemy,
-          'pulse',
-          toward,
-          ARCHCANTOR_WINDUP_TICKS,
-          ARCHCANTOR_CHAIN_LAYERS * ARCHCANTOR_CHAIN_STEP_TICKS,
-          events,
-          player.id,
-        );
-        continue;
+      if (enemy.archetype === 'archcantor') {
+        // A NOTA ISOLADA entre um canto e outro: presenca, nao ameaca. So
+        // com rede — uma Catedral em silencio nao tem quem afinar.
+        if (
+          state.tick % ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS === 0 &&
+          !state.bossRuntime.archcantorSilent
+        ) {
+          events.push({
+            t: 'boss_state',
+            archetype: 'archcantor',
+            state: 'idle_note',
+            x: enemy.x,
+            y: enemy.y,
+          });
+        }
+        if (
+          state.tick >= enemy.rangedReadyAt &&
+          dist <= ARCHCANTOR_PULSE_RADIUS + 1.5 &&
+          archcantorHasNetwork(state, enemy)
+        ) {
+          enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
+          startAction(
+            state,
+            enemy,
+            'pulse',
+            toward,
+            ARCHCANTOR_WINDUP_TICKS,
+            ARCHCANTOR_CHAIN_LAYERS * ARCHCANTOR_CHAIN_STEP_TICKS,
+            events,
+            player.id,
+            archcantorSongIntensity(state, enemy),
+          );
+          continue;
+        }
       }
 
       // RAINHA DA GEADA: refaz o lago e solta os Espectros dele.
@@ -5899,6 +6272,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (moved.blockCell && crushesWalls(enemy)) {
         breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
       }
+      // O PASSO do Guardiao: peso no chao a cada tile, enquanto anda. E o
+      // unico chefe cuja presenca e um corpo pesado se deslocando, e o passo
+      // e o que faz um chefe atras da parede ser ouvido antes de ser visto.
+      if (enemy.archetype === 'guardian' && state.tick % GUARDIAN_STEP_INTERVAL_TICKS === 0) {
+        events.push({
+          t: 'boss_state',
+          archetype: 'guardian',
+          state: 'step',
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
       // NAO existe mais um segundo empurrao no eixo livre quando o outro trava.
       //
       // Ele existia para "ajudar o inimigo a nao grudar na parede", e era
@@ -5940,15 +6325,80 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) === 0
   ) {
     state.bossRuntime.phasesFired |= BOSS_PHASE_REACTOR;
+    // A "falha operacional": a fase e um evento como a da Fornalha ja era.
+    events.push({
+      t: 'boss_phase',
+      archetype: 'diamandis',
+      phase: BOSS_PHASE_REACTOR,
+      x: diamandis.x,
+      y: diamandis.y,
+    });
     diamandisReactorCollapse(state, diamandis, events);
+  }
+
+  // As duas blindagens que so existiam DENTRO do funil de dano viram
+  // transicao aqui, uma vez por tick: a Catedral calando (o Arquicantor
+  // fragil) e o lago da Rainha derretendo (a couraça caindo). A memoria fica
+  // em `bossRuntime` porque as duas sao recomputadas da grade e nao ha outro
+  // jeito de saber que ESTE tick e o da virada.
+  const archcantor = state.enemies.find((e) => e.archetype === 'archcantor' && e.alive);
+  if (archcantor) {
+    const silent = !archcantorHasNetwork(state, archcantor);
+    if (silent !== state.bossRuntime.archcantorSilent) {
+      state.bossRuntime.archcantorSilent = silent;
+      events.push({
+        t: 'boss_vulnerable',
+        archetype: 'archcantor',
+        x: archcantor.x,
+        y: archcantor.y,
+        open: silent,
+      });
+    }
+  }
+  const queen = state.enemies.find((e) => e.archetype === 'frost_queen' && e.alive);
+  if (queen) {
+    const armored = frostQueenIceAround(state, queen) >= FROST_QUEEN_ICE_THRESHOLD ? 1 : 0;
+    const before = state.bossRuntime.frostArmored;
+    state.bossRuntime.frostArmored = armored;
+    // A primeira leitura nao e uma transicao: um encontro que comecasse
+    // anunciando "a couraça caiu" estaria mentindo sobre um gelo que nunca
+    // existiu.
+    if (before >= 0 && before !== armored) {
+      events.push({
+        t: 'boss_vulnerable',
+        archetype: 'frost_queen',
+        x: queen.x,
+        y: queen.y,
+        open: armored === 0,
+      });
+    }
   }
 
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');
   if (!guardian || !guardian.alive) return;
   const enraged = guardian.hp < guardian.maxHp * 0.5;
 
+  // A ESTRUTURA CEDENDO: na fase final o corpo range, esparso e continuo.
+  // Ele nao fala e nao canta — desloca massa, e a massa esta rachando.
+  if (enraged && state.tick % GUARDIAN_STRAIN_INTERVAL_TICKS === 0) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'guardian',
+      state: 'strain',
+      x: guardian.x,
+      y: guardian.y,
+    });
+  }
+
   if (enraged && (state.bossRuntime.phasesFired & BOSS_PHASE_SUMMON) === 0) {
     state.bossRuntime.phasesFired |= BOSS_PHASE_SUMMON;
+    events.push({
+      t: 'boss_phase',
+      archetype: 'guardian',
+      phase: BOSS_PHASE_SUMMON,
+      x: guardian.x,
+      y: guardian.y,
+    });
     // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
     // resolvia os quatro com um recuo so.
     const around = [
@@ -5989,7 +6439,6 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
   }
-
 };
 
 export const applyExplosionDamage = (

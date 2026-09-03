@@ -12,17 +12,23 @@
 // no primeiro toque e o que garante que o primeiro tiro da run ja tenha som.
 
 import {
+  BOSS_PHASE_OVERHEAT,
+  BOSS_PHASE_UNSTABLE,
   MINIGUN_SPIN_MAX,
   TICK_HZ,
+  mawIntensity,
   normalizedDepth,
   runSectorCount,
 } from '@voxelyn/survival-sim';
-import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { Entity, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
 import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents } from './cues';
+import { DevourerVortexBus } from './devourer-vortex-bus';
+import { FurnaceHeartBus } from './furnace-heart-bus';
+import { LungBreathBus } from './lung-breath-bus';
 import { MinigunBus } from './minigun-bus';
-import { CueMixer, NEAR_CUTOFF_HZ } from './mixer';
+import { CueMixer, NEAR_CUTOFF_HZ, distanceGain } from './mixer';
 import { MusicBus } from './music-bus';
 import {
   MENU_SOUNDTRACK_URL,
@@ -90,6 +96,16 @@ export class AudioDirector {
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
   private minigunBus: MinigunBus | null = null;
+  /**
+   * Os tres leitos de CHEFE: o vortice do Devorador, a respiracao do Pulmao
+   * e o batimento da Fornalha. Nascem com o contexto, em ganho zero, como o
+   * motor da minigun e pelo mesmo motivo — leito nao e criado no meio do
+   * combate. Quem os dirige e `update()`, lendo o estado autoritativo do
+   * chefe vivo no setor; sem chefe (ou chefe de outro tipo) ficam calados.
+   */
+  private devourerBus: DevourerVortexBus | null = null;
+  private lungBus: LungBreathBus | null = null;
+  private furnaceBus: FurnaceHeartBus | null = null;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
@@ -173,6 +189,7 @@ export class AudioDirector {
     if (muted) {
       this.ambienceBus?.silence();
       this.minigunBus?.silence();
+      this.silenceBossBeds();
       // O scheduler para junto (update retorna cedo com muted); silenciar o
       // barramento evita que o desmute volte com um acorde pendurado.
       this.musicBus?.silence();
@@ -375,6 +392,14 @@ export class AudioDirector {
       // exatamente o instante em que o jogador esta esperando o som.
       this.minigunBus = new MinigunBus(ctx, master, this.noise);
       this.minigunBus.start();
+      // Os leitos de chefe saem pelo barramento de EFEITOS, como a ambiencia:
+      // sao som do mundo, e quem baixa "Efeitos" quer o vortice mais baixo.
+      this.devourerBus = new DevourerVortexBus(ctx, sfxBus, this.noise);
+      this.devourerBus.start();
+      this.lungBus = new LungBreathBus(ctx, sfxBus, this.noise);
+      this.lungBus.start();
+      this.furnaceBus = new FurnaceHeartBus(ctx, sfxBus, this.noise);
+      this.furnaceBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
       this.musicBus.setVolume(this.musicVolume);
@@ -481,8 +506,13 @@ export class AudioDirector {
       const mg = state.playerExtra.minigun;
       const strain = Math.min(1, state.playerExtra.heat / Math.max(1, state.config.tuning.heatMax));
       this.minigunBus?.set(mg.spin / MINIGUN_SPIN_MAX, strain);
+      // Os leitos de chefe e as bolhas do Leviata, pelo mesmo principio do
+      // motor: estado autoritativo, nunca um relogio do cliente.
+      this.updateBossBeds(state, this.listenerPosition(state));
+      this.updateBubbleSafety(state, nowMs);
     } else {
       this.minigunBus?.silence();
+      this.silenceBossBeds();
     }
 
     if (nowMs - this.lastSampleMs >= AMBIENCE_SAMPLE_MS) {
@@ -521,9 +551,83 @@ export class AudioDirector {
     this.lastOccupation = null;
     this.ambienceBus?.silence();
     this.minigunBus?.silence();
+    this.silenceBossBeds();
     this.musicBus?.silence();
     this.soundtrackBus?.silence();
     this.activeSource = null;
+  }
+
+  private silenceBossBeds(): void {
+    this.devourerBus?.silence();
+    this.lungBus?.silence();
+    this.furnaceBus?.silence();
+  }
+
+  /**
+   * Os LEITOS DE CHEFE, dirigidos pelo estado. Um por quadro.
+   *
+   * O chefe e procurado no estado (o corpo vivo do arquetipo do setor), e a
+   * atenuacao por distancia e feita aqui com a MESMA curva do mixer, porque
+   * um leito nao passa por ele: e a unica maneira de a boca do Devorador do
+   * outro lado da sala soar como "ali longe" e nao como "ao lado".
+   *
+   * Nada aqui inventa fase: o vortice le `mawOpenedAt` (a mesma rampa que
+   * puxa), a respiracao le o tick (a mesma conta do `lungMatrixStep`), e a
+   * Fornalha le `furnaceOverheatingAt` e os bits de fase (a mesma blindagem).
+   */
+  private updateBossBeds(state: SurvivalState, listener: { x: number; y: number }): void {
+    const boss = this.sectorBossBody(state);
+    const presence = boss ? distanceGain(Math.hypot(boss.x - listener.x, boss.y - listener.y)) : 0;
+
+    if (boss?.archetype === 'white_devourer') {
+      this.devourerBus?.set(mawIntensity(state.tick, state.bossRuntime.mawOpenedAt), presence);
+    } else this.devourerBus?.silence();
+
+    if (boss?.archetype === 'lung_matrix') {
+      const hp = boss.maxHp > 0 ? boss.hp / boss.maxHp : 1;
+      this.lungBus?.set(state.tick, hp, presence);
+    } else this.lungBus?.silence();
+
+    if (boss?.archetype === 'furnace_heart') {
+      const phases = state.bossRuntime.phasesFired;
+      this.furnaceBus?.set({
+        tick: state.tick,
+        collapsed: (phases & BOSS_PHASE_OVERHEAT) !== 0,
+        unstable: (phases & BOSS_PHASE_UNSTABLE) !== 0,
+        presence,
+      });
+    } else this.furnaceBus?.silence();
+  }
+
+  /** O corpo vivo do dono do setor, ou null. */
+  private sectorBossBody(state: SurvivalState): Entity | null {
+    const archetype = state.sectorBoss.archetype;
+    if (!archetype || state.sectorBoss.defeated) return null;
+    return state.enemies.find((e) => e.alive && e.archetype === archetype) ?? null;
+  }
+
+  /**
+   * As BOLHAS PROTETORAS do Leviata: pulsos ocos, suaves e regulares —
+   * o proprio coracao ouvido de dentro de uma bolha — enquanto o jogador
+   * local esta dentro de uma durante a carga da descarga. E o unico "voce
+   * esta seguro" sonoro do jogo, e ele vem do ESTADO (as bolhas viajam no
+   * snapshot), nao de um evento: quem entra na bolha no ultimo meio segundo
+   * tambem tem de ouvir. O ritmo e a trava da voz (500 ms); passa pelo
+   * mixer como qualquer cue, para respeitar orcamento e travas.
+   */
+  private updateBubbleSafety(state: SurvivalState, nowMs: number): void {
+    if (state.bossRuntime.leviathanShockAt < 0) return;
+    const local = state.players.find((p) => p.id === this.localPlayerId);
+    if (!local || !local.alive) return;
+    const inside = state.bossRuntime.protectiveBubbles.some(
+      (bubble) =>
+        Math.hypot(local.x - bubble.x, local.y - bubble.y) + local.radius <= bubble.radius,
+    );
+    if (!inside) return;
+    const cue = { voice: 'leviathanBubbleSafe' as const, x: 0, y: 0, scale: 1 };
+    for (const planned of this.mixer.plan([cue], { x: local.x, y: local.y }, nowMs)) {
+      this.play(planned.voice, planned.gain, planned.pan, planned.cutoffHz);
+    }
   }
 
   /** Suspende o contexto (aba escondida). Nao destroi nada. */

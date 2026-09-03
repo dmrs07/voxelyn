@@ -72,6 +72,9 @@ suítes (`cues.test.ts`, `mixer.test.ts`, `ambience.test.ts`) rodam sem `AudioCo
 | `music.ts` | Temas por estrato, timeline por tick, notas por compasso (puro) |
 | `music-bus.ts` | Drone/pad persistentes + scheduler lookahead do riff |
 | `minigun-bus.ts` | O motor contínuo do canhão rotativo (§4.5) |
+| `devourer-vortex-bus.ts` | O vórtice da boca do Devorador Branco (§4.6) |
+| `lung-breath-bus.ts` | A respiração contínua do Pulmão-Matriz (§4.6) |
+| `furnace-heart-bus.ts` | O batimento e a pressão da sala do Coração da Fornalha (§4.6) |
 | `index.ts` | `AudioDirector`: ciclo de vida, unlock, volume, mudo |
 
 ## 3. As três decisões do mixer
@@ -171,6 +174,73 @@ som por cápsula seria a mesma armadilha do som por bala, um andar abaixo.
 mudo porque quem anuncia que a arma cuspiu é a própria rajada, um instante depois;
 `overheated` fica mudo porque o evento `overheat` já toca o alarme no mesmo tick, e dois
 sons para a mesma coisa são o dobro do aviso pela metade da clareza.
+
+## 4.6 Os chefes, ou: uma assinatura por corpo, três momentos por habilidade
+
+Cada chefe tem uma **assinatura sonora** — um material, uma física — e cada habilidade dele
+usa essa assinatura para comunicar três momentos distintos:
+
+1. **Preparação** — "algo vai acontecer" (`boss_windup`).
+2. **Execução** — "aconteceu agora" (`boss_attack`).
+3. **Consequência** — "o mundo mudou por causa disso" (`boss_state`, `boss_vulnerable`).
+
+A regra que rege a feature: **a assinatura não é inferida no cliente**. `action_start` diz
+que uma ação `pulse` começou, mas só a simulação sabe que aquele pulso é o canto do
+Arquicantor e não a Supernova do Bispo — e as fases que não passam por `EntityAction` (a
+respiração do Pulmão, a polaridade do Magnetarca, a boca do Devorador) não tinham evento
+nenhum. Desde o protocolo 29 a simulação emite os quatro eventos acima, discriminados por
+arquétipo e habilidade/momento, sem nenhuma decisão acústica: que voz soa é de `cues.ts`.
+`action_start` carrega `archetype`, e por ele o cliente **cala o telegrafo genérico** quando
+o ator é um chefe — o `boss_windup` do mesmo tick fala por ele (com a assinatura, ou com o
+mesmo telegrafo genérico como reserva deliberada, nunca em silêncio).
+
+| Chefe | Identidade sonora | A regra |
+| --- | --- | --- |
+| Guardião de Pedra | massa, rocha, subgrave | lento e tectônico; não fala, desloca massa |
+| Bispo | matéria orgânica, fungo | preserva a subida da cura, agora na preparação da Supernova |
+| Diamandis | máquina industrial + voz corporativa | toda habilidade é uma operação de mineração |
+| Devorador Branco | fricção subterrânea, garganta, vácuo | o som localiza o que não pode ser visto |
+| Arquicantor | cristal afinado, acordes | ataques são frases: nota, intervalo, acorde — ou trítono |
+| Leviatã do Lençol | baleia abissal, água, eletricidade abafada | o canto anuncia intenção; o estalo, perigo |
+| Pulmão-Matriz | inspiração, pressão, membrana, gás | o ciclo respiratório é o relógio da luta |
+| Coração da Fornalha | pulsação, pressão, combustão | não vocaliza; a sala é a voz dele |
+| Rainha da Geada | cristais finos, gelo tensionado | beleza fria antes de ruptura violenta; nunca a linguagem do Arquicantor |
+| Magnetarca | magnetismo, inversão, metal | atração e repulsão soam opostas, e sem olhar |
+
+**Prioridade e mixagem** (em `voices.ts`): windup de golpe letal e mudança de fase/estado
+global, 10; execução da habilidade principal e cue de vulnerabilidade, 9; movimento
+importante fora da tela, 7–8; vocalização de personalidade, 5–6; passos, respiração e
+fragmentos, 2–4. Vocalização **nunca** rouba a vaga de um windup, e o canto do Leviatã não
+pode mascarar a própria descarga — `leviathanCall` está em 6 e `leviathanShockCharge` em 10.
+A carga e a descarga do Leviatã, a polaridade do Magnetarca e as fases da Fornalha **não são
+espaciais**: são informação global da arena, reconhecida de qualquer lugar.
+
+**A voz do Diamandis** é sintetizada como fonemas robóticos curtos (`speak` em `synth.ts`):
+"SONDAGEM", "CARGA ARMADA", "AFASTE-SE", "ÁREA NÃO MAPEADA", "FALHA OPERACIONAL", "UNIDADE
+NÃO RECUPERÁVEL". As palavras não ficam inteligíveis e não precisam — o ritmo silábico é a
+personalidade. Ele não acorda: liga. Não enfurece: falha. Não ruge: desliga por subsistemas.
+
+**Três leitos contínuos**, no molde do motor da minigun (nós persistentes, só o ganho anda,
+dirigidos pelo estado autoritativo e nunca por um relógio do cliente):
+
+- `DevourerVortexBus` — lê `bossRuntime.mawOpenedAt` com a mesma `mawIntensity` que puxa.
+  Ruído filtrado descendo, subgrave pulsante, fragmentos de sílica acelerando para o centro.
+- `LungBreathBus` — lê o tick com a mesma aritmética do `lungMatrixStep`. Inspirar sobe para
+  dentro; o pulmão cheio **cala** por meio segundo; expirar desce e se afasta. Vida baixa: mais
+  curto e irregular.
+- `FurnaceHeartBus` — lê `furnaceOverheatingAt` e os bits de fase. Pressão de caldeira como
+  leito, batimento como scheduler de lookahead (para poder **falhar** na instabilidade).
+
+As **bolhas protetoras** do Leviatã são o único "você está seguro" sonoro do jogo: pulsos ocos
+e regulares enquanto o jogador local está dentro de uma durante a carga, lidos do estado (as
+bolhas viajam no snapshot) e passando pelo mixer como qualquer cue.
+
+**Fora do primeiro recorte**, e por quê: o zumbido contínuo do campo do Magnetarca e a
+modulação periódica dos ciclones da Fornalha (leitos a mais, cada um um par de nós permanentes
+para um chefe que aparece uma vez por run — só quando a fase pedir modulação contínua); a
+nota que some do conjunto quando um cristal da rede do Arquicantor quebra (a simulação ainda
+não distingue "um cristal quebrou" de "um cristal DA REDE quebrou"; hoje soa o `breakCrystal`
+comum); "OBSTRUÇÃO" quando a broca come parede (o `break` não carrega dono).
 
 ## 5. Ambiência
 

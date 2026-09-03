@@ -124,6 +124,154 @@ const burst = (
   src.start(t0, Math.max(0, offset), opts.decay + 0.12);
 };
 
+/**
+ * Tom SUSTENTADO: sobe, segura, e so entao cai. E o bloco dos chefes.
+ *
+ * `tone` e percussivo — ataque de 2 ms e cauda — e serve para tudo o que
+ * e um impacto. Um chamado de baleia, um motor ganhando rotacao, um gemido
+ * com harmonicos se acumulando NAO sao impactos: sao coisas que duram, e a
+ * forma delas e o ataque lento e a sustentacao. A varredura de altura corre
+ * do ataque ao fim do hold, para o "subindo" e o "descendo" coincidirem com
+ * o tempo em que a voz esta plena.
+ */
+const sustain = (
+  ctx: AudioContext,
+  out: AudioNode,
+  t0: number,
+  opts: {
+    type: OscillatorType;
+    from: number;
+    to?: number;
+    peak: number;
+    attack: number;
+    hold: number;
+    release: number;
+    detune?: number;
+  },
+): void => {
+  const osc = ctx.createOscillator();
+  osc.type = opts.type;
+  if (opts.detune) osc.detune.setValueAtTime(opts.detune, t0);
+  osc.frequency.setValueAtTime(opts.from, t0);
+  if (opts.to !== undefined && opts.to !== opts.from) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.to), t0 + opts.attack + opts.hold);
+  }
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(opts.peak, t0 + opts.attack);
+  g.gain.setValueAtTime(opts.peak, t0 + opts.attack + opts.hold);
+  g.gain.setTargetAtTime(0.0001, t0 + opts.attack + opts.hold, opts.release / 3);
+  osc.connect(g).connect(out);
+  osc.start(t0);
+  osc.stop(t0 + opts.attack + opts.hold + opts.release + 0.15);
+};
+
+/**
+ * A VOZ CORPORATIVA do Diamandis: fonemas roboticos, sem gravacao humana.
+ *
+ * Cada silaba e uma onda quadrada curta com um formante (ruido em banda
+ * estreita) por cima, e o que separa as frases umas das outras e o RITMO:
+ * "SON-DA-GEM" tem tres batidas, "A-FAS-TE-SE" tem quatro. As palavras nao
+ * ficam inteligiveis, e nao precisam — o que o jogador aprende e a
+ * cadencia, e a cadencia e a personalidade: uma ordem de trabalho lida em
+ * voz alta por uma maquina que ainda acredita que esta trabalhando.
+ *
+ * `pattern` e uma lista de [altura em Hz, duracao em s]; o intervalo entre
+ * silabas e fixo (40 ms), o que da a fala o staccato de um sintetizador de
+ * voz dos anos 80 em vez de uma fala continua.
+ */
+const speak = (
+  ctx: AudioContext,
+  out: AudioNode,
+  t0: number,
+  noise: AudioBuffer,
+  pattern: ReadonlyArray<readonly [number, number]>,
+  peak = 0.3,
+): void => {
+  let at = t0;
+  for (const [hz, dur] of pattern) {
+    tone(ctx, out, at, {
+      type: 'square',
+      from: hz,
+      to: hz * 0.94,
+      peak,
+      decay: dur,
+      attack: 0.008,
+    });
+    tone(ctx, out, at, {
+      type: 'sawtooth',
+      from: hz * 2.02,
+      to: hz * 1.9,
+      peak: peak * 0.35,
+      decay: dur * 0.8,
+      attack: 0.008,
+    });
+    burst(ctx, out, at, noise, {
+      peak: peak * 0.5,
+      decay: dur * 0.7,
+      type: 'bandpass',
+      from: 1400 + (hz % 60) * 8,
+      q: 4,
+      attack: 0.01,
+    });
+    at += dur + 0.04;
+  }
+};
+
+/** Uma nota AFINADA do Arquicantor: triangulo com a oitava e a quinta por cima. */
+const crystalNote = (
+  ctx: AudioContext,
+  out: AudioNode,
+  t0: number,
+  hz: number,
+  peak: number,
+  decay: number,
+): void => {
+  tone(ctx, out, t0, { type: 'triangle', from: hz, to: hz, peak, decay, attack: 0.012 });
+  tone(ctx, out, t0, {
+    type: 'sine',
+    from: hz * 2,
+    to: hz * 2,
+    peak: peak * 0.35,
+    decay: decay * 0.8,
+    attack: 0.012,
+  });
+  tone(ctx, out, t0 + 0.01, {
+    type: 'sine',
+    from: hz * 3,
+    to: hz * 3,
+    peak: peak * 0.12,
+    decay: decay * 0.6,
+    attack: 0.012,
+  });
+};
+
+/**
+ * O MOTIVO de tres notas do Arquicantor. A4, C#5, E5: uma triade maior, que
+ * e a frase que RESOLVE. O tritono troca a terceira por D#5 e deixa a frase
+ * sem chao — e a diferenca entre "vem canto" e "vem canto e ele e grande".
+ */
+const ARCHCANTOR_MOTIF = [440, 554.37, 659.25] as const;
+const ARCHCANTOR_TRITONE = 622.25;
+
+/** Um "bling" de gelo: aperiodico, levemente desafinado, cauda curta. */
+const iceBling = (
+  ctx: AudioContext,
+  out: AudioNode,
+  t0: number,
+  hz: number,
+  peak: number,
+): void => {
+  tone(ctx, out, t0, {
+    type: 'triangle',
+    from: hz,
+    to: hz * 0.97,
+    peak,
+    decay: 0.09,
+    detune: (hz % 17) * 3 - 24,
+  });
+};
+
 // ---------------------------------------------------------------------------
 // Receitas
 // ---------------------------------------------------------------------------
@@ -346,7 +494,13 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
    */
   minigunCasing: (ctx, out, t0) => {
     tone(ctx, out, t0, { type: 'triangle', from: 2600, to: 1900, peak: 0.2, decay: 0.032 });
-    tone(ctx, out, t0 + 0.037, { type: 'triangle', from: 3100, to: 2300, peak: 0.14, decay: 0.028 });
+    tone(ctx, out, t0 + 0.037, {
+      type: 'triangle',
+      from: 3100,
+      to: 2300,
+      peak: 0.14,
+      decay: 0.028,
+    });
   },
 
   // --- impactos -----------------------------------------------------------
@@ -373,7 +527,13 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // leito continuo; esta voz so lembra que a permanencia custa vida.
   hitPlayerHazard: (ctx, out, t0, noise) => {
     tone(ctx, out, t0, { type: 'sine', from: 85, to: 55, peak: 0.5, decay: 0.16, attack: 0.012 });
-    burst(ctx, out, t0, noise, { peak: 0.15, decay: 0.09, type: 'lowpass', from: 300, attack: 0.01 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.15,
+      decay: 0.09,
+      type: 'lowpass',
+      from: 300,
+      attack: 0.01,
+    });
   },
   death: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, {
@@ -755,6 +915,1326 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       from: 4200,
       attack: 0.005,
     });
+  },
+
+  // =========================================================================
+  // OS CHEFES
+  //
+  // Regra de leitura das receitas abaixo: cada chefe e um MATERIAL, e cada
+  // habilidade dele usa esse material para dizer preparacao, execucao e
+  // consequencia. As faixas de frequencia obedecem a separacao timbral do
+  // arquivo: os windups continuam TONAIS e ritmados (para nunca serem
+  // mascarados pelo entulho), e as consequencias podem ser ruido — porque
+  // consequencia e mundo.
+  // =========================================================================
+
+  // --- Guardiao de Pedra: massa, rocha, subgrave. Lento e tectonico. -------
+  // O passo: impacto duplo — o peso no chao, e pedrinhas caindo depois.
+  guardianStep: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 70, to: 38, peak: 0.6, decay: 0.16, attack: 0.006 });
+    burst(ctx, out, t0 + 0.09, noise, {
+      peak: 0.16,
+      decay: 0.14,
+      type: 'bandpass',
+      from: 900,
+      to: 400,
+      q: 1.2,
+      attack: 0.02,
+    });
+  },
+  // Compressao de rocha: placas apertando. Sobe devagar no subgrave, com um
+  // rangido estreito por cima — e o "algo pesado esta sendo armado".
+  guardianCompress: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 48,
+      to: 96,
+      peak: 0.45,
+      attack: 0.2,
+      hold: 0.12,
+      release: 0.12,
+    });
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.22,
+      decay: 0.3,
+      type: 'bandpass',
+      from: 300,
+      to: 700,
+      q: 6,
+      attack: 0.1,
+    });
+  },
+  // Estalo seco antes da salva: a rocha lascando ao ser erguida. Curto e
+  // medio-agudo, para nao depender so da marca visual da area de impacto.
+  guardianSalvoCrack: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.05, type: 'bandpass', from: 1800, q: 2 });
+    tone(ctx, out, t0 + 0.06, { type: 'triangle', from: 220, to: 130, peak: 0.3, decay: 0.12 });
+    burst(ctx, out, t0 + 0.14, noise, {
+      peak: 0.36,
+      decay: 0.05,
+      type: 'bandpass',
+      from: 1500,
+      q: 2,
+    });
+  },
+  // O golpe: subgrave curto, SEM cauda musical. Massa encontrando chao.
+  guardianSlam: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 60, to: 30, peak: 0.9, decay: 0.2, attack: 0.004 });
+    burst(ctx, out, t0, noise, { peak: 0.45, decay: 0.1, type: 'lowpass', from: 500, to: 120 });
+  },
+  // Dano recebido: lascas, nao gemido.
+  guardianChip: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.05,
+      type: 'bandpass',
+      from: 2200,
+      to: 900,
+      q: 1.6,
+    });
+    tone(ctx, out, t0, { type: 'triangle', from: 900, to: 500, peak: 0.12, decay: 0.04 });
+  },
+  // Fase final: rangido estrutural, sugerindo que o corpo esta cedendo.
+  guardianStrain: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.28,
+      decay: 0.7,
+      type: 'bandpass',
+      from: 180,
+      to: 420,
+      q: 9,
+      attack: 0.15,
+    });
+    tone(ctx, out, t0 + 0.1, {
+      type: 'sawtooth',
+      from: 44,
+      to: 58,
+      peak: 0.16,
+      decay: 0.6,
+      attack: 0.15,
+    });
+  },
+
+  // --- Bispo: a subida da cura, agora na preparacao da Supernova. ---------
+  // Materia organica inchando: a mesma glissando ascendente do `bishopHeal`,
+  // mais longa e com um sopro fungico por baixo. Ele nao "carrega" — cresce.
+  bishopNovaCharge: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 220,
+      to: 660,
+      peak: 0.34,
+      attack: 0.5,
+      hold: 0.1,
+      release: 0.2,
+    });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'triangle',
+      from: 330,
+      to: 990,
+      peak: 0.14,
+      attack: 0.5,
+      hold: 0.05,
+      release: 0.2,
+      detune: 9,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.14,
+      decay: 0.6,
+      type: 'bandpass',
+      from: 250,
+      to: 900,
+      q: 1.4,
+      attack: 0.3,
+    });
+  },
+
+  // --- Diamandis: maquina industrial + voz corporativa. --------------------
+  // Boot: subsistemas ligando um a um — rele, motor pegando, scanner
+  // acendendo. Nao e um rugido; e uma maquina retomando uma ordem de servico.
+  diamandisBoot: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.4, decay: 0.04, type: 'bandpass', from: 2400, q: 3 });
+    sustain(ctx, out, t0 + 0.08, {
+      type: 'sawtooth',
+      from: 40,
+      to: 110,
+      peak: 0.4,
+      attack: 0.9,
+      hold: 0.4,
+      release: 0.5,
+    });
+    sustain(ctx, out, t0 + 0.08, {
+      type: 'square',
+      from: 60,
+      to: 165,
+      peak: 0.1,
+      attack: 0.9,
+      hold: 0.4,
+      release: 0.5,
+      detune: 14,
+    });
+    tone(ctx, out, t0 + 0.9, {
+      type: 'sine',
+      from: 1400,
+      to: 2600,
+      peak: 0.18,
+      decay: 0.3,
+      attack: 0.05,
+    });
+    tone(ctx, out, t0 + 1.25, { type: 'square', from: 880, to: 880, peak: 0.16, decay: 0.08 });
+  },
+  // "Á-RE-A NÃO MA-PE-A-DA."
+  diamandisVoiceUnmapped: (ctx, out, t0, noise) =>
+    speak(ctx, out, t0, noise, [
+      [230, 0.09],
+      [210, 0.08],
+      [200, 0.08],
+      [240, 0.11],
+      [215, 0.08],
+      [200, 0.08],
+      [190, 0.08],
+      [175, 0.12],
+    ]),
+  // "SON-DA-GEM."
+  diamandisVoiceSurvey: (ctx, out, t0, noise) =>
+    speak(ctx, out, t0, noise, [
+      [220, 0.11],
+      [205, 0.09],
+      [180, 0.14],
+    ]),
+  // "CAR-GA AR-MA-DA."
+  diamandisVoiceArmed: (ctx, out, t0, noise) =>
+    speak(ctx, out, t0, noise, [
+      [240, 0.1],
+      [215, 0.09],
+      [235, 0.09],
+      [210, 0.09],
+      [180, 0.13],
+    ]),
+  // "A-FAS-TE-SE."
+  diamandisVoiceStandClear: (ctx, out, t0, noise) =>
+    speak(ctx, out, t0, noise, [
+      [250, 0.08],
+      [235, 0.11],
+      [215, 0.09],
+      [185, 0.12],
+    ]),
+  // "FA-LHA O-PE-RA-CI-O-NAL." Mais grave e mais lenta: o sistema que fala
+  // e o mesmo que esta falhando.
+  diamandisVoiceFault: (ctx, out, t0, noise) =>
+    speak(
+      ctx,
+      out,
+      t0,
+      noise,
+      [
+        [200, 0.12],
+        [180, 0.12],
+        [190, 0.1],
+        [175, 0.1],
+        [185, 0.1],
+        [170, 0.1],
+        [160, 0.1],
+        [140, 0.18],
+      ],
+      0.34,
+    ),
+  // "U-NI-DA-DE NÃO RE-CU-PE-RÁ-VEL."
+  diamandisVoiceLost: (ctx, out, t0, noise) =>
+    speak(ctx, out, t0, noise, [
+      [225, 0.08],
+      [215, 0.08],
+      [230, 0.08],
+      [205, 0.1],
+      [240, 0.11],
+      [210, 0.08],
+      [200, 0.08],
+      [215, 0.08],
+      [195, 0.1],
+      [170, 0.14],
+    ]),
+  // A broca: motor ganhando rotacao durante o windup inteiro (1,8 s).
+  // Dente de serra subindo com a quinta desafinada por cima — a mesma
+  // gramatica do motor da minigun, porque e a mesma familia de maquina.
+  diamandisDrillSpin: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 55,
+      to: 210,
+      peak: 0.4,
+      attack: 1.4,
+      hold: 0.3,
+      release: 0.15,
+    });
+    sustain(ctx, out, t0, {
+      type: 'square',
+      from: 82,
+      to: 315,
+      peak: 0.1,
+      attack: 1.4,
+      hold: 0.3,
+      release: 0.15,
+      detune: 12,
+    });
+    burst(ctx, out, t0 + 0.3, noise, {
+      peak: 0.18,
+      decay: 1.5,
+      type: 'bandpass',
+      from: 400,
+      to: 2400,
+      q: 1.3,
+      attack: 0.6,
+    });
+  },
+  // Contato com o chao: subgrave e fragmentacao metalica.
+  diamandisDrillImpact: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 90, to: 36, peak: 0.85, decay: 0.3, attack: 0.004 });
+    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.22, type: 'lowpass', from: 2400, to: 300 });
+    for (let i = 0; i < 4; i++) {
+      tone(ctx, out, t0 + 0.04 + i * 0.05, {
+        type: 'square',
+        from: 1900 - i * 210,
+        to: 1200,
+        peak: 0.12,
+        decay: 0.035,
+      });
+    }
+  },
+  // Tres bipes corporativos secos, ACELERANDO: as cargas armando.
+  diamandisChargeArmed: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'square', from: 1046, to: 1046, peak: 0.34, decay: 0.06 });
+    tone(ctx, out, t0 + 0.2, { type: 'square', from: 1046, to: 1046, peak: 0.36, decay: 0.06 });
+    tone(ctx, out, t0 + 0.34, { type: 'square', from: 1318, to: 1318, peak: 0.4, decay: 0.08 });
+  },
+  // A implosao: o som entra PARA DENTRO antes do impacto grave — ruido
+  // subindo e sumindo, depois o baque.
+  diamandisImplosion: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.4,
+      decay: 0.22,
+      type: 'bandpass',
+      from: 600,
+      to: 3800,
+      q: 2,
+      attack: 0.03,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 320, to: 1100, peak: 0.2, decay: 0.2, attack: 0.03 });
+    tone(ctx, out, t0 + 0.24, {
+      type: 'sine',
+      from: 120,
+      to: 32,
+      peak: 0.85,
+      decay: 0.45,
+      attack: 0.004,
+    });
+    burst(ctx, out, t0 + 0.24, noise, {
+      peak: 0.5,
+      decay: 0.3,
+      type: 'lowpass',
+      from: 1600,
+      to: 160,
+    });
+  },
+  // Scanner estreito percorrendo frequencias: a varredura medindo.
+  diamandisBeamScan: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 700,
+      to: 2600,
+      peak: 0.22,
+      attack: 0.6,
+      hold: 0.05,
+      release: 0.1,
+    });
+    sustain(ctx, out, t0 + 0.75, {
+      type: 'sine',
+      from: 2600,
+      to: 900,
+      peak: 0.2,
+      attack: 0.5,
+      hold: 0.05,
+      release: 0.1,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.08,
+      decay: 1.3,
+      type: 'bandpass',
+      from: 3000,
+      q: 12,
+      attack: 0.2,
+    });
+  },
+  // Trava no jogador: tom FIXO, e a potencia entrando por baixo.
+  diamandisBeamLocked: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'square',
+      from: 1760,
+      peak: 0.26,
+      attack: 0.01,
+      hold: 0.32,
+      release: 0.08,
+    });
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.3,
+      decay: 0.4,
+      type: 'highpass',
+      from: 2400,
+      to: 5000,
+      attack: 0.08,
+    });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 110,
+      to: 220,
+      peak: 0.16,
+      decay: 0.4,
+      attack: 0.05,
+    });
+  },
+  // Falha operacional: o motor comeca a funcionar fora dos limites —
+  // batimento entre duas serras que nao se acertam, e um rele estalando.
+  diamandisReactorFail: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.45, decay: 0.05, type: 'bandpass', from: 2600, q: 3 });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'sawtooth',
+      from: 120,
+      to: 95,
+      peak: 0.4,
+      attack: 0.15,
+      hold: 1.2,
+      release: 0.5,
+    });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'sawtooth',
+      from: 128,
+      to: 108,
+      peak: 0.3,
+      attack: 0.15,
+      hold: 1.2,
+      release: 0.5,
+      detune: 35,
+    });
+    burst(ctx, out, t0 + 0.3, noise, {
+      peak: 0.2,
+      decay: 1.4,
+      type: 'bandpass',
+      from: 900,
+      to: 300,
+      q: 2,
+      attack: 0.4,
+    });
+  },
+  // Desligamento por subsistemas: o scanner apaga, o motor perde rotacao,
+  // o rele final desconecta. Nao ha rugido — ha uma ordem de servico
+  // terminando decadas atrasada.
+  diamandisShutdown: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 2400, to: 300, peak: 0.24, decay: 0.5, attack: 0.02 });
+    sustain(ctx, out, t0 + 0.2, {
+      type: 'sawtooth',
+      from: 170,
+      to: 22,
+      peak: 0.45,
+      attack: 0.05,
+      hold: 1.6,
+      release: 0.4,
+    });
+    sustain(ctx, out, t0 + 0.2, {
+      type: 'square',
+      from: 250,
+      to: 30,
+      peak: 0.1,
+      attack: 0.05,
+      hold: 1.6,
+      release: 0.4,
+      detune: 12,
+    });
+    burst(ctx, out, t0 + 2.1, noise, {
+      peak: 0.45,
+      decay: 0.06,
+      type: 'bandpass',
+      from: 2000,
+      q: 3,
+    });
+    tone(ctx, out, t0 + 2.14, { type: 'square', from: 300, to: 60, peak: 0.2, decay: 0.12 });
+  },
+
+  // --- Devorador Branco: friccao subterranea, garganta, vacuo. --------------
+  // Navegacao: atrito granular grave, com pequenos estalos vitreos por cima.
+  // A posicao vem do evento — e o paneamento que faz disto informacao.
+  devourerBurrow: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.4,
+      decay: 0.42,
+      type: 'lowpass',
+      from: 260,
+      to: 180,
+      attack: 0.08,
+    });
+    for (let i = 0; i < 3; i++) {
+      tone(ctx, out, t0 + 0.06 + i * 0.11, {
+        type: 'triangle',
+        from: 2600 + i * 300,
+        to: 1800,
+        peak: 0.08,
+        decay: 0.025,
+      });
+    }
+  },
+  // Emergencia: a silica chia em frequencia CRESCENTE — e o "de onde ele
+  // vai sair" que a marca no chao promete.
+  devourerEmergeWarning: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.42,
+      decay: 1.0,
+      type: 'bandpass',
+      from: 500,
+      to: 4200,
+      q: 2.4,
+      attack: 0.3,
+    });
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 60,
+      to: 140,
+      peak: 0.2,
+      attack: 0.8,
+      hold: 0.1,
+      release: 0.1,
+    });
+  },
+  // A ruptura seca e grave quando a boca aparece.
+  devourerEmerge: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.6,
+      decay: 0.12,
+      type: 'bandpass',
+      from: 1200,
+      to: 300,
+      q: 0.8,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 110, to: 34, peak: 0.85, decay: 0.32, attack: 0.004 });
+    burst(ctx, out, t0 + 0.1, noise, {
+      peak: 0.25,
+      decay: 0.4,
+      type: 'lowpass',
+      from: 900,
+      to: 200,
+      attack: 0.04,
+    });
+  },
+  // Placas calcificadas raspando umas nas outras, e uma inspiracao
+  // cavernosa: a boca abrindo. O vortice continua no leito, nao aqui.
+  devourerMawOpen: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.4,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 700,
+      to: 250,
+      q: 5,
+      attack: 0.05,
+    });
+    tone(ctx, out, t0 + 0.05, {
+      type: 'sawtooth',
+      from: 90,
+      to: 45,
+      peak: 0.24,
+      decay: 0.5,
+      attack: 0.05,
+    });
+    burst(ctx, out, t0 + 0.45, noise, {
+      peak: 0.35,
+      decay: 0.9,
+      type: 'lowpass',
+      from: 300,
+      to: 1200,
+      attack: 0.5,
+    });
+  },
+  // Impacto umido-mineral curto, seguido de SILENCIO — o leito do vortice
+  // e quem cala; esta voz e so a mordida do fechamento.
+  devourerMawClose: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.55, decay: 0.08, type: 'lowpass', from: 1400, to: 200 });
+    tone(ctx, out, t0, { type: 'sine', from: 140, to: 40, peak: 0.6, decay: 0.14, attack: 0.004 });
+    burst(ctx, out, t0 + 0.02, noise, {
+      peak: 0.2,
+      decay: 0.06,
+      type: 'bandpass',
+      from: 2800,
+      q: 2,
+    });
+  },
+  // Presa e vulneravel: respiracao irregular e seca — a criatura fora do
+  // elemento dela. Entra DEPOIS da boca abrir, para nao disputar com ela.
+  devourerVulnerable: (ctx, out, t0, noise) => {
+    for (const [i, gap] of [0.6, 0.95, 1.2, 1.6].entries()) {
+      burst(ctx, out, t0 + gap, noise, {
+        peak: 0.24 - i * 0.02,
+        decay: 0.14 + (i % 2) * 0.08,
+        type: 'bandpass',
+        from: 420 + i * 60,
+        to: 260,
+        q: 1.2,
+        attack: 0.04,
+      });
+    }
+  },
+  // Ninhada engolida: estalos agudos desaparecendo dentro do grave.
+  devourerBroodSwallowed: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'triangle', from: 2400, to: 300, peak: 0.22, decay: 0.12 });
+    burst(ctx, out, t0 + 0.04, noise, {
+      peak: 0.12,
+      decay: 0.1,
+      type: 'lowpass',
+      from: 600,
+      to: 120,
+    });
+  },
+
+  // --- Arquicantor: cristal afinado, acordes e ressonancia. -----------------
+  // Idle: uma nota isolada, ocasional.
+  archcantorNote: (ctx, out, t0) => crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[0], 0.3, 0.7),
+  // Preparacao: primeira e segunda notas. A frase fica no ar.
+  archcantorPhrase: (ctx, out, t0) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[0], 0.34, 0.6);
+    crystalNote(ctx, out, t0 + 0.32, ARCHCANTOR_MOTIF[1], 0.36, 0.7);
+  },
+  // Ataque: a terceira nota completa a frase — e o acorde inteiro ressoa.
+  archcantorChord: (ctx, out, t0) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[2], 0.4, 1.1);
+    crystalNote(ctx, out, t0 + 0.04, ARCHCANTOR_MOTIF[0], 0.22, 1.0);
+    crystalNote(ctx, out, t0 + 0.08, ARCHCANTOR_MOTIF[1], 0.22, 1.0);
+  },
+  // Ataque perigoso: a terceira nota e um TRITONO. A frase nao resolve, e a
+  // dissonancia fica batendo ate o jogador cortar a cadeia.
+  archcantorTritone: (ctx, out, t0) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_TRITONE, 0.42, 1.3);
+    crystalNote(ctx, out, t0 + 0.04, ARCHCANTOR_MOTIF[0], 0.24, 1.2);
+    tone(ctx, out, t0 + 0.06, {
+      type: 'triangle',
+      from: ARCHCANTOR_TRITONE,
+      to: ARCHCANTOR_TRITONE,
+      peak: 0.16,
+      decay: 1.2,
+      attack: 0.02,
+      detune: 22,
+    });
+  },
+  // Cada cristal da arena assume uma nota do acorde: a quinta, brilhante,
+  // com a cauda de um cristal que continua vibrando.
+  archcantorResonance: (ctx, out, t0) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[2] * 2, 0.26, 0.5);
+    tone(ctx, out, t0 + 0.02, {
+      type: 'sine',
+      from: ARCHCANTOR_MOTIF[1] * 2,
+      to: ARCHCANTOR_MOTIF[1] * 2,
+      peak: 0.1,
+      decay: 0.45,
+      attack: 0.03,
+    });
+  },
+  // Silenciamento: TODO o reverb tonal e cortado, e o que sobra e um ruido
+  // mineral seco. Um estalo de corte, e nada afinado depois dele.
+  archcantorSilenced: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'triangle',
+      from: ARCHCANTOR_MOTIF[2],
+      to: ARCHCANTOR_MOTIF[2],
+      peak: 0.3,
+      decay: 0.05,
+    });
+    burst(ctx, out, t0 + 0.05, noise, { peak: 0.45, decay: 0.06, type: 'highpass', from: 3000 });
+    burst(ctx, out, t0 + 0.12, noise, {
+      peak: 0.3,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 700,
+      to: 250,
+      q: 0.7,
+      attack: 0.02,
+    });
+  },
+  // Morte: o acorde comeca completo e perde as notas uma a uma.
+  archcantorDeath: (ctx, out, t0, noise) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[2], 0.36, 0.5);
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[1], 0.36, 1.1);
+    crystalNote(ctx, out, t0, ARCHCANTOR_MOTIF[0], 0.4, 1.9);
+    burst(ctx, out, t0 + 0.5, noise, { peak: 0.2, decay: 0.15, type: 'highpass', from: 2800 });
+    burst(ctx, out, t0 + 1.1, noise, { peak: 0.24, decay: 0.15, type: 'highpass', from: 2400 });
+    burst(ctx, out, t0 + 1.9, noise, {
+      peak: 0.32,
+      decay: 0.5,
+      type: 'lowpass',
+      from: 1200,
+      to: 150,
+    });
+  },
+
+  // --- Leviata do Lencol: baleia abissal, agua, eletricidade abafada. -------
+  // Presenca: chamado longo, muito grave, parcialmente abafado.
+  leviathanCall: (ctx, out, t0) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 62,
+      to: 78,
+      peak: 0.5,
+      attack: 0.35,
+      hold: 0.5,
+      release: 0.5,
+    });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'triangle',
+      from: 124,
+      to: 152,
+      peak: 0.12,
+      attack: 0.35,
+      hold: 0.45,
+      release: 0.45,
+      detune: 7,
+    });
+  },
+  // A rompida da lamina: agua fazendo pressao para cima, e um estalo.
+  leviathanBreach: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.36,
+      decay: 0.9,
+      type: 'lowpass',
+      from: 200,
+      to: 1400,
+      attack: 0.4,
+    });
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 70,
+      to: 130,
+      peak: 0.3,
+      attack: 0.7,
+      hold: 0.1,
+      release: 0.1,
+    });
+    burst(ctx, out, t0 + 0.9, noise, {
+      peak: 0.3,
+      decay: 0.08,
+      type: 'bandpass',
+      from: 1600,
+      q: 2,
+    });
+  },
+  // Inicio do Diluvio: um chamado ASCENDENTE e distante; depois o
+  // deslocamento de agua e a pressao estrutural. A subida e CONTINUA —
+  // um so movimento de grave para medio, nunca uma serie de respingos.
+  leviathanDelugeRise: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 55,
+      to: 165,
+      peak: 0.45,
+      attack: 1.2,
+      hold: 0.4,
+      release: 0.6,
+    });
+    burst(ctx, out, t0 + 0.6, noise, {
+      peak: 0.34,
+      decay: 2.2,
+      type: 'lowpass',
+      from: 180,
+      to: 900,
+      attack: 1.0,
+    });
+    burst(ctx, out, t0 + 1.4, noise, {
+      peak: 0.2,
+      decay: 1.2,
+      type: 'bandpass',
+      from: 120,
+      to: 260,
+      q: 8,
+      attack: 0.5,
+    });
+  },
+  // Preparacao da descarga: o canto PARA, e sobe um gemido sustentado com
+  // harmonicos eletricos se acumulando por cima. 3,6 s de windup; o som
+  // ocupa quase tudo, porque o que anuncia perigo aqui e a tensao crescendo.
+  leviathanShockCharge: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 58,
+      to: 92,
+      peak: 0.42,
+      attack: 0.8,
+      hold: 2.2,
+      release: 0.3,
+    });
+    sustain(ctx, out, t0 + 0.6, {
+      type: 'sawtooth',
+      from: 700,
+      to: 2400,
+      peak: 0.14,
+      attack: 2.2,
+      hold: 0.3,
+      release: 0.2,
+      detune: 18,
+    });
+    burst(ctx, out, t0 + 1.0, noise, {
+      peak: 0.22,
+      decay: 2.4,
+      type: 'highpass',
+      from: 1800,
+      to: 5000,
+      attack: 1.6,
+    });
+  },
+  // Descarga massiva: um estalo agudo curtissimo, depois um golpe grave e
+  // abafado atravessando a agua.
+  leviathanShockRelease: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.7, decay: 0.035, type: 'highpass', from: 5000 });
+    tone(ctx, out, t0, { type: 'sawtooth', from: 3200, to: 900, peak: 0.3, decay: 0.05 });
+    tone(ctx, out, t0 + 0.06, {
+      type: 'sine',
+      from: 90,
+      to: 28,
+      peak: 0.9,
+      decay: 0.7,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0 + 0.06, noise, {
+      peak: 0.45,
+      decay: 0.6,
+      type: 'lowpass',
+      from: 700,
+      to: 120,
+    });
+  },
+  // Bolha protetora: pulso oco, suave e regular — o proprio coracao ouvido
+  // de dentro de uma bolha. Um pulso por voz; o ritmo e a trava (500 ms).
+  leviathanBubbleSafe: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'sine', from: 160, to: 120, peak: 0.34, decay: 0.16, attack: 0.02 });
+    tone(ctx, out, t0 + 0.13, {
+      type: 'sine',
+      from: 140,
+      to: 100,
+      peak: 0.22,
+      decay: 0.14,
+      attack: 0.02,
+    });
+  },
+  // Recuperacao: bolhas escapando e um chamado quebrado, descendente.
+  leviathanShockRecover: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 5; i++) {
+      tone(ctx, out, t0 + i * 0.09, {
+        type: 'sine',
+        from: 500 + i * 140,
+        to: 900 + i * 140,
+        peak: 0.12,
+        decay: 0.06,
+        attack: 0.01,
+      });
+    }
+    sustain(ctx, out, t0 + 0.4, {
+      type: 'sine',
+      from: 96,
+      to: 52,
+      peak: 0.36,
+      attack: 0.15,
+      hold: 0.3,
+      release: 0.5,
+    });
+    burst(ctx, out, t0 + 0.4, noise, {
+      peak: 0.14,
+      decay: 0.8,
+      type: 'bandpass',
+      from: 400,
+      to: 200,
+      q: 1.6,
+      attack: 0.2,
+    });
+  },
+
+  // --- Pulmao-Matriz: inspiracao, pressao, membrana, gas. -------------------
+  // Pulmao cheio: a succao (leito) para, e fica uma pressao presa — um tom
+  // grave subindo meio-tom e travando. E o meio segundo de medo.
+  lungHold: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 84,
+      to: 96,
+      peak: 0.42,
+      attack: 0.12,
+      hold: 0.4,
+      release: 0.08,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.12,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 900,
+      q: 14,
+      attack: 0.1,
+    });
+  },
+  // Expiracao: abertura ABRUPTA da membrana e um jato largo de gas. O
+  // transiente inicial e o ruido se espalhando para fora — o oposto exato da
+  // inspiracao, que sobe para dentro.
+  lungExhale: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.55, decay: 0.06, type: 'bandpass', from: 1200, q: 1.2 });
+    burst(ctx, out, t0 + 0.03, noise, {
+      peak: 0.5,
+      decay: 0.9,
+      type: 'lowpass',
+      from: 2600,
+      to: 500,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 180,
+      to: 70,
+      peak: 0.16,
+      decay: 0.5,
+      attack: 0.01,
+    });
+  },
+  // Fechamento: valvula organica pesada, quase cardiaca.
+  lungClose: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 110, to: 48, peak: 0.6, decay: 0.2, attack: 0.02 });
+    burst(ctx, out, t0 + 0.02, noise, {
+      peak: 0.22,
+      decay: 0.2,
+      type: 'lowpass',
+      from: 600,
+      to: 150,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0 + 0.22, {
+      type: 'sine',
+      from: 90,
+      to: 44,
+      peak: 0.36,
+      decay: 0.16,
+      attack: 0.02,
+    });
+  },
+  // Gas inflamado: "whoomph" grave seguido de crepitacao — nunca a explosao
+  // comum, porque isto e a alavanca do encontro e nao um estouro qualquer.
+  lungIgnite: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.6,
+      decay: 0.4,
+      type: 'lowpass',
+      from: 400,
+      to: 1800,
+      attack: 0.06,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 70, to: 40, peak: 0.5, decay: 0.4, attack: 0.05 });
+    for (let i = 0; i < 6; i++) {
+      burst(ctx, out, t0 + 0.3 + i * 0.07, noise, {
+        peak: 0.16,
+        decay: 0.04,
+        type: 'bandpass',
+        from: 2000 + (i % 3) * 500,
+        q: 3,
+      });
+    }
+  },
+  // Ferido: chiado de vazamento, como um fole perfurado.
+  lungWound: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.35,
+      type: 'bandpass',
+      from: 2600,
+      to: 1600,
+      q: 3,
+      attack: 0.02,
+    });
+  },
+
+  // --- Coracao da Fornalha: pulsacao, pressao e combustao. ------------------
+  // Setor marcado: um SOPRO direcional percorrendo o arco antes da chama. A
+  // posicao do cue e o rumo da cunha — e o paneamento que diz de que lado.
+  furnaceWedgeWarn: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.36,
+      decay: 1.4,
+      type: 'bandpass',
+      from: 300,
+      to: 1400,
+      q: 1.1,
+      attack: 0.5,
+    });
+    sustain(ctx, out, t0 + 0.2, {
+      type: 'sine',
+      from: 140,
+      to: 210,
+      peak: 0.16,
+      attack: 0.9,
+      hold: 0.2,
+      release: 0.2,
+    });
+  },
+  // Onda de fogo: combustao larga. O movimento estereo vem da posicao.
+  furnaceWave: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.55,
+      decay: 0.5,
+      type: 'lowpass',
+      from: 3000,
+      to: 400,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 95, to: 45, peak: 0.5, decay: 0.4, attack: 0.02 });
+    burst(ctx, out, t0 + 0.15, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 1200,
+      to: 600,
+      q: 0.9,
+      attack: 0.05,
+    });
+  },
+  // Resfriamento: queda ABRUPTA da pressao, vapor — e a janela abrindo.
+  furnaceCooling: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 160,
+      to: 40,
+      peak: 0.3,
+      decay: 0.35,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0 + 0.08, noise, {
+      peak: 0.4,
+      decay: 1.4,
+      type: 'highpass',
+      from: 1800,
+      to: 4500,
+      attack: 0.1,
+    });
+    burst(ctx, out, t0 + 0.08, noise, {
+      peak: 0.18,
+      decay: 1.0,
+      type: 'bandpass',
+      from: 500,
+      to: 250,
+      q: 1.4,
+      attack: 0.1,
+    });
+  },
+  // Reaquecimento: a pressao voltando — e a blindagem fechando.
+  furnaceReheat: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 40,
+      to: 110,
+      peak: 0.34,
+      attack: 0.8,
+      hold: 0.2,
+      release: 0.3,
+    });
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.22,
+      decay: 1.0,
+      type: 'lowpass',
+      from: 300,
+      to: 1200,
+      attack: 0.6,
+    });
+    burst(ctx, out, t0 + 0.9, noise, { peak: 0.3, decay: 0.08, type: 'bandpass', from: 700, q: 4 });
+  },
+  // Colapso a 45%: rachadura profunda ACIMA do jogador; depois pequenos
+  // detritos, antes das estalactites.
+  furnaceCrack: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.7,
+      decay: 0.16,
+      type: 'bandpass',
+      from: 900,
+      to: 200,
+      q: 0.9,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 70, to: 24, peak: 0.85, decay: 1.4, attack: 0.01 });
+    tone(ctx, out, t0 + 0.05, {
+      type: 'sawtooth',
+      from: 120,
+      to: 40,
+      peak: 0.24,
+      decay: 1.2,
+      attack: 0.02,
+    });
+    for (let i = 0; i < 5; i++) {
+      burst(ctx, out, t0 + 0.6 + i * 0.13, noise, {
+        peak: 0.16,
+        decay: 0.08,
+        type: 'bandpass',
+        from: 1400 - i * 120,
+        q: 1.5,
+      });
+    }
+  },
+  // Instabilidade a 10%: o ritmo deixa de ser regular — dois batimentos
+  // falhando, e metal rangendo por cima. O leito passa a falhar tambem.
+  furnaceUnstable: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 60, to: 34, peak: 0.7, decay: 0.2, attack: 0.01 });
+    tone(ctx, out, t0 + 0.55, {
+      type: 'sine',
+      from: 60,
+      to: 34,
+      peak: 0.5,
+      decay: 0.2,
+      attack: 0.01,
+    });
+    tone(ctx, out, t0 + 0.7, {
+      type: 'sine',
+      from: 60,
+      to: 34,
+      peak: 0.62,
+      decay: 0.2,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.3,
+      decay: 1.2,
+      type: 'bandpass',
+      from: 200,
+      to: 600,
+      q: 9,
+      attack: 0.3,
+    });
+  },
+  // Detritos: o teto soltando pedrinhas onde a estalactite vai cair.
+  furnaceDebris: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 4; i++) {
+      burst(ctx, out, t0 + i * 0.09, noise, {
+        peak: 0.2,
+        decay: 0.06,
+        type: 'bandpass',
+        from: 1600 - i * 200,
+        q: 1.8,
+      });
+    }
+    tone(ctx, out, t0 + 0.2, {
+      type: 'sawtooth',
+      from: 220,
+      to: 160,
+      peak: 0.1,
+      decay: 0.3,
+      attack: 0.05,
+    });
+  },
+
+  // --- Rainha da Geada: cristais finos, gelo tensionado, estilhacos. --------
+  // Preparacao: pequenos "blings" surgem ao redor e CONVERGEM para uma nota
+  // aguda so — aperiodicos e desafinados, nunca o motivo do Arquicantor.
+  frostQueenFreezeCharge: (ctx, out, t0) => {
+    const blings = [3100, 2700, 3600, 2900, 3300, 3900, 3500, 4100];
+    for (const [i, hz] of blings.entries()) iceBling(ctx, out, t0 + i * 0.1, hz, 0.16 + i * 0.01);
+    sustain(ctx, out, t0 + 0.7, {
+      type: 'sine',
+      from: 3800,
+      to: 4400,
+      peak: 0.3,
+      attack: 0.3,
+      hold: 0.2,
+      release: 0.1,
+    });
+  },
+  // Congelamento: expansao rapida de gelo — varias fissuras atravessando a
+  // arena, agudas e curtas, sobre um subgrave de massa congelando.
+  frostQueenFreeze: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 120, to: 40, peak: 0.5, decay: 0.4, attack: 0.01 });
+    for (let i = 0; i < 7; i++) {
+      burst(ctx, out, t0 + 0.03 + i * 0.06, noise, {
+        peak: 0.3,
+        decay: 0.05,
+        type: 'highpass',
+        from: 3000 + i * 300,
+      });
+    }
+    burst(ctx, out, t0 + 0.1, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 4000,
+      to: 1500,
+      q: 1.4,
+      attack: 0.02,
+    });
+  },
+  // Espectros: som INVERTIDO de cristal quebrando — os fragmentos parecem se
+  // reconstruir. Ataques lentos e cauda cortada, o contrario do `breakCrystal`.
+  frostQueenWraithRise: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.5,
+      type: 'highpass',
+      from: 2600,
+      to: 5000,
+      attack: 0.45,
+    });
+    sustain(ctx, out, t0, {
+      type: 'triangle',
+      from: 1500,
+      to: 2400,
+      peak: 0.28,
+      attack: 0.5,
+      hold: 0.02,
+      release: 0.03,
+    });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'triangle',
+      from: 2100,
+      to: 3300,
+      peak: 0.16,
+      attack: 0.5,
+      hold: 0.02,
+      release: 0.03,
+      detune: -15,
+    });
+  },
+  // Armadura ativa: tilintar discreto — o tiro foi absorvido.
+  frostQueenArmorHit: (ctx, out, t0) => {
+    iceBling(ctx, out, t0, 3400, 0.22);
+    iceBling(ctx, out, t0 + 0.03, 4300, 0.14);
+  },
+  // Armadura quebrada: ruptura grande e SECA, imediatamente diferente do
+  // `breakCrystal` — sem tom, so a massa de gelo cedendo.
+  frostQueenArmorBreak: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.7,
+      decay: 0.09,
+      type: 'bandpass',
+      from: 1800,
+      to: 500,
+      q: 0.8,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 130, to: 45, peak: 0.55, decay: 0.3, attack: 0.004 });
+    for (let i = 0; i < 5; i++) {
+      burst(ctx, out, t0 + 0.08 + i * 0.05, noise, {
+        peak: 0.2,
+        decay: 0.04,
+        type: 'highpass',
+        from: 3500 + i * 400,
+      });
+    }
+  },
+  // Morte: primeiro SILENCIO; depois o corpo inteiro se desfaz em centenas
+  // de fragmentos, do grave para o agudo.
+  frostQueenShatter: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0 + 0.45, {
+      type: 'sine',
+      from: 90,
+      to: 40,
+      peak: 0.6,
+      decay: 0.5,
+      attack: 0.01,
+    });
+    for (let i = 0; i < 14; i++) {
+      const at = t0 + 0.5 + i * 0.07;
+      burst(ctx, out, at, noise, {
+        peak: 0.22,
+        decay: 0.05,
+        type: 'bandpass',
+        from: 900 + i * 320,
+        q: 2,
+      });
+      iceBling(ctx, out, at + 0.02, 1400 + i * 260, 0.12);
+    }
+  },
+
+  // --- Magnetarca: magnetismo, inversao e metal tensionado. -----------------
+  // Atracao: tom DESCENDENTE que se aproxima do centro, com o batimento entre
+  // duas serras ficando mais rapido — o campo puxando.
+  magnetarchAttract: (ctx, out, t0) => {
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 320,
+      to: 90,
+      peak: 0.28,
+      attack: 0.1,
+      hold: 0.7,
+      release: 0.3,
+    });
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 323,
+      to: 102,
+      peak: 0.22,
+      attack: 0.1,
+      hold: 0.7,
+      release: 0.3,
+      detune: 20,
+    });
+  },
+  // Repulsao: ataque agudo que se ABRE para fora, seguido de queda grave.
+  // Intervalo inverso ao da atracao, para as duas soarem opostas.
+  magnetarchRepel: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 900,
+      to: 2400,
+      peak: 0.3,
+      decay: 0.25,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0, noise, { peak: 0.24, decay: 0.3, type: 'highpass', from: 1500, to: 4000 });
+    tone(ctx, out, t0 + 0.28, {
+      type: 'sine',
+      from: 180,
+      to: 45,
+      peak: 0.55,
+      decay: 0.5,
+      attack: 0.01,
+    });
+  },
+  // Troca de polaridade: um "clack" metalico central — um rele gigantesco
+  // invertendo. Sai junto da polaridade que entra.
+  magnetarchFlip: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.6, decay: 0.03, type: 'bandpass', from: 2200, q: 4 });
+    tone(ctx, out, t0, { type: 'square', from: 700, to: 350, peak: 0.3, decay: 0.05 });
+    tone(ctx, out, t0 + 0.05, { type: 'triangle', from: 1400, to: 1100, peak: 0.16, decay: 0.12 });
+  },
+  // Esmagamento proximo: metal sob tensao.
+  magnetarchCrush: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.4,
+      decay: 0.3,
+      type: 'bandpass',
+      from: 240,
+      to: 520,
+      q: 10,
+      attack: 0.03,
+    });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 130,
+      to: 180,
+      peak: 0.28,
+      decay: 0.28,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0 + 0.05, { type: 'sine', from: 80, to: 40, peak: 0.5, decay: 0.2 });
+  },
+  // Arco de retorno distante: descarga FINA e longa — nada do golpe aquatico
+  // do Leviata; isto e um fio de corrente esticado ate estalar.
+  magnetarchArc: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.4,
+      type: 'bandpass',
+      from: 4200,
+      to: 6000,
+      q: 6,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 3200,
+      to: 1800,
+      peak: 0.18,
+      decay: 0.35,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0 + 0.3, noise, { peak: 0.24, decay: 0.05, type: 'highpass', from: 3000 });
   },
 };
 
