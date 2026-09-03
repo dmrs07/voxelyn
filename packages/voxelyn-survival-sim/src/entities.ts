@@ -4160,6 +4160,12 @@ const archcantorChoirTick = (state: SurvivalState, events: SemanticEvent[]): voi
       }
     }
     if (!best) continue;
+    // A promocao troca o repertorio inteiro do Ressonante. Se ele chegou aqui
+    // durante o windup/recuperacao do pulso selvagem, conservar a acao faria
+    // o novo guarda disparar a habilidade antiga antes de tomar o posto.
+    best.action = undefined;
+    best.vx = 0;
+    best.vy = 0;
     best.mood = RESONANT_CHOIR;
     runtime.choir[seat] = best.id;
   }
