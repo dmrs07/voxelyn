@@ -165,7 +165,8 @@
 // 29: A ASSINATURA SONORA DOS CHEFES entra no wire. Quatro eventos novos —
 // `boss_windup` (preparacao), `boss_attack` (execucao), `boss_state`
 // (consequencia/presenca: o passo do Guardiao, o Devorador cavando, o chamado
-// do Leviata, o ciclo do Pulmao, a polaridade do Magnetarca) e
+// do Leviata, o ciclo do Pulmao, a polaridade do Magnetarca, a broca do
+// Diamandis encontrando parede) e
 // `boss_vulnerable` (a janela de dano abrindo/fechando) — todos discriminados
 // por arquetipo e habilidade/momento, sem nenhuma decisao acustica na
 // simulacao. `action_start` ganha `archetype` (por ele o cliente cala o

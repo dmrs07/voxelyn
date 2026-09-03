@@ -114,6 +114,7 @@ export type VoiceId =
   | 'diamandisVoiceStandClear'
   | 'diamandisVoiceFault'
   | 'diamandisVoiceLost'
+  | 'diamandisVoiceObstruction'
   | 'diamandisDrillSpin'
   | 'diamandisDrillImpact'
   | 'diamandisChargeArmed'
@@ -387,6 +388,7 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   diamandisVoiceStandClear: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
   diamandisVoiceFault: { priority: 6, gain: 0.46, minIntervalMs: 400, spatial: true },
   diamandisVoiceLost: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceObstruction: { priority: 6, gain: 0.44, minIntervalMs: 400, spatial: true },
   diamandisDrillSpin: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
   diamandisDrillImpact: { priority: 9, gain: 0.7, minIntervalMs: 60, spatial: true },
   diamandisChargeArmed: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },

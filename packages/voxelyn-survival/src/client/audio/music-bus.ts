@@ -401,11 +401,7 @@ export class MusicBus {
 
     const added = v.droneAddedInterval;
     if (added !== undefined) {
-      this.droneAdded?.frequency.setTargetAtTime(
-        theme.rootHz * Math.pow(2, added / 12),
-        at,
-        tc,
-      );
+      this.droneAdded?.frequency.setTargetAtTime(theme.rootHz * Math.pow(2, added / 12), at, tc);
     }
     this.droneAddedGain?.gain.setTargetAtTime(added !== undefined ? DRONE_ADDED : 0, at, tc);
 
@@ -422,11 +418,7 @@ export class MusicBus {
 
     const tension = v.tensionInterval;
     if (tension !== undefined) {
-      this.tensionOsc?.frequency.setTargetAtTime(
-        theme.rootHz * Math.pow(2, tension / 12),
-        at,
-        tc,
-      );
+      this.tensionOsc?.frequency.setTargetAtTime(theme.rootHz * Math.pow(2, tension / 12), at, tc);
     }
     this.applyLayers();
   }
@@ -447,7 +439,12 @@ export class MusicBus {
     ramp(this.droneLayerGain, this.theme !== null, LAYER_GAINS.drone);
     ramp(this.bassLayerGain, this.layers.bass, LAYER_GAINS.bass);
     // O pad respira no tempo do proprio tema: padAttack e a rampa de entrada.
-    ramp(this.padLayerGain, this.layers.pad, LAYER_GAINS.pad, theme ? theme.padAttack / 3 : undefined);
+    ramp(
+      this.padLayerGain,
+      this.layers.pad,
+      LAYER_GAINS.pad,
+      theme ? theme.padAttack / 3 : undefined,
+    );
     ramp(
       this.tensionLayerGain,
       this.layers.tension && this.variation.tensionInterval !== undefined,

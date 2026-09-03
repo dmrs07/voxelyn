@@ -2581,6 +2581,7 @@ const diamandisDrillStride = (
   // largura do corpo, e ai o passo cabe.
   const ahead = 1.2;
   const side = { x: -action.direction.y, y: action.direction.x };
+  let obstructed = false;
   for (let lane = -DIAMANDIS_DRILL_WIDTH; lane <= DIAMANDIS_DRILL_WIDTH; lane++) {
     for (const reach of [ahead, ahead + 0.9]) {
       const cx = Math.floor(enemy.x + action.direction.x * reach + side.x * lane);
@@ -2590,6 +2591,7 @@ const diamandisDrillStride = (
       // `breakSolid` primeiro (fragil e cristal tem resposta propria), e o que
       // ele recusar vai para `ripSolid`, que e quem derruba rocha comum.
       const opened = breakSolid(state, cx, cy, events) || ripSolid(state, cx, cy, events);
+      if (opened) obstructed = true;
       // A obra VISTA e uma descoberta. Sai antes de qualquer raycast quando o
       // bit ja esta aceso — a broca abre dezenas de celulas por passagem, e
       // isto roda por celula.
@@ -2604,6 +2606,21 @@ const diamandisDrillStride = (
         }
       }
     }
+  }
+
+  // "OBSTRUCAO": a broca encontrou parede. Uma ordem de servico por PASSAGEM
+  // — a primeira celula que ela abre nesta corrida anuncia, as dezenas
+  // seguintes nao. Um chefe que lesse a mesma linha a cada celula seria um
+  // narrador, e a obra em si (o `break` por celula) ja soa.
+  if (obstructed && state.tick - state.bossRuntime.drillObstructedAt >= DIAMANDIS_DRILL_TICKS) {
+    state.bossRuntime.drillObstructedAt = state.tick;
+    events.push({
+      t: 'boss_state',
+      archetype: 'diamandis',
+      state: 'obstruction',
+      x: enemy.x,
+      y: enemy.y,
+    });
   }
 
   moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);

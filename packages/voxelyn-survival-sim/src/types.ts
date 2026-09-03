@@ -754,6 +754,13 @@ export type BossRuntime = {
    */
   frostArmored: number;
   archcantorSilent: boolean;
+  /**
+   * Tick da ultima vez em que a broca do Diamandis ANUNCIOU parede
+   * ("OBSTRUCAO"), ou -1. A broca abre dezenas de celulas por passagem e o
+   * anuncio e por PASSAGEM, nao por celula: uma ordem de servico por obra.
+   * Memoria de apresentacao, como as duas acima — fora do hash e do wire.
+   */
+  drillObstructedAt: number;
 };
 
 /**
@@ -827,7 +834,9 @@ export type BossMoment =
   | 'repel'
   // Arquicantor: a nota isolada do idle; uma camada de cristal respondendo.
   | 'idle_note'
-  | 'resonance';
+  | 'resonance'
+  // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.
+  | 'obstruction';
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
 export const BOSS_PHASE_SUMMON = 1 << 0;

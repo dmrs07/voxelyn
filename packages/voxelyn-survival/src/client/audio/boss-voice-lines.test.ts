@@ -48,6 +48,18 @@ describe('as falas do Diamandis', () => {
       'lost',
     );
     expect(
+      diamandisLineFor({
+        t: 'boss_state',
+        archetype: 'diamandis',
+        state: 'obstruction',
+        x: 1,
+        y: 1,
+      }),
+    ).toBe('obstruction');
+    expect(
+      diamandisLineFor({ t: 'boss_state', archetype: 'guardian', state: 'step', x: 1, y: 1 }),
+    ).toBeNull();
+    expect(
       diamandisLineFor({ t: 'boss_module', x: 1, y: 1, module: 0, state: 'exposed' }),
     ).toBeNull();
   });

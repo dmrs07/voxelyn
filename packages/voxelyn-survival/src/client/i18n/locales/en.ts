@@ -694,6 +694,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'voice.diamandis.standClear': 'DIAMANDIS: STAND CLEAR.',
   'voice.diamandis.armed': 'DIAMANDIS: CHARGE ARMED.',
   'voice.diamandis.survey': 'DIAMANDIS: SURVEYING.',
+  'voice.diamandis.obstruction': 'DIAMANDIS: OBSTRUCTION.',
   'voice.diamandis.fault': 'DIAMANDIS: OPERATIONAL FAULT.',
   'voice.diamandis.lost': 'DIAMANDIS: UNIT NOT RECOVERABLE.',
   'toast.module.expired': '{module} DEACTIVATED',

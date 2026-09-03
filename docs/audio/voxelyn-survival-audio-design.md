@@ -222,7 +222,8 @@ personalidade. Ele não acorda: liga. Não enfurece: falha. Não ruge: desliga p
 Cada fala sobe também como **legenda** no HUD (tom `voice`, no teal da Aurix), pelo mesmo
 evento e pela mesma tabela (`boss-voice-lines.ts`) que escolhe a voz — texto e som nunca
 discordam. As seis: ÁREA NÃO MAPEADA (liga), AFASTE-SE (broca), CARGA ARMADA (implosão),
-SONDAGEM (feixe), FALHA OPERACIONAL (reator), UNIDADE NÃO RECUPERÁVEL (módulo arrancado).
+SONDAGEM (feixe), OBSTRUÇÃO (a broca encontrou parede, uma vez por passagem), FALHA
+OPERACIONAL (reator), UNIDADE NÃO RECUPERÁVEL (módulo arrancado).
 
 **Três leitos contínuos**, no molde do motor da minigun (nós persistentes, só o ganho anda,
 dirigidos pelo estado autoritativo e nunca por um relógio do cliente):
@@ -254,7 +255,7 @@ modulação periódica dos ciclones da Fornalha (leitos a mais, cada um um par d
 para um chefe que aparece uma vez por run — só quando a fase pedir modulação contínua); a
 nota que some do conjunto quando um cristal da rede do Arquicantor quebra (a simulação ainda
 não distingue "um cristal quebrou" de "um cristal DA REDE quebrou"; hoje soa o `breakCrystal`
-comum); "OBSTRUÇÃO" quando a broca come parede (o `break` não carrega dono).
+comum).
 
 ## 5. Ambiência
 

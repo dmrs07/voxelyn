@@ -18,7 +18,14 @@ import type { SemanticEvent } from '@voxelyn/survival-sim';
 import type { MessageKey } from '../i18n';
 import type { VoiceId } from './voices';
 
-export type DiamandisLine = 'unmapped' | 'standClear' | 'armed' | 'survey' | 'fault' | 'lost';
+export type DiamandisLine =
+  | 'unmapped'
+  | 'standClear'
+  | 'armed'
+  | 'survey'
+  | 'obstruction'
+  | 'fault'
+  | 'lost';
 
 export type DiamandisLineSpec = {
   /** A voz sintetizada (fonemas) da frase. */
@@ -40,6 +47,11 @@ export const DIAMANDIS_LINES: Record<DiamandisLine, DiamandisLineSpec> = {
   survey: { voice: 'diamandisVoiceSurvey', key: 'voice.diamandis.survey', holdMs: 2400 },
   fault: { voice: 'diamandisVoiceFault', key: 'voice.diamandis.fault', holdMs: 3400 },
   lost: { voice: 'diamandisVoiceLost', key: 'voice.diamandis.lost', holdMs: 3400 },
+  obstruction: {
+    voice: 'diamandisVoiceObstruction',
+    key: 'voice.diamandis.obstruction',
+    holdMs: 2200,
+  },
 };
 
 /**
@@ -56,6 +68,9 @@ export const diamandisLineFor = (ev: SemanticEvent): DiamandisLine | null => {
       if (ev.ability === 'demolish') return 'armed';
       if (ev.ability === 'beam') return 'survey';
       return null;
+    case 'boss_state':
+      // A broca encontrou parede: uma vez por passagem (a simulacao ja limita).
+      return ev.archetype === 'diamandis' && ev.state === 'obstruction' ? 'obstruction' : null;
     case 'boss_phase':
       return ev.archetype === 'diamandis' && ev.phase === BOSS_PHASE_REACTOR ? 'fault' : null;
     case 'boss_module':

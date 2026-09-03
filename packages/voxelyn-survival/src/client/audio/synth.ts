@@ -1153,6 +1153,21 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       [195, 0.1],
       [170, 0.14],
     ]),
+  // "OBS-TRU-CAO." Tres batidas secas, a segunda mais alta: a maquina
+  // registrando parede — e continuando.
+  diamandisVoiceObstruction: (ctx, out, t0, noise) =>
+    speak(
+      ctx,
+      out,
+      t0,
+      noise,
+      [
+        [225, 0.1],
+        [255, 0.11],
+        [185, 0.15],
+      ],
+      0.33,
+    ),
   // A broca: motor ganhando rotacao durante o windup inteiro (1,8 s).
   // Dente de serra subindo com a quinta desafinada por cima — a mesma
   // gramatica do motor da minigun, porque e a mesma familia de maquina.

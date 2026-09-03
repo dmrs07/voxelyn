@@ -75,8 +75,7 @@ export type MusicSource = 'composed' | 'synth';
 
 export const MUSIC_SOURCES: readonly MusicSource[] = ['composed', 'synth'];
 
-export const isMusicSource = (v: unknown): v is MusicSource =>
-  v === 'composed' || v === 'synth';
+export const isMusicSource = (v: unknown): v is MusicSource => v === 'composed' || v === 'synth';
 
 /**
  * A fonte que deve SOAR agora, dada a preferencia e a disponibilidade do
@@ -84,10 +83,8 @@ export const isMusicSource = (v: unknown): v is MusicSource =>
  * preferencia 'composed' sem arquivo pronto (ainda carregando, 404, decode
  * falhou) toca o backup procedural — o jogo nunca desce mudo.
  */
-export const resolveMusicSource = (
-  preference: MusicSource,
-  composedReady: boolean,
-): MusicSource => (preference === 'composed' && composedReady ? 'composed' : 'synth');
+export const resolveMusicSource = (preference: MusicSource, composedReady: boolean): MusicSource =>
+  preference === 'composed' && composedReady ? 'composed' : 'synth';
 
 const trackBaseGain = (trim: number, musicVolume: number): number => {
   const vol = Math.max(0, Math.min(1, musicVolume));
@@ -127,5 +124,4 @@ export const MENU_SOUNDTRACK_URL = 'audio/voxelyn-survival-menu.flac';
 export const MENU_TRIM = 1.37;
 
 /** Ganho base da trilha de menu sob o slider. */
-export const menuBaseGain = (musicVolume: number): number =>
-  trackBaseGain(MENU_TRIM, musicVolume);
+export const menuBaseGain = (musicVolume: number): number => trackBaseGain(MENU_TRIM, musicVolume);

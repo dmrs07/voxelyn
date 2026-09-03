@@ -718,6 +718,7 @@ export const PT_BR = {
   'voice.diamandis.standClear': 'DIAMANDIS: AFASTE-SE.',
   'voice.diamandis.armed': 'DIAMANDIS: CARGA ARMADA.',
   'voice.diamandis.survey': 'DIAMANDIS: SONDAGEM.',
+  'voice.diamandis.obstruction': 'DIAMANDIS: OBSTRUÇÃO.',
   'voice.diamandis.fault': 'DIAMANDIS: FALHA OPERACIONAL.',
   'voice.diamandis.lost': 'DIAMANDIS: UNIDADE NÃO RECUPERÁVEL.',
   'toast.module.expired': '{module} DESATIVADO',

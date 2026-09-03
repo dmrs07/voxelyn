@@ -23,6 +23,7 @@ import {
   MAGNETARCH_CYCLE_TICKS,
   SOLID_CRYSTAL,
   SOLID_NONE,
+  SOLID_ROCK,
   SURF_ICE,
   SURF_NONE,
   SURF_WATER,
@@ -215,6 +216,22 @@ describe('presenca e relogio da luta', () => {
     const late = advanceCollecting(state, 60);
     expect(ofType(late, 'boss_phase').some((e) => e.phase === BOSS_PHASE_SUMMON)).toBe(true);
     expect(ofType(late, 'boss_state').some((e) => e.state === 'strain')).toBe(true);
+  });
+
+  it('a broca do Diamandis anuncia OBSTRUCAO uma vez por passagem, nao por celula', () => {
+    const { state, px, py, w } = duel(47, 'diamandis', 12);
+    // Uma parede de rocha entre os dois: a broca vai ter de abri-la.
+    for (let y = py - 4; y <= py + 4; y++) {
+      for (let x = px + 5; x <= px + 6; x++) state.solid[y * w + x] = SOLID_ROCK;
+    }
+    const events = advanceCollecting(state, 320);
+    const drills = ofType(events, 'boss_attack').filter((e) => e.ability === 'drill');
+    expect(drills.length).toBeGreaterThan(0);
+    const obstructions = ofType(events, 'boss_state').filter((e) => e.state === 'obstruction');
+    expect(obstructions.length).toBeGreaterThan(0);
+    // Dezenas de celulas abertas, UM anuncio por corrida da broca.
+    expect(ofType(events, 'break').length).toBeGreaterThan(obstructions.length);
+    expect(obstructions.length).toBeLessThanOrEqual(drills.length);
   });
 
   it('o colapso do reator do Diamandis e uma fase anunciada', () => {

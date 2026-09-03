@@ -76,6 +76,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   protectiveBubbles: [],
   frostArmored: -1,
   archcantorSilent: false,
+  drillObstructedAt: -1,
 });
 
 /**
