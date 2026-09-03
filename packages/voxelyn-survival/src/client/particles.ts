@@ -11,7 +11,7 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
-import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import { ARCHCANTOR_CHOIR_LANCE_LENGTH, SOLID_CRYSTAL } from '@voxelyn/survival-sim';
 import { COMBAT_PLANE_TILES } from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
@@ -392,10 +392,11 @@ export class VoxelParticles {
                     [1, -1],
                   ];
             for (const [dx, dy] of dirs) {
-              for (let step = 2; step <= 8; step += 1.5) {
+              const unit = dx !== 0 && dy !== 0 ? Math.SQRT1_2 : 1;
+              for (let step = 2; step <= ARCHCANTOR_CHOIR_LANCE_LENGTH; step += 1.5) {
                 this.ring(
-                  ev.x + dx * step,
-                  ev.y + dy * step,
+                  ev.x + dx * unit * step,
+                  ev.y + dy * unit * step,
                   'crystalShard',
                   Math.max(4, n(7)),
                   0.48,
