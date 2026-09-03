@@ -281,7 +281,11 @@ export const deriveLeylineCircuit = (
   const find = (a: number): number => {
     let r = a;
     while (parent[r] !== r) r = parent[r];
-    while (parent[a] !== r) { const n = parent[a]; parent[a] = r; a = n; }
+    while (parent[a] !== r) {
+      const n = parent[a];
+      parent[a] = r;
+      a = n;
+    }
     return r;
   };
   for (const node of nodes) {
@@ -302,7 +306,10 @@ export const deriveLeylineCircuit = (
   let best = -1;
   let bestSize = 1; // exige DOIS segmentos: um segmento so nao e circuito.
   for (const [root, n] of [...size].sort((a, b) => a[0] - b[0])) {
-    if (n > bestSize) { best = root; bestSize = n; }
+    if (n > bestSize) {
+      best = root;
+      bestSize = n;
+    }
   }
   if (best < 0) return { sourceNode: -1, members: [] };
 
@@ -317,7 +324,10 @@ export const deriveLeylineCircuit = (
     const dx = (node.cell % width) - entry.x;
     const dy = Math.floor(node.cell / width) - entry.y;
     const d = dx * dx + dy * dy;
-    if (d < bestDist) { bestDist = d; sourceNode = n; }
+    if (d < bestDist) {
+      bestDist = d;
+      sourceNode = n;
+    }
   }
   if (sourceNode < 0) return { sourceNode: -1, members: [] };
   return { sourceNode, members };
@@ -365,7 +375,13 @@ const CORE_BORDER_MARGIN = 2;
 
 const idx = (w: number, x: number, y: number): number => y * w + x;
 
-const countWallNeighbors = (solid: Uint8Array, w: number, h: number, x: number, y: number): number => {
+const countWallNeighbors = (
+  solid: Uint8Array,
+  w: number,
+  h: number,
+  x: number,
+  y: number,
+): number => {
   let count = 0;
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -383,7 +399,13 @@ const countWallNeighbors = (solid: Uint8Array, w: number, h: number, x: number, 
 };
 
 /** Flood fill a partir de (sx,sy); retorna indices alcancaveis. */
-export const floodOpen = (solid: Uint8Array, w: number, h: number, sx: number, sy: number): Set<number> => {
+export const floodOpen = (
+  solid: Uint8Array,
+  w: number,
+  h: number,
+  sx: number,
+  sy: number,
+): Set<number> => {
   const seen = new Set<number>();
   const start = idx(w, sx, sy);
   if (solid[start] !== SOLID_NONE) return seen;
@@ -414,7 +436,7 @@ const bfsFarthest = (
   solid: Uint8Array,
   w: number,
   h: number,
-  from: Vec2
+  from: Vec2,
 ): { cell: Vec2; dist: Int32Array } => {
   const dist = new Int32Array(w * h).fill(-1);
   const queue: number[] = [idx(w, from.x, from.y)];
@@ -439,7 +461,14 @@ const bfsFarthest = (
   return { cell: { x: far % w, y: Math.floor(far / w) }, dist };
 };
 
-const carveBlob = (draft: TerrainDraft, w: number, h: number, cx: number, cy: number, r: number): void => {
+const carveBlob = (
+  draft: TerrainDraft,
+  w: number,
+  h: number,
+  cx: number,
+  cy: number,
+  r: number,
+): void => {
   for (let y = Math.max(1, cy - r); y <= Math.min(h - 2, cy + r); y++) {
     for (let x = Math.max(1, cx - r); x <= Math.min(w - 2, cx + r); x++) {
       const dx = x - cx;
@@ -495,7 +524,13 @@ const stampHalls = (
     if (x > 1 && y > 1 && x < w - 2 && y < h - 2) draft.setSolid(idx(w, x, y), mat);
   };
   /** Elipse aberta; devolve as celulas internas (para encher de elemento). */
-  const carveEllipse = (cx: number, cy: number, rx: number, ry: number, collect?: number[]): void => {
+  const carveEllipse = (
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    collect?: number[],
+  ): void => {
     for (let y = Math.max(1, cy - ry); y <= Math.min(h - 2, cy + ry); y++) {
       for (let x = Math.max(1, cx - rx); x <= Math.min(w - 2, cx + rx); x++) {
         const nx = (x - cx) / rx;
@@ -537,7 +572,11 @@ const stampHalls = (
       const phase = rng.nextFloat01() * Math.PI * 2;
       for (let k = 0; k < 7; k++) {
         const a = phase + (k * Math.PI * 2) / 7;
-        pillar(Math.round(c.x + Math.cos(a) * (r - 2)), Math.round(c.y + Math.sin(a) * (r - 2)), SOLID_ROCK);
+        pillar(
+          Math.round(c.x + Math.cos(a) * (r - 2)),
+          Math.round(c.y + Math.sin(a) * (r - 2)),
+          SOLID_ROCK,
+        );
       }
     }
     // Floresta de pilares: campo aberto interrompido por ilhas solidas —
@@ -618,7 +657,13 @@ const stampHalls = (
       for (let seg = 0; seg < 4; seg++) {
         const len = 5 + rng.nextInt(5);
         const dir = rng.nextFloat01() < 0.5 ? -1 : 1;
-        carveLine(px, py, horizontal ? (dir < 0 ? Math.PI : 0) : (dir < 0 ? -Math.PI / 2 : Math.PI / 2), len, 0);
+        carveLine(
+          px,
+          py,
+          horizontal ? (dir < 0 ? Math.PI : 0) : dir < 0 ? -Math.PI / 2 : Math.PI / 2,
+          len,
+          0,
+        );
         if (horizontal) px = Math.max(4, Math.min(w - 4, px + dir * len));
         else py = Math.max(4, Math.min(h - 4, py + dir * len));
         horizontal = !horizontal;
@@ -790,28 +835,61 @@ const stampCorePedestal = (
     }
   };
   const RING = [
-    [3, 0], [-3, 0], [0, 3], [0, -3],
-    [2, 2], [2, -2], [-2, 2], [-2, -2],
+    [3, 0],
+    [-3, 0],
+    [0, 3],
+    [0, -3],
+    [2, 2],
+    [2, -2],
+    [-2, 2],
+    [-2, -2],
   ] as const;
 
   if (halls === 'columns') {
     // Anfiteatro do poco: colunas nas diagonais, corredores nos eixos.
-    for (const [dx, dy] of [[2, 2], [2, -2], [-2, 2], [-2, -2]] as const) put(dx, dy, SOLID_ROCK);
+    for (const [dx, dy] of [
+      [2, 2],
+      [2, -2],
+      [-2, 2],
+      [-2, -2],
+    ] as const)
+      put(dx, dy, SOLID_ROCK);
   } else if (halls === 'radial') {
     // Pilares de cristal nos eixos: cobertura, luz e municao do objetivo.
-    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_CRYSTAL);
+    for (const [dx, dy] of [
+      [3, 0],
+      [-3, 0],
+      [0, 3],
+      [0, -3],
+    ] as const)
+      put(dx, dy, SOLID_CRYSTAL);
   } else if (halls === 'karst') {
     // Fosso raso: chegar ao poco atravessa a agua — a geografia cobra.
     for (const [dx, dy] of RING) paint(dx, dy, SURF_WATER);
   } else if (halls === 'lungs') {
     // Borda porosa: duas celulas frageis — a camara do poco tambem respira.
-    for (const [dx, dy] of [[3, 0], [-3, 0]] as const) put(dx, dy, SOLID_FRAGILE);
+    for (const [dx, dy] of [
+      [3, 0],
+      [-3, 0],
+    ] as const)
+      put(dx, dy, SOLID_FRAGILE);
   } else if (halls === 'canyon') {
     // Escombros: a camara que desabou em volta do que importava.
-    for (const [dx, dy] of [[3, 0], [-2, 2], [0, -3]] as const) put(dx, dy, SOLID_ROCK);
+    for (const [dx, dy] of [
+      [3, 0],
+      [-2, 2],
+      [0, -3],
+    ] as const)
+      put(dx, dy, SOLID_ROCK);
   } else if (halls === 'terraced') {
     // Anel fragil nos eixos: a parede em volta do poco e uma decisao.
-    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_FRAGILE);
+    for (const [dx, dy] of [
+      [3, 0],
+      [-3, 0],
+      [0, 3],
+      [0, -3],
+    ] as const)
+      put(dx, dy, SOLID_FRAGILE);
   } else if (halls === 'lakes') {
     // O poco no meio do lago congelado: a aproximacao final desliza.
     for (const [dx, dy] of RING) paint(dx, dy, SURF_ICE);
@@ -893,8 +971,18 @@ export const stampBossArena = (
   };
 
   // Anel 4: as quatro diagonais e os quatro eixos. Cobertura, nunca cerco.
-  const PILLARS = [[4, 4], [4, -4], [-4, 4], [-4, -4]] as const;
-  const AXES = [[4, 0], [-4, 0], [0, 4], [0, -4]] as const;
+  const PILLARS = [
+    [4, 4],
+    [4, -4],
+    [-4, 4],
+    [-4, -4],
+  ] as const;
+  const AXES = [
+    [4, 0],
+    [-4, 0],
+    [0, 4],
+    [0, -4],
+  ] as const;
   /** Aneis 5 e 6, em passo 2: a orla, esparsa o bastante para ler como orla. */
   const ORLA: Array<readonly [number, number]> = [];
   for (let r = 5; r <= 6; r++) {
@@ -1102,7 +1190,7 @@ const generateAttempt = (
   seed: number,
   w: number,
   h: number,
-  profile: WorldgenProfile
+  profile: WorldgenProfile,
 ): GeneratedWorld | null => {
   const rng = new RNG(seed >>> 0 || 1);
   const draft = createTerrainDraft(w, h);
@@ -1198,16 +1286,38 @@ const generateAttempt = (
     return true;
   };
   const guardianOffsets = [
-    [3, 0], [-3, 0], [0, 3], [0, -3],
-    [2, 2], [-2, 2], [2, -2], [-2, -2],
+    [3, 0],
+    [-3, 0],
+    [0, 3],
+    [0, -3],
+    [2, 2],
+    [-2, 2],
+    [2, -2],
+    [-2, -2],
   ] as const;
   let guardianSpawn: Vec2 | null = null;
-  for (const [dx, dy] of guardianOffsets) {
-    const x = corePos.x + dx;
-    const y = corePos.y + dy;
-    if (!hasGuardianClearance(x, y)) continue;
-    guardianSpawn = { x, y };
-    break;
+  if (profile.halls === 'radial') {
+    // O ponto mais distante costuma cair perto da borda. Para a Catedral isso
+    // nao serve: corpo + orbita + resposta precisam de doze tiles de margem.
+    // Recuamos a ROTUNDA para dentro e abrimos a camara ali; o Nucleo continua
+    // no extremo e ligado pelo mesmo chao escavado, em vez de rejeitar seeds
+    // perfeitamente solucionaveis ou cortar silenciosamente um braco do coro.
+    const margin = 12;
+    const inwardX = corePos.x >= w / 2 ? -3 : 3;
+    const inwardY = corePos.y >= h / 2 ? -3 : 3;
+    guardianSpawn = {
+      x: Math.max(margin, Math.min(w - margin - 1, corePos.x + inwardX)),
+      y: Math.max(margin, Math.min(h - margin - 1, corePos.y + inwardY)),
+    };
+    carveBlob(draft, w, h, guardianSpawn.x, guardianSpawn.y, 8);
+  } else {
+    for (const [dx, dy] of guardianOffsets) {
+      const x = corePos.x + dx;
+      const y = corePos.y + dy;
+      if (!hasGuardianClearance(x, y)) continue;
+      guardianSpawn = { x, y };
+      break;
+    }
   }
   // Esta tentativa de mapa nao oferece uma arena fisicamente valida.
   // A geracao limitada tentara outra seed derivada em vez de criar um boss preso.
@@ -1252,7 +1362,8 @@ const generateAttempt = (
     for (let x = 1; x < w - 1; x++) {
       const i = idx(w, x, y);
       if (solid[i] !== SOLID_ROCK || arenaKeeps(i)) continue;
-      const touchesOpen = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
+      const touchesOpen =
+        isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
       if (!touchesOpen) continue;
       const roll = rng.nextFloat01();
       // parede fina (aberto dos dois lados) tem chance alta de ser fragil
@@ -1355,12 +1466,37 @@ const generateAttempt = (
   // SURF_NONE), e no Aquifero o lago e a geografia — fungo e biofluido crescem
   // nas MARGENS dele, nunca por cima. Com count 0 nada e sorteado, entao o
   // basalto historico consome exatamente a mesma sequencia de RNG de sempre.
-  blobSurface(SURF_WATER, profile.waterBlobs.count, profile.waterBlobs.rMin, profile.waterBlobs.rMax);
+  blobSurface(
+    SURF_WATER,
+    profile.waterBlobs.count,
+    profile.waterBlobs.rMin,
+    profile.waterBlobs.rMax,
+  );
   blobSurface(SURF_ICE, profile.iceBlobs.count, profile.iceBlobs.rMin, profile.iceBlobs.rMax);
-  blobSurface(SURF_EMBER, profile.emberBlobs.count, profile.emberBlobs.rMin, profile.emberBlobs.rMax);
-  blobSurface(SURF_SCORCHED, profile.coalBlobs.count, profile.coalBlobs.rMin, profile.coalBlobs.rMax);
-  blobSurface(SURF_FUNGAL, profile.fungalBlobs.count, profile.fungalBlobs.rMin, profile.fungalBlobs.rMax);
-  blobSurface(SURF_BIOFLUID, profile.biofluidBlobs.count, profile.biofluidBlobs.rMin, profile.biofluidBlobs.rMax);
+  blobSurface(
+    SURF_EMBER,
+    profile.emberBlobs.count,
+    profile.emberBlobs.rMin,
+    profile.emberBlobs.rMax,
+  );
+  blobSurface(
+    SURF_SCORCHED,
+    profile.coalBlobs.count,
+    profile.coalBlobs.rMin,
+    profile.coalBlobs.rMax,
+  );
+  blobSurface(
+    SURF_FUNGAL,
+    profile.fungalBlobs.count,
+    profile.fungalBlobs.rMin,
+    profile.fungalBlobs.rMax,
+  );
+  blobSurface(
+    SURF_BIOFLUID,
+    profile.biofluidBlobs.count,
+    profile.biofluidBlobs.rMin,
+    profile.biofluidBlobs.rMax,
+  );
 
   // area de entrada limpa (jogador nao nasce em material perigoso)
   for (let y = entry.y - 2; y <= entry.y + 2; y++) {
@@ -1396,7 +1532,10 @@ const generateAttempt = (
       const dx = horizontal ? 1 : 0;
       const dy = horizontal ? 0 : 1;
       const fits = (x: number, y: number): boolean =>
-        x > 1 && y > 1 && x < w - 2 && y < h - 2 &&
+        x > 1 &&
+        y > 1 &&
+        x < w - 2 &&
+        y < h - 2 &&
         solid[idx(w, x, y)] === SOLID_NONE &&
         surface[idx(w, x, y)] === SURF_NONE &&
         Math.hypot(x - entry.x, y - entry.y) > 6 &&
@@ -1435,9 +1574,9 @@ const generateAttempt = (
   const maxPath = distFromEntry[idx(w, corePos.x, corePos.y)];
   const reserved: Vec2[] = [entry, corePos, guardianSpawn];
   const bands: Array<{ min: number; max: number; tier: 1 | 2 | 3; optional?: boolean }> = [
-    { min: 0.20, max: 0.35, tier: 1 },
-    { min: 0.40, max: 0.60, tier: 1 },
-    { min: 0.65, max: 0.80, tier: 2 },
+    { min: 0.2, max: 0.35, tier: 1 },
+    { min: 0.4, max: 0.6, tier: 1 },
+    { min: 0.65, max: 0.8, tier: 2 },
     { min: 0.82, max: 0.95, tier: 3, optional: true },
   ];
 
@@ -1463,7 +1602,8 @@ const generateAttempt = (
       const y = Math.floor(cell / w);
       const path = distFromEntry[cell];
       const euclideanSq = (x - terminal.x) ** 2 + (y - terminal.y) ** 2;
-      if (path < terminalDist + 3 || path > terminalDist + Math.max(8, Math.floor(maxPath * 0.12))) return false;
+      if (path < terminalDist + 3 || path > terminalDist + Math.max(8, Math.floor(maxPath * 0.12)))
+        return false;
       if (euclideanSq < 5 * 5 || euclideanSq > 15 * 15) return false;
       if (Math.hypot(x - corePos.x, y - corePos.y) < 5) return false;
       return taken.every((p) => (p.x - x) ** 2 + (p.y - y) ** 2 >= 6 * 6);
@@ -1581,7 +1721,10 @@ const generateAttempt = (
           const wi = wallNeigh[k];
           if (solid[wi] !== SOLID_ROCK || arenaKeeps(wi) || leyUsed.has(wi)) continue;
           leyUsed.add(wi);
-          if (pending || segCells.length + 1 >= Math.min(LEYLINE_JUNCTION_SPACING, LEYLINE_SEGMENT_MAX_CELLS)) {
+          if (
+            pending ||
+            segCells.length + 1 >= Math.min(LEYLINE_JUNCTION_SPACING, LEYLINE_SEGMENT_MAX_CELLS)
+          ) {
             draft.setSolid(wi, SOLID_LEYLINE_NODE);
             leylineNodesOut.push({ cell: wi, segments: [] });
             const nodeIdx = leylineNodesOut.length - 1;
@@ -1665,11 +1808,11 @@ const generateAttempt = (
         return true;
       };
       let deepBand = openArr.filter(
-        (cell) => distFromEntry[cell] >= Math.floor(maxPath * 0.82) && farFromGoals(cell)
+        (cell) => distFromEntry[cell] >= Math.floor(maxPath * 0.82) && farFromGoals(cell),
       );
       if (deepBand.length === 0) {
         deepBand = openArr.filter(
-          (cell) => distFromEntry[cell] >= Math.floor(maxPath * 0.7) && farFromGoals(cell)
+          (cell) => distFromEntry[cell] >= Math.floor(maxPath * 0.7) && farFromGoals(cell),
         );
       }
       // Sem candidato nem relaxando: o mapa e pequeno demais para esta linha.
@@ -1748,9 +1891,18 @@ const generateAttempt = (
     // ambientacao: o Aquifero e um lugar que bombeava agua, e nao um lugar com
     // quatro canos ao redor de um monstro.
     const ARENA_RING = [
-      [0, -11], [0, 11], [-11, 0], [11, 0],
-      [-8, -8], [8, 8], [8, -8], [-8, 8],
-      [0, -15], [0, 15], [-15, 0], [15, 0],
+      [0, -11],
+      [0, 11],
+      [-11, 0],
+      [11, 0],
+      [-8, -8],
+      [8, 8],
+      [8, -8],
+      [-8, 8],
+      [0, -15],
+      [0, 15],
+      [-15, 0],
+      [15, 0],
     ] as const;
     const arenaQuota = Math.min(4, profile.pipeCount);
     for (const [dx, dy] of ARENA_RING) {
@@ -1767,18 +1919,26 @@ const generateAttempt = (
         if (solid[i] !== SOLID_ROCK) continue;
         if (placed.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 6)) break;
         const facing =
-          solid[i - w] === SOLID_NONE ? SOLID_PIPE_N
-          : solid[i + w] === SOLID_NONE ? SOLID_PIPE_S
-          : solid[i - 1] === SOLID_NONE ? SOLID_PIPE_W
-          : solid[i + 1] === SOLID_NONE ? SOLID_PIPE_E
-          : 0;
+          solid[i - w] === SOLID_NONE
+            ? SOLID_PIPE_N
+            : solid[i + w] === SOLID_NONE
+              ? SOLID_PIPE_S
+              : solid[i - 1] === SOLID_NONE
+                ? SOLID_PIPE_W
+                : solid[i + 1] === SOLID_NONE
+                  ? SOLID_PIPE_E
+                  : 0;
         if (facing === 0) continue;
         solid[i] = facing;
         placed.push({ x, y });
         break;
       }
     }
-    for (let attempt = 0; attempt < profile.pipeCount * 40 && placed.length < profile.pipeCount; attempt++) {
+    for (
+      let attempt = 0;
+      attempt < profile.pipeCount * 40 && placed.length < profile.pipeCount;
+      attempt++
+    ) {
       const x = 2 + rng.nextInt(w - 4);
       const y = 2 + rng.nextInt(h - 4);
       const i = y * w + x;
@@ -1787,11 +1947,15 @@ const generateAttempt = (
       // fontes, sao uma fonte gorda, e a inundacao voltaria a ler como circulo.
       if (placed.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 8)) continue;
       const facing =
-        solid[i - w] === SOLID_NONE ? SOLID_PIPE_N
-        : solid[i + w] === SOLID_NONE ? SOLID_PIPE_S
-        : solid[i - 1] === SOLID_NONE ? SOLID_PIPE_W
-        : solid[i + 1] === SOLID_NONE ? SOLID_PIPE_E
-        : 0;
+        solid[i - w] === SOLID_NONE
+          ? SOLID_PIPE_N
+          : solid[i + w] === SOLID_NONE
+            ? SOLID_PIPE_S
+            : solid[i - 1] === SOLID_NONE
+              ? SOLID_PIPE_W
+              : solid[i + 1] === SOLID_NONE
+                ? SOLID_PIPE_E
+                : 0;
       if (facing === 0) continue;
       solid[i] = facing;
       placed.push({ x, y });
@@ -1834,7 +1998,7 @@ export const generateWorld = (
   seed: number,
   w: number,
   h: number,
-  profile: WorldgenProfile = DEFAULT_PROFILE
+  profile: WorldgenProfile = DEFAULT_PROFILE,
 ): GeneratedWorld => {
   for (let attempt = 0; attempt < 16; attempt++) {
     const result = generateAttempt((seed ^ (attempt * 0x85ebca6b)) >>> 0, w, h, profile);

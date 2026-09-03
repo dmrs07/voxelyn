@@ -486,4 +486,17 @@ describe('arena real do Arquicantor', () => {
       'o Arquicantor real nao chamou o quarteto',
     ).toHaveLength(4);
   });
+
+  it('reserva margem para os quatro bracos do coro ate nas seeds de borda', () => {
+    const state = createRun({
+      seed: 19,
+      sector: 3,
+      depth: { generation: 'G-04', sectorCount: 7, coreSectors: [3, 7] },
+    });
+    const boss = state.enemies.find((e) => e.id === state.sectorBoss.entityId);
+    expect(boss).toBeDefined();
+    expect(
+      Math.min(boss!.x, boss!.y, state.config.width - boss!.x, state.config.height - boss!.y),
+    ).toBeGreaterThanOrEqual(12);
+  });
 });

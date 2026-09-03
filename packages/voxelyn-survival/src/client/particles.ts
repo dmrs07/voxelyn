@@ -373,6 +373,38 @@ export class VoxelParticles {
           if (ev.archetype !== 'archcantor') break;
           if (ev.state === 'song_halo') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(18, n(32)), 4.8, 720, 81, 0.35);
+          } else if (ev.state === 'choir_cross' || ev.state === 'choir_diagonal') {
+            // O halo nao e so decoracao: durante TODO o windup ele desenha os
+            // quatro corredores que vao cobrar. A cruz usa as cardinais; o xis
+            // gira o mesmo vocabulário cristalino em 45 graus.
+            const dirs =
+              ev.state === 'choir_cross'
+                ? [
+                    [1, 0],
+                    [0, 1],
+                    [-1, 0],
+                    [0, -1],
+                  ]
+                : [
+                    [1, 1],
+                    [-1, 1],
+                    [-1, -1],
+                    [1, -1],
+                  ];
+            for (const [dx, dy] of dirs) {
+              for (let step = 2; step <= 8; step += 1.5) {
+                this.ring(
+                  ev.x + dx * step,
+                  ev.y + dy * step,
+                  'crystalShard',
+                  Math.max(4, n(7)),
+                  0.48,
+                  760,
+                  84 + step,
+                  0.22,
+                );
+              }
+            }
           } else if (ev.state === 'choir_voice') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(8, n(14)), 1.35, 420, 82, 0.3);
           } else if (ev.state === 'resonance_halo') {
