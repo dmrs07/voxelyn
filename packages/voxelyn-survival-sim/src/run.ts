@@ -3358,6 +3358,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // inimigos, como as de qualquer corpo.
   for (const seat of state.bossRuntime.choir) mix(seat);
   mix(state.bossRuntime.choirRotation);
+  mix(state.bossRuntime.choirPattern);
   mix(state.bossRuntime.choirRotateAt);
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que

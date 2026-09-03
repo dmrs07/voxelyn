@@ -369,6 +369,16 @@ export class VoxelParticles {
     const n = (base: number) => Math.max(1, Math.round(base * scale));
     for (const ev of events) {
       switch (ev.t) {
+        case 'boss_state':
+          if (ev.archetype !== 'archcantor') break;
+          if (ev.state === 'song_halo') {
+            this.ring(ev.x, ev.y, 'crystalShard', Math.max(18, n(32)), 4.8, 720, 81, 0.35);
+          } else if (ev.state === 'choir_voice') {
+            this.ring(ev.x, ev.y, 'crystalShard', Math.max(8, n(14)), 1.35, 420, 82, 0.3);
+          } else if (ev.state === 'resonance_halo') {
+            this.ring(ev.x, ev.y, 'crystalShard', Math.max(6, n(10)), 0.9, 520, 83, 0.25);
+          }
+          break;
         case 'leviathan_discharge':
           this.ring(
             ev.x,

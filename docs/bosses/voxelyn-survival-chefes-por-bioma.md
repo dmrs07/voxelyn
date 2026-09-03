@@ -18,24 +18,24 @@ Prioridade:
 1. **Uma ocupação forte substitui o chefe do estrato.**
 2. **Sem ocupação dominante, entra o chefe natural do estrato.**
 
-| Categoria | Mapa | Chefe | Status |
-| --- | --- | --- | --- |
-| Ocupação | Contaminação Micelial | Bispo | **implementado** |
-| Ocupação | Cicatriz Aurix | Diamandis | **implementado** |
-| Estrato | Galerias de Basalto | Guardião | **implementado** |
-| Estrato | Catedral Prismática | Arquicantor | **implementado** |
-| Estrato | Aquífero Negro | Leviatã do Lençol | **implementado** |
-| Estrato | Fenda Sulfurosa | Pulmão-Matriz | **implementado** |
-| Estrato | Fornalha Abissal | Coração da Fornalha | **implementado** |
-| Estrato | Sumidouros de Sílica | Devorador Branco | **implementado** |
-| Estrato | Cripta Glacial | Rainha da Geada | **implementado** |
-| Estrato | Estrato Ferrífero | Magnetarca | **implementado** |
+| Categoria | Mapa                  | Chefe               | Status           |
+| --------- | --------------------- | ------------------- | ---------------- |
+| Ocupação  | Contaminação Micelial | Bispo               | **implementado** |
+| Ocupação  | Cicatriz Aurix        | Diamandis           | **implementado** |
+| Estrato   | Galerias de Basalto   | Guardião            | **implementado** |
+| Estrato   | Catedral Prismática   | Arquicantor         | **implementado** |
+| Estrato   | Aquífero Negro        | Leviatã do Lençol   | **implementado** |
+| Estrato   | Fenda Sulfurosa       | Pulmão-Matriz       | **implementado** |
+| Estrato   | Fornalha Abissal      | Coração da Fornalha | **implementado** |
+| Estrato   | Sumidouros de Sílica  | Devorador Branco    | **implementado** |
+| Estrato   | Cripta Glacial        | Rainha da Geada     | **implementado** |
+| Estrato   | Estrato Ferrífero     | Magnetarca          | **implementado** |
 
 **A tabela está completa**: os dez chefes conceituais têm corpo, e o fallback no
 Guardião — que sustentou a seleção enquanto a lista era parcial — não responde mais
 por nenhuma linha. Ele continua no código porque `BossId` é um espaço aberto: um chefe
 novo entra na tabela antes de ganhar corpo, e até lá a câmara dele não pode ficar
-vazia. O teste *"a tabela está COMPLETA"* é o que impede o fallback de voltar a
+vazia. O teste _"a tabela está COMPLETA"_ é o que impede o fallback de voltar a
 responder em silêncio.
 
 ### Um chefe por run
@@ -112,8 +112,8 @@ objeto só, `state.bossRuntime`:
 ```ts
 type BossRuntime = {
   awake: boolean;
-  phasesFired: number;      // bitmask; BOSS_PHASE_SUMMON é a matilha do Guardião
-  path: number[];           // derivado: não entra no hash nem no snapshot
+  phasesFired: number; // bitmask; BOSS_PHASE_SUMMON é a matilha do Guardião
+  path: number[]; // derivado: não entra no hash nem no snapshot
   pathAt: number;
   arenaClosed: boolean;
   arenaBarrierCells: number[];
@@ -135,7 +135,7 @@ Três decisões dentro disso:
 
 No wire, `WorldFlags.guardianAwake` virou `bossAwake` e o evento `guardian_awake`
 virou `boss_awake` — os dois nomes mentiam sobre metade das runs desde
-`bossForBiome`. `PROTOCOL_VERSION` 15, `SIMULATION_VERSION` 24. (A *voz* de áudio
+`bossForBiome`. `PROTOCOL_VERSION` 15, `SIMULATION_VERSION` 24. (A _voz_ de áudio
 continua se chamando `guardianAwake`: ela é o nome de um som, não de um chefe.)
 
 ## Diamandis — a máquina que parou de executar a tarefa
@@ -153,11 +153,11 @@ paralisa: chefe paralisável é chefe que morre num stun-lock).
 
 **As três faixas, sem sobreposição** — e a ordem de leitura da IA é a mesma:
 
-| Distância | Ferramenta | O que ela faz |
-| --- | --- | --- |
-| 9–20 | **Broca de avanço** | fixa o rumo, 1,8 s parado, atravessa a arena abrindo um corredor de 3 células |
-| 4–13 | **Salva de demolição** | 3 cargas marcadas no chão no início do telégrafo, implodem onde foram marcadas |
-| ≤ 16 | **Feixe de prospecção** | varre a linha inofensivo por 2 s, depois a mesma linha com potência |
+| Distância | Ferramenta              | O que ela faz                                                                  |
+| --------- | ----------------------- | ------------------------------------------------------------------------------ |
+| 9–20      | **Broca de avanço**     | fixa o rumo, 1,8 s parado, atravessa a arena abrindo um corredor de 3 células  |
+| 4–13      | **Salva de demolição**  | 3 cargas marcadas no chão no início do telégrafo, implodem onde foram marcadas |
+| ≤ 16      | **Feixe de prospecção** | varre a linha inofensivo por 2 s, depois a mesma linha com potência            |
 
 A primeira versão tinha a broca começando em 5 e a demolição cobrindo 0–13: como a
 broca é checada primeiro, ela vencia em toda distância útil e a salva **nunca saía**.
@@ -165,7 +165,7 @@ Faixa que só existe no comentário não é faixa.
 
 **A broca é a única ação telegrafada do jogo que não exige linha de visão.** Exigir
 anularia a mecânica: o Corcel precisa de visada porque a investida dele se perde numa
-parede, e a do Diamandis a *come*. Ela existe justamente para a cobertura deixar de
+parede, e a do Diamandis a _come_. Ela existe justamente para a cobertura deixar de
 valer. O que a mantém justa é o 1,8 s parado antes de sair — e, ao contrário do
 Corcel, **bater na pedra não encerra a ação**: a pedra é que acaba.
 
@@ -190,11 +190,11 @@ levantamento, e um feixe que queima do outro lado do muro é dano sem sinal.
 
 **Colapso do reator (< 50%)**, uma vez, via `BOSS_PHASE_REACTOR`:
 
-- o reator **vaza**: um *anel* de brasa nasce em volta dele (anel e não disco — o
+- o reator **vaza**: um _anel_ de brasa nasce em volta dele (anel e não disco — o
   centro fica pisável para a luta não virar "fique longe e espere"), e ele continua
   deixando brasa sob os rastos enquanto perfura;
 - um sistema **desliga**: o feixe morre — é o primeiro a cair quando a alimentação
-  entra em colapso, e é o que faz a segunda fase ser *outra luta* em vez da mesma com
+  entra em colapso, e é o que faz a segunda fase ser _outra luta_ em vez da mesma com
   números piores;
 - os outros **operam acima do limite**: broca e demolição recarregam a 65%.
 
@@ -207,11 +207,11 @@ próprio aggro, e sem isso ficavam mirando de um raio em que nunca decidiam nada
 
 ### Documentos do Diamandis
 
-| Gatilho | Documento | ID |
-| --- | --- | --- |
-| Primeiro abate | Propaganda: *"Uma máquina. Quatrocentas funções. Nenhum trabalhador abaixo da superfície."* | `AX-PUB-010` |
-| **Ver a broca abrir um corredor** | Raio mínimo de operação: o ativo não cabe nos túneis que deveria escavar → *"os túneis serão adaptados ao ativo"* | `AX-ENG-029` |
-| Abate **+** ver o corredor | Incidente 41: ele recebeu o desligamento, **acusou o recebimento**, parou 9 s e continuou — em azimute que não consta de contrato | `AX-INC-041` |
+| Gatilho                           | Documento                                                                                                                                         | ID           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Primeiro abate                    | Propaganda: _"Uma máquina. Quatrocentas funções. Nenhum trabalhador abaixo da superfície."_                                                       | `AX-PUB-010` |
+| **Ver a broca abrir um corredor** | Raio mínimo de operação: o ativo não cabe nos túneis que deveria escavar → _"os túneis serão adaptados ao ativo"_                                 | `AX-ENG-029` |
+| Abate **+** ver o corredor        | Incidente 41: ele recebeu o desligamento, **acusou o recebimento**, parou 9 s e continuou — em azimute que não consta de contrato                 | `AX-INC-041` |
 | Abate **+** corredor **+** Núcleo | Não classificado: os corredores dele formam arcos **concêntricos** ao redor do sinal. Ele não escavava em direção à fonte — escavava **ao redor** | `AX-UNK-059` |
 
 `DISCOVERY_DIAMANDIS_CORRIDOR` (bit 16) é a única testemunha do jogo que **não** exige
@@ -220,7 +220,7 @@ que está sendo removida, e quem está do outro lado dela é quem mais precisa e
 o que aconteceu.
 
 `AX-UNK-059` fecha com o gancho do Guardião (`AX-UNK-051`): dois sistemas de contenção,
-e *um deles nós construímos*. A pergunta que nenhum documento aprovado formula é se o
+e _um deles nós construímos_. A pergunta que nenhum documento aprovado formula é se o
 Diamandis falhou em alcançar o objetivo — ou entendeu antes da companhia que ele não
 devia ser alcançado.
 
@@ -232,19 +232,19 @@ Diamandis só ainda não está abatido.
 
 Cada arma dele mora num **módulo** preso à carcaça. Conforme a vida cai, o módulo
 daquela arma **se solta** — em ordem fixa e ensinável (78% → broca, 55% → torre,
-30% → scanner), do maior alcance para o menor, então o cerco vai *fechando*: perder
+30% → scanner), do maior alcance para o menor, então o cerco vai _fechando_: perder
 a broca cedo significa que a luta termina de perto, que é onde o corpo dele cobra
 caro. Soltar **não** é perder: a arma continua funcionando enquanto ninguém arranca.
 
 Um Coveiro que enxergue um módulo solto **larga o jogador** e vai buscar a peça —
 2 s de eletroímã engatando, telegrafados. No arranque o chefe perde aquela arma na
-hora, e o Coveiro vira um *carregador* rumo à saída.
+hora, e o Coveiro vira um _carregador_ rumo à saída.
 
-| Você faz | A luta | A recompensa |
-| --- | --- | --- |
-| **Deixa trabalhar** | mais fácil: cada módulo arrancado é uma arma a menos | vai embora com a peça, se você não interceptar |
-| **Mata antes do arranque** | mais longa: o chefe mantém as três armas | garantida — o módulo continua na carcaça e paga no abate |
-| **Mata o carregador** | já sem aquela arma | recuperada: a peça cai e é sua |
+| Você faz                   | A luta                                               | A recompensa                                             |
+| -------------------------- | ---------------------------------------------------- | -------------------------------------------------------- |
+| **Deixa trabalhar**        | mais fácil: cada módulo arrancado é uma arma a menos | vai embora com a peça, se você não interceptar           |
+| **Mata antes do arranque** | mais longa: o chefe mantém as três armas             | garantida — o módulo continua na carcaça e paga no abate |
+| **Mata o carregador**      | já sem aquela arma                                   | recuperada: a peça cai e é sua                           |
 
 O abate paga `DIAMANDIS_MODULE_ORE` (16) por módulo ainda preso. Os dois lados são
 legítimos, e é isso que faz disso uma decisão em vez de uma armadilha.
@@ -253,7 +253,7 @@ legítimos, e é isso que faz disso uma decisão em vez de uma armadilha.
 mapa" e estava errado: o carregador não come minério (recurso do jogador, mesma
 regra da broca), então um veio no caminho o encalhava — medido na seed 404, ele
 parava em x=85 de um mapa de 96 e ficava ali pelo resto da run. Com uma porta como
-critério, *deixar trabalhar* virava *espere, ele empaca*, e o preço de não
+critério, _deixar trabalhar_ virava _espere, ele empaca_, e o preço de não
 interceptar nunca chegava a ser cobrado. A distância (24 tiles da carcaça) diz a
 coisa certa — a peça se perde quando sai da luta — e a borda continua valendo para
 quem escapa de verdade.
@@ -268,11 +268,11 @@ dois ficavam parados em cima do chefe sem nada para fazer.
 
 ### Documentos dos Coveiros
 
-| Gatilho | Documento | ID |
-| --- | --- | --- |
-| **Ver um módulo ser arrancado** | Não classificado: o procedimento de recolhimento foi escrito para equipamento **abatido**, e não tem passo que verifique se o ativo ainda opera — *"um Prospector é equipamento da mesma frota"* | `AX-UNK-060` |
-| Coveiro abatido **+** ver o arranque | Aquisições: recuperar o Diamandis custa mais que o programa inteiro → *abandonar o corpo, enviar unidades menores.* O item 3 foi aprovado e nunca cancelado | `AX-PRC-026` |
-| Diamandis abatido **+** ver o arranque | Executivo: reclassificação para *"instalação móvel de recuperação economicamente inviável"* — a máquina em operação vira parte do mapa, por contabilidade | `AX-EXE-048` |
+| Gatilho                                | Documento                                                                                                                                                                                        | ID           |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| **Ver um módulo ser arrancado**        | Não classificado: o procedimento de recolhimento foi escrito para equipamento **abatido**, e não tem passo que verifique se o ativo ainda opera — _"um Prospector é equipamento da mesma frota"_ | `AX-UNK-060` |
+| Coveiro abatido **+** ver o arranque   | Aquisições: recuperar o Diamandis custa mais que o programa inteiro → _abandonar o corpo, enviar unidades menores._ O item 3 foi aprovado e nunca cancelado                                      | `AX-PRC-026` |
+| Diamandis abatido **+** ver o arranque | Executivo: reclassificação para _"instalação móvel de recuperação economicamente inviável"_ — a máquina em operação vira parte do mapa, por contabilidade                                        | `AX-EXE-048` |
 
 `AX-PRC-026` é de onde os Coveiros vêm, e `AX-UNK-060` é o que eles são. A piada
 contábil de `AX-EXE-048` fecha: a reclassificação não o desativa, não o recupera e
@@ -327,7 +327,7 @@ Essa parte não mudou, e não pode mudar — é a única janela de dano do encon
 O que mudou é o que ele **faz** parado. Ele era uma torre: um alvo inofensivo que não
 andava, não cobrava contato e não pedia nada de quem o usava além de munição. A única
 decisão do encontro era ter guardado o superaquecimento, e essa decisão acontece
-*antes* da janela, não dentro dela.
+_antes_ da janela, não dentro dela.
 
 Agora a mesma janela é uma **boca**, e enquanto ela dura ele engole o setor para
 dentro de si: areia, bicho e jogador. A janela deixou de ser um alvo e virou um
@@ -343,7 +343,7 @@ dentro de si: areia, bicho e jogador. A janela deixou de ser um alvo e virou um
   depois. Esse segundo é o tempo de sair de cima do buraco andando.
 - **No espaço.** A força a cada distância é fixa — 0,7 tile/s na borda, 7,6 colado na
   garganta — e cruza a velocidade de caminhada (4,6) a **3,47 tiles do centro**. Essa
-  é a *linha do sem-volta*, e o jogo a desenha no chão. Fora dela, andar para longe
+  é a _linha do sem-volta_, e o jogo a desenha no chão. Fora dela, andar para longe
   resolve. Dentro dela, andar não basta mais.
 
 Nenhum tick arranca mais que um terço de tile: quem se ignora por completo, parado na
@@ -352,11 +352,11 @@ cabe.
 
 **As três saídas, e nenhuma é automática:**
 
-| Saída | Como funciona | Quando serve |
-| --- | --- | --- |
-| **Andar** | A sucção é menor que a caminhada fora da linha do sem-volta | Do disco inteiro até 3,47 tiles |
-| **Esquivar** | 2,2 tiles em 0,2 s contra ~1,2 de sucção — devolve o corpo à linha | Dentro dela, gastando o recurso |
-| **Vidro** | Sobre `SURF_GLASS` a sucção cai a 45% e **nunca** vence a caminhada | De qualquer ponto — mas o vidro tem de já existir |
+| Saída        | Como funciona                                                       | Quando serve                                      |
+| ------------ | ------------------------------------------------------------------- | ------------------------------------------------- |
+| **Andar**    | A sucção é menor que a caminhada fora da linha do sem-volta         | Do disco inteiro até 3,47 tiles                   |
+| **Esquivar** | 2,2 tiles em 0,2 s contra ~1,2 de sucção — devolve o corpo à linha  | Dentro dela, gastando o recurso                   |
+| **Vidro**    | Sobre `SURF_GLASS` a sucção cai a 45% e **nunca** vence a caminhada | De qualquer ponto — mas o vidro tem de já existir |
 
 **A garganta é uma regra, não um risco.** Chegar ao centro custa 200 — o dobro da vida
 cheia do Prospector. Nenhuma cura e nenhum módulo salvam quem chega lá, e é deliberado:
@@ -417,11 +417,11 @@ em que o chão é a mecânica. Agora um índice ausente cai na cor, como o comen
 
 ### Documentos do Devorador
 
-| Gatilho | Documento | ID |
-| --- | --- | --- |
-| Primeiro abate | Levantamento de massa: 400–600 t contra um estrato inteiro três ordens de grandeza abaixo. *"Engenharia registra que a conta não fecha"* | `AX-ENG-030` |
-| **Vitrificar sílica solta** | Incidente 42: em 61 emergências, nenhuma sobre vidro. *"A superfície que ele deixa ao passar é a mesma que ele precisa para voltar"* | `AX-INC-042` |
-| Abate **+** vitrificar | Não classificado: ele não atravessa a sílica — **a sílica assume temporariamente a forma dele**. Não estamos matando um organismo, estamos interrompendo um padrão de movimento do estrato | `AX-UNK-061` |
+| Gatilho                     | Documento                                                                                                                                                                                  | ID           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| Primeiro abate              | Levantamento de massa: 400–600 t contra um estrato inteiro três ordens de grandeza abaixo. _"Engenharia registra que a conta não fecha"_                                                   | `AX-ENG-030` |
+| **Vitrificar sílica solta** | Incidente 42: em 61 emergências, nenhuma sobre vidro. _"A superfície que ele deixa ao passar é a mesma que ele precisa para voltar"_                                                       | `AX-INC-042` |
+| Abate **+** vitrificar      | Não classificado: ele não atravessa a sílica — **a sílica assume temporariamente a forma dele**. Não estamos matando um organismo, estamos interrompendo um padrão de movimento do estrato | `AX-UNK-061` |
 
 `DISCOVERY_SILICA_VITRIFIED` exige ter **feito**, não ter entendido — a compreensão vem
 depois, de ver o verme falhar em subir ali.
@@ -433,24 +433,24 @@ chefe, a alavanca que a própria geologia já tem. É a mesma regra do bestiári
 assinatura, e vale ainda mais aqui — um chefe que trouxesse mecânica própria seria um
 chefe que poderia estar em qualquer mapa.
 
-| Chefe | Estrato | A alavanca | O contra-jogo |
-| --- | --- | --- | --- |
-| **Arquicantor** | Catedral Prismática | rege: quatro Ressonantes em órbita cardinal, e todo cristal ao alcance descarrega | romper a órbita para abrir ângulo, **e** esvaziar a sala — a Catedral é a luz e o recurso do setor |
-| **Leviatã do Lençol** | Aquífero Negro | só anda e só emerge por superfície condutiva | o terreno seco, e eletrificar a água (que fica mortal para você também) |
-| **Pulmão-Matriz** | Fenda Sulfurosa | inspira o gás da câmara, expele em outra direção | **incendiar a expiração** — a única janela de dano que o jogador abre |
-| **Coração da Fornalha** | Fornalha Abissal | ciclo térmico; setores da arena acendem em sequência | estar no lugar certo quando ele esfria |
-| **Rainha da Geada** | Cripta Glacial | a couraça é o gelo em volta; Espectros como extensões | derreter o lago — e a água que sobra conduz nos dois sentidos |
-| **Magnetarca** | Estrato Ferrífero | polaridade alterna: atrai, depois repele | achar a **faixa**, que troca de lado a cada ciclo |
+| Chefe                   | Estrato             | A alavanca                                                                        | O contra-jogo                                                                                      |
+| ----------------------- | ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Arquicantor**         | Catedral Prismática | rege: quatro Ressonantes em órbita cardinal, e todo cristal ao alcance descarrega | romper a órbita para abrir ângulo, **e** esvaziar a sala — a Catedral é a luz e o recurso do setor |
+| **Leviatã do Lençol**   | Aquífero Negro      | só anda e só emerge por superfície condutiva                                      | o terreno seco, e eletrificar a água (que fica mortal para você também)                            |
+| **Pulmão-Matriz**       | Fenda Sulfurosa     | inspira o gás da câmara, expele em outra direção                                  | **incendiar a expiração** — a única janela de dano que o jogador abre                              |
+| **Coração da Fornalha** | Fornalha Abissal    | ciclo térmico; setores da arena acendem em sequência                              | estar no lugar certo quando ele esfria                                                             |
+| **Rainha da Geada**     | Cripta Glacial      | a couraça é o gelo em volta; Espectros como extensões                             | derreter o lago — e a água que sobra conduz nos dois sentidos                                      |
+| **Magnetarca**          | Estrato Ferrífero   | polaridade alterna: atrai, depois repele                                          | achar a **faixa**, que troca de lado a cada ciclo                                                  |
 
 Notas de desenho que valem registrar:
 
 - **O Arquicantor é o único cuja blindagem é inversa.** Calar a rede o deixa mais
-  *frágil* (`ARCHCANTOR_SILENT_ARMOR` > 1), porque a Catedral era a defesa dele. Nos
+  _frágil_ (`ARCHCANTOR_SILENT_ARMOR` > 1), porque a Catedral era a defesa dele. Nos
   outros a couraça é o bioma intacto; nele, o bioma intacto é a arma. Desde o **Coro
   Cardinal**, a rede tem duas metades — o cristal da nave e as vozes em órbita — e a
   blindagem só abre quando as duas caem. Antes, um mapa pobre de cristal entregava um
   chefe desarmado de graça, sem o jogador entender nada.
-- **O Arquicantor rege criaturas, e não só pedra.** Ver §*O Coro Cardinal* abaixo.
+- **O Arquicantor rege criaturas, e não só pedra.** Ver §_O Coro Cardinal_ abaixo.
 - **Pulmão e Coração são FIXOS** (`speed: 0`). A luta não é contra um corpo, é contra
   a sala — e a ficha de Ativo do Pulmão registra que neutralizá-lo deixou câmaras a
   jusante permanentemente irrespiráveis. Matá-lo não é claramente uma vitória.
@@ -468,7 +468,7 @@ Notas de desenho que valem registrar:
 O encontro começava **vazio**: um corpo lento no meio da nave cantando para cristais que
 a geração tinha (ou não tinha) posto por perto. Com sorte de mapa a Catedral respondia
 inteira; sem ela o chefe era um alvo parado que não defendia nem o próprio corpo. E os
-Ressonantes do setor — que são a fauna *dele* — agiam exatamente como agiriam sem ele na
+Ressonantes do setor — que são a fauna _dele_ — agiam exatamente como agiriam sem ele na
 sala.
 
 Ao **acordar**, ele chama quatro Ressonantes de verdade (mesmo arquétipo, mesma vida,
@@ -492,16 +492,18 @@ cruzando no meio, e durante a travessia a formação deixaria de cobrir o corpo.
 encontram fazem cada canto acontecer com outra configuração do coro.
 
 **Por que eles protegem.** Não há redução de dano envolvida. O corpo do guarda está
-*literalmente* na trajetória do tiro mirado no chefe — e isso é melhor que qualquer
+_literalmente_ na trajetória do tiro mirado no chefe — e isso é melhor que qualquer
 número: perfuração continua valendo, ricochete abre jogada, o ângulo passa a ser uma
 decisão, e matar uma voz abre uma janela de tiro **visível**, sem ícone de escudo nenhum.
 
-**O canto vira arpejo.** Na execução, as quatro vozes respondem *uma a uma* — na ordem da
-órbita (N, L, S, O), a cada `ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS` (3 ticks) — e cada uma
-abre um corredor estreito de descarga para fora da formação. A cruz de corredores é
-mortal; **as diagonais são a segurança**, e a formação está travada desde o telegrafo,
-então os quatro corredores são exatamente os que o jogador viu ao decidir onde ficar. Só
-depois disso a rede de cristal continua propagando em camadas, como já fazia.
+**O canto vira arpejo.** Na execução, as quatro vozes respondem _uma a uma_ — na ordem da
+órbita (N, L, S, O), a cada `ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS` (3 ticks). Os cantos
+alternam duas geometrias: primeiro a **cruz cardinal**, emitida para fora de cada guarda;
+depois o **xis diagonal**, cujo raio nasce no ponto médio entre dois guardas adjacentes.
+O halo do telegrafo identifica qual desenho vem a seguir, portanto nenhuma direção é uma
+segurança permanente. Derrubar uma voz apaga seu braço da cruz e também as duas diagonais
+que dependiam daquele par. Só depois do arpejo a rede de cristal continua propagando em
+camadas, com um halo circular reverberando em cada cristal alcançado.
 
 **Reforço é finito.** Um guarda abatido deixa um **buraco permanente**: não há
 recomposição por cooldown, porque desmontar o coro precisa representar progresso. A vaga
@@ -509,8 +511,8 @@ só volta a ser preenchida por um Ressonante que já estava na Catedral e entrou
 atração (`ARCHCANTOR_CHOIR_ATTRACT_RADIUS`, 8 tiles) — ou seja, por um recurso que o
 jogador também pode gastar antes.
 
-**O Solista.** Com os quatro postos ocupados, quem chega é *expulso* por uma das
-diagonais — justamente as brechas que a cruz do coro deixa. Ele deixa de operar a regra da
+**O Solista.** Com os quatro postos ocupados, quem chega é _expulso_ por uma das
+diagonais. Ele deixa de operar a regra da
 Catedral e passa a se mover como um **bispo de xadrez**: só diagonal, comprometido com a
 diagonal escolhida até bater em alguma coisa ou até o relógio (`_RETARGET_TICKS`) permitir
 trocar. O compromisso é o bicho inteiro — um solista que corrigisse o rumo a cada tick
@@ -518,11 +520,11 @@ seria um perseguidor comum com animação torta, e a resposta a ele deixaria de 
 geométrica. Chegando perto, ele solta uma descarga curta telegrafada e **recua** por outra
 diagonal.
 
-**Som.** Cada posição cardinal tem uma nota — fundamental, terça *menor*, quinta e nona —,
+**Som.** Cada posição cardinal tem uma nota — fundamental, terça _menor_, quinta e nona —,
 e a nota sai da **posição**, não de quem está nela. É isso que faz um coro incompleto soar
 incompleto: a voz que falta simplesmente não emite, e o buraco no acorde é o buraco na
 órbita. A dança confirma o movimento com um arpejo curtíssimo; o solista usa o mesmo
-material sonoro *errado* (trítono, ritmo quebrado). Quando a última fonte cai, entra o cue
+material sonoro _errado_ (trítono, ritmo quebrado). Quando a última fonte cai, entra o cue
 de silêncio que já existia.
 
 **Estado.** Três campos em `BossRuntime` (`choir`, `choirRotation`, `choirRotateAt`) e um
@@ -539,14 +541,14 @@ no primeiro abate). O miolo do arco abre por uma **Descoberta** que marca o inst
 em que o jogador entende a alavanca — nunca por repetição: um chefe aparece no máximo
 uma vez por run, e uma grade de abates transformaria a revelação em farm.
 
-| Chefe | A Descoberta exige | Incidente | Não classificado (abate + Descoberta) |
-| --- | --- | --- | --- |
-| Arquicantor | bater nele com a **Catedral em silêncio** | `AX-INC-043` | `AX-UNK-062` — alguns cristais respondem *antes* do pulso; ele não emite o sinal, **rege** |
-| Leviatã | **atordoá-lo** eletrificando a lâmina | `AX-INC-044` | `AX-UNK-063` — as sete medições não discordam: cada uma mediu uma parte, ao mesmo tempo |
-| Pulmão-Matriz | **acender a expiração** e queimar a coluna de volta | `AX-INC-045` | `AX-UNK-064` — nos setores em que ele caiu, a ventilação nunca voltou |
-| Coração da Fornalha | acertar na **janela fria** | `AX-INC-046` | `AX-UNK-065` — o magma não aquece a formação; a emissão aquece o magma |
-| Rainha da Geada | **derreter o lago** e bater sem a couraça | `AX-INC-047` | `AX-UNK-066` — ela não reproduz uma pessoa, reproduz um organograma |
-| Magnetarca | ficar na **faixa** (dentro do campo, fora das duas bordas) | `AX-INC-048` | `AX-UNK-067` — o campo antecede a mina; a operação foi construída sobre um cabo que ela não instalou |
+| Chefe               | A Descoberta exige                                         | Incidente    | Não classificado (abate + Descoberta)                                                                |
+| ------------------- | ---------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| Arquicantor         | bater nele com a **Catedral em silêncio**                  | `AX-INC-043` | `AX-UNK-062` — alguns cristais respondem _antes_ do pulso; ele não emite o sinal, **rege**           |
+| Leviatã             | **atordoá-lo** eletrificando a lâmina                      | `AX-INC-044` | `AX-UNK-063` — as sete medições não discordam: cada uma mediu uma parte, ao mesmo tempo              |
+| Pulmão-Matriz       | **acender a expiração** e queimar a coluna de volta        | `AX-INC-045` | `AX-UNK-064` — nos setores em que ele caiu, a ventilação nunca voltou                                |
+| Coração da Fornalha | acertar na **janela fria**                                 | `AX-INC-046` | `AX-UNK-065` — o magma não aquece a formação; a emissão aquece o magma                               |
+| Rainha da Geada     | **derreter o lago** e bater sem a couraça                  | `AX-INC-047` | `AX-UNK-066` — ela não reproduz uma pessoa, reproduz um organograma                                  |
+| Magnetarca          | ficar na **faixa** (dentro do campo, fora das duas bordas) | `AX-INC-048` | `AX-UNK-067` — o campo antecede a mina; a operação foi construída sobre um cabo que ela não instalou |
 
 Duas notas de implementação:
 

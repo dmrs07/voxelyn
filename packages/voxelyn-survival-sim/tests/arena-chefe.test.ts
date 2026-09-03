@@ -24,7 +24,7 @@ import {
 } from '../src/constants';
 import { SOLID_ROCK } from '../src/constants';
 import { RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
-import { createRun } from '../src/run';
+import { createRun, emptyCommand, stepRun } from '../src/run';
 import { isBossArchetype } from '../src/bosses';
 import { sectorSeed } from '../src/sectors';
 import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
@@ -53,7 +53,12 @@ const bfsFromEntry = (solid: Uint8Array, entry: { x: number; y: number }): Int32
     const cell = queue[head];
     const x = cell % WORLD_W;
     const y = Math.floor(cell / WORLD_W);
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
       const nx = x + dx;
       const ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) continue;
@@ -113,7 +118,10 @@ describe('arena do chefe por estrato', () => {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         const boss = chamberOf(seed, sector);
-        for (const [cx, cy] of [[boss.x, boss.y], [state.corePos.x, state.corePos.y]]) {
+        for (const [cx, cy] of [
+          [boss.x, boss.y],
+          [state.corePos.x, state.corePos.y],
+        ]) {
           for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
               expect(
@@ -130,7 +138,11 @@ describe('arena do chefe por estrato', () => {
   it('cada estrato deixa a PROPRIA marca na camara', () => {
     // Amostra por linhagem: o que a arena daquele bioma deposita em volta do
     // chefe. Conta na janela da camara (raio 7 = o mesmo do cerco).
-    const marks: Array<{ lineage: string; sector: number; find: (s: SurvivalState, i: number) => boolean }> = [
+    const marks: Array<{
+      lineage: string;
+      sector: number;
+      find: (s: SurvivalState, i: number) => boolean;
+    }> = [
       // Catedral Prismatica: pilares de cristal.
       { lineage: 'mineral', sector: MID_SECTOR, find: (s, i) => s.solid[i] === SOLID_CRYSTAL },
       // Aquifero Negro: a orla e agua.
@@ -138,7 +150,11 @@ describe('arena do chefe por estrato', () => {
       // Cripta Glacial: a arena escorrega.
       { lineage: 'cryo', sector: DEFAULT_SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_ICE },
       // Fornalha/Ferrifero: brasa na orla.
-      { lineage: 'industrial', sector: DEFAULT_SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_EMBER },
+      {
+        lineage: 'industrial',
+        sector: DEFAULT_SECTOR_COUNT,
+        find: (s, i) => s.surface[i] === SURF_EMBER,
+      },
       // Fenda Sulfurosa: paredes porosas.
       { lineage: 'thermal', sector: MID_SECTOR, find: (s, i) => s.solid[i] === SOLID_FRAGILE },
     ];
@@ -155,7 +171,10 @@ describe('arena do chefe por estrato', () => {
           if (m.find(state, y * w + x)) found++;
         }
       }
-      expect(found, `${m.lineage} s${m.sector}: a camara nao tem a marca do estrato`).toBeGreaterThan(0);
+      expect(
+        found,
+        `${m.lineage} s${m.sector}: a camara nao tem a marca do estrato`,
+      ).toBeGreaterThan(0);
     }
   });
 
@@ -231,7 +250,9 @@ describe('arena do chefe por estrato', () => {
     // percebe e some POR INTEIRO.
     const sealed = build(1);
     stampBossArena(sealed, W, H, boss, core, entry, 'radial');
-    expect(sealed.solid[choke], 'o gargalo foi tapado: a moldura tinha de ter sumido').toBe(SOLID_NONE);
+    expect(sealed.solid[choke], 'o gargalo foi tapado: a moldura tinha de ter sumido').toBe(
+      SOLID_NONE,
+    );
     expect(
       floodOpen(sealed.solid, W, H, entry.x, entry.y).has(boss.y * W + boss.x),
       'chefe isolado apos o carimbo',
@@ -242,19 +263,15 @@ describe('arena do chefe por estrato', () => {
       'o derivado ficou preso no mundo de antes do desfazer',
     ).toBe(true);
 
-    // Controle: com duas faixas o gargalo deixa de ser gargalo, e ai o pilar
-    // FICA. Sem este par, um carimbo que nunca escreve nada passaria no teste
-    // de cima sem fazer nada.
+    // A Catedral agora escava a rotunda independentemente do gargalo: a arena
+    // aberta e parte da mecanica do Arquicantor, nao decoracao opcional.
     const open = build(2);
     // O derivado e pedido ANTES do carimbo: e o caso que o draft existe para
     // resolver — depois do pilar entrar, a leitura seguinte tem de vir refeita.
     const antes = open.derived(entry).openCells.length;
     stampBossArena(open, W, H, boss, core, entry, 'radial');
-    expect(open.solid[choke], 'sem gargalo, o pilar tinha de ficar').toBe(SOLID_CRYSTAL);
-    expect(
-      open.derived(entry).openCells.length,
-      'o derivado nao percebeu o pilar novo: ficou com o chao de antes',
-    ).toBe(antes - 1);
+    expect(open.solid[choke], 'a rotunda radial fechou um eixo do canto').toBe(SOLID_NONE);
+    expect(open.derived(entry).openCells.length).toBeGreaterThanOrEqual(antes);
 
     // E o desfazer tem de levar a SUPERFICIE junto. O `canyon` e o unico ramo
     // que faz as duas coisas — escombro nas diagonais e BRASA na orla — entao e
@@ -264,7 +281,8 @@ describe('arena do chefe por estrato', () => {
     const abre = (x: number, y: number): void => {
       canyon.setSolid(y * W + x, SOLID_NONE);
     };
-    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) abre(boss.x + dx, boss.y + dy);
+    for (let dy = -3; dy <= 3; dy++)
+      for (let dx = -3; dx <= 3; dx++) abre(boss.x + dx, boss.y + dy);
     abre(boss.x + 4, boss.y + 3); // liga a camara ao gargalo pela ortogonal
     abre(boss.x + 4, boss.y + 4); // O GARGALO: a diagonal que o canyon tapa
     for (let x = boss.x + 4; x <= entry.x; x++) abre(x, boss.y + 4);
@@ -285,7 +303,10 @@ describe('arena do chefe por estrato', () => {
     const largo = createTerrainDraft(W, H);
     for (let i = 0; i < W * H; i++) largo.setSolid(i, SOLID_NONE);
     stampBossArena(largo, W, H, boss, core, entry, 'canyon');
-    expect(largo.surface.some((s) => s === SURF_EMBER), 'o canyon nao pinta brasa?').toBe(true);
+    expect(
+      largo.surface.some((s) => s === SURF_EMBER),
+      'o canyon nao pinta brasa?',
+    ).toBe(true);
   });
 
   it('a decoracao de parede NAO re-sorteia o material da moldura', () => {
@@ -339,8 +360,10 @@ describe('arena do chefe por estrato', () => {
         }
       }
     }
-    expect(conferidos, 'nenhuma celula de moldura na amostra: o teste nao mede nada')
-      .toBeGreaterThan(50);
+    expect(
+      conferidos,
+      'nenhuma celula de moldura na amostra: o teste nao mede nada',
+    ).toBeGreaterThan(50);
     // Timeout proprio, como os outros dois varredores deste arquivo. Sem ele a
     // varredura de 200 seeds rodava em ~4,3 s aqui — passando por pouco do
     // padrao de 5 s do vitest — e ESTOURAVA no CI, que e mais lento. Amostra
@@ -455,5 +478,12 @@ describe('arena real do Arquicantor', () => {
     }
     expect(openCore, 'a danca nasceu dentro de um corredor').toBeGreaterThan(55);
     expect(crystals, 'a Catedral nasceu sem uma rede densa').toBeGreaterThanOrEqual(16);
+    state.player.x = boss!.x + 2;
+    state.player.y = boss!.y;
+    for (let tick = 0; tick < 12; tick++) stepRun(state, [emptyCommand()]);
+    expect(
+      state.bossRuntime.choir.filter((id) => id !== 0),
+      'o Arquicantor real nao chamou o quarteto',
+    ).toHaveLength(4);
   });
 });

@@ -3881,8 +3881,27 @@ const archcantorPulse = (state: SurvivalState, enemy: Entity, events: SemanticEv
   if (layers.length > 0) {
     const cells = archcantorLayerCells(state, layers[0]);
     if (cells.length > 0) chargeCells(state, cells, events, { source: 'enemy', owner: enemy.id });
+    const w = state.config.width;
+    for (const crystal of layers[0]) {
+      events.push({
+        t: 'boss_state',
+        archetype: 'archcantor',
+        state: 'resonance_halo',
+        x: (crystal % w) + 0.5,
+        y: Math.floor(crystal / w) + 0.5,
+        intensity: 1,
+      });
+    }
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: ARCHCANTOR_PULSE_RADIUS });
+  events.push({
+    t: 'boss_state',
+    archetype: 'archcantor',
+    state: 'song_halo',
+    x: enemy.x,
+    y: enemy.y,
+    intensity: 1,
+  });
 };
 
 /**
@@ -3912,7 +3931,12 @@ const archcantorChainStride = (
   // corredores sao exatamente os que o jogador viu ao decidir onde ficar.
   if (elapsed % ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS === 0) {
     const voice = elapsed / ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS;
-    if (voice < ARCHCANTOR_CHOIR_SLOTS) archcantorChoirAnswer(state, voice, events);
+    if (voice < ARCHCANTOR_CHOIR_SLOTS) {
+      archcantorChoirAnswer(state, voice, events);
+      if (voice === ARCHCANTOR_CHOIR_SLOTS - 1) {
+        state.bossRuntime.choirPattern = 1 - state.bossRuntime.choirPattern;
+      }
+    }
   }
   if (elapsed <= 0 || elapsed % ARCHCANTOR_CHAIN_STEP_TICKS !== 0) return;
   const layer = elapsed / ARCHCANTOR_CHAIN_STEP_TICKS;
@@ -3926,6 +3950,16 @@ const archcantorChainStride = (
   // onda; `intensity` cai com a distancia do corpo — a camada de fora e a
   // nota mais fraca, e e a que o jogador consegue cortar a tempo.
   const w = state.config.width;
+  for (const crystal of layers[layer]) {
+    events.push({
+      t: 'boss_state',
+      archetype: 'archcantor',
+      state: 'resonance_halo',
+      x: (crystal % w) + 0.5,
+      y: Math.floor(crystal / w) + 0.5,
+      intensity: 1 - layer / ARCHCANTOR_CHAIN_LAYERS,
+    });
+  }
   events.push({
     t: 'boss_state',
     archetype: 'archcantor',
@@ -4061,11 +4095,21 @@ const isWildResonant = (enemy: Entity): boolean =>
 const archcantorSummonChoir = (state: SurvivalState, boss: Entity): void => {
   const def = ARCHETYPES.resonant;
   for (let seat = 0; seat < ARCHCANTOR_CHOIR_SLOTS; seat++) {
-    if (state.enemies.length >= MAX_ENEMIES) break;
     const dir = CHOIR_CARDINALS[seat];
     const x = boss.x + dir.x * ARCHCANTOR_CHOIR_RADIUS;
     const y = boss.y + dir.y * ARCHCANTOR_CHOIR_RADIUS;
-    if (circleBlocked(state, x, y, def.radius)) continue;
+    // A primeira formacao e uma promessa do encontro, nao uma loteria da seed.
+    // Se algum detalhe da geracao ocupou um posto, o chamado abre apenas a
+    // pegada daquele guarda e preserva o restante da rede de cristais.
+    if (circleBlocked(state, x, y, def.radius)) {
+      for (let cy = Math.floor(y - def.radius); cy <= Math.floor(y + def.radius); cy++) {
+        for (let cx = Math.floor(x - def.radius); cx <= Math.floor(x + def.radius); cx++) {
+          if (cx <= 0 || cy <= 0 || cx >= state.config.width - 1 || cy >= state.config.height - 1)
+            continue;
+          state.solid[cy * state.config.width + cx] = SOLID_NONE;
+        }
+      }
+    }
     const guard = spawnEnemy(state, 'resonant', Math.floor(x), Math.floor(y), false);
     // `spawnEnemy` centraliza na celula; o posto e um ponto do CIRCULO, e a
     // formacao so le como formacao se os quatro comecarem exatos nele.
@@ -4276,19 +4320,34 @@ const archcantorChoirAnswer = (
   cardinal: number,
   events: SemanticEvent[],
 ): void => {
+  const diagonal = state.bossRuntime.choirPattern === 1;
   const seat =
     (cardinal - state.bossRuntime.choirRotation + ARCHCANTOR_CHOIR_SLOTS) % ARCHCANTOR_CHOIR_SLOTS;
   const guard = choirGuardAt(state, seat);
   // A voz que falta simplesmente NAO EMITE, e e assim que um coro incompleto
   // soa incompleto: sem corredor e sem nota, no lugar exato onde havia uma.
   if (!guard) return;
+  const nextSeat =
+    (cardinal + 1 - state.bossRuntime.choirRotation + ARCHCANTOR_CHOIR_SLOTS) %
+    ARCHCANTOR_CHOIR_SLOTS;
+  const nextGuard = diagonal ? choirGuardAt(state, nextSeat) : null;
+  // O xis nasce da INTERSECAO do par adjacente. Se uma das duas vozes caiu,
+  // aquela diagonal vira uma brecha real, assim como um braco ausente da cruz.
+  if (diagonal && !nextGuard) return;
   const w = state.config.width;
   const h = state.config.height;
-  const dir = CHOIR_CARDINALS[cardinal];
+  const dir = diagonal
+    ? {
+        x: CHOIR_CARDINALS[cardinal].x + CHOIR_CARDINALS[(cardinal + 1) % 4].x,
+        y: CHOIR_CARDINALS[cardinal].y + CHOIR_CARDINALS[(cardinal + 1) % 4].y,
+      }
+    : CHOIR_CARDINALS[cardinal];
+  const originX = diagonal ? (guard.x + nextGuard!.x) * 0.5 : guard.x;
+  const originY = diagonal ? (guard.y + nextGuard!.y) * 0.5 : guard.y;
   const cells: number[] = [];
   for (let step = 1; step <= ARCHCANTOR_CHOIR_LANCE_LENGTH; step++) {
-    const x = Math.floor(guard.x + dir.x * step);
-    const y = Math.floor(guard.y + dir.y * step);
+    const x = Math.floor(originX + dir.x * step);
+    const y = Math.floor(originY + dir.y * step);
     if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
     const i = y * w + x;
     if (state.solid[i] !== SOLID_NONE) break;
@@ -4308,8 +4367,8 @@ const archcantorChoirAnswer = (
     t: 'boss_state',
     archetype: 'archcantor',
     state: 'choir_voice',
-    x: guard.x,
-    y: guard.y,
+    x: originX,
+    y: originY,
     intensity: cardinal / (ARCHCANTOR_CHOIR_SLOTS - 1),
   });
 };
@@ -6725,6 +6784,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           archcantorHasNetwork(state, enemy)
         ) {
           enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
+          events.push({
+            t: 'boss_state',
+            archetype: 'archcantor',
+            state: state.bossRuntime.choirPattern === 0 ? 'choir_cross' : 'choir_diagonal',
+            x: enemy.x,
+            y: enemy.y,
+            intensity: state.bossRuntime.choirPattern,
+          });
           startAction(
             state,
             enemy,

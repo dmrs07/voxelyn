@@ -777,6 +777,8 @@ export type BossRuntime = {
   choir: number[];
   /** Quantos quartos de volta a formacao ja deu (0..3). */
   choirRotation: number;
+  /** Geometria do proximo canto: 0 = cruz cardinal, 1 = xis diagonal. */
+  choirPattern: number;
   /** O tick do proximo passo da danca. */
   choirRotateAt: number;
   /**
@@ -860,6 +862,10 @@ export type BossMoment =
   // Arquicantor: a nota isolada do idle; uma camada de cristal respondendo.
   | 'idle_note'
   | 'resonance'
+  | 'song_halo'
+  | 'resonance_halo'
+  | 'choir_cross'
+  | 'choir_diagonal'
   // Arquicantor, o coro: a formacao trocando de posto (um arpejo curto que
   // CONFIRMA o movimento, e nao musica de fundo), e cada guarda respondendo ao
   // canto com a propria nota. `intensity` carrega a posicao cardinal (0..1),

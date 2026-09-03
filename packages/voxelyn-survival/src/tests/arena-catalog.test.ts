@@ -160,7 +160,12 @@ describe('createArenaRun — o recorte da arena', () => {
         const cell = queue[head];
         const cx = cell % w;
         const cy = (cell - cx) / w;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
           const i = (cy + dy) * w + (cx + dx);
           if (state.solid[i] !== SOLID_NONE || seen.has(i)) continue;
           seen.add(i);
@@ -217,7 +222,9 @@ describe('createArenaRun — o recorte da arena', () => {
         }
       }
       const ratio = wide / cells;
-      expect(ratio, `arena de ${boss}: so ${(ratio * 100) | 0}% de chao largo`).toBeGreaterThan(0.35);
+      expect(ratio, `arena de ${boss}: so ${(ratio * 100) | 0}% de chao largo`).toBeGreaterThan(
+        0.35,
+      );
     }
   });
 
@@ -272,5 +279,12 @@ describe('arena.html — Catedral Prismatica', () => {
     }
     expect(openCore, 'arena.html apertou a danca do coro').toBeGreaterThan(55);
     expect(crystals, 'arena.html perdeu a rede da Catedral').toBeGreaterThanOrEqual(16);
+    state.player.x = boss!.x + 2;
+    state.player.y = boss!.y;
+    for (let tick = 0; tick < 12; tick++) stepRun(state, [emptyCommand()]);
+    expect(
+      state.bossRuntime.choir.filter((id) => id !== 0),
+      'arena.html nao chamou o quarteto',
+    ).toHaveLength(4);
   });
 });
