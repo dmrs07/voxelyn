@@ -792,7 +792,13 @@ export const PROTOCOL_VERSION = 29;
 //
 // Medido em 44 camaras geradas: catorze filhotes em todas, nenhum com o corpo
 // encostado na pedra.
-export const SIMULATION_VERSION = 52;
+// 53: o Coro Cardinal do Arquicantor entra na simulacao autoritativa.
+//
+// O chefe passa a criar quatro Ressonantes, reger seus papeis (solto, guarda e
+// solista), mover a formacao e produzir descargas novas. Isso altera entidades,
+// dano e hash; cliente e servidor v52 nao podem simular a mesma sala durante um
+// deploy gradual.
+export const SIMULATION_VERSION = 53;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
