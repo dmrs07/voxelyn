@@ -907,10 +907,58 @@ export const stampBossArena = (
     // Anfiteatro: colunas nas diagonais. A luta ganha quinas para cortar linha.
     for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_ROCK);
   } else if (halls === 'radial') {
-    // Catedral: pilares de CRISTAL. Cobertura que tambem e municao — quebrar um
-    // deles no meio da luta descarrega a cadeia que o proprio jogador armou.
-    for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_CRYSTAL);
-    for (const [dx, dy] of AXES) put(dx, dy, SOLID_CRYSTAL);
+    // CATEDRAL ABERTA. O Arquicantor precisa de espaco para a orbita, para as
+    // diagonais do Solista e para o jogador ler os quatro corredores do canto.
+    // A gramatica radial ainda pode deixar esporao de rocha dentro da rotunda;
+    // removemos apenas pedra comum/fragil — minerio, leyline e cristal existente
+    // continuam sendo materia real do setor.
+    const OPEN_RADIUS = 8;
+    for (let dy = -OPEN_RADIUS; dy <= OPEN_RADIUS; dy++) {
+      for (let dx = -OPEN_RADIUS; dx <= OPEN_RADIUS; dx++) {
+        if (dx * dx + dy * dy > OPEN_RADIUS * OPEN_RADIUS) continue;
+        const x = boss.x + dx;
+        const y = boss.y + dy;
+        if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2 || !free(x, y)) continue;
+        const cell = idx(w, x, y);
+        if (solid[cell] === SOLID_ROCK || solid[cell] === SOLID_FRAGILE) {
+          draft.setSolid(cell, SOLID_NONE);
+        }
+      }
+    }
+
+    // MUITOS cristais, mas na ORLA: o miolo permanece livre para a danca. Os
+    // eixos e as diagonais ficam vazios de proposito — sao, respectivamente,
+    // os corredores de dano e as rotas de fuga que a formacao promete.
+    const TARGET_CRYSTALS = 20;
+    let crystals = 0;
+    for (let dy = -9; dy <= 9; dy++) {
+      for (let dx = -9; dx <= 9; dx++) {
+        const x = boss.x + dx;
+        const y = boss.y + dy;
+        if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) continue;
+        if (solid[idx(w, x, y)] === SOLID_CRYSTAL) crystals++;
+      }
+    }
+    const candidates: Array<readonly [number, number]> = [];
+    for (let r = 6; r <= 9; r++) {
+      for (let k = -r + 1; k < r; k += 2) {
+        candidates.push([k, -r], [r, k], [-k, r], [-r, -k]);
+      }
+    }
+    const seen = new Set<number>();
+    for (const [dx, dy] of candidates) {
+      if (crystals >= TARGET_CRYSTALS) break;
+      // Preserva os oito raios legiveis do encontro.
+      if (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy)) continue;
+      const x = boss.x + dx;
+      const y = boss.y + dy;
+      if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2 || !free(x, y)) continue;
+      const cell = idx(w, x, y);
+      if (seen.has(cell) || solid[cell] !== SOLID_NONE) continue;
+      seen.add(cell);
+      draft.setSolid(cell, SOLID_CRYSTAL);
+      crystals++;
+    }
   } else if (halls === 'karst') {
     // Aquifero: a orla e agua. Numa arena fechada, agua e o chao que CONDUZ —
     // a descarga que o jogador solta volta para ele se ele estiver na lamina.
@@ -945,7 +993,11 @@ export const stampBossArena = (
     surface.set(beforeSurface);
     return filled;
   }
-  for (let i = 0; i < solid.length; i++) if (solid[i] !== before[i]) filled.add(i);
+  // O retorno enumera apenas chao que VIROU solido. A Catedral tambem escava
+  // pedra para abrir a rotunda; essas celulas precisam permanecer em openCells.
+  for (let i = 0; i < solid.length; i++) {
+    if (solid[i] !== before[i] && solid[i] !== SOLID_NONE) filled.add(i);
+  }
   return filled;
 };
 
