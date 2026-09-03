@@ -482,3 +482,27 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
 };
 
 export const voiceSpec = (id: VoiceId): VoiceSpec => VOICE_SPECS[id];
+
+/**
+ * Os prefixos das vozes de CHEFE — as que passam pela amarrotada lo-fi
+ * (ver `lofi.ts`) em vez do barramento de efeitos limpo. Por prefixo e nao
+ * por flag em cada spec porque a regra e por chefe, nao por voz: ou um chefe
+ * inteiro e amarrotado, ou nenhum. `deathGuardian` e `guardianAwake` entram
+ * por serem do Guardiao; `bishopHeal` entra pelo mesmo motivo.
+ */
+const BOSS_VOICE_PREFIXES: readonly string[] = [
+  'guardian',
+  'deathGuardian',
+  'bishop',
+  'diamandis',
+  'devourer',
+  'archcantor',
+  'leviathan',
+  'lung',
+  'furnace',
+  'frostQueen',
+  'magnetarch',
+];
+
+export const isBossVoice = (id: VoiceId): boolean =>
+  BOSS_VOICE_PREFIXES.some((prefix) => id.startsWith(prefix));

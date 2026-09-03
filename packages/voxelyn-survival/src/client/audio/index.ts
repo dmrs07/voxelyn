@@ -38,8 +38,9 @@ import {
   type MusicSource,
 } from './soundtrack';
 import { SoundtrackBus } from './soundtrack-bus';
+import { createBossLofi } from './lofi';
 import { VOICE_RENDERERS, createNoiseBuffer } from './synth';
-import { voiceSpec, type VoiceId } from './voices';
+import { isBossVoice, voiceSpec, type VoiceId } from './voices';
 
 export type { AmbienceLevels } from './ambience';
 export type { Cue } from './cues';
@@ -93,6 +94,12 @@ export class AudioDirector {
    * inteira da feature.
    */
   private sfxBus: GainNode | null = null;
+  /**
+   * A AMARROTADA dos chefes (ver `lofi.ts`): entrada de uma cadeia de
+   * saturacao, quantizacao a 8 bits e passa-baixa que desagua no barramento
+   * de efeitos. So as vozes e os leitos de chefe passam por ela.
+   */
+  private bossLofi: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
   private minigunBus: MinigunBus | null = null;
@@ -379,9 +386,14 @@ export class AudioDirector {
       sfxBus.gain.value = this.sfxVolume;
       sfxBus.connect(master);
 
+      // A amarrotada dos chefes desagua no barramento de efeitos: e som do
+      // mundo, e o slider de efeitos vale para ela como para tudo o mais.
+      const bossLofi = createBossLofi(ctx, sfxBus);
+
       this.ctx = ctx;
       this.master = master;
       this.sfxBus = sfxBus;
+      this.bossLofi = bossLofi;
       this.noise = createNoiseBuffer(ctx);
       this.ambienceBus = new AmbienceBus(ctx, sfxBus, this.noise);
       this.ambienceBus.start();
@@ -394,11 +406,12 @@ export class AudioDirector {
       this.minigunBus.start();
       // Os leitos de chefe saem pelo barramento de EFEITOS, como a ambiencia:
       // sao som do mundo, e quem baixa "Efeitos" quer o vortice mais baixo.
-      this.devourerBus = new DevourerVortexBus(ctx, sfxBus, this.noise);
+      // ...e passam pela amarrotada, como as vozes dos chefes.
+      this.devourerBus = new DevourerVortexBus(ctx, bossLofi, this.noise);
       this.devourerBus.start();
-      this.lungBus = new LungBreathBus(ctx, sfxBus, this.noise);
+      this.lungBus = new LungBreathBus(ctx, bossLofi, this.noise);
       this.lungBus.start();
-      this.furnaceBus = new FurnaceHeartBus(ctx, sfxBus, this.noise);
+      this.furnaceBus = new FurnaceHeartBus(ctx, bossLofi, this.noise);
       this.furnaceBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
@@ -655,8 +668,9 @@ export class AudioDirector {
     const ctx = this.ctx;
     // A saida das vozes e o barramento de EFEITOS, nunca o mestre direto: e o
     // que faz o slider de efeitos valer para todo som do mundo sem que cada
-    // voz precise saber que ele existe.
-    const out = this.sfxBus;
+    // voz precise saber que ele existe. As vozes de CHEFE entram pela
+    // amarrotada lo-fi, que desagua no mesmo barramento.
+    const out = isBossVoice(voice) ? this.bossLofi : this.sfxBus;
     const noise = this.noise;
     if (!ctx || !out || !noise) return;
     const render = VOICE_RENDERERS[voice];

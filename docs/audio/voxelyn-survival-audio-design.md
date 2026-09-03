@@ -235,6 +235,16 @@ As **bolhas protetoras** do Leviatã são o único "você está seguro" sonoro d
 e regulares enquanto o jogador local está dentro de uma durante a carga, lidos do estado (as
 bolhas viajam no snapshot) e passando pelo mixer como qualquer cue.
 
+**A amarrotada** (`lofi.ts`). Feedback de playtest: "baixar a taxa de bit, pra ficar um pouco
+mais amedrontador". As receitas são limpas — osciladores ideais, ruído branco filtrado — e
+limpeza soa como sintetizador, não como uma coisa enorme ouvida através de pedra e água.
+Só os chefes (vozes e leitos, por `isBossVoice`) passam por uma cadeia de saturação leve →
+quantização mid-tread a 8 bits (um `WaveShaperNode` com curva em tabela, `oversample:
+'none'` porque o aliasing é parte do pedido) → passa-baixa em 5,4 kHz, que deságua no
+barramento de efeitos. O resto do banco continua limpo de propósito: um telegrafo de bruiser
+amarrotado seria um aviso mais difícil de ler. O chefe pode assustar porque o aviso dele
+continua sendo um windup de prioridade 10 com forma própria — o amarrotado é textura.
+
 **Fora do primeiro recorte**, e por quê: o zumbido contínuo do campo do Magnetarca e a
 modulação periódica dos ciclones da Fornalha (leitos a mais, cada um um par de nós permanentes
 para um chefe que aparece uma vez por run — só quando a fase pedir modulação contínua); a
