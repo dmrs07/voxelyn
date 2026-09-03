@@ -809,7 +809,15 @@ export const PROTOCOL_VERSION = 29;
 // solista; e cada corredor cobra duas vezes, com o desenho (cruz ou xis)
 // trocando so depois do eco. Cliente 53 e servidor 54 discordariam do
 // primeiro cristal consumido e de todo corpo nascido dali em diante.
-export const SIMULATION_VERSION = 54;
+//
+// 55: Ressonantes ganham afinidade com a descarga de cristal regida pelo
+// Arquicantor.
+//
+// A onda continua acertando jogador e outras criaturas, mas ignora guardas,
+// solistas e vozes recem-cristalizadas. Como isso muda HP e, portanto, o hash
+// autoritativo depois do primeiro choque sobre um Ressonante, cliente 54 e
+// servidor 55 nao podem compartilhar a mesma simulacao.
+export const SIMULATION_VERSION = 55;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -606,6 +606,35 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(recruit).toBeDefined();
     expect(recruit!.mood).toBe(RESONANT_CHOIR);
     expect(recruit!.archetype).toBe('resonant');
+
+    // A voz nova nasceu DA rede e tem afinidade com ela: o proximo acorde de
+    // cristais nao pode cobrar a reposicao assim que ela aparece. A imunidade
+    // nao e uma anulacao geral do evento — outro bicho na mesma celula ainda
+    // toma o choque normalmente.
+    const recruitCell = Math.floor(recruit!.y) * w + Math.floor(recruit!.x);
+    const recruitHp = recruit!.hp;
+    const bystander = spawnEnemy(
+      state,
+      'stalker',
+      Math.floor(recruit!.x),
+      Math.floor(recruit!.y),
+      false,
+    );
+    bystander.x = recruit!.x;
+    bystander.y = recruit!.y;
+    const bystanderHp = bystander.hp;
+    state.player.x = recruit!.x;
+    state.player.y = recruit!.y;
+    state.player.hp = state.player.maxHp;
+    const playerHp = state.player.hp;
+    resolveChainedEvents(state, [
+      { t: 'discharge', cells: [recruitCell], source: 'enemy', owner: boss.id },
+    ]);
+    expect(recruit!.hp, 'o choque da Catedral feriu a voz que ela repôs').toBe(recruitHp);
+    expect(bystander.hp, 'a imunidade do Ressonante anulou a descarga inteira').toBeLessThan(
+      bystanderHp,
+    );
+    expect(state.player.hp, 'a afinidade do Ressonante protegeu o jogador').toBeLessThan(playerHp);
   });
 
   it('com o acorde CHEIO, cada volta completa cospe um SOLISTA de cristal — com teto', () => {

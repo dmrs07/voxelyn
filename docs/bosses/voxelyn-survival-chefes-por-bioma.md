@@ -524,7 +524,10 @@ o contra-jogo — agora pelas duas razões. No último segundo, o cristal escolh
 **brilho de metamorfose** crescente antes de virar corpo; quebrá-lo durante o aviso força a
 Catedral a procurar outro cristal. Uma vaga por vez: derrubar os quatro compra
 dezesseis segundos de corpo exposto. Um Ressonante _solto_ que entre no raio de atração
-(`_ATTRACT_RADIUS`, 8) também ocupa a vaga, sem custar cristal.
+(`_ATTRACT_RADIUS`, 8) também ocupa a vaga, sem custar cristal. Todos os Ressonantes têm
+afinidade com a rede: a descarga de cristal regida pelo Arquicantor atravessa guardas,
+solistas e vozes recém-cristalizadas sem feri-los; jogador e outras criaturas continuam
+recebendo o choque normalmente.
 
 **O Solista.** Com os quatro postos ocupados, quem chega é _expulso_ por uma das
 diagonais. E com o acorde cheio a Catedral **continua respondendo**: a cada **volta
