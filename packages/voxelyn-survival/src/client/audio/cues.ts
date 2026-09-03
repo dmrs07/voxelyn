@@ -27,6 +27,7 @@ import type {
   SemanticEvent,
 } from '@voxelyn/survival-sim';
 import type { VoiceId } from './voices';
+import { DIAMANDIS_LINES, diamandisLineFor } from './boss-voice-lines';
 
 export type Cue = {
   voice: VoiceId;
@@ -166,17 +167,6 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   tether: null,
 };
 
-/**
- * A voz corporativa que acompanha cada ferramenta do Diamandis. A ordem de
- * trabalho sai JUNTO do som da ferramenta: "AFASTE-SE" com o motor da broca
- * subindo, "CARGA ARMADA" com os bipes, "SONDAGEM" com o scanner.
- */
-const DIAMANDIS_WINDUP_LINE: Partial<Record<BossAbility, VoiceId>> = {
-  drill: 'diamandisVoiceStandClear',
-  demolish: 'diamandisVoiceArmed',
-  beam: 'diamandisVoiceSurvey',
-};
-
 const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
   // A salva NAO esta aqui: cada pedra ja sai como `shot`. O contato e o
   // mesmo golpe de massa, menor.
@@ -288,6 +278,20 @@ export type CueContext = {
  * chamador a testar.
  */
 export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
+  const cues = cuesForEventBody(ev, ctx);
+  // AS FALAS do Diamandis saem de uma tabela so (boss-voice-lines.ts), a
+  // mesma que o HUD usa para a legenda: a voz e o texto nunca discordam. A
+  // fala vem DEPOIS do som da ferramenta na leva — a ordem de trabalho
+  // acompanha a maquina, nao a antecede.
+  const line = diamandisLineFor(ev);
+  if (line) {
+    const at = 'x' in ev ? { x: ev.x ?? 0, y: ev.y ?? 0 } : { x: 0, y: 0 };
+    cues.push({ voice: DIAMANDIS_LINES[line].voice, x: at.x, y: at.y, scale: 1 });
+  }
+  return cues;
+};
+
+const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
   switch (ev.t) {
     case 'action_start': {
       // Um CHEFE nao fala pelo generico: o `boss_windup` que sai no mesmo
@@ -314,10 +318,6 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
           y: ev.y + (ev.dy ?? 0) * offset,
           scale: 1,
         });
-      }
-      if (ev.archetype === 'diamandis') {
-        const line = DIAMANDIS_WINDUP_LINE[ev.ability];
-        if (line) cues.push({ voice: line, x: ev.x, y: ev.y, scale: 1 });
       }
       return cues;
     }
@@ -387,12 +387,9 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       const y = ev.y ?? 0;
       switch (ev.archetype) {
         case 'diamandis':
-          if (ev.phase === BOSS_PHASE_REACTOR) {
-            return [
-              { voice: 'diamandisReactorFail', x, y, scale: 1 },
-              { voice: 'diamandisVoiceFault', x, y, scale: 1 },
-            ];
-          }
+          // A fala ("FALHA OPERACIONAL") entra pela tabela das falas, abaixo.
+          if (ev.phase === BOSS_PHASE_REACTOR)
+            return [{ voice: 'diamandisReactorFail', x, y, scale: 1 }];
           return [];
         case 'furnace_heart':
           if (ev.phase === BOSS_PHASE_OVERHEAT) return [{ voice: 'furnaceCrack', x, y, scale: 1 }];
@@ -426,12 +423,7 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       return [];
 
     case 'boss_module':
-      // "UNIDADE NAO RECUPERAVEL": a peca arrancada, ou perdida de vez. A
-      // exposicao e a queda ao chao sao silenciosas — o clarao e a marca no
-      // chao ja dizem, e uma frase para cada estado viraria um narrador.
-      if (ev.state === 'detached' || ev.state === 'lost') {
-        return [{ voice: 'diamandisVoiceLost', x: ev.x, y: ev.y, scale: 1 }];
-      }
+      // So a fala ("UNIDADE NAO RECUPERAVEL"), pela tabela das falas abaixo.
       return [];
 
     case 'shot':
@@ -647,12 +639,7 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // de trabalho — "AREA NAO MAPEADA" — de onde a maquina esta. Todos os
       // outros dividem o subgrave tectonico: e "algo enorme notou voce", e
       // esse aviso e o mesmo para um lago, uma sala ou uma pedra.
-      if (ev.archetype === 'diamandis') {
-        return [
-          { voice: 'diamandisBoot', x: 0, y: 0, scale: 1 },
-          { voice: 'diamandisVoiceUnmapped', x: ev.x ?? 0, y: ev.y ?? 0, scale: 1 },
-        ];
-      }
+      if (ev.archetype === 'diamandis') return [{ voice: 'diamandisBoot', x: 0, y: 0, scale: 1 }];
       return [{ voice: 'guardianAwake', x: 0, y: 0, scale: 1 }];
 
     case 'player_down':

@@ -114,6 +114,7 @@ import {
   bossModulePresentation,
   type BossModuleMark,
 } from './boss-module-presentation';
+import { DIAMANDIS_LINES, diamandisLineFor } from './audio/boss-voice-lines';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { COMBAT_PLANE_TILES, heightToScreenPx } from './combat-plane';
 import { drawEmissiveHalo } from './emissive-halo';
@@ -540,7 +541,7 @@ export const moduleHudMetrics = (
 };
 
 /** A cor do acento de uma notificacao: o que ela significa antes de ser lida. */
-export type HudMessageTone = 'info' | 'good' | 'warn';
+export type HudMessageTone = 'info' | 'good' | 'warn' | 'voice';
 
 /**
  * O tom de uma mensagem que a SIMULACAO manda pela chave. A simulacao nao
@@ -554,6 +555,9 @@ export const simMessageTone = (key: string): HudMessageTone => {
   if (/Revived|Closed|coreTaken/i.test(key)) return 'good';
   return 'info';
 };
+
+/** O teal da Aurix, para a legenda das falas do Diamandis. Ver AX.teal no painel de carga. */
+const VOICE_CAPTION_COLOR = '#4fd6c9';
 
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md)
 const PAL = {
@@ -1733,6 +1737,14 @@ export class SurvivalRenderer {
     this.particles.budget = this.quality.maxFx * 2;
     this.particles.ingest(events, this.worldWidth, this.quality.maxFx / PRESETS.high.maxFx);
     for (const ev of events) {
+      // A LEGENDA de uma fala de chefe, pelo MESMO evento que toca a voz: a
+      // tabela e uma so (boss-voice-lines.ts), entao o texto e o som nunca
+      // discordam. Sobe como mensagem, no tom de voz, e some com a fala.
+      const line = diamandisLineFor(ev);
+      if (line) {
+        const spec = DIAMANDIS_LINES[line];
+        this.messages.push({ text: t(spec.key), until: nowMs + spec.holdMs, tone: 'voice' });
+      }
       switch (ev.t) {
         case 'explosion':
           // O anel tracado que estava aqui virou materia voxel em
@@ -1821,7 +1833,15 @@ export class SurvivalRenderer {
           // mentir quando a onda de choque do Devorador chegou, com quase o
           // dobro do alcance dela. Um efeito menor que a area que machucou e a
           // pior forma de um ataque enganar.
-          this.addFlash(ev.x, ev.y, Math.max(ABILITY_RADIUS, ev.radius) * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
+          this.addFlash(
+            ev.x,
+            ev.y,
+            Math.max(ABILITY_RADIUS, ev.radius) * 2,
+            0.75,
+            nowMs,
+            200,
+            LIGHT_NEUTRAL,
+          );
           break;
         case 'flame_cone': {
           // Cada emissao do canal ja chega com o jato pronto: as brasas nascem
@@ -1917,11 +1937,15 @@ export class SurvivalRenderer {
           });
           break;
         case 'boss_awake':
-          this.messages.push({
-            text: t('toast.guardian.awake'),
-            until: nowMs + 3000,
-            tone: 'warn',
-          });
+          // O Diamandis se apresenta com a propria fala (legenda acima); o
+          // aviso generico de despertar so nao faria sentido em cima dela.
+          if (ev.archetype !== 'diamandis') {
+            this.messages.push({
+              text: t('toast.guardian.awake'),
+              until: nowMs + 3000,
+              tone: 'warn',
+            });
+          }
           this.shake = { power: 6, until: nowMs + 500 };
           break;
         case 'boss_phase':
@@ -3385,7 +3409,7 @@ export class SurvivalRenderer {
       this.lurkerTrails.clear();
       this.devourerSpines.reset();
       this.devourerAloft.clear();
-    this.devourerLandedAt.clear();
+      this.devourerLandedAt.clear();
       this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
@@ -3654,10 +3678,7 @@ export class SurvivalRenderer {
       // deles vem do rastro e a cauda ainda esta entrando quando a cabeca ja
       // sumiu. O corpo termina de entrar depois da cabeca, que e o que um verme
       // faz.
-      if (
-        enemy.archetype === 'white_devourer' &&
-        !devourerHeadShows(headLiftPx, z, spriteZoom)
-      ) {
+      if (enemy.archetype === 'white_devourer' && !devourerHeadShows(headLiftPx, z, spriteZoom)) {
         continue;
       }
 
@@ -6311,9 +6332,19 @@ export class SurvivalRenderer {
       ctx.lineWidth = 1;
       ctx.stroke();
       const tone = m.tone ?? 'info';
-      ctx.fillStyle = tone === 'good' ? PAL.biolum : tone === 'warn' ? PAL.blood : PAL.bone;
+      // 'voice' e a LEGENDA de uma fala de chefe (hoje, o Diamandis): o acento
+      // e o texto no teal da Aurix, a cor de tudo o que a companhia escreveu.
+      ctx.fillStyle =
+        tone === 'good'
+          ? PAL.biolum
+          : tone === 'warn'
+            ? PAL.blood
+            : tone === 'voice'
+              ? VOICE_CAPTION_COLOR
+              : PAL.bone;
       ctx.fillRect(boxX + 6, boxY + 6, 2, msgH - 12);
-      ctx.fillStyle = tone === 'warn' ? PAL.player : PAL.bone;
+      ctx.fillStyle =
+        tone === 'warn' ? PAL.player : tone === 'voice' ? VOICE_CAPTION_COLOR : PAL.bone;
       ctx.fillText(m.text, vw / 2 + 4, my + slide);
       ctx.globalAlpha = 1;
       my += msgH + 6;

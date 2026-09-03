@@ -219,6 +219,10 @@ espaciais**: são informação global da arena, reconhecida de qualquer lugar.
 "SONDAGEM", "CARGA ARMADA", "AFASTE-SE", "ÁREA NÃO MAPEADA", "FALHA OPERACIONAL", "UNIDADE
 NÃO RECUPERÁVEL". As palavras não ficam inteligíveis e não precisam — o ritmo silábico é a
 personalidade. Ele não acorda: liga. Não enfurece: falha. Não ruge: desliga por subsistemas.
+Cada fala sobe também como **legenda** no HUD (tom `voice`, no teal da Aurix), pelo mesmo
+evento e pela mesma tabela (`boss-voice-lines.ts`) que escolhe a voz — texto e som nunca
+discordam. As seis: ÁREA NÃO MAPEADA (liga), AFASTE-SE (broca), CARGA ARMADA (implosão),
+SONDAGEM (feixe), FALHA OPERACIONAL (reator), UNIDADE NÃO RECUPERÁVEL (módulo arrancado).
 
 **Três leitos contínuos**, no molde do motor da minigun (nós persistentes, só o ganho anda,
 dirigidos pelo estado autoritativo e nunca por um relógio do cliente):
