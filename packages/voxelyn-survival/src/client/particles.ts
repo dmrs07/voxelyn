@@ -11,7 +11,11 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
-import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import {
+  ARCHCANTOR_CHOIR_LANCE_LENGTH,
+  archcantorChoirLanceSpread,
+  SOLID_CRYSTAL,
+} from '@voxelyn/survival-sim';
 import { COMBAT_PLANE_TILES } from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
@@ -392,23 +396,34 @@ export class VoxelParticles {
                     [1, -1],
                   ];
             for (const [dx, dy] of dirs) {
-              for (let step = 2; step <= 8; step += 1.5) {
-                this.ring(
-                  ev.x + dx * step,
-                  ev.y + dy * step,
-                  'crystalShard',
-                  Math.max(4, n(7)),
-                  0.48,
-                  760,
-                  84 + step,
-                  0.22,
-                );
+              const unit = dx !== 0 && dy !== 0 ? Math.SQRT1_2 : 1;
+              for (let step = 2; step <= ARCHCANTOR_CHOIR_LANCE_LENGTH; step += 1.5) {
+                const ux = dx * unit;
+                const uy = dy * unit;
+                const spread = archcantorChoirLanceSpread(step);
+                for (const side of [-1, 1]) {
+                  this.ring(
+                    ev.x + ux * step - uy * spread * side,
+                    ev.y + uy * step + ux * spread * side,
+                    'crystalShard',
+                    Math.max(4, n(6)),
+                    0.42,
+                    760,
+                    84 + step + side,
+                    0.22,
+                  );
+                }
               }
             }
           } else if (ev.state === 'choir_voice') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(8, n(14)), 1.35, 420, 82, 0.3);
           } else if (ev.state === 'resonance_halo') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(6, n(10)), 0.9, 520, 83, 0.25);
+          } else if (ev.state === 'choir_metamorphosis') {
+            const power = 0.45 + (ev.intensity ?? 0) * 0.75;
+            this.ring(ev.x, ev.y, 'crystalShard', Math.max(10, n(18)), power, 300, 96, 0.35);
+            this.ring(ev.x, ev.y, 'spark', Math.max(6, n(10)), power * 0.62, 260, 97, 0.55);
+            this.burst(ev.x, ev.y, 'crystalShard', n(5), 0.45, 1.5, 360, 98, 0.4);
           }
           break;
         case 'leviathan_discharge':

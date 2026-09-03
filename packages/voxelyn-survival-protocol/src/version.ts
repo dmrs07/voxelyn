@@ -798,7 +798,18 @@ export const PROTOCOL_VERSION = 29;
 // solista), mover a formacao e produzir descargas novas. Isso altera entidades,
 // dano e hash; cliente e servidor v52 nao podem simular a mesma sala durante um
 // deploy gradual.
-export const SIMULATION_VERSION = 53;
+//
+// 54: a Catedral REPOE o coro, os corredores REVERBERAM e a volta cospe
+// solistas.
+//
+// Tres mudancas autoritativas em cima da 53, e a 53 ja estava servida: uma
+// vaga no coro passa a ser respondida pelo cristal mais proximo do corpo, que
+// deixa de existir e vira um Ressonante novo (`choirRecruitAt` entra no
+// hash); com o acorde cheio cada volta completa da danca cristaliza um
+// solista; e cada corredor cobra duas vezes, com o desenho (cruz ou xis)
+// trocando so depois do eco. Cliente 53 e servidor 54 discordariam do
+// primeiro cristal consumido e de todo corpo nascido dali em diante.
+export const SIMULATION_VERSION = 54;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -14,6 +14,8 @@
 //    continua sem marca nenhuma.
 import { describe, expect, it } from 'vitest';
 import {
+  ARCHCANTOR_CHOIR_LANCE_LENGTH,
+  ARCHCANTOR_CHOIR_RADIUS,
   DEFAULT_SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
@@ -495,8 +497,9 @@ describe('arena real do Arquicantor', () => {
     });
     const boss = state.enemies.find((e) => e.id === state.sectorBoss.entityId);
     expect(boss).toBeDefined();
+    const requiredMargin = Math.ceil(ARCHCANTOR_CHOIR_RADIUS + ARCHCANTOR_CHOIR_LANCE_LENGTH) + 1;
     expect(
       Math.min(boss!.x, boss!.y, state.config.width - boss!.x, state.config.height - boss!.y),
-    ).toBeGreaterThanOrEqual(12);
+    ).toBeGreaterThanOrEqual(requiredMargin);
   });
 });

@@ -55,6 +55,11 @@ import {
   ARCHCANTOR_CHOIR_RADIUS,
   ARCHCANTOR_CHOIR_MOVE_SPEED,
   ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
+  ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+  ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH,
+  ARCHCANTOR_CHOIR_RECRUIT_TICKS,
+  ARCHCANTOR_CHOIR_METAMORPH_TICKS,
+  ARCHCANTOR_SOLOIST_CAP,
   TICK_HZ,
   DELUGE_HP_FRACTION,
   SOLID_PIPE_W,
@@ -308,7 +313,15 @@ describe('Arquicantor — a Catedral responde', () => {
     }
   };
 
-  /** O tick em que alguma celula ALEM do raio do canto descarregou, ou -1. */
+  /**
+   * O tick em que alguma celula ALEM do raio do canto descarregou PELA CADEIA,
+   * ou -1.
+   *
+   * So as descargas do proprio chefe contam: os corredores do coro tem dono
+   * (o guarda) e alcancam doze tiles para fora da formacao — para leste, por
+   * cima da mesma fileira — e o que estes testes medem e o canto passado de
+   * cristal em cristal, nao a lanca de uma voz.
+   */
   const farDischargeTick = (
     state: SurvivalState,
     px: number,
@@ -316,9 +329,11 @@ describe('Arquicantor — a Catedral responde', () => {
     ticks: number,
   ): number => {
     const w = state.config.width;
+    const boss = state.enemies.find((e) => e.archetype === 'archcantor');
     for (let t = 0; t < ticks; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
         if (ev.t !== 'discharge') continue;
+        if (!('owner' in ev) || ev.owner !== boss?.id) continue;
         for (const cell of ev.cells) {
           const d = Math.hypot((cell % w) - px, Math.floor(cell / w) - py);
           if (d > ARCHCANTOR_PULSE_RADIUS + 1) return t;
@@ -529,10 +544,11 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(boss.hp, 'o tiro atravessou o guarda').toBe(bossHp);
   });
 
-  it('a voz derrubada deixa BURACO permanente: o chefe nao recompoe o acorde', () => {
-    // Se o coro se refizesse sozinho, cada guarda abatido viraria tempo perdido
-    // e a primeira camada de contra-jogo deixaria de existir. Desmontar a
-    // formacao precisa ser progresso.
+  it('sem cristal ao alcance, a voz derrubada NAO volta: a sala e o recurso', () => {
+    // A reposicao custa um cristal da nave. Numa sala sem cristal o chefe nao
+    // tem com que pagar, e o buraco fica — e assim que repor vozes continua
+    // sendo progresso em vez de tempo perdido: cada voz nova apaga um pedaco
+    // da propria Catedral.
     const { state } = duel(625, 'archcantor', 5);
     for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
     const victim = choirGuards(state)[0];
@@ -543,6 +559,122 @@ describe('Arquicantor — o Coro Cardinal', () => {
       ARCHCANTOR_CHOIR_SLOTS - 1,
     );
     expect(state.bossRuntime.choir.filter((id) => id === 0)).toHaveLength(1);
+  });
+
+  it('a Catedral REPOE a voz a partir do cristal — e o cristal deixa de existir', () => {
+    // O que isto protege e o preco: a voz nova nao e de graca, e a luz da sala
+    // que vira corpo. Sem o preco a reposicao apagaria o progresso; sem a
+    // reposicao a luta virava a luta antiga assim que o coro caia uma vez.
+    const { state, boss, w } = duel(633, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const idx = (Math.floor(boss.y) + 5) * w + Math.floor(boss.x) + 5;
+    state.solid[idx] = SOLID_CRYSTAL;
+    const before = choirGuards(state).map((guard) => guard.id);
+    const victim = choirGuards(state)[0];
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+    expect(choirGuards(state)).toHaveLength(ARCHCANTOR_CHOIR_SLOTS - 1);
+
+    // A contagem so comeca com a vaga aberta: antes do prazo, nada nasce e o
+    // cristal continua de pe.
+    const metamorphosis: number[] = [];
+    for (let t = 0; t < ARCHCANTOR_CHOIR_RECRUIT_TICKS - 5; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'boss_state' || ev.state !== 'choir_metamorphosis') continue;
+        expect(ev.x).toBe((idx % w) + 0.5);
+        expect(ev.y).toBe(Math.floor(idx / w) + 0.5);
+        expect(state.solid[idx], 'o brilho consumiu o cristal antes da metamorfose').toBe(
+          SOLID_CRYSTAL,
+        );
+        metamorphosis.push(ev.intensity ?? -1);
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(choirGuards(state), 'a voz nasceu antes do prazo').toHaveLength(
+      ARCHCANTOR_CHOIR_SLOTS - 1,
+    );
+    expect(state.solid[idx]).toBe(SOLID_CRYSTAL);
+    expect(metamorphosis.length, 'o cristal nao brilhou antes de virar voz').toBeGreaterThan(0);
+    expect(metamorphosis.at(-1)!).toBeGreaterThan(metamorphosis[0]);
+    expect(ARCHCANTOR_CHOIR_METAMORPH_TICKS).toBeLessThan(ARCHCANTOR_CHOIR_RECRUIT_TICKS);
+
+    expect(
+      advanceUntil(state, () => choirGuards(state).length === ARCHCANTOR_CHOIR_SLOTS, 40),
+      'a Catedral nunca respondeu',
+    ).toBe(true);
+    expect(state.solid[idx], 'a voz nasceu sem gastar o cristal').toBe(SOLID_NONE);
+    const recruit = choirGuards(state).find((guard) => !before.includes(guard.id));
+    expect(recruit).toBeDefined();
+    expect(recruit!.mood).toBe(RESONANT_CHOIR);
+    expect(recruit!.archetype).toBe('resonant');
+  });
+
+  it('com o acorde CHEIO, cada volta completa cospe um SOLISTA de cristal — com teto', () => {
+    // E o que fecha a saida facil: as diagonais sao a seguranca contra a cruz,
+    // e sao exatamente por onde o solista vem. Com teto, porque tres bispos
+    // numa nave estreita viram uma parede que anda.
+    const { state, boss, w } = duel(634, 'archcantor', 5);
+    const bx = Math.floor(boss.x);
+    const by = Math.floor(boss.y);
+    const seeds: number[] = [];
+    for (const [dx, dy] of [
+      [7, 0],
+      [-7, 0],
+      [0, 7],
+      [0, -7],
+      [7, 7],
+      [-7, -7],
+    ]) {
+      const idx = (by + dy) * w + bx + dx;
+      state.solid[idx] = SOLID_CRYSTAL;
+      seeds.push(idx);
+    }
+    const soloists = () =>
+      state.enemies.filter(
+        (e) => e.alive && e.archetype === 'resonant' && e.mood === RESONANT_SOLOIST,
+      );
+    expect(soloists()).toHaveLength(0);
+
+    let wraps = 0;
+    let last = state.bossRuntime.choirRotation;
+    const spent = () => seeds.filter((idx) => state.solid[idx] !== SOLID_CRYSTAL).length;
+    let peak = 0;
+    expect(
+      advanceUntil(
+        state,
+        () => {
+          const rotation = state.bossRuntime.choirRotation;
+          if (rotation === 0 && last !== 0) wraps++;
+          last = rotation;
+          peak = Math.max(peak, soloists().length);
+          return wraps >= 3;
+        },
+        3000,
+      ),
+      'a formacao nao completou tres voltas',
+    ).toBe(true);
+    expect(peak, 'nenhuma volta completa cuspiu solista').toBeGreaterThan(0);
+    expect(peak, 'a Catedral passou do teto de solistas').toBeLessThanOrEqual(
+      ARCHCANTOR_SOLOIST_CAP,
+    );
+    // E cada voz custou um cristal, no minimo — reposicoes tambem custam.
+    expect(spent()).toBeGreaterThanOrEqual(peak);
+  });
+
+  it('o corredor REVERBERA: cada voz cobra duas vezes por canto', () => {
+    // A descarga e instantanea. Sem o eco, o corredor recem-piscado era o lugar
+    // mais seguro da sala pelos cinco segundos seguintes.
+    const { state } = duel(636, 'archcantor', 5);
+    let songs = 0;
+    let north = 0;
+    for (let t = 0; t < 300; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_attack' && ev.ability === 'song') songs++;
+        if (ev.t === 'boss_state' && ev.state === 'choir_voice' && ev.intensity === 0) north++;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(songs, 'nenhum canto saiu').toBeGreaterThan(0);
+    expect(north, 'a voz do norte nao ecoou').toBe(songs * 2);
   });
 
   it('um Ressonante SOLTO que chega perto ocupa a vaga aberta', () => {
@@ -674,6 +806,7 @@ describe('Arquicantor — o Coro Cardinal', () => {
     let diagonalCells = 0;
     let invalidCross = 0;
     let invalidDiagonal = 0;
+    let widestCross = 0;
     const telegraphs: string[] = [];
     for (let t = 0; t < 400 && telegraphs.length < 3; t++) {
       const events = stepRun(state, [emptyCommand()]).events;
@@ -694,10 +827,22 @@ describe('Arquicantor — o Coro Cardinal', () => {
           const cy = (cell - cx) / w;
           if (pattern === 'cross') {
             crossCells++;
-            if (cx !== bx && cy !== by) invalidCross++;
+            const lateral = Math.min(Math.abs(cx - bx), Math.abs(cy - by));
+            widestCross = Math.max(widestCross, lateral);
+            // A boca abre quadraticamente, mas continua pertencendo a um dos
+            // eixos. Uma celula alem da largura maxima seria vazamento.
+            if (
+              Math.abs(cx - bx) > ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH + 1 &&
+              Math.abs(cy - by) > ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH + 1
+            ) {
+              invalidCross++;
+            }
           } else if (pattern === 'diagonal') {
             diagonalCells++;
-            if (cx === bx || cy === by) invalidDiagonal++;
+            const diagonalBand = Math.ceil(ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH * Math.SQRT2) + 1;
+            if (Math.abs(Math.abs(cx - bx) - Math.abs(cy - by)) > diagonalBand) {
+              invalidDiagonal++;
+            }
           }
         }
       }
@@ -706,6 +851,9 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(telegraphs.slice(0, 3)).toEqual(['choir_cross', 'choir_diagonal', 'choir_cross']);
     expect(crossCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
     expect(diagonalCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+    expect(widestCross, 'a lanca nao abriu a boca paraboloide').toBeGreaterThan(
+      ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+    );
     expect(invalidCross, 'a cruz vazou para fora dos eixos').toBe(0);
     expect(invalidDiagonal, 'o xis vazou para um eixo cardinal').toBe(0);
   });

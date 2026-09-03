@@ -1,5 +1,7 @@
 import { RNG } from '@voxelyn/core';
 import {
+  ARCHCANTOR_CHOIR_LANCE_LENGTH,
+  ARCHCANTOR_CHOIR_RADIUS,
   CHUNK,
   LEYLINE_JUNCTION_SPACING,
   LEYLINE_SEGMENT_MAX_CELLS,
@@ -1302,7 +1304,7 @@ const generateAttempt = (
     // Recuamos a ROTUNDA para dentro e abrimos a camara ali; o Nucleo continua
     // no extremo e ligado pelo mesmo chao escavado, em vez de rejeitar seeds
     // perfeitamente solucionaveis ou cortar silenciosamente um braco do coro.
-    const margin = 12;
+    const margin = Math.ceil(ARCHCANTOR_CHOIR_RADIUS + ARCHCANTOR_CHOIR_LANCE_LENGTH) + 1;
     const inwardX = corePos.x >= w / 2 ? -3 : 3;
     const inwardY = corePos.y >= h / 2 ? -3 : 3;
     guardianSpawn = {

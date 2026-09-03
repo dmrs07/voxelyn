@@ -88,6 +88,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   // e ela que carimba o primeiro prazo — sem isso o primeiro tick acordado ja
   // giraria a formacao antes de ela existir.
   choirRotateAt: 0,
+  choirRecruitAt: 0,
   drillObstructedAt: -1,
 });
 
