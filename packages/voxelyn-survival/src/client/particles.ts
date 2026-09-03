@@ -11,7 +11,11 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
-import { ARCHCANTOR_CHOIR_LANCE_LENGTH, SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import {
+  ARCHCANTOR_CHOIR_LANCE_LENGTH,
+  archcantorChoirLanceSpread,
+  SOLID_CRYSTAL,
+} from '@voxelyn/survival-sim';
 import { COMBAT_PLANE_TILES } from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
@@ -394,16 +398,21 @@ export class VoxelParticles {
             for (const [dx, dy] of dirs) {
               const unit = dx !== 0 && dy !== 0 ? Math.SQRT1_2 : 1;
               for (let step = 2; step <= ARCHCANTOR_CHOIR_LANCE_LENGTH; step += 1.5) {
-                this.ring(
-                  ev.x + dx * unit * step,
-                  ev.y + dy * unit * step,
-                  'crystalShard',
-                  Math.max(4, n(7)),
-                  0.48,
-                  760,
-                  84 + step,
-                  0.22,
-                );
+                const ux = dx * unit;
+                const uy = dy * unit;
+                const spread = archcantorChoirLanceSpread(step);
+                for (const side of [-1, 1]) {
+                  this.ring(
+                    ev.x + ux * step - uy * spread * side,
+                    ev.y + uy * step + ux * spread * side,
+                    'crystalShard',
+                    Math.max(4, n(6)),
+                    0.42,
+                    760,
+                    84 + step + side,
+                    0.22,
+                  );
+                }
               }
             }
           } else if (ev.state === 'choir_voice') {

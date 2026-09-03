@@ -56,6 +56,7 @@ import {
   ARCHCANTOR_CHOIR_MOVE_SPEED,
   ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
   ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+  ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH,
   ARCHCANTOR_CHOIR_RECRUIT_TICKS,
   ARCHCANTOR_CHOIR_METAMORPH_TICKS,
   ARCHCANTOR_SOLOIST_CAP,
@@ -805,6 +806,7 @@ describe('Arquicantor — o Coro Cardinal', () => {
     let diagonalCells = 0;
     let invalidCross = 0;
     let invalidDiagonal = 0;
+    let widestCross = 0;
     const telegraphs: string[] = [];
     for (let t = 0; t < 400 && telegraphs.length < 3; t++) {
       const events = stepRun(state, [emptyCommand()]).events;
@@ -825,16 +827,22 @@ describe('Arquicantor — o Coro Cardinal', () => {
           const cy = (cell - cx) / w;
           if (pattern === 'cross') {
             crossCells++;
-            // A faixa tem largura: o eixo e os flancos. Fora disso e vazamento.
+            const lateral = Math.min(Math.abs(cx - bx), Math.abs(cy - by));
+            widestCross = Math.max(widestCross, lateral);
+            // A boca abre quadraticamente, mas continua pertencendo a um dos
+            // eixos. Uma celula alem da largura maxima seria vazamento.
             if (
-              Math.abs(cx - bx) > ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH &&
-              Math.abs(cy - by) > ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH
+              Math.abs(cx - bx) > ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH + 1 &&
+              Math.abs(cy - by) > ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH + 1
             ) {
               invalidCross++;
             }
           } else if (pattern === 'diagonal') {
             diagonalCells++;
-            if (cx === bx || cy === by) invalidDiagonal++;
+            const diagonalBand = Math.ceil(ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH * Math.SQRT2) + 1;
+            if (Math.abs(Math.abs(cx - bx) - Math.abs(cy - by)) > diagonalBand) {
+              invalidDiagonal++;
+            }
           }
         }
       }
@@ -843,6 +851,9 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(telegraphs.slice(0, 3)).toEqual(['choir_cross', 'choir_diagonal', 'choir_cross']);
     expect(crossCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
     expect(diagonalCells).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+    expect(widestCross, 'a lanca nao abriu a boca paraboloide').toBeGreaterThan(
+      ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+    );
     expect(invalidCross, 'a cruz vazou para fora dos eixos').toBe(0);
     expect(invalidDiagonal, 'o xis vazou para um eixo cardinal').toBe(0);
   });

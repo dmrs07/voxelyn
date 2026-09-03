@@ -2047,6 +2047,20 @@ export const ARCHCANTOR_CHOIR_LANCE_LENGTH = 12;
  * proposito. As diagonais continuam abertas.
  */
 export const ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH = 1;
+/** Meia-largura na ponta: sete celulas no trecho mais distante. */
+export const ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH = 3;
+/**
+ * A boca PARABOLICA da lanca. Perto do coro ainda existe janela para reagir;
+ * longe dele, onde era possivel estacionar e atirar, a faixa abre pelo
+ * quadrado da distancia e comprime os quatro setores seguros.
+ */
+export const archcantorChoirLanceSpread = (distance: number): number => {
+  const t = Math.max(0, Math.min(1, distance / ARCHCANTOR_CHOIR_LANCE_LENGTH));
+  return (
+    ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH +
+    (ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH - ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH) * t * t
+  );
+};
 /**
  * O ECO: quantos ticks depois da resposta cada corredor cobra de novo.
  *

@@ -501,9 +501,12 @@ decisão, e matar uma voz abre uma janela de tiro **visível**, sem ícone de es
 Os cantos alternam duas geometrias: primeiro a **cruz cardinal**, emitida para fora de cada
 guarda; depois o **xis diagonal**, cujo raio nasce no ponto médio entre dois guardas
 adjacentes. O halo do telegrafo identifica qual desenho vem a seguir, portanto nenhuma
-direção é uma segurança permanente. Cada corredor é uma **faixa**: três células de largura
-(`_LANCE_HALF_WIDTH` 1) e alcance euclidiano de doze (`_LANCE_LENGTH`), o que põe a ponta
-dos dois desenhos onde o canto termina. Um compasso depois (`_ECHO_TICKS`, 12) cada corredor
+direção é uma segurança permanente. Cada corredor é uma **faixa parabólica**: nasce com
+três células de largura (`_LANCE_HALF_WIDTH` 1) e abre pelo quadrado da distância até sete
+na ponta (`_LANCE_MAX_HALF_WIDTH` 3). A janela ainda permite reagir perto do coro, mas fica
+bem mais apertada onde seria fácil estacionar e atirar. O alcance euclidiano de doze
+(`_LANCE_LENGTH`) põe a ponta dos dois desenhos onde o canto termina, e o halo desenha as
+duas bordas curvas com a mesma função do dano. Um compasso depois (`_ECHO_TICKS`, 12) cada corredor
 cobra **de novo**, na mesma ordem — a descarga é instantânea, e sem o eco o corredor
 recém-piscado era o lugar mais seguro da sala; o desenho só troca **depois** do eco, para a
 segunda cobrança nunca sair de uma geometria que ninguém anunciou. Derrubar uma voz apaga

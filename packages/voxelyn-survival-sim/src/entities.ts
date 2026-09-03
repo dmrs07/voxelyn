@@ -25,7 +25,8 @@ import {
   ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
   ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS,
   ARCHCANTOR_CHOIR_LANCE_LENGTH,
-  ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH,
+  ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH,
+  archcantorChoirLanceSpread,
   ARCHCANTOR_CHOIR_ECHO_TICKS,
   ARCHCANTOR_CHOIR_RECRUIT_TICKS,
   ARCHCANTOR_CHOIR_METAMORPH_TICKS,
@@ -4515,42 +4516,39 @@ const archcantorChoirAnswer = (
     : CHOIR_CARDINALS[cardinal];
   const originX = diagonal ? (guard.x + nextGuard!.x) * 0.5 : guard.x;
   const originY = diagonal ? (guard.y + nextGuard!.y) * 0.5 : guard.y;
-  // A FAIXA: a celula do eixo e as que a flanqueiam. O eixo manda — parede no
-  // eixo encerra o corredor, porque atras dela nao ha corredor; um flanco
-  // bloqueado so tira aquela celula, e a faixa segue estreita por ali.
-  //
-  // Na cruz os flancos sao a perpendicular. No xis sao as duas celulas que
-  // completam o degrau da diagonal — e o que faz a banda diagonal ser cheia em
-  // vez de uma escada com buracos por onde um corpo passa sem tocar.
-  const flanks: Vec2[] = diagonal
-    ? [
-        { x: dir.x, y: 0 },
-        { x: 0, y: dir.y },
-      ]
-    : [
-        { x: -dir.y, y: dir.x },
-        { x: dir.y, y: -dir.x },
-      ];
   // O alcance e EUCLIDIANO: um passo diagonal anda raiz de dois, entao o xis
   // da menos passos para chegar a mesma distancia. A ponta dos dois desenhos
   // termina onde o canto termina.
-  const steps = Math.floor(ARCHCANTOR_CHOIR_LANCE_LENGTH / Math.hypot(dir.x, dir.y));
-  const cells = new Set<number>();
+  const dirLength = Math.hypot(dir.x, dir.y);
+  const ux = dir.x / dirLength;
+  const uy = dir.y / dirLength;
+  const steps = Math.floor(ARCHCANTOR_CHOIR_LANCE_LENGTH / dirLength);
+  let reach = 0;
   for (let step = 1; step <= steps; step++) {
     const ax = Math.floor(originX + dir.x * step);
     const ay = Math.floor(originY + dir.y * step);
     if (ax <= 0 || ay <= 0 || ax >= w - 1 || ay >= h - 1) break;
     if (state.solid[ay * w + ax] !== SOLID_NONE) break;
-    cells.add(ay * w + ax);
-    for (let k = 1; k <= ARCHCANTOR_CHOIR_LANCE_HALF_WIDTH; k++) {
-      for (const flank of flanks) {
-        const x = ax + flank.x * k;
-        const y = ay + flank.y * k;
-        if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
-        const i = y * w + x;
-        if (state.solid[i] !== SOLID_NONE) continue;
-        cells.add(i);
-      }
+    reach = step * dirLength;
+  }
+
+  // O PARABOLOIDE. Em vez de empilhar flancos discretos, mede cada centro de
+  // celula no referencial da lanca: projecao longitudinal escolhe o trecho e a
+  // distancia perpendicular precisa caber na abertura quadratica daquele
+  // ponto. A mesma conta vale para + e X, sem escada furada na diagonal.
+  const cells = new Set<number>();
+  const bounds = Math.ceil(reach + ARCHCANTOR_CHOIR_LANCE_MAX_HALF_WIDTH + 1);
+  for (let y = Math.floor(originY - bounds); y <= Math.ceil(originY + bounds); y++) {
+    for (let x = Math.floor(originX - bounds); x <= Math.ceil(originX + bounds); x++) {
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      const relX = x + 0.5 - originX;
+      const relY = y + 0.5 - originY;
+      const along = relX * ux + relY * uy;
+      if (along < 0.5 || along > reach + 0.5) continue;
+      const lateral = Math.abs(relX * -uy + relY * ux);
+      if (lateral > archcantorChoirLanceSpread(along) + 0.5) continue;
+      const i = y * w + x;
+      if (state.solid[i] === SOLID_NONE) cells.add(i);
     }
   }
   // SEM ponto de entrada, e essa e a diferenca entre um corredor e um sopro.
