@@ -623,6 +623,10 @@ describe('Arquicantor — o Coro Cardinal', () => {
     bystander.x = recruit!.x;
     bystander.y = recruit!.y;
     const bystanderHp = bystander.hp;
+    state.player.x = recruit!.x;
+    state.player.y = recruit!.y;
+    state.player.hp = state.player.maxHp;
+    const playerHp = state.player.hp;
     resolveChainedEvents(state, [
       { t: 'discharge', cells: [recruitCell], source: 'enemy', owner: boss.id },
     ]);
@@ -630,6 +634,7 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(bystander.hp, 'a imunidade do Ressonante anulou a descarga inteira').toBeLessThan(
       bystanderHp,
     );
+    expect(state.player.hp, 'a afinidade do Ressonante protegeu o jogador').toBeLessThan(playerHp);
   });
 
   it('com o acorde CHEIO, cada volta completa cospe um SOLISTA de cristal — com teto', () => {
