@@ -254,6 +254,21 @@ const crystalNote = (
 const ARCHCANTOR_MOTIF = [440, 554.37, 659.25] as const;
 const ARCHCANTOR_TRITONE = 622.25;
 
+/**
+ * O ACORDE DO CORO: uma nota por posicao cardinal, na ordem da orbita.
+ *
+ * A4 (fundamental), C5 (terca MENOR), E5 (quinta) e B5 (nona). A terca e menor
+ * de proposito, e nao a maior do motivo: a frase do chefe resolve, e o coro
+ * dele nao — a formacao e uma ameaca em volta do corpo, nao a conclusao de
+ * nada. A nona por cima e o que impede as quatro juntas de virarem uma triade
+ * confortavel.
+ *
+ * A nota sai da POSICAO e nao de quem esta nela, e e isso que faz um coro
+ * incompleto soar incompleto: a voz que falta nao emite, e o buraco no acorde e
+ * exatamente o buraco na formacao — o jogador ouve de que lado esta a janela.
+ */
+const ARCHCANTOR_CHOIR_CHORD = [440, 523.25, 659.25, 987.77] as const;
+
 /** Um "bling" de gelo: aperiodico, levemente desafinado, cauda curta. */
 const iceBling = (
   ctx: AudioContext,
@@ -1547,6 +1562,41 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       decay: 0.45,
       attack: 0.03,
     });
+  },
+  // O CORO, uma voz por vez: a nota da posicao cardinal, curta e seca. Curta
+  // porque quatro delas saem em 0,45 s (uma a cada 3 ticks) e precisam ler como
+  // arpejo, e nao como um acorde borrado.
+  archcantorChoirRoot: (ctx, out, t0) =>
+    crystalNote(ctx, out, t0, ARCHCANTOR_CHOIR_CHORD[0], 0.3, 0.42),
+  archcantorChoirThird: (ctx, out, t0) =>
+    crystalNote(ctx, out, t0, ARCHCANTOR_CHOIR_CHORD[1], 0.28, 0.42),
+  archcantorChoirFifth: (ctx, out, t0) =>
+    crystalNote(ctx, out, t0, ARCHCANTOR_CHOIR_CHORD[2], 0.26, 0.42),
+  archcantorChoirNinth: (ctx, out, t0) =>
+    crystalNote(ctx, out, t0, ARCHCANTOR_CHOIR_CHORD[3], 0.22, 0.4),
+  // A DANCA: um arpejo descendente curtissimo, que confirma o movimento em vez
+  // de anuncia-lo. Nao e musica de fundo — e a formacao dizendo "girei", e o
+  // paneamento diz de que lado ela esta agora.
+  archcantorChoirStep: (ctx, out, t0) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_CHOIR_CHORD[3], 0.14, 0.16);
+    crystalNote(ctx, out, t0 + 0.05, ARCHCANTOR_CHOIR_CHORD[2], 0.13, 0.16);
+    crystalNote(ctx, out, t0 + 0.1, ARCHCANTOR_CHOIR_CHORD[0], 0.15, 0.3);
+  },
+  // O SOLISTA: a voz que nao coube no acorde. Tritono contra a fundamental,
+  // ritmo quebrado e nenhuma cauda afinada — e o mesmo material sonoro do coro,
+  // usado errado.
+  archcantorDissonance: (ctx, out, t0, noise) => {
+    crystalNote(ctx, out, t0, ARCHCANTOR_TRITONE, 0.26, 0.3);
+    tone(ctx, out, t0 + 0.07, {
+      type: 'triangle',
+      from: ARCHCANTOR_CHOIR_CHORD[0],
+      to: ARCHCANTOR_CHOIR_CHORD[0] * 0.94,
+      peak: 0.18,
+      decay: 0.24,
+      attack: 0.008,
+      detune: 31,
+    });
+    burst(ctx, out, t0 + 0.09, noise, { peak: 0.16, decay: 0.1, type: 'highpass', from: 2600 });
   },
   // Silenciamento: TODO o reverb tonal e cortado, e o que sobra e um ruido
   // mineral seco. Um estalo de corte, e nada afinado depois dele.

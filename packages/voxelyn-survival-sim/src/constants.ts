@@ -1959,6 +1959,104 @@ export const ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS = 70;
 /** Quanto a rede vazia o enfraquece: sem cristal, o canto nao tem quem responda. */
 export const ARCHCANTOR_SILENT_ARMOR = 1.5;
 
+// ---------------------------------------------------------------------------
+// O CORO CARDINAL: o Arquicantor rege criaturas, e nao so pedra
+// ---------------------------------------------------------------------------
+// O encontro comecava VAZIO. Um corpo lento no meio da nave, cantando para
+// cristais que a geracao tinha (ou nao tinha) posto por perto: com sorte de
+// mapa a Catedral respondia inteira, sem ela o chefe era um alvo parado que
+// nao defendia nem o proprio corpo. E os Ressonantes do setor, que sao a fauna
+// DELE, agiam exatamente como agiriam sem ele na sala.
+//
+// O coro fecha as duas coisas com uma peca so: quatro Ressonantes de verdade —
+// mesmo arquetipo, mesma vida, mesma morte — orbitando o corpo nas quatro
+// direcoes cardinais. Eles nao sao um escudo abstrato: protegem porque estao
+// LITERALMENTE na trajetoria do tiro, e por isso perfuracao continua valendo,
+// ricochete continua valendo, e o angulo passa a ser uma decisao.
+//
+// Tres camadas de contra-jogo, nesta ordem: romper a orbita para abrir angulo,
+// cortar a rede de cristal para encurtar o canto, e controlar os reforcos que
+// tentam preencher as vagas abertas.
+
+/** Quantas vozes a formacao tem. Quatro porque as direcoes cardinais sao quatro. */
+export const ARCHCANTOR_CHOIR_SLOTS = 4;
+/**
+ * A que distancia do corpo o coro orbita.
+ *
+ * 2,5 e a distancia em que os quatro corpos ainda INTERCEPTAM o tiro mirado no
+ * chefe (raio 0,75 no centro, 0,44 em cada guarda) sem formar uma parede: as
+ * diagonais continuam abertas, e e por elas que o angulo se resolve. Mais perto
+ * eles viravam um bloco unico; mais longe deixavam de cobrir coisa alguma.
+ */
+export const ARCHCANTOR_CHOIR_RADIUS = 2.5;
+/**
+ * Ticks entre dois passos da danca — 2,5 s.
+ *
+ * Deliberadamente PRIMO com a recarga do canto (110): dois relogios que so as
+ * vezes se encontram fazem cada canto acontecer com outra configuracao do coro.
+ * Sincronizar os dois daria um encontro que se aprende uma vez e se repete.
+ */
+export const ARCHCANTOR_CHOIR_ROTATE_TICKS = 50;
+/**
+ * Velocidade dos guardas na troca de posto. Alta (5,2) porque a troca tem de
+ * CABER no intervalo da danca: um quarto de circunferencia a 2,5 de raio sao
+ * ~3,9 tiles, e a 5,2 isso leva 0,75 s — sobra tempo parado em cada posto, que
+ * e o que faz a formacao ser legivel entre um movimento e outro.
+ */
+export const ARCHCANTOR_CHOIR_MOVE_SPEED = 5.2;
+/** A que distancia do posto o guarda para de corrigir e simplesmente ocupa. */
+export const ARCHCANTOR_CHOIR_SNAP_DISTANCE = 0.18;
+/**
+ * De quao longe um Ressonante SOLTO e puxado para o encontro.
+ *
+ * Oito tiles: perto o bastante para o jogador conseguir decidir eliminar o
+ * bicho antes que ele reforce o chefe, longe o bastante para essa decisao
+ * existir de fato — um raio colado no corpo so avisaria quando ja fosse tarde.
+ */
+export const ARCHCANTOR_CHOIR_ATTRACT_RADIUS = 8;
+/**
+ * Ticks entre duas vozes do coro respondendo ao canto.
+ *
+ * As quatro NAO saem juntas. Elas respondem na ordem da orbita (N, L, S, O),
+ * uma a cada 3 ticks, e e isso que faz o canto ler como um arpejo atravessando
+ * a formacao em vez de um estouro simultaneo — da para ver de que lado a onda
+ * comecou, e da para correr contra ela.
+ */
+export const ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS = 3;
+/**
+ * O corredor que cada voz abre, em tiles, para FORA da formacao.
+ *
+ * Estreito (uma celula) e cardinal: os quatro corredores desenham uma cruz e as
+ * diagonais ficam seguras. E a mesma geometria que a orbita ja promete de
+ * olhar, e por isso o aviso e a formacao — nao um circulo no chao.
+ */
+export const ARCHCANTOR_CHOIR_LANCE_LENGTH = 7;
+
+/**
+ * O SOLISTA: o Ressonante que chegou tarde e nao coube no acorde.
+ *
+ * Com os quatro postos ocupados, a formacao EXPULSA quem chega — por uma das
+ * diagonais, que sao justamente as brechas que a cruz do coro deixa. Ele deixa
+ * de operar a regra da Catedral e passa a se mover como um bispo de xadrez:
+ * so diagonal, comprometido com a diagonal escolhida ate bater em alguma coisa
+ * ou ate o relogio permitir trocar.
+ *
+ * O compromisso e o bicho inteiro. Um solista que corrigisse o rumo a cada tick
+ * seria um perseguidor comum com animacao torta; e porque ele NAO corrige que a
+ * esquiva dele e geometrica — sair da diagonal e sair do problema.
+ */
+export const ARCHCANTOR_SOLOIST_SPEED = 4.4;
+/** De quanto em quanto tempo ele pode escolher outra diagonal. */
+export const ARCHCANTOR_SOLOIST_RETARGET_TICKS = 24;
+/** A que distancia ele para e descarrega. Curta: ele tem de CHEGAR. */
+export const ARCHCANTOR_SOLOIST_ATTACK_RANGE = 1.4;
+/** Telegrafo da descarga do solista (0,7 s). */
+export const ARCHCANTOR_SOLOIST_WINDUP_TICKS = 14;
+/** Recarga entre duas descargas do solista. */
+export const ARCHCANTOR_SOLOIST_COOLDOWN_TICKS = 48;
+/** O raio da descarga curta que ele solta antes de recuar. */
+export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
+
 /**
  * LEVIATA DO LENCOL (Aquifero Negro) — o corpo que se move sob a agua.
  *

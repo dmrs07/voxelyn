@@ -196,7 +196,15 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
   // inspirar TOCA e a valvula fechando.
   lung_matrix: { hold: 'lungHold', exhale: 'lungExhale', inhale: 'lungClose', wound: 'lungWound' },
   frost_queen: { wraiths: 'frostQueenWraithRise', armor_hit: 'frostQueenArmorHit' },
-  archcantor: { idle_note: 'archcantorNote', resonance: 'archcantorResonance' },
+  archcantor: {
+    idle_note: 'archcantorNote',
+    resonance: 'archcantorResonance',
+    // A danca confirma a geometria nova; a dissonancia e o solista chegando.
+    // `choir_voice` NAO entra aqui: a nota dele depende da posicao cardinal, e
+    // uma tabela por momento so sabe devolver uma voz (ver o ramo em cues).
+    choir_rotate: 'archcantorChoirStep',
+    dissonance: 'archcantorDissonance',
+  },
 };
 
 /**
@@ -238,6 +246,21 @@ const FURNACE_WEDGE_CUE_OFFSET = 6;
  * sem resolucao e o que diz isso antes de a onda chegar.
  */
 const ARCHCANTOR_TRITONE_INTENSITY = 0.5;
+
+/**
+ * As quatro notas do coro, na ordem da orbita (N, L, S, O).
+ *
+ * A escolha vem de `boss_state.intensity`, que a simulacao preenche com a
+ * POSICAO cardinal normalizada (0, 1/3, 2/3, 1) — e nao com o assento nem com a
+ * identidade do guarda. E o que faz o acorde descrever a formacao: quem morre
+ * cala uma nota especifica, e o buraco no acorde e o buraco na orbita.
+ */
+const ARCHCANTOR_CHOIR_VOICES: readonly VoiceId[] = [
+  'archcantorChoirRoot',
+  'archcantorChoirThird',
+  'archcantorChoirFifth',
+  'archcantorChoirNinth',
+];
 
 /** Centro geometrico de uma descarga, em tiles. */
 const dischargeCentroid = (
@@ -365,6 +388,16 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
           ];
         }
         return [];
+      }
+      // O CORO. A voz sai da posicao cardinal, entao ela nao cabe numa tabela
+      // por momento: sao quatro notas para um unico `boss_state`.
+      if (ev.archetype === 'archcantor' && ev.state === 'choir_voice') {
+        const cardinal = Math.round((ev.intensity ?? 0) * (ARCHCANTOR_CHOIR_VOICES.length - 1));
+        const choirVoice =
+          ARCHCANTOR_CHOIR_VOICES[
+            Math.max(0, Math.min(ARCHCANTOR_CHOIR_VOICES.length - 1, cardinal))
+          ];
+        return [{ voice: choirVoice, x: ev.x, y: ev.y, scale: 1 }];
       }
       const voice = BOSS_STATE_VOICE[ev.archetype]?.[ev.state];
       if (!voice) return [];

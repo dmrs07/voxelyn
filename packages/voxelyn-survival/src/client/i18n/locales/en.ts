@@ -329,7 +329,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Adapted quadruped. The presence of a harness does not imply an operator.',
   'bestiary.code.resonant': 'SPECIMEN CRYST-01',
   'bestiary.note.resonant':
-    'Induces discharge in nearby crystal formations. Loss of catalogable material attributed to the specimen, not to extraction protocol.',
+    'Induces discharge in nearby crystal formations. Loss of catalogable material attributed to the specimen, not to extraction protocol. Addendum: in the presence of a larger specimen, isolated individuals stop operating independently and take up fixed positions around it. Nobody has established what issues the order.',
   'bestiary.code.mud_lamprey': 'SPECIMEN AQU-03',
   'bestiary.note.mud_lamprey':
     'Lacustrine predator. Attacks occur exclusively from beneath the waterline. Preventive drainage exceeds sector budget.',
@@ -350,7 +350,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.code.devourer_brood': 'MOVEMENT PATTERN SIL-00b',
   'bestiary.code.archcantor': 'PIEZOELECTRIC ARRAY PRZ-00',
   'bestiary.note.archcantor':
-    'The company classifies it as a "natural piezoelectric array". Later reports record that the crystals reproduce frequencies of the transmission — and that some respond BEFORE receiving the pulse.',
+    'The company classifies it as a "natural piezoelectric array". Later reports record that the crystals reproduce frequencies of the transmission — and that some respond BEFORE receiving the pulse. The four bodies orbiting it were catalogued separately, as fauna, until someone noticed they change position together.',
   'bestiary.code.sheet_leviathan': 'HOSTILE ASSET AQF-00',
   'bestiary.note.sheet_leviathan':
     'Every team measured a different length. The simplest explanation is that the measurements are wrong. The second simplest is that it is not a single body.',

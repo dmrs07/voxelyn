@@ -3349,6 +3349,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(bubble.y * 1000));
     mix(Math.round(bubble.radius * 1000));
   }
+  // O CORO CARDINAL. Tres campos que decidem a POSICAO de quatro corpos que
+  // interceptam tiro: quem ocupa cada assento, quantos quartos de volta a
+  // formacao ja deu e quando ela gira de novo. Duas simulacoes que discordem de
+  // um assento divergem no primeiro disparo que passa (ou nao passa) por ali —
+  // e continuam divergindo, porque o guarda que uma delas matou a outra ainda
+  // tem em orbita. As posicoes em si NAO entram aqui: elas ja entram no laco de
+  // inimigos, como as de qualquer corpo.
+  for (const seat of state.bossRuntime.choir) mix(seat);
+  mix(state.bossRuntime.choirRotation);
+  mix(state.bossRuntime.choirRotateAt);
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
   // ja e hasheado por conta propria. Duas simulacoes discordando de

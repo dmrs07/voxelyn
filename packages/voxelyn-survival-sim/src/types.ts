@@ -755,6 +755,31 @@ export type BossRuntime = {
   frostArmored: number;
   archcantorSilent: boolean;
   /**
+   * O CORO CARDINAL: a entidade que ocupa cada assento da formacao, ou 0.
+   *
+   * Quatro ids e nao quatro coordenadas. A posicao de um guarda e DERIVADA —
+   * corpo do chefe + raio + assento + rotacao — e sincronizar o alvo de cada um
+   * seria guardar quatro numeros que ja se sabem calcular, com quatro formas
+   * novas de discordar deles. O que precisa ser lembrado e so QUEM esta em cada
+   * assento, porque isso ninguem recomputa: sai de uma promocao que aconteceu
+   * num tick especifico.
+   *
+   * Assento e nao direcao: o guarda fica com o assento e a DIRECAO que ele
+   * ocupa avanca com `choirRotation` (assento `i` ocupa a cardinal
+   * `(i + rotation) % 4`). Guardar a direcao em vez do assento faria a danca
+   * ser uma reatribuicao de quatro entidades a cada 2,5 s, e um guarda que
+   * morresse no meio da troca deixaria o buraco no lugar errado.
+   *
+   * Entra no hash: os tres campos decidem POSICAO de quatro corpos que
+   * interceptam tiro. Duas simulacoes que discordem de um assento divergem no
+   * primeiro disparo que passa (ou nao passa) por ali.
+   */
+  choir: number[];
+  /** Quantos quartos de volta a formacao ja deu (0..3). */
+  choirRotation: number;
+  /** O tick do proximo passo da danca. */
+  choirRotateAt: number;
+  /**
    * Tick da ultima vez em que a broca do Diamandis ANUNCIOU parede
    * ("OBSTRUCAO"), ou -1. A broca abre dezenas de celulas por passagem e o
    * anuncio e por PASSAGEM, nao por celula: uma ordem de servico por obra.
@@ -835,6 +860,15 @@ export type BossMoment =
   // Arquicantor: a nota isolada do idle; uma camada de cristal respondendo.
   | 'idle_note'
   | 'resonance'
+  // Arquicantor, o coro: a formacao trocando de posto (um arpejo curto que
+  // CONFIRMA o movimento, e nao musica de fundo), e cada guarda respondendo ao
+  // canto com a propria nota. `intensity` carrega a posicao cardinal (0..1),
+  // porque e ela que decide a nota: um coro incompleto soa incompleto porque a
+  // voz que falta simplesmente nao emite.
+  | 'choir_rotate'
+  | 'choir_voice'
+  // O SOLISTA: a voz que nao coube no acorde. Tritono, e no lugar errado.
+  | 'dissonance'
   // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.
   | 'obstruction';
 
@@ -859,6 +893,19 @@ export const BOSS_PHASE_UNSTABLE = 1 << 3;
  * `isDeluged` e a nota do Diluvio em constants.ts.
  */
 export const BOSS_PHASE_DELUGE = 1 << 4;
+/**
+ * A FORMACAO INICIAL do Arquicantor: os quatro Ressonantes que ele chama ao
+ * acordar.
+ *
+ * E uma fase de UMA VEZ e nao um cooldown de invocacao, e isso e a mecanica
+ * inteira: desmontar o coro tem de representar PROGRESSO. Um chefe que
+ * recompusesse os quatro depois de alguns segundos transformaria cada guarda
+ * abatido em tempo perdido, e a primeira das tres camadas de contra-jogo
+ * deixaria de existir. As vagas abertas so voltam a ser preenchidas por
+ * Ressonantes que ja estavam na Catedral (ver ARCHCANTOR_CHOIR_ATTRACT_RADIUS)
+ * — ou seja, por um recurso finito que o jogador tambem pode gastar antes.
+ */
+export const BOSS_PHASE_CHOIR = 1 << 5;
 
 /**
  * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
@@ -938,6 +985,24 @@ export const FURNACE_COOLING = 1;
 /** Magnetarca: atraindo (perto machuca) ou repelindo (longe machuca). */
 export const MAGNET_ATTRACT = 0;
 export const MAGNET_REPEL = 1;
+
+/**
+ * PAPEL do Ressonante — quem ele e enquanto o Arquicantor esta de pe.
+ *
+ * Um papel e nao um arquetipo novo, e a diferenca importa: um `choir_guard`
+ * continua sendo o MESMO bicho da Catedral (mesma vida, mesmo corpo, mesma
+ * morte, mesmo atlas), so que regido. Um arquetipo separado teria de repetir
+ * tudo isso e divergiria dele no primeiro ajuste — e o coro deixaria de ser
+ * "os Ressonantes da sala" para virar um adereço de chefe.
+ *
+ * Viaja no snapshot pelo mesmo motivo do humor do Miner: o cliente precisa
+ * desenhar a diferenca. Um guarda em orbita e um solista arremessado na
+ * diagonal nao se parecem, e derivar isso no cliente exigiria uma segunda
+ * copia da regra de formacao.
+ */
+export const RESONANT_WILD = 0;
+export const RESONANT_CHOIR = 1;
+export const RESONANT_SOLOIST = 2;
 
 /** Postura do Escoriaceo: couraça fria fechada, ou aberta pelo calor. */
 export const SCORIAC_COOL = 0;

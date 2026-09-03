@@ -76,6 +76,17 @@ export const emptyBossRuntime = (): BossRuntime => ({
   protectiveBubbles: [],
   frostArmored: -1,
   archcantorSilent: false,
+  // Quatro assentos VAZIOS, e nao quatro ids inventados: nenhuma entidade tem
+  // id 0 (`nextEntityId` nasce em `playerCount + 1`), entao zero e um "assento
+  // sem dono" que nao pode colidir com ninguem. Um array proprio por encontro
+  // pelo mesmo motivo de `path`: um literal congelado no modulo faria o coro do
+  // setor 5 herdar os guardas mortos do setor 3.
+  choir: [0, 0, 0, 0],
+  choirRotation: 0,
+  // Zero e "a danca ainda nao comecou". Quem a inicia e a formacao inicial, e
+  // e ela que carimba o primeiro prazo — sem isso o primeiro tick acordado ja
+  // giraria a formacao antes de ela existir.
+  choirRotateAt: 0,
   drillObstructedAt: -1,
 });
 
