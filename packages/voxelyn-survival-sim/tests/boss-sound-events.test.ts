@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { damageEntity, spawnEnemy } from '../src/entities';
 import {
+  ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS,
   ARCHCANTOR_PULSE_RADIUS,
   DEVOURER_BURROW_CUE_INTERVAL_TICKS,
   FROST_QUEEN_FREEZE_RADIUS,
@@ -267,6 +268,26 @@ describe('a janela de dano como transicao', () => {
     const back = ofType(advanceCollecting(state, 1), 'boss_vulnerable');
     expect(back[0]).toMatchObject({ archetype: 'archcantor', open: false });
     expect(ARCHCANTOR_PULSE_RADIUS).toBeGreaterThan(2);
+  });
+
+  it('a nota isolada consulta a rede AGORA: o ultimo cristal caindo no mesmo tick nao deixa a nota sair', () => {
+    const { state, boss, w } = duel(50, 'archcantor', 4);
+    const idx = (Math.floor(boss.y) + 2) * w + Math.floor(boss.x) + 2;
+    state.solid[idx] = SOLID_CRYSTAL;
+    // Ate a vespera de um tick de nota (o tick processado e `state.tick + 1`).
+    for (let t = 0; t < ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS * 2; t++) {
+      if ((state.tick + 1) % ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS === 0 && state.tick > 0) break;
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.bossRuntime.archcantorSilent).toBe(false);
+    // O cristal some ANTES do tick da nota, com a memoria ainda dizendo "ha rede".
+    state.solid[idx] = SOLID_NONE;
+    const events = stepRun(state, [emptyCommand()]).events;
+    expect(ofType(events, 'boss_state').some((e) => e.state === 'idle_note')).toBe(false);
+    expect(
+      ofType(events, 'boss_vulnerable').some((e) => e.archetype === 'archcantor' && e.open),
+    ).toBe(true);
   });
 
   it('a couraça da Rainha caindo e um boss_vulnerable, e o tiro absorvido e um armor_hit', () => {

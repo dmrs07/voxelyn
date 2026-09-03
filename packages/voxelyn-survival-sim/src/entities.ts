@@ -6079,10 +6079,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // checagem tem de ser real.
       if (enemy.archetype === 'archcantor') {
         // A NOTA ISOLADA entre um canto e outro: presenca, nao ameaca. So
-        // com rede — uma Catedral em silencio nao tem quem afinar.
+        // com rede — uma Catedral em silencio nao tem quem afinar. A rede e
+        // consultada AGORA, e nao pela memoria `archcantorSilent`: aquela so
+        // e atualizada no fim de `updateEnemies`, e o ultimo cristal pode ter
+        // caido num tiro deste mesmo tick — a nota sairia junto do cue de
+        // silencio, um contradizendo o outro na mesma leva.
         if (
           state.tick % ARCHCANTOR_IDLE_NOTE_INTERVAL_TICKS === 0 &&
-          !state.bossRuntime.archcantorSilent
+          archcantorHasNetwork(state, enemy)
         ) {
           events.push({
             t: 'boss_state',
