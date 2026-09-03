@@ -3392,6 +3392,10 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(enemy.hp * 100));
     mix(enemy.stunnedUntil);
     mix(enemy.alive ? 1 : 0);
+    // mood e estado autoritativo: no Ressonante ele escolhe entre o pulso
+    // selvagem, a orbita do coro e o ataque diagonal do Solista. Dois estados
+    // com papeis diferentes precisam divergir ANTES do proximo movimento.
+    mix(enemy.mood ?? 0);
     if (enemy.action) {
       mixString(enemy.action.kind);
       mix(enemy.action.startedAt);
