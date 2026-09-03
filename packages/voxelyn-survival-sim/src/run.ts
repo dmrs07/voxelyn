@@ -828,9 +828,21 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       // da rede que o jogador montou.
       if (ev.source === 'player' && !ev.relayed) recordPlayerResonance(state, ev.owner, 'current');
       const cells = new Set(ev.cells);
+      // O canto do Arquicantor usa os cristais da Catedral como extensao do
+      // proprio corpo. Ressonantes pertencem a essa mesma rede — inclusive os
+      // que acabaram de cristalizar para repor o coro —, entao a onda regida
+      // pelo chefe atravessa todos eles sem fogo amigo. A excecao e presa ao
+      // DONO Arquicantor: descarga do jogador, do ambiente e ate a lanca de uma
+      // voz continuam seguindo suas regras normais.
+      const archcantorCrystalShock =
+        ev.source === 'enemy' &&
+        ev.owner !== undefined &&
+        state.enemies.some((enemy) => enemy.id === ev.owner && enemy.archetype === 'archcantor');
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
         if (!cells.has(cellIndexAt(state, ent.x, ent.y))) continue;
+        if (archcantorCrystalShock && ent.kind === 'enemy' && ent.archetype === 'resonant')
+          continue;
         const scale =
           ev.source === 'player' && ent.kind === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1;
         damageEntity(state, ent, DISCHARGE_DAMAGE * scale * shockFalloff(ev, ent), events, {
