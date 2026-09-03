@@ -430,3 +430,30 @@ describe('arena do chefe por estrato', () => {
     }
   });
 });
+
+describe('arena real do Arquicantor', () => {
+  it('nasce como uma rotunda aberta cercada por muitos cristais', () => {
+    const state = createRun({
+      seed: 11,
+      sector: 3,
+      depth: { generation: 'G-04', sectorCount: 7, coreSectors: [3, 7] },
+    });
+    expect(state.sectorBoss.archetype).toBe('archcantor');
+    const boss = state.enemies.find((e) => e.id === state.sectorBoss.entityId);
+    expect(boss).toBeDefined();
+    const w = state.config.width;
+    let openCore = 0;
+    let crystals = 0;
+    for (let y = Math.floor(boss!.y) - 10; y <= Math.floor(boss!.y) + 10; y++) {
+      for (let x = Math.floor(boss!.x) - 10; x <= Math.floor(boss!.x) + 10; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+        const d = Math.hypot(x + 0.5 - boss!.x, y + 0.5 - boss!.y);
+        const material = state.solid[y * w + x];
+        if (d <= 5 && material === SOLID_NONE) openCore++;
+        if (d <= 10 && material === SOLID_CRYSTAL) crystals++;
+      }
+    }
+    expect(openCore, 'a danca nasceu dentro de um corredor').toBeGreaterThan(55);
+    expect(crystals, 'a Catedral nasceu sem uma rede densa').toBeGreaterThanOrEqual(16);
+  });
+});
