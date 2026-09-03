@@ -6,7 +6,7 @@
 // forma de isso acontecer sem ninguem perceber e a mecanica de bioma parar de
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, resolveChainedEvents, stepRun } from '../src/run';
+import { createRun, emptyCommand, hashAuthoritativeState, resolveChainedEvents, stepRun } from '../src/run';
 import { ARCHETYPES, damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy, surfaceSpeedMul } from '../src/entities';
 import { breakSolid, canRip, dischargeAt, isConductiveSurface, isDeluged, setSurface } from '../src/cells';
 import { generateWorld } from '../src/worldgen';
@@ -536,6 +536,49 @@ describe('Arquicantor — o Coro Cardinal', () => {
     expect(recruit.mood).toBe(RESONANT_CHOIR);
   });
 
+  it('promover um Ressonante cancela o pulso selvagem que estava em voo', () => {
+    const { state, boss } = duel(6261, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const victim = choirGuards(state)[0];
+    const seat = state.bossRuntime.choir.indexOf(victim.id);
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.choir[seat]).toBe(0);
+
+    const recruit = spawnEnemy(
+      state,
+      'resonant',
+      Math.floor(boss.x) + ARCHCANTOR_CHOIR_ATTRACT_RADIUS - 2,
+      Math.floor(boss.y),
+      false,
+    );
+    recruit.action = {
+      kind: 'pulse',
+      phase: 'windup',
+      startedAt: state.tick,
+      releaseAt: state.tick + 10,
+      endsAt: state.tick + 18,
+      direction: { x: 1, y: 0 },
+    };
+    recruit.vx = 3;
+    recruit.vy = -2;
+
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.choir[seat]).toBe(recruit.id);
+    expect(recruit.mood).toBe(RESONANT_CHOIR);
+    expect(recruit.action, 'o guarda conservou o pulso da vida selvagem').toBeUndefined();
+    expect(recruit.vx).toBe(0);
+    expect(recruit.vy).toBe(0);
+  });
+
+  it('o papel do Ressonante participa do hash autoritativo', () => {
+    const { state, boss } = duel(6262, 'archcantor', 5);
+    const extra = spawnEnemy(state, 'resonant', Math.floor(boss.x) + 4, Math.floor(boss.y), false);
+    extra.mood = RESONANT_WILD;
+    const wild = hashAuthoritativeState(state);
+    extra.mood = RESONANT_SOLOIST;
+    expect(hashAuthoritativeState(state)).not.toBe(wild);
+  });
   it('com o acorde CHEIO, quem chega e cuspido como SOLISTA e anda so na diagonal', () => {
     // O compromisso com a diagonal e o bicho inteiro: um solista que corrigisse
     // o rumo a cada tick seria um perseguidor comum com animacao torta, e a
