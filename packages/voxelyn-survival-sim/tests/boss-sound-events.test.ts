@@ -66,6 +66,24 @@ const advanceCollecting = (state: SurvivalState, ticks: number): SemanticEvent[]
   return out;
 };
 
+/**
+ * Derruba o CORO CARDINAL do Arquicantor.
+ *
+ * Desde o coro, calar a Catedral tem duas metades: apagar a rede de cristal e
+ * desmontar a formacao. Cada guarda vinculado e uma origem de descarga que o
+ * chefe rege — uma rede movel — entao um teste que so quebrasse cristal estaria
+ * medindo meio contra-jogo e chamando o resultado de silencio.
+ */
+const breakChoir = (state: SurvivalState): number => {
+  let felled = 0;
+  for (const guard of state.enemies) {
+    if (!guard.alive || guard.archetype !== 'resonant') continue;
+    damageEntity(state, guard, guard.maxHp, [], { kind: 'player_shot' });
+    felled++;
+  }
+  return felled;
+};
+
 const paint = (state: SurvivalState, cx: number, cy: number, r: number, kind: number): void => {
   const w = state.config.width;
   for (let y = cy - r; y <= cy + r; y++) {
@@ -260,6 +278,11 @@ describe('a janela de dano como transicao', () => {
     const idx = (Math.floor(boss.y) + 2) * w + Math.floor(boss.x) + 2;
     state.solid[idx] = SOLID_CRYSTAL;
     expect(ofType(advanceCollecting(state, 2), 'boss_vulnerable')).toEqual([]);
+    // O coro cai primeiro, e com o cristal ainda de pe NADA muda: a rede
+    // continua respondendo pela outra metade. E a prova de que a transicao mede
+    // a Catedral inteira, e nao um dos dois lados dela.
+    expect(breakChoir(state), 'a formacao nem chegou a nascer').toBeGreaterThan(0);
+    expect(ofType(advanceCollecting(state, 1), 'boss_vulnerable')).toEqual([]);
     state.solid[idx] = SOLID_NONE;
     const silenced = ofType(advanceCollecting(state, 1), 'boss_vulnerable');
     expect(silenced).toHaveLength(1);
@@ -281,6 +304,8 @@ describe('a janela de dano como transicao', () => {
       state.player.hp = state.player.maxHp;
     }
     expect(state.bossRuntime.archcantorSilent).toBe(false);
+    // O coro sai de cena antes, para o cristal ser mesmo o ultimo fio da rede.
+    breakChoir(state);
     // O cristal some ANTES do tick da nota, com a memoria ainda dizendo "ha rede".
     state.solid[idx] = SOLID_NONE;
     const events = stepRun(state, [emptyCommand()]).events;

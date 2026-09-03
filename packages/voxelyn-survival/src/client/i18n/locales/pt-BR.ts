@@ -345,7 +345,7 @@ export const PT_BR = {
   'bestiary.note.fungal_horse': 'Quadrúpede adaptado. A presença de arreios não implica operador.',
   'bestiary.code.resonant': 'ESPÉCIME CRIST-01',
   'bestiary.note.resonant':
-    'Induz descarga em formações cristalinas próximas. Perda de material catalogável atribuída ao espécime, não ao protocolo de extração.',
+    'Induz descarga em formações cristalinas próximas. Perda de material catalogável atribuída ao espécime, não ao protocolo de extração. Adendo: na presença de um espécime maior, indivíduos isolados deixam de operar por conta própria e assumem posições fixas ao redor dele. Não se estabeleceu o que emite a ordem.',
   'bestiary.code.mud_lamprey': 'ESPÉCIME AQU-03',
   'bestiary.note.mud_lamprey':
     'Predador lacustre. Ataques ocorrem exclusivamente a partir da lâmina d’água. Drenagem preventiva excede o orçamento do setor.',
@@ -367,7 +367,7 @@ export const PT_BR = {
   'bestiary.code.devourer_brood': 'PADRÃO DE MOVIMENTO SIL-00b',
   'bestiary.code.archcantor': 'ARRANJO PIEZOELÉTRICO PRZ-00',
   'bestiary.note.archcantor':
-    'A companhia o classifica como "arranjo piezoelétrico natural". Os laudos posteriores registram que os cristais reproduzem frequências da transmissão — e que alguns respondem ANTES de receber o pulso.',
+    'A companhia o classifica como "arranjo piezoelétrico natural". Os laudos posteriores registram que os cristais reproduzem frequências da transmissão — e que alguns respondem ANTES de receber o pulso. Os quatro corpos em órbita dele foram catalogados à parte, como fauna, até alguém notar que trocam de posição juntos.',
   'bestiary.code.sheet_leviathan': 'ATIVO HOSTIL AQF-00',
   'bestiary.note.sheet_leviathan':
     'Cada equipe mediu um comprimento diferente. A explicação mais simples é que as medições estão erradas. A segunda mais simples é que não se trata de um único corpo.',

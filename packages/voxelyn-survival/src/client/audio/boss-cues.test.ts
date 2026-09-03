@@ -240,6 +240,54 @@ describe('Arquicantor: nota, intervalo, acorde', () => {
     expect(far[0].scale).toBeLessThan(near[0].scale);
   });
 
+  it('o CORO tem uma nota por posicao, e a nota sai da posicao — nao de quem esta nela', () => {
+    // O acorde descreve a FORMACAO. E por isso que um coro incompleto soa
+    // incompleto: a voz que falta nao emite, e o buraco no acorde e o buraco na
+    // orbita — o jogador ouve de que lado esta a janela de tiro.
+    const cardinal = (intensity: number) =>
+      cuesForEvent(
+        { t: 'boss_state', archetype: 'archcantor', state: 'choir_voice', x: 1, y: 1, intensity },
+        ctx,
+      )[0].voice;
+    const notes = [cardinal(0), cardinal(1 / 3), cardinal(2 / 3), cardinal(1)];
+    expect(notes).toEqual([
+      'archcantorChoirRoot',
+      'archcantorChoirThird',
+      'archcantorChoirFifth',
+      'archcantorChoirNinth',
+    ]);
+    // Quatro vozes distintas: duas posicoes que soassem igual apagariam a
+    // informacao inteira.
+    expect(new Set(notes).size).toBe(4);
+    for (const note of notes) expect(VOICE_SPECS[note].spatial).toBe(true);
+  });
+
+  it('a danca CONFIRMA a geometria nova, e o solista chega dissonante', () => {
+    const [step] = cuesForEvent(
+      {
+        t: 'boss_state',
+        archetype: 'archcantor',
+        state: 'choir_rotate',
+        x: 1,
+        y: 1,
+        intensity: 0.5,
+      },
+      ctx,
+    );
+    expect(step.voice).toBe('archcantorChoirStep');
+    // Presenca, e nao aviso: a danca nao pede resposta nenhuma.
+    expect(VOICE_SPECS.archcantorChoirStep.priority).toBeLessThan(
+      VOICE_SPECS.archcantorChord.priority,
+    );
+    const [solo] = cuesForEvent(
+      { t: 'boss_state', archetype: 'archcantor', state: 'dissonance', x: 1, y: 1, intensity: 1 },
+      ctx,
+    );
+    expect(solo.voice).toBe('archcantorDissonance');
+    // O solista chega de perto: o cue dele TEM de localizar.
+    expect(VOICE_SPECS.archcantorDissonance.spatial).toBe(true);
+  });
+
   it('o silencio da Catedral e vulnerabilidade, e a rede voltando devolve uma nota', () => {
     const [silenced] = cuesForEvent(
       { t: 'boss_vulnerable', archetype: 'archcantor', x: 1, y: 1, open: true },

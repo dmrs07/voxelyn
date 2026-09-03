@@ -142,6 +142,15 @@ export type VoiceId =
   | 'archcantorResonance'
   | 'archcantorSilenced'
   | 'archcantorDeath'
+  // O CORO CARDINAL: uma nota por posicao (fundamental, terca menor, quinta,
+  // nona), o arpejo curto que confirma a danca, e o tritono do solista — a voz
+  // que a formacao expulsou.
+  | 'archcantorChoirRoot'
+  | 'archcantorChoirThird'
+  | 'archcantorChoirFifth'
+  | 'archcantorChoirNinth'
+  | 'archcantorChoirStep'
+  | 'archcantorDissonance'
   // Leviata do Lencol: baleia abissal, agua, eletricidade abafada. O canto
   // anuncia intencao; o estalo eletrico anuncia perigo.
   | 'leviathanCall'
@@ -423,6 +432,26 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   archcantorResonance: { priority: 5, gain: 0.32, minIntervalMs: 250, spatial: true },
   archcantorSilenced: { priority: 9, gain: 0.55, minIntervalMs: 0, spatial: false },
   archcantorDeath: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+
+  // O CORO. As quatro vozes sao ESPACIAIS e nao tem trava entre si — elas sao
+  // vozes DIFERENTES, e a trava e por voz: as quatro saem em 0,45 s e o
+  // paneamento de cada uma diz de que lado esta o corredor que abriu. Prioridade
+  // 8 (abaixo do canto, acima da textura) porque perder uma delas e perder a
+  // informacao de que aquele lado do coro ainda esta de pe.
+  //
+  // A trava de 200 ms existe para o caso do coro girando durante um canto
+  // encadeado, e nao entre notas: a mesma posicao nao responde duas vezes em
+  // menos que isso.
+  archcantorChoirRoot: { priority: 8, gain: 0.34, minIntervalMs: 200, spatial: true },
+  archcantorChoirThird: { priority: 8, gain: 0.34, minIntervalMs: 200, spatial: true },
+  archcantorChoirFifth: { priority: 8, gain: 0.34, minIntervalMs: 200, spatial: true },
+  archcantorChoirNinth: { priority: 8, gain: 0.34, minIntervalMs: 200, spatial: true },
+  // A danca e PRESENCA (5), esparsa por natureza (2,5 s) e espacial: ela nao
+  // pede resposta, so confirma que a geometria mudou.
+  archcantorChoirStep: { priority: 5, gain: 0.26, minIntervalMs: 400, spatial: true },
+  // O solista e um TELEGRAFO local (9): ele chega pela diagonal e descarrega de
+  // perto, e a unica pista de que ele chegou e essa.
+  archcantorDissonance: { priority: 9, gain: 0.42, minIntervalMs: 120, spatial: true },
 
   // Leviata. O chamado e presenca (6) e espacial: e "algo enorme navegando
   // fora da camera". A carga da descarga e a descarga NAO sao espaciais: a

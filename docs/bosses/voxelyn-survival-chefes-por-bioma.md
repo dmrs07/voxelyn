@@ -435,7 +435,7 @@ chefe que poderia estar em qualquer mapa.
 
 | Chefe | Estrato | A alavanca | O contra-jogo |
 | --- | --- | --- | --- |
-| **Arquicantor** | Catedral Prismática | canta, e todo cristal ao alcance descarrega | esvaziar a sala — e a Catedral é a luz e o recurso do setor |
+| **Arquicantor** | Catedral Prismática | rege: quatro Ressonantes em órbita cardinal, e todo cristal ao alcance descarrega | romper a órbita para abrir ângulo, **e** esvaziar a sala — a Catedral é a luz e o recurso do setor |
 | **Leviatã do Lençol** | Aquífero Negro | só anda e só emerge por superfície condutiva | o terreno seco, e eletrificar a água (que fica mortal para você também) |
 | **Pulmão-Matriz** | Fenda Sulfurosa | inspira o gás da câmara, expele em outra direção | **incendiar a expiração** — a única janela de dano que o jogador abre |
 | **Coração da Fornalha** | Fornalha Abissal | ciclo térmico; setores da arena acendem em sequência | estar no lugar certo quando ele esfria |
@@ -444,9 +444,13 @@ chefe que poderia estar em qualquer mapa.
 
 Notas de desenho que valem registrar:
 
-- **O Arquicantor é o único cuja blindagem é inversa.** Esvaziar a rede o deixa mais
+- **O Arquicantor é o único cuja blindagem é inversa.** Calar a rede o deixa mais
   *frágil* (`ARCHCANTOR_SILENT_ARMOR` > 1), porque a Catedral era a defesa dele. Nos
-  outros a couraça é o bioma intacto; nele, o bioma intacto é a arma.
+  outros a couraça é o bioma intacto; nele, o bioma intacto é a arma. Desde o **Coro
+  Cardinal**, a rede tem duas metades — o cristal da nave e as vozes em órbita — e a
+  blindagem só abre quando as duas caem. Antes, um mapa pobre de cristal entregava um
+  chefe desarmado de graça, sem o jogador entender nada.
+- **O Arquicantor rege criaturas, e não só pedra.** Ver §*O Coro Cardinal* abaixo.
 - **Pulmão e Coração são FIXOS** (`speed: 0`). A luta não é contra um corpo, é contra
   a sala — e a ficha de Ativo do Pulmão registra que neutralizá-lo deixou câmaras a
   jusante permanentemente irrespiráveis. Matá-lo não é claramente uma vitória.
@@ -458,6 +462,75 @@ Notas de desenho que valem registrar:
   filhotes, e nascem com vida parcial.
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
   (fogo, descarga, explosão) as esqueça.
+
+### O Coro Cardinal
+
+O encontro começava **vazio**: um corpo lento no meio da nave cantando para cristais que
+a geração tinha (ou não tinha) posto por perto. Com sorte de mapa a Catedral respondia
+inteira; sem ela o chefe era um alvo parado que não defendia nem o próprio corpo. E os
+Ressonantes do setor — que são a fauna *dele* — agiam exatamente como agiriam sem ele na
+sala.
+
+Ao **acordar**, ele chama quatro Ressonantes de verdade (mesmo arquétipo, mesma vida,
+mesma morte, mesmo atlas) e os põe em órbita nas quatro direções cardinais, a
+`ARCHCANTOR_CHOIR_RADIUS` (2,5) tiles do corpo:
+
+```
+                [N]
+                 │
+          [O] — ARQUI — [L]
+                 │
+                [S]
+```
+
+**A dança.** A cada `ARCHCANTOR_CHOIR_ROTATE_TICKS` (50 ticks / 2,5 s) os quatro avançam
+juntos para o posto seguinte, no sentido horário (N → L → S → O → N). Não é teleporte: o
+percurso é um **arco** pela circunferência, porque uma reta de norte a leste é uma corda
+que passa a 1,77 do centro — quatro cordas simultâneas leem como quatro bichos se
+cruzando no meio, e durante a travessia a formação deixaria de cobrir o corpo. O período
+é deliberadamente primo com a recarga do canto (110): dois relógios que só às vezes se
+encontram fazem cada canto acontecer com outra configuração do coro.
+
+**Por que eles protegem.** Não há redução de dano envolvida. O corpo do guarda está
+*literalmente* na trajetória do tiro mirado no chefe — e isso é melhor que qualquer
+número: perfuração continua valendo, ricochete abre jogada, o ângulo passa a ser uma
+decisão, e matar uma voz abre uma janela de tiro **visível**, sem ícone de escudo nenhum.
+
+**O canto vira arpejo.** Na execução, as quatro vozes respondem *uma a uma* — na ordem da
+órbita (N, L, S, O), a cada `ARCHCANTOR_CHOIR_ANSWER_STEP_TICKS` (3 ticks) — e cada uma
+abre um corredor estreito de descarga para fora da formação. A cruz de corredores é
+mortal; **as diagonais são a segurança**, e a formação está travada desde o telegrafo,
+então os quatro corredores são exatamente os que o jogador viu ao decidir onde ficar. Só
+depois disso a rede de cristal continua propagando em camadas, como já fazia.
+
+**Reforço é finito.** Um guarda abatido deixa um **buraco permanente**: não há
+recomposição por cooldown, porque desmontar o coro precisa representar progresso. A vaga
+só volta a ser preenchida por um Ressonante que já estava na Catedral e entrou no raio de
+atração (`ARCHCANTOR_CHOIR_ATTRACT_RADIUS`, 8 tiles) — ou seja, por um recurso que o
+jogador também pode gastar antes.
+
+**O Solista.** Com os quatro postos ocupados, quem chega é *expulso* por uma das
+diagonais — justamente as brechas que a cruz do coro deixa. Ele deixa de operar a regra da
+Catedral e passa a se mover como um **bispo de xadrez**: só diagonal, comprometido com a
+diagonal escolhida até bater em alguma coisa ou até o relógio (`_RETARGET_TICKS`) permitir
+trocar. O compromisso é o bicho inteiro — um solista que corrigisse o rumo a cada tick
+seria um perseguidor comum com animação torta, e a resposta a ele deixaria de ser
+geométrica. Chegando perto, ele solta uma descarga curta telegrafada e **recua** por outra
+diagonal.
+
+**Som.** Cada posição cardinal tem uma nota — fundamental, terça *menor*, quinta e nona —,
+e a nota sai da **posição**, não de quem está nela. É isso que faz um coro incompleto soar
+incompleto: a voz que falta simplesmente não emite, e o buraco no acorde é o buraco na
+órbita. A dança confirma o movimento com um arpejo curtíssimo; o solista usa o mesmo
+material sonoro *errado* (trítono, ritmo quebrado). Quando a última fonte cai, entra o cue
+de silêncio que já existia.
+
+**Estado.** Três campos em `BossRuntime` (`choir`, `choirRotation`, `choirRotateAt`) e um
+papel na entidade (`RESONANT_WILD` / `RESONANT_CHOIR` / `RESONANT_SOLOIST`, em `mood`). A
+posição desejada é **derivada** — corpo + raio + assento + rotação — e não sincronizada:
+guardar quatro coordenadas seria guardar números que já se sabem calcular, com quatro
+formas novas de discordar deles. Matar o regente **dissolve a regência**, não o coro: os
+guardas voltam a ser Ressonantes soltos.
 
 ### Os arcos de entendimento
 

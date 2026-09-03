@@ -7,7 +7,7 @@
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, resolveChainedEvents, stepRun } from '../src/run';
-import { damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy, surfaceSpeedMul } from '../src/entities';
+import { ARCHETYPES, damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy, surfaceSpeedMul } from '../src/entities';
 import { breakSolid, canRip, dischargeAt, isConductiveSurface, isDeluged, setSurface } from '../src/cells';
 import { generateWorld } from '../src/worldgen';
 import { biomeProfile } from '../src/strata';
@@ -31,6 +31,11 @@ import {
   SURF_SCORCHED,
   LUNG_MATRIX_CYCLE_TICKS,
   ARCHCANTOR_PULSE_RADIUS,
+  ARCHCANTOR_CHOIR_SLOTS,
+  ARCHCANTOR_CHOIR_RADIUS,
+  ARCHCANTOR_CHOIR_MOVE_SPEED,
+  ARCHCANTOR_CHOIR_ATTRACT_RADIUS,
+  TICK_HZ,
   DELUGE_HP_FRACTION,
   SOLID_PIPE_W,
   SOLID_PIPE_E,
@@ -67,6 +72,9 @@ import {
   DISCOVERY_QUEEN_THAWED,
   MAGNET_ATTRACT,
   MAGNET_REPEL,
+  RESONANT_CHOIR,
+  RESONANT_SOLOIST,
+  RESONANT_WILD,
   type EnemyArchetype,
   type SurvivalState,
 } from '../src/types';
@@ -138,6 +146,30 @@ const advanceUntil = (state: SurvivalState, ready: () => boolean, limit = 2000):
   return ready();
 };
 
+/** Os Ressonantes vivos que o Arquicantor rege neste instante. */
+const choirGuards = (state: SurvivalState) =>
+  state.bossRuntime.choir
+    .map((id) => state.enemies.find((e) => e.id === id && e.alive))
+    .filter((guard): guard is NonNullable<typeof guard> => guard !== undefined);
+
+/**
+ * Derruba o CORO CARDINAL do Arquicantor.
+ *
+ * Desde o coro, calar a Catedral tem duas metades: apagar a rede de cristal e
+ * desmontar a formacao. Cada guarda vinculado e uma origem de descarga que o
+ * chefe rege — uma rede movel — entao um teste que so quebrasse cristal estaria
+ * medindo meio contra-jogo e chamando o resultado de silencio.
+ */
+const breakChoir = (state: SurvivalState): number => {
+  let felled = 0;
+  for (const guard of state.enemies) {
+    if (!guard.alive || guard.archetype !== 'resonant') continue;
+    damageEntity(state, guard, guard.maxHp, [], { kind: 'player_shot' });
+    felled++;
+  }
+  return felled;
+};
+
 /** Quanto dano ENTRA de fato num golpe de 100. */
 const damageTaken = (state: SurvivalState, boss: { hp: number }): number => {
   const before = boss.hp;
@@ -172,8 +204,15 @@ describe('a tabela de chefes esta completa', () => {
 });
 
 describe('Arquicantor — a Catedral responde', () => {
-  it('sem cristal ao alcance ele nao canta: a sala esvaziada o desarma', () => {
+  it('sem rede E sem coro ele nao canta: a Catedral calada o desarma', () => {
+    // A regra nao mudou, a Catedral e que ficou maior: cristal e coro sao as
+    // duas metades da rede que responde ao canto. Calar as duas continua sendo
+    // o contra-jogo; calar so uma deixou de bastar.
     const { state, boss } = duel(601, 'archcantor', 5);
+    // A formacao nasce, e cai ANTES de o primeiro canto sair: acordar poe o
+    // coro em campo, nao um golpe (ver o telegrafo de folga no despertar).
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    expect(breakChoir(state), 'a formacao nem chegou a nascer').toBeGreaterThan(0);
     let pulses = 0;
     for (let t = 0; t < 400; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
@@ -181,7 +220,27 @@ describe('Arquicantor — a Catedral responde', () => {
       }
       state.player.hp = state.player.maxHp;
     }
-    expect(pulses, 'cantou numa sala sem um cristal sequer').toBe(0);
+    expect(pulses, 'cantou com a Catedral inteira em silencio').toBe(0);
+  });
+
+  it('o CORO e rede: com a formacao de pe ele canta numa sala sem um cristal', () => {
+    // O defeito que isto protege e o que o coro existe para fechar: o encontro
+    // dependia inteiramente de a geracao ter posto cristal por perto. Num mapa
+    // pobre de cristal, o chefe do estrato mineral nascia desarmado de graca —
+    // sem golpe, sem defesa e sem nada para o jogador entender. A formacao e a
+    // parte da Catedral que ele traz consigo.
+    const { state, boss } = duel(606, 'archcantor', 5);
+    let sang = false;
+    let discharged = false;
+    for (let t = 0; t < 400 && !(sang && discharged); t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'pulse') sang = true;
+        if (ev.t === 'discharge') discharged = true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(sang, 'nao cantou com o coro inteiro em orbita').toBe(true);
+    expect(discharged, 'o coro nao abriu corredor nenhum').toBe(true);
   });
 
   it('com cristal por perto ele canta, e a rede descarrega', () => {
@@ -297,6 +356,320 @@ describe('Arquicantor — a Catedral responde', () => {
     const cut = ARCHCANTOR_PULSE_RADIUS + 2;
     crystalLine(state, px, py, 2, ARCHCANTOR_PULSE_RADIUS + 10, [cut, cut + 2, cut + 4]);
     expect(farDischargeTick(state, px, py, 400), 'o canto atravessou o vao').toBe(-1);
+  });
+});
+
+// O CORO CARDINAL.
+//
+// O que estes testes protegem e a promessa inteira do rework: o Arquicantor
+// deixou de ser um emissor parado no meio da sala e passou a REGER criaturas.
+// As tres camadas de contra-jogo que isso cria — romper a orbita para abrir
+// angulo, cortar a rede para encurtar o canto, controlar os reforcos — so
+// existem enquanto a formacao for feita de bichos de verdade, em posicoes de
+// verdade. No dia em que o coro virar um numero de reducao de dano, todos os
+// testes daqui continuam passando por acidente, e e por isso que eles medem
+// POSICAO e CORPO, nunca "o chefe levou menos".
+describe('Arquicantor — o Coro Cardinal', () => {
+  /** A cardinal (0=N, 1=L, 2=S, 3=O) que um guarda ocupa em torno do corpo. */
+  const cardinalOf = (boss: { x: number; y: number }, guard: { x: number; y: number }): number => {
+    const dx = guard.x - boss.x;
+    const dy = guard.y - boss.y;
+    if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? 0 : 2;
+    return dx > 0 ? 1 : 3;
+  };
+
+  /** Distancia de cada guarda ao corpo do regente. */
+  const orbit = (state: SurvivalState, boss: { x: number; y: number }): number[] =>
+    choirGuards(state).map((guard) => Math.hypot(guard.x - boss.x, guard.y - boss.y));
+
+  /** Anda ate a formacao ter dado `turns` quartos de volta. */
+  const advanceToRotation = (state: SurvivalState, turns: number): boolean =>
+    advanceUntil(state, () => state.bossRuntime.choirRotation === turns, 600);
+
+  it('acordar CHAMA quatro Ressonantes, um por cardinal, em orbita do corpo', () => {
+    const { state, boss } = duel(620, 'archcantor', 5);
+    expect(choirGuards(state), 'a formacao nasceu antes de o encontro comecar').toHaveLength(0);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+
+    const guards = choirGuards(state);
+    expect(guards, 'o coro nao se formou').toHaveLength(ARCHCANTOR_CHOIR_SLOTS);
+    // Ressonantes de VERDADE, e nao um adereço: mesmo arquetipo, mesma vida.
+    for (const guard of guards) {
+      expect(guard.archetype).toBe('resonant');
+      expect(guard.mood).toBe(RESONANT_CHOIR);
+      expect(guard.maxHp).toBe(ARCHETYPES.resonant.hp);
+    }
+    for (const radius of orbit(state, boss)) {
+      expect(radius).toBeGreaterThan(ARCHCANTOR_CHOIR_RADIUS - 0.4);
+      expect(radius).toBeLessThan(ARCHCANTOR_CHOIR_RADIUS + 0.4);
+    }
+    // As quatro cardinais, e nao quatro corpos amontoados de um lado.
+    expect(new Set(guards.map((guard) => cardinalOf(boss, guard))).size).toBe(4);
+  });
+
+  it('a danca avanca no sentido HORARIO, e cada guarda leva o posto seguinte', () => {
+    const { state, boss } = duel(621, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const seats = [...state.bossRuntime.choir];
+    for (let seat = 0; seat < ARCHCANTOR_CHOIR_SLOTS; seat++) {
+      const guard = state.enemies.find((e) => e.id === seats[seat])!;
+      expect(cardinalOf(boss, guard), `assento ${seat} nasceu fora do posto`).toBe(seat);
+    }
+
+    expect(advanceToRotation(state, 1), 'a formacao nunca girou').toBe(true);
+    // A troca de posto e um percurso, nao um instante: da tempo de o guarda
+    // chegar antes de medir onde ele esta.
+    for (let t = 0; t < 20; t++) stepRun(state, [emptyCommand()]);
+    for (let seat = 0; seat < ARCHCANTOR_CHOIR_SLOTS; seat++) {
+      const guard = state.enemies.find((e) => e.id === seats[seat])!;
+      expect(cardinalOf(boss, guard), `assento ${seat} nao avancou`).toBe(
+        (seat + 1) % ARCHCANTOR_CHOIR_SLOTS,
+      );
+    }
+    // O MESMO corpo em cada assento: a danca move os guardas, nao reatribui a
+    // formacao. Reatribuir faria um guarda morto abrir buraco no lugar errado.
+    expect(state.bossRuntime.choir).toEqual(seats);
+  });
+
+  it('a troca de posto e um ARCO: nenhum guarda corta por dentro da formacao', () => {
+    // O defeito que isto protege: uma reta de norte a leste e uma corda que
+    // passa a 1,77 do centro — quatro cordas simultaneas leem como quatro
+    // bichos se cruzando no meio, e durante a travessia a formacao deixa de
+    // cobrir o corpo. Pela circunferencia ela continua sendo uma formacao
+    // enquanto anda, e e disso que a interceptacao depende.
+    const { state, boss } = duel(622, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const before = state.bossRuntime.choirRotation;
+    expect(advanceUntil(state, () => state.bossRuntime.choirRotation !== before, 600)).toBe(true);
+
+    let closest = Infinity;
+    let widestStep = 0;
+    let guards = choirGuards(state).map((guard) => ({ id: guard.id, x: guard.x, y: guard.y }));
+    for (let t = 0; t < 24; t++) {
+      stepRun(state, [emptyCommand()]);
+      for (const guard of choirGuards(state)) {
+        closest = Math.min(closest, Math.hypot(guard.x - boss.x, guard.y - boss.y));
+        const was = guards.find((g) => g.id === guard.id);
+        if (was) widestStep = Math.max(widestStep, Math.hypot(guard.x - was.x, guard.y - was.y));
+      }
+      guards = choirGuards(state).map((guard) => ({ id: guard.id, x: guard.x, y: guard.y }));
+    }
+    // A corda de um quarto de volta desceria a 1,77. O arco nao desce.
+    expect(closest, 'algum guarda cortou por dentro').toBeGreaterThan(2.2);
+    // E nao e teleporte: cada passo cabe na velocidade dele.
+    expect(widestStep).toBeLessThan((ARCHCANTOR_CHOIR_MOVE_SPEED / TICK_HZ) * 1.6);
+  });
+
+  it('os guardas NAO perseguem: o jogador colado nao desfaz a orbita', () => {
+    // Um guarda que perseguisse seria um Ressonante comum com um nome novo, e a
+    // formacao — que e a defesa, o aviso e a geometria do encontro — se
+    // dissolveria no primeiro tick em que o jogador entrasse no raio de aggro.
+    const { state, boss } = duel(623, 'archcantor', 3);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    for (let t = 0; t < 90; t++) {
+      state.player.x = boss.x - 1.2;
+      state.player.y = boss.y;
+      state.player.hp = state.player.maxHp;
+      stepRun(state, [emptyCommand()]);
+      for (const radius of orbit(state, boss)) {
+        expect(radius, 'um guarda largou o posto para caçar').toBeGreaterThan(1.6);
+      }
+    }
+  });
+
+  it('o coro PROTEGE por interceptacao: o tiro para no corpo do guarda', () => {
+    // A defesa nao e um numero. Ela e geometrica, e e por isso que perfuracao
+    // continua valendo, que o angulo passa a ser uma decisao e que matar uma
+    // voz abre uma janela de tiro VISIVEL, sem icone de escudo nenhum.
+    const { state, boss } = duel(624, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const west = choirGuards(state).find((guard) => cardinalOf(boss, guard) === 3);
+    expect(west, 'nenhum guarda ocupava a cardinal do jogador').toBeDefined();
+
+    const bossHp = boss.hp;
+    const guardHp = west!.hp;
+    for (let t = 0; t < 30; t++) {
+      state.player.y = boss.y;
+      stepRun(state, [{ ...emptyCommand(), aim: { x: 1, y: 0 }, fire: true }]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(guardHp - west!.hp, 'o guarda no caminho nao levou nada').toBeGreaterThan(0);
+    expect(boss.hp, 'o tiro atravessou o guarda').toBe(bossHp);
+  });
+
+  it('a voz derrubada deixa BURACO permanente: o chefe nao recompoe o acorde', () => {
+    // Se o coro se refizesse sozinho, cada guarda abatido viraria tempo perdido
+    // e a primeira camada de contra-jogo deixaria de existir. Desmontar a
+    // formacao precisa ser progresso.
+    const { state } = duel(625, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const victim = choirGuards(state)[0];
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+
+    for (let t = 0; t < 400; t++) stepRun(state, [emptyCommand()]);
+    expect(choirGuards(state), 'o acorde voltou a ficar cheio sozinho').toHaveLength(
+      ARCHCANTOR_CHOIR_SLOTS - 1,
+    );
+    expect(state.bossRuntime.choir.filter((id) => id === 0)).toHaveLength(1);
+  });
+
+  it('um Ressonante SOLTO que chega perto ocupa a vaga aberta', () => {
+    // A vaga so volta a ser preenchida por um bicho que ja estava na Catedral —
+    // um recurso finito, que o jogador tambem pode gastar antes. E o que
+    // transforma "matar aquele Ressonante ali" numa decisao de verdade.
+    const { state, boss } = duel(626, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const victim = choirGuards(state)[0];
+    const seat = state.bossRuntime.choir.indexOf(victim.id);
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+
+    const recruit = spawnEnemy(
+      state,
+      'resonant',
+      Math.floor(boss.x) + ARCHCANTOR_CHOIR_ATTRACT_RADIUS - 2,
+      Math.floor(boss.y),
+      false,
+    );
+    expect(recruit.mood).toBe(RESONANT_WILD);
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.choir[seat], 'a vaga nao foi preenchida').toBe(recruit.id);
+    expect(recruit.mood).toBe(RESONANT_CHOIR);
+  });
+
+  it('com o acorde CHEIO, quem chega e cuspido como SOLISTA e anda so na diagonal', () => {
+    // O compromisso com a diagonal e o bicho inteiro: um solista que corrigisse
+    // o rumo a cada tick seria um perseguidor comum com animacao torta, e a
+    // resposta a ele deixaria de ser geometrica.
+    const { state, boss } = duel(627, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    expect(choirGuards(state)).toHaveLength(ARCHCANTOR_CHOIR_SLOTS);
+
+    const extra = spawnEnemy(
+      state,
+      'resonant',
+      Math.floor(boss.x) + 4,
+      Math.floor(boss.y) + 4,
+      false,
+    );
+    stepRun(state, [emptyCommand()]);
+    expect(extra.mood, 'o quinto entrou na orbita').toBe(RESONANT_SOLOIST);
+    expect(state.bossRuntime.choir).not.toContain(extra.id);
+
+    let moved = 0;
+    for (let t = 0; t < 60; t++) {
+      const wasX = extra.x;
+      const wasY = extra.y;
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (!extra.alive) break;
+      const dx = Math.abs(extra.x - wasX);
+      const dy = Math.abs(extra.y - wasY);
+      if (dx < 1e-6 && dy < 1e-6) continue;
+      moved++;
+      // Bispo de xadrez: os dois eixos andam JUNTOS e na mesma medida. Um passo
+      // barrado num dos eixos e a excecao legitima — a parede e que decide.
+      if (dx > 1e-6 && dy > 1e-6) expect(Math.abs(dx - dy)).toBeLessThan(1e-6);
+    }
+    expect(moved, 'o solista nunca saiu do lugar').toBeGreaterThan(0);
+  });
+
+  it('o canto e um ARPEJO: as quatro vozes respondem uma a uma, na ordem da orbita', () => {
+    const { state } = duel(628, 'archcantor', 5);
+    const voices: number[] = [];
+    for (let t = 0; t < 200 && voices.length < ARCHCANTOR_CHOIR_SLOTS; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_state' && ev.state === 'choir_voice') voices.push(ev.intensity ?? -1);
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(voices, 'o coro nao respondeu ao canto').toHaveLength(ARCHCANTOR_CHOIR_SLOTS);
+    // N, L, S, O — a nota sai da POSICAO, e nao de quem esta nela.
+    expect(voices).toEqual([0, 1 / 3, 2 / 3, 1]);
+  });
+
+  it('as vozes abrem uma CRUZ de corredores, e as diagonais sao a saida', () => {
+    // O aviso e a formacao, e nao um circulo no chao: os quatro corpos em orbita
+    // JA desenham para onde a descarga vai. Se a geometria da carga nao fosse a
+    // da formacao, o encontro cobraria por uma leitura que nunca ofereceu.
+    const { state, boss, w } = duel(632, 'archcantor', 5);
+    expect(
+      state.solid[(Math.floor(boss.y) + 2) * w + Math.floor(boss.x) + 2],
+      'a arena nao esta limpa',
+    ).toBe(SOLID_NONE);
+
+    let charged = 0;
+    let offAxis = 0;
+    for (let t = 0; t < 200; t++) {
+      const events = stepRun(state, [emptyCommand()]).events;
+      // O eixo e lido NO TICK: o chefe anda entre um canto e outro, e a cruz e
+      // ancorada no corpo dele — nao no lugar onde o encontro comecou.
+      const bx = Math.floor(boss.x);
+      const by = Math.floor(boss.y);
+      for (const ev of events) {
+        if (ev.t !== 'discharge') continue;
+        for (const cell of ev.cells) {
+          charged++;
+          const cx = cell % w;
+          const cy = (cell - cx) / w;
+          if (cx !== bx && cy !== by) offAxis++;
+        }
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(charged, 'o coro nao abriu corredor nenhum').toBeGreaterThan(0);
+    expect(offAxis, 'uma carga saiu fora da cruz: a diagonal deixou de ser saida').toBe(0);
+    // E a cruz e um corredor com comprimento, nao um anel colado neles.
+    expect(charged).toBeGreaterThanOrEqual(ARCHCANTOR_CHOIR_SLOTS * 2);
+  });
+
+  it('a voz que falta nao emite: um coro incompleto responde incompleto', () => {
+    const { state } = duel(629, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const victim = choirGuards(state)[0];
+    const silenced = state.bossRuntime.choir.indexOf(victim.id);
+    damageEntity(state, victim, victim.maxHp, [], { kind: 'player_shot' });
+
+    const voices: number[] = [];
+    for (let t = 0; t < 300 && voices.length < ARCHCANTOR_CHOIR_SLOTS - 1; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_state' && ev.state === 'choir_voice') voices.push(ev.intensity ?? -1);
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(voices.length).toBe(ARCHCANTOR_CHOIR_SLOTS - 1);
+    const missing = (silenced + state.bossRuntime.choirRotation) % ARCHCANTOR_CHOIR_SLOTS;
+    expect(voices, 'a nota do assento vazio saiu assim mesmo').not.toContain(
+      missing / (ARCHCANTOR_CHOIR_SLOTS - 1),
+    );
+  });
+
+  it('o coro tambem e REDE: com a formacao de pe, a sala vazia nao o deixa fragil', () => {
+    // A blindagem inversa continua sendo a dele; o que mudou e quantas coisas
+    // precisam cair para ela abrir. Antes, um mapa pobre de cristal entregava
+    // um chefe fragil de graca, sem o jogador entender nada.
+    const { state, boss } = duel(630, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const guarded = damageTaken(state, boss);
+    expect(breakChoir(state)).toBeGreaterThan(0);
+    const silent = damageTaken(state, boss);
+    expect(silent, 'derrubar o coro nao cobrou nada dele').toBeGreaterThan(guarded);
+  });
+
+  it('o regente caindo DISSOLVE a regencia: os guardas voltam a ser bichos da sala', () => {
+    // Eles nao morrem junto e nao ficam presos ao papel. Um guarda orbitando um
+    // cadaver seria um inimigo inofensivo e eternamente ocupado no meio da
+    // arena — o unico jeito de este rework produzir lixo em campo.
+    const { state, boss } = duel(631, 'archcantor', 5);
+    for (let t = 0; t < 12; t++) stepRun(state, [emptyCommand()]);
+    const guards = choirGuards(state);
+    expect(guards).toHaveLength(ARCHCANTOR_CHOIR_SLOTS);
+    damageEntity(state, boss, boss.maxHp, [], { kind: 'player_shot' });
+
+    expect(state.bossRuntime.choir).toEqual([0, 0, 0, 0]);
+    for (const guard of guards) {
+      expect(guard.alive, 'o guarda morreu junto com o regente').toBe(true);
+      expect(guard.mood).toBe(RESONANT_WILD);
+    }
   });
 });
 
