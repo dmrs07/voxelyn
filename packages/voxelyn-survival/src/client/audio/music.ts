@@ -364,8 +364,7 @@ export const layersForIntensity = (intensity: number): MusicLayers => ({
 });
 
 /** Duracao de um compasso, em segundos. */
-export const barDurationSec = (theme: MusicTheme): number =>
-  (60 / theme.bpm) * theme.beatsPerBar;
+export const barDurationSec = (theme: MusicTheme): number => (60 / theme.bpm) * theme.beatsPerBar;
 
 /**
  * O compasso em que o tick da simulacao esta. ESTA e a ponte relogio-da-sim ->

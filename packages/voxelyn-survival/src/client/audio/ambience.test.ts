@@ -158,7 +158,7 @@ describe('limiar do aviso de calor', () => {
   // util sairia perto de zero e o aviso so existiria de fato nos ultimos tiros,
   // tarde demais para mudar a decisao de quem esta com o gatilho preso.
   it('o primeiro tique ja e audivel', () => {
-    const primeiroPasso = (HEAT_PER_SHOT / HEAT_MAX) / (1 - HEAT_WARN_AT);
+    const primeiroPasso = HEAT_PER_SHOT / HEAT_MAX / (1 - HEAT_WARN_AT);
     expect(heatWarning(HEAT_WARN_AT + HEAT_PER_SHOT / HEAT_MAX)).toBeGreaterThan(primeiroPasso);
   });
 

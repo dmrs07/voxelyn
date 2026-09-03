@@ -12,6 +12,11 @@ Este diretório recebe os dois slots do pipeline de trilha:
 - `voxelyn-survival-menu.flac` — a trilha de **abertura** (tela de título e
   overlays do terminal), em loop; cala sob o véu quando a descida começa.
   Ausente, o menu fica em silêncio — o comportamento histórico.
+- `voxelyn-survival-diamandis.mp3` — a trilha do **encontro com o Diamandis**,
+  em loop enquanto ele está acordado e de pé; a trilha da run cala e volta
+  quando ele cai. É **mp3 de propósito**: o master só existe nesse formato, e
+  reempacotar em FLAC não devolveria o que o encoder descartou (e pesaria dez
+  vezes mais no precache). Ausente, o encontro segue com a trilha da run.
 
 ## Contrato (do compositor, preservado pelo código)
 
@@ -33,13 +38,17 @@ Este diretório recebe os dois slots do pipeline de trilha:
 ## Como gerar o asset a partir do arquivo do compositor
 
 ```sh
-node scripts/prepare-soundtrack.mjs <arquivo-do-compositor>              # run
-node scripts/prepare-soundtrack.mjs <arquivo-do-compositor> --slot menu  # abertura
+node scripts/prepare-soundtrack.mjs <arquivo-do-compositor>                        # run
+node scripts/prepare-soundtrack.mjs <arquivo-do-compositor> --slot menu            # abertura
+node scripts/prepare-soundtrack.mjs <arquivo-do-compositor> --slot diamandis --copy  # encontro (master lossy)
 ```
+
+`--copy` grava a entrada como está (sem transcode) — para masters que só
+existem em formato lossy. A análise e o trim rodam do mesmo jeito.
 
 O script analisa (LUFS, true peak, mid/side em banda cheia e <120 Hz, bordas
 do loop), empacota em FLAC sem alterar o áudio e imprime o trim calibrado
-(`COMPOSED_TRIM` ou `MENU_TRIM`) para colar em
+(`COMPOSED_TRIM`, `MENU_TRIM` ou `BOSS_TRIM`) para colar em
 `src/client/audio/soundtrack.ts`.
 
 O arquivo não versionado aqui ainda? O jogo toca o backup procedural e nada

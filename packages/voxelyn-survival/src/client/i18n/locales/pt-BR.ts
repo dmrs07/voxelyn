@@ -710,6 +710,17 @@ export const PT_BR = {
   'toast.furnace.cooled': 'A SALA ESFRIA',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
+  // As FALAS do Diamandis, como legenda. A voz e sintetizada em fonemas e as
+  // palavras nao ficam inteligiveis — a legenda devolve a palavra, no mesmo
+  // instante e pelo mesmo evento (boss-voice-lines.ts). Frases de ordem de
+  // servico, lidas por uma maquina que ainda acredita que esta trabalhando.
+  'voice.diamandis.unmapped': 'DIAMANDIS: ÁREA NÃO MAPEADA.',
+  'voice.diamandis.standClear': 'DIAMANDIS: AFASTE-SE.',
+  'voice.diamandis.armed': 'DIAMANDIS: CARGA ARMADA.',
+  'voice.diamandis.survey': 'DIAMANDIS: SONDAGEM.',
+  'voice.diamandis.obstruction': 'DIAMANDIS: OBSTRUÇÃO.',
+  'voice.diamandis.fault': 'DIAMANDIS: FALHA OPERACIONAL.',
+  'voice.diamandis.lost': 'DIAMANDIS: UNIDADE NÃO RECUPERÁVEL.',
   'toast.module.expired': '{module} DESATIVADO',
   // Os quatro estados de uma peça do Diamandis. O verbo de cada frase e o que
   // separa os quatro: SOLTOU (apareceu), LEVANDO (ainda da tempo), CAIU (voltou

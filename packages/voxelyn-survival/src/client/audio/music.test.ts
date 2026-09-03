@@ -64,9 +64,7 @@ describe('temas por estrato', () => {
       for (const note of t.riff) {
         expect(note.beat, `${s}: beat fora do ciclo`).toBeGreaterThanOrEqual(0);
         expect(note.beat, `${s}: beat fora do ciclo`).toBeLessThan(total);
-        expect(note.beat + note.lenBeats, `${s}: nota vaza o ciclo`).toBeLessThanOrEqual(
-          total + 1,
-        );
+        expect(note.beat + note.lenBeats, `${s}: nota vaza o ciclo`).toBeLessThanOrEqual(total + 1);
       }
     }
   });

@@ -7,9 +7,13 @@ import {
   COMPOSED_TRIM,
   COMPOSED_TRIM_MAX,
   COMPOSED_TRIM_MIN,
+  BOSS_SOUNDTRACK_URL,
+  BOSS_TRIM,
   MENU_SOUNDTRACK_URL,
   MENU_TRIM,
   SOUNDTRACK_URL,
+  bossBaseGain,
+  bossTrackPlaying,
   composedBaseGain,
   isMusicSource,
   menuBaseGain,
@@ -71,6 +75,7 @@ describe('contrato da trilha composta', () => {
       10 ** ((alvo - lufsDoArquivo) / 20) / MUSIC_CEILING;
     expect(trimPara(-17.1)).toBeCloseTo(COMPOSED_TRIM, 2);
     expect(trimPara(-15.0)).toBeCloseTo(MENU_TRIM, 2);
+    expect(trimPara(-5.95)).toBeCloseTo(BOSS_TRIM, 2);
   });
 
   it('composedBaseGain satura o slider em [0,1]', () => {
@@ -102,6 +107,32 @@ describe('resolucao de fonte (fallback para o backup procedural)', () => {
     expect(menuBaseGain(1) * MUSIC_DUCK_FACTOR).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
     expect(menuBaseGain(-1)).toBe(0);
     expect(menuBaseGain(0.5)).toBeCloseTo(menuBaseGain(1) / 2, 10);
+  });
+
+  it('a trilha do Diamandis: slot proprio, teto, trim na faixa — e lossy de proposito', () => {
+    // O master so existe em mp3; reempacotar em FLAC nao devolveria nada e
+    // multiplicaria o precache por dez. Se um master lossless chegar, este
+    // teste passa a cobrar `.flac` como os outros dois slots.
+    expect(BOSS_SOUNDTRACK_URL.endsWith('.mp3')).toBe(true);
+    expect(BOSS_SOUNDTRACK_URL.startsWith('/')).toBe(false);
+    expect(BOSS_SOUNDTRACK_URL).not.toBe(SOUNDTRACK_URL);
+    expect(BOSS_SOUNDTRACK_URL).not.toBe(MENU_SOUNDTRACK_URL);
+    expect(BOSS_TRIM).toBeGreaterThanOrEqual(COMPOSED_TRIM_MIN);
+    expect(BOSS_TRIM).toBeLessThanOrEqual(COMPOSED_TRIM_MAX);
+    expect(bossBaseGain(1) * MUSIC_DUCK_FACTOR).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
+    expect(bossBaseGain(-1)).toBe(0);
+    expect(bossBaseGain(0.5)).toBeCloseTo(bossBaseGain(1) / 2, 10);
+  });
+
+  it('a trilha de encontro so soa com o dono certo, acordado, de pe e decodificado', () => {
+    expect(bossTrackPlaying('diamandis', true, true, true)).toBe(true);
+    // Dormindo, caido, ou sem o arquivo: a trilha da run continua.
+    expect(bossTrackPlaying('diamandis', false, true, true)).toBe(false);
+    expect(bossTrackPlaying('diamandis', true, false, true)).toBe(false);
+    expect(bossTrackPlaying('diamandis', true, true, false)).toBe(false);
+    // Os outros chefes nao tem trilha (ainda): tabela, nao excecao.
+    expect(bossTrackPlaying('guardian', true, true, true)).toBe(false);
+    expect(bossTrackPlaying(null, true, true, true)).toBe(false);
   });
 
   it('isMusicSource valida o que vem do storage', () => {

@@ -29,6 +29,7 @@
 //    precisao de amostra; um HTMLAudioElement em loop tem respiro audivel na
 //    volta e por isso NAO e usado.
 
+import type { EnemyArchetype } from '@voxelyn/survival-sim';
 import { MUSIC_CEILING } from './music';
 
 /**
@@ -75,8 +76,7 @@ export type MusicSource = 'composed' | 'synth';
 
 export const MUSIC_SOURCES: readonly MusicSource[] = ['composed', 'synth'];
 
-export const isMusicSource = (v: unknown): v is MusicSource =>
-  v === 'composed' || v === 'synth';
+export const isMusicSource = (v: unknown): v is MusicSource => v === 'composed' || v === 'synth';
 
 /**
  * A fonte que deve SOAR agora, dada a preferencia e a disponibilidade do
@@ -84,10 +84,8 @@ export const isMusicSource = (v: unknown): v is MusicSource =>
  * preferencia 'composed' sem arquivo pronto (ainda carregando, 404, decode
  * falhou) toca o backup procedural — o jogo nunca desce mudo.
  */
-export const resolveMusicSource = (
-  preference: MusicSource,
-  composedReady: boolean,
-): MusicSource => (preference === 'composed' && composedReady ? 'composed' : 'synth');
+export const resolveMusicSource = (preference: MusicSource, composedReady: boolean): MusicSource =>
+  preference === 'composed' && composedReady ? 'composed' : 'synth';
 
 const trackBaseGain = (trim: number, musicVolume: number): number => {
   const vol = Math.max(0, Math.min(1, musicVolume));
@@ -127,5 +125,59 @@ export const MENU_SOUNDTRACK_URL = 'audio/voxelyn-survival-menu.flac';
 export const MENU_TRIM = 1.37;
 
 /** Ganho base da trilha de menu sob o slider. */
-export const menuBaseGain = (musicVolume: number): number =>
-  trackBaseGain(MENU_TRIM, musicVolume);
+export const menuBaseGain = (musicVolume: number): number => trackBaseGain(MENU_TRIM, musicVolume);
+
+// ---------------------------------------------------------------------------
+// Trilha de ENCONTRO (o Diamandis)
+// ---------------------------------------------------------------------------
+
+/**
+ * Terceiro slot do pipeline: a trilha do encontro com o Diamandis. Toca em
+ * loop enquanto o dono do setor e o Diamandis, ele ja notou o jogador e esta
+ * de pe; a trilha da run (composta ou procedural) cala enquanto isso e volta
+ * quando ele cai — o sting do desligamento soa sobre o silencio dela, como o
+ * `died` soa sobre o silencio da run.
+ *
+ * O ASSET E LOSSY, e isso e deliberado e documentado, nao um descuido: o
+ * master chegou como mp3 a 320 kbps (nao existe WAV/FLAC dele). Reempacotar
+ * em FLAC nao devolveria o que o encoder descartou e multiplicaria o precache
+ * por dez para nada. `decodeAudioData` entrega o PCM do mp3 do mesmo jeito;
+ * o resto do contrato (imagem intacta, teto, ducking, loop gapless) vale
+ * igual. Se um master lossless aparecer, `prepare-soundtrack.mjs --slot
+ * diamandis` o empacota em FLAC e o teste da extensao passa a cobrar `.flac`.
+ */
+export const BOSS_SOUNDTRACK_URL = 'audio/voxelyn-survival-diamandis.mp3';
+
+/**
+ * Trim da trilha do Diamandis, mesmo papel do COMPOSED_TRIM.
+ *
+ * Calibrado para o master recebido em 2026-09-02: -5,95 LUFS integrado (um
+ * master MUITO quente, true peak 0,0 dBTP, brickwall), 85,6 s, estereo com o
+ * lado 13 dB abaixo do centro -> 0.48 poe o leito em -21 LUFS com o slider
+ * no maximo. Trocou o master, rode o script de novo.
+ */
+export const BOSS_TRIM = 0.48;
+
+/** Ganho base da trilha de encontro sob o slider. */
+export const bossBaseGain = (musicVolume: number): number => trackBaseGain(BOSS_TRIM, musicVolume);
+
+/**
+ * Os chefes que TEM trilha propria. Uma tabela, e nao um `=== 'diamandis'`
+ * espalhado: o proximo chefe com musica entra aqui e em mais lugar nenhum.
+ */
+export const BOSS_SOUNDTRACKS: Partial<Record<EnemyArchetype, string>> = {
+  diamandis: BOSS_SOUNDTRACK_URL,
+};
+
+/**
+ * A trilha de encontro deve SOAR agora? Pura e testavel: o dono do setor tem
+ * trilha, ja acordou, esta de pe, e o arquivo decodificou. Sem o arquivo a
+ * trilha da run continua — o encontro nunca desce mudo por causa de um 404.
+ */
+export const bossTrackPlaying = (
+  archetype: EnemyArchetype | null,
+  awake: boolean,
+  alive: boolean,
+  ready: boolean,
+): boolean =>
+  archetype !== null && BOSS_SOUNDTRACKS[archetype] !== undefined && awake && alive && ready;

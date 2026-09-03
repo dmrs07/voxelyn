@@ -162,7 +162,26 @@
 // pode fazer.
 // 28: WorldFlags carrega a carga do Leviata e as duas bolhas protetivas;
 // EntityActionKind/eventos ganham massive_shock/leviathan_discharge.
-export const PROTOCOL_VERSION = 28;
+// 29: A ASSINATURA SONORA DOS CHEFES entra no wire. Quatro eventos novos —
+// `boss_windup` (preparacao), `boss_attack` (execucao), `boss_state`
+// (consequencia/presenca: o passo do Guardiao, o Devorador cavando, o chamado
+// do Leviata, o ciclo do Pulmao, a polaridade do Magnetarca, a broca do
+// Diamandis encontrando parede) e
+// `boss_vulnerable` (a janela de dano abrindo/fechando) — todos discriminados
+// por arquetipo e habilidade/momento, sem nenhuma decisao acustica na
+// simulacao. `action_start` ganha `archetype` (por ele o cliente cala o
+// telegrafo generico quando o ator e um chefe), `boss_awake` ganha
+// `archetype`/`x`/`y`, `boss_phase` ganha `x`/`y`, e o Guardiao e o Diamandis
+// passam a emitir `boss_phase` como a Fornalha e o Leviata ja faziam.
+// As duas metades doem de forma assimetrica. Cliente NOVO contra servidor
+// antigo: `action_start` chega sem `archetype`, o cliente nao cala o generico
+// e os chefes voltam a soar como bruisers — e nenhum dos quatro eventos novos
+// chega, entao a respiracao do Pulmao e a polaridade do Magnetarca ficam
+// mudas no unico canal que as anuncia. Cliente ANTIGO contra servidor novo:
+// quatro tipos que ele nao conhece caem no `default` do switch e sao
+// ignorados em silencio — nada quebra, mas e exatamente o "nada quebra, so
+// falta" que um bug mudo e. O bump transforma os dois em recusa no handshake.
+export const PROTOCOL_VERSION = 29;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de

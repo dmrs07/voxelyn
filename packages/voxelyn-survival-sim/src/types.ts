@@ -739,7 +739,104 @@ export type BossRuntime = {
   leviathanShockRecoverAt: number;
   leviathanShockSeq: number;
   protectiveBubbles: Array<{ x: number; y: number; radius: number }>;
+  /**
+   * Os dois estados de blindagem que so existiam DENTRO do funil de dano e
+   * que a apresentacao precisa ver como TRANSICAO (`boss_vulnerable`).
+   *
+   * A couraça da Rainha e a rede do Arquicantor sao recomputadas da grade a
+   * cada golpe; para dizer "a armadura quebrou" e "a Catedral calou" e preciso
+   * lembrar o que se viu no tick anterior. Nao entram no hash nem no wire: sao
+   * memoria de apresentacao, e o cliente que reconecta ouve a proxima
+   * transicao — o estado em si ele ja ve na grade.
+   *
+   * `frostArmored` e tri-estado: -1 ainda nao medido (a primeira leitura nao
+   * e uma transicao), 0 sem couraça, 1 com.
+   */
+  frostArmored: number;
+  archcantorSilent: boolean;
+  /**
+   * Tick da ultima vez em que a broca do Diamandis ANUNCIOU parede
+   * ("OBSTRUCAO"), ou -1. A broca abre dezenas de celulas por passagem e o
+   * anuncio e por PASSAGEM, nao por celula: uma ordem de servico por obra.
+   * Memoria de apresentacao, como as duas acima — fora do hash e do wire.
+   */
+  drillObstructedAt: number;
 };
+
+/**
+ * As habilidades de chefe que os eventos `boss_windup`/`boss_attack` nomeiam.
+ *
+ * Uma lista chata de proposito: cada nome e uma coisa que o JOGADOR precisa
+ * distinguir de ouvido, e nao uma acao interna. A broca e a demolicao do
+ * Diamandis pedem respostas opostas (recuar da linha, sair das marcas), entao
+ * sao dois nomes; a decolagem e a emergencia do Devorador sao a mesma
+ * ameaca ("o chao onde voce esta"), entao sao um.
+ */
+export type BossAbility =
+  // Guardiao: pedra e massa.
+  | 'salvo'
+  | 'slam'
+  | 'charge'
+  | 'contact'
+  // Bispo.
+  | 'nova'
+  // Diamandis: ferramentas.
+  | 'drill'
+  | 'demolish'
+  | 'beam'
+  // Devorador Branco.
+  | 'erupt'
+  | 'maw'
+  // Arquicantor.
+  | 'song'
+  // Leviata do Lencol.
+  | 'breach'
+  | 'deluge'
+  | 'massive_shock'
+  // Coracao da Fornalha.
+  | 'wave'
+  // Rainha da Geada.
+  | 'freeze'
+  // Magnetarca.
+  | 'crush'
+  | 'tether';
+
+/**
+ * Os momentos de ESTADO/PRESENCA de chefe (`boss_state`): nem preparacao nem
+ * execucao — o corpo fazendo o que o corpo faz, e o mundo mudando por causa
+ * disso. E o que deixa o audio localizar o que nao esta na tela (o Devorador
+ * cavando, o Leviata chamando de longe) e ler o relogio da luta (a
+ * respiracao do Pulmao, a polaridade do Magnetarca).
+ */
+export type BossMoment =
+  // Guardiao: um passo pesado; a estrutura cedendo na fase final; a lasca ao
+  // levar dano (ele nao geme — desloca massa).
+  | 'step'
+  | 'strain'
+  | 'chip'
+  // Devorador: deslocamento sob a silica; a boca abrindo e fechando.
+  | 'burrow'
+  | 'maw_open'
+  | 'maw_close'
+  // Leviata: o chamado de presenca; a recuperacao depois da descarga.
+  | 'call'
+  | 'recover'
+  // Pulmao-Matriz: as fases do ciclo e o ferimento (fole perfurado).
+  | 'inhale'
+  | 'hold'
+  | 'exhale'
+  | 'wound'
+  // Rainha da Geada: os Espectros saindo do gelo; o tiro absorvido pela couraça.
+  | 'wraiths'
+  | 'armor_hit'
+  // Magnetarca: a polaridade que acabou de valer.
+  | 'attract'
+  | 'repel'
+  // Arquicantor: a nota isolada do idle; uma camada de cristal respondendo.
+  | 'idle_note'
+  | 'resonance'
+  // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.
+  | 'obstruction';
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
 export const BOSS_PHASE_SUMMON = 1 << 0;
@@ -1172,6 +1269,13 @@ export type SemanticEvent =
       t: 'action_start';
       entity: number;
       action: EntityActionKind;
+      /**
+       * Quem esta agindo. Opcional por defesa (fixtures montam o evento a
+       * mao); a simulacao sempre o preenche. Existe para o audio calar o
+       * telegrafo GENERICO quando o ator e um chefe com assinatura propria —
+       * o `boss_windup` que sai no mesmo tick e quem fala por ele.
+       */
+      archetype?: EnemyArchetype;
       x: number;
       y: number;
       dx: number;
@@ -1415,7 +1519,67 @@ export type SemanticEvent =
    * unico chefe que dormia ate ser notado, e desde `bossForBiome` a camara
    * final pode ser de outro.
    */
-  | { t: 'boss_awake' }
+  // `archetype`/`x`/`y` sao opcionais por defesa (fixtures antigas); a
+  // simulacao sempre os preenche, e e por eles que o despertar de cada chefe
+  // soa como o proprio chefe, de onde ele esta.
+  | { t: 'boss_awake'; archetype?: EnemyArchetype; x?: number; y?: number }
+  /**
+   * OS TRES MOMENTOS de uma habilidade de chefe, como eventos PROPRIOS.
+   *
+   *   boss_windup      preparacao — "algo vai acontecer".
+   *   boss_attack      execucao   — "aconteceu agora".
+   *   boss_state       consequencia/presenca — "o mundo (ou o corpo) mudou".
+   *   boss_vulnerable  a blindagem abriu (ou fechou de novo).
+   *
+   * Existem porque a assinatura sonora de cada chefe nao pode ser INFERIDA no
+   * cliente: `action_start` diz que uma acao `pulse` comecou, mas so a
+   * simulacao sabe que aquele pulso e o canto do Arquicantor e nao a Supernova
+   * do Bispo — e as fases que nao passam por `EntityAction` (a respiracao do
+   * Pulmao, a polaridade do Magnetarca, a boca do Devorador) nao tinham
+   * evento nenhum. Cada um carrega o arquetipo e a habilidade/momento, e NADA
+   * de acustica: que voz soa, com que altura, e decisao do cliente (cues.ts).
+   *
+   * `intensity` (0..1) e o unico numero "de apresentacao" que viaja, e o
+   * significado e da habilidade: para o canto do Arquicantor e o tamanho da
+   * rede que vai responder; para a ressonancia, quao perto do corpo a camada
+   * esta. `releaseTick` no windup e para o cliente poder casar a duracao da
+   * preparacao com a do aviso, como `action_start` ja faz.
+   */
+  | {
+      t: 'boss_windup';
+      archetype: EnemyArchetype;
+      ability: BossAbility;
+      x: number;
+      y: number;
+      dx?: number;
+      dy?: number;
+      releaseTick: number;
+      intensity?: number;
+    }
+  | {
+      t: 'boss_attack';
+      archetype: EnemyArchetype;
+      ability: BossAbility;
+      x: number;
+      y: number;
+      dx?: number;
+      dy?: number;
+      intensity?: number;
+    }
+  | {
+      t: 'boss_state';
+      archetype: EnemyArchetype;
+      state: BossMoment;
+      x: number;
+      y: number;
+      intensity?: number;
+    }
+  /**
+   * A JANELA DE DANO abriu (`open`) ou fechou. E o "bata agora" sonoro: a
+   * Fornalha esfriando, o lago da Rainha derretido, a Catedral em silencio, a
+   * boca do Devorador, o Pulmao aceso pela propria expiracao.
+   */
+  | { t: 'boss_vulnerable'; archetype: EnemyArchetype; x: number; y: number; open: boolean }
   /**
    * O chefe cruzou um LIMIAR e nao volta atras.
    *
@@ -1428,7 +1592,7 @@ export type SemanticEvent =
    * O bit tambem viaja em `WorldFlags.bossPhases`, entao quem reconecta no meio
    * do colapso chega ja com a apresentacao certa.
    */
-  | { t: 'boss_phase'; archetype: EnemyArchetype; phase: number }
+  | { t: 'boss_phase'; archetype: EnemyArchetype; phase: number; x?: number; y?: number }
   /**
    * Uma estalactite foi MARCADA. `fireTick` e quando ela chega.
    *

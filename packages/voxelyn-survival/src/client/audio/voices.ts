@@ -82,7 +82,107 @@ export type VoiceId =
   | 'died'
   | 'uiTap'
   // A estatica do véu de deploy: a colmeia fechando sobre a tela.
-  | 'deployStatic';
+  | 'deployStatic'
+  // --- OS CHEFES ---------------------------------------------------------
+  //
+  // Cada chefe tem uma ASSINATURA (um material, uma fisica), e cada
+  // habilidade dele a usa para dizer tres coisas distintas: PREPARACAO ("algo
+  // vai acontecer"), EXECUCAO ("aconteceu agora") e CONSEQUENCIA ("o mundo
+  // mudou por causa disso"). As vozes abaixo sao essas tres coisas, por chefe,
+  // e nao uma paleta de rugidos: o jogador tem de aprender a OUVIR qual golpe
+  // vem, e isso so funciona se cada momento tiver a propria forma.
+  //
+  // Guardiao de Pedra: massa, rocha, subgrave. Nao fala, nao canta — desloca
+  // massa. Mantem `guardianAwake` e `deathGuardian`, que ja eram isso.
+  | 'guardianStep'
+  | 'guardianCompress'
+  | 'guardianSalvoCrack'
+  | 'guardianSlam'
+  | 'guardianChip'
+  | 'guardianStrain'
+  // Bispo: materia organica, fungo e regeneracao — a subida da cura, agora
+  // tambem na preparacao da Supernova.
+  | 'bishopNovaCharge'
+  // Diamandis: maquina industrial + VOZ CORPORATIVA. Ele nao esta lutando,
+  // esta trabalhando, e cada habilidade parece uma operacao de mineracao. A
+  // voz e fonemas roboticos curtos: mesmo sem as palavras ficarem
+  // inteligiveis, o ritmo silabico e a personalidade.
+  | 'diamandisBoot'
+  | 'diamandisVoiceUnmapped'
+  | 'diamandisVoiceSurvey'
+  | 'diamandisVoiceArmed'
+  | 'diamandisVoiceStandClear'
+  | 'diamandisVoiceFault'
+  | 'diamandisVoiceLost'
+  | 'diamandisVoiceObstruction'
+  | 'diamandisDrillSpin'
+  | 'diamandisDrillImpact'
+  | 'diamandisChargeArmed'
+  | 'diamandisImplosion'
+  | 'diamandisBeamScan'
+  | 'diamandisBeamLocked'
+  | 'diamandisReactorFail'
+  | 'diamandisShutdown'
+  // Devorador Branco: friccao subterranea, garganta, vacuo. O som LOCALIZA o
+  // que nao pode ser visto. O vortice em si e um leito (devourer-vortex-bus).
+  | 'devourerBurrow'
+  | 'devourerEmergeWarning'
+  | 'devourerEmerge'
+  | 'devourerMawOpen'
+  | 'devourerMawClose'
+  | 'devourerVulnerable'
+  | 'devourerBroodSwallowed'
+  // Arquicantor: cristal AFINADO, acordes e ressonancia. Um motivo de tres
+  // notas: o idle e uma; a preparacao, duas; o ataque completa a frase — e o
+  // ataque perigoso termina num tritono, sem resolucao.
+  | 'archcantorNote'
+  | 'archcantorPhrase'
+  | 'archcantorChord'
+  | 'archcantorTritone'
+  | 'archcantorResonance'
+  | 'archcantorSilenced'
+  | 'archcantorDeath'
+  // Leviata do Lencol: baleia abissal, agua, eletricidade abafada. O canto
+  // anuncia intencao; o estalo eletrico anuncia perigo.
+  | 'leviathanCall'
+  | 'leviathanBreach'
+  | 'leviathanDelugeRise'
+  | 'leviathanShockCharge'
+  | 'leviathanShockRelease'
+  | 'leviathanBubbleSafe'
+  | 'leviathanShockRecover'
+  // Pulmao-Matriz: inspiracao, pressao, membrana, gas. O ciclo respiratorio
+  // e o relogio da luta; a succao continua e um leito (lung-breath-bus).
+  | 'lungHold'
+  | 'lungExhale'
+  | 'lungClose'
+  | 'lungIgnite'
+  | 'lungWound'
+  // Coracao da Fornalha: pulsacao, pressao e combustao. NAO vocaliza — a
+  // sala e a voz dele. O batimento e um leito (furnace-heart-bus).
+  | 'furnaceWedgeWarn'
+  | 'furnaceWave'
+  | 'furnaceCooling'
+  | 'furnaceReheat'
+  | 'furnaceCrack'
+  | 'furnaceUnstable'
+  | 'furnaceDebris'
+  // Rainha da Geada: cristais finos, gelo tensionado, estilhacos. Beleza fria
+  // antes de ruptura violenta. Aperiodica e desafinada — nunca a linguagem do
+  // Arquicantor, embora os dois sejam cristal.
+  | 'frostQueenFreezeCharge'
+  | 'frostQueenFreeze'
+  | 'frostQueenWraithRise'
+  | 'frostQueenArmorHit'
+  | 'frostQueenArmorBreak'
+  | 'frostQueenShatter'
+  // Magnetarca: magnetismo, inversao e metal tensionado. Atracao e repulsao
+  // precisam soar OPOSTAS — e o jogador precisa saber a polaridade sem olhar.
+  | 'magnetarchAttract'
+  | 'magnetarchRepel'
+  | 'magnetarchFlip'
+  | 'magnetarchCrush'
+  | 'magnetarchArc';
 
 export type VoiceSpec = {
   /**
@@ -246,6 +346,165 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // Trava de 500 ms: o véu chama uma vez por varredura (fechar e abrir), e a
   // trava so existe para um duplo-disparo acidental nao somar duas estaticas.
   deployStatic: { priority: 8, gain: 0.5, minIntervalMs: 500, spatial: false },
+
+  // --- OS CHEFES ---------------------------------------------------------
+  //
+  // A politica de prioridade dos chefes, e a regra que a rege:
+  //
+  //   windup de golpe letal              10
+  //   mudanca de fase / estado global    10
+  //   execucao da habilidade principal    9
+  //   cue de vulnerabilidade              9
+  //   movimento importante fora da tela   7-8
+  //   vocalizacao de personalidade        5-6
+  //   passos, respiracao e fragmentos     2-4
+  //
+  // Vocalizacao NUNCA rouba a vaga de um windup, e o canto do Leviata nao
+  // pode mascarar a propria descarga: e por isso que `leviathanCall` esta em
+  // 6 e `leviathanShockCharge` em 10, e nao o contrario.
+
+  // Guardiao. O passo e textura (3); a compressao de rocha antes do golpe e
+  // o estalo seco antes da salva sao telegrafos (10); o golpe em si e curto e
+  // sem cauda (9). A lasca ao levar dano e textura, e a trava de 110 ms e o
+  // que impede uma minigun de transforma-la numa britadeira.
+  guardianStep: { priority: 3, gain: 0.34, minIntervalMs: 150, spatial: true },
+  guardianCompress: { priority: 10, gain: 0.6, minIntervalMs: 90, spatial: true },
+  guardianSalvoCrack: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  guardianSlam: { priority: 9, gain: 0.7, minIntervalMs: 60, spatial: true },
+  guardianChip: { priority: 3, gain: 0.26, minIntervalMs: 110, spatial: true },
+  guardianStrain: { priority: 4, gain: 0.3, minIntervalMs: 800, spatial: true },
+
+  bishopNovaCharge: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+
+  // Diamandis. As frases de sistema sao personalidade (6): a trava de 400 ms
+  // e o que garante que duas ordens no mesmo tick nao saiam sobrepostas. As
+  // ferramentas seguem a tabela: motor da broca e bipes das cargas sao
+  // windup (10); o contato da broca, a implosao e a trava do feixe sao
+  // execucao (9). A falha operacional e o desligamento sao fase (10).
+  diamandisBoot: { priority: 10, gain: 0.85, minIntervalMs: 0, spatial: false },
+  diamandisVoiceUnmapped: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceSurvey: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceArmed: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceStandClear: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceFault: { priority: 6, gain: 0.46, minIntervalMs: 400, spatial: true },
+  diamandisVoiceLost: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
+  diamandisVoiceObstruction: { priority: 6, gain: 0.44, minIntervalMs: 400, spatial: true },
+  diamandisDrillSpin: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  diamandisDrillImpact: { priority: 9, gain: 0.7, minIntervalMs: 60, spatial: true },
+  diamandisChargeArmed: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+  diamandisImplosion: { priority: 9, gain: 0.75, minIntervalMs: 60, spatial: true },
+  diamandisBeamScan: { priority: 10, gain: 0.45, minIntervalMs: 90, spatial: true },
+  diamandisBeamLocked: { priority: 9, gain: 0.55, minIntervalMs: 60, spatial: true },
+  diamandisReactorFail: { priority: 10, gain: 0.8, minIntervalMs: 0, spatial: false },
+  diamandisShutdown: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+
+  // Devorador. O deslocamento sob a silica e MOVIMENTO FORA DA TELA (7): e
+  // a informacao espacial do encontro, e perde-la no orcamento seria perder
+  // a rota. A trava de 400 ms casa com a cadencia do evento (500 ms) sem
+  // nunca empilhar dois. A boca abrindo e estado global (10); fechando e
+  // consequencia (8); a ninhada engolida e fragmento (2).
+  devourerBurrow: { priority: 7, gain: 0.4, minIntervalMs: 400, spatial: true },
+  devourerEmergeWarning: { priority: 10, gain: 0.6, minIntervalMs: 90, spatial: true },
+  devourerEmerge: { priority: 9, gain: 0.75, minIntervalMs: 60, spatial: true },
+  devourerMawOpen: { priority: 10, gain: 0.75, minIntervalMs: 0, spatial: true },
+  devourerMawClose: { priority: 8, gain: 0.6, minIntervalMs: 0, spatial: true },
+  devourerVulnerable: { priority: 9, gain: 0.45, minIntervalMs: 0, spatial: true },
+  devourerBroodSwallowed: { priority: 2, gain: 0.22, minIntervalMs: 90, spatial: true },
+
+  // Arquicantor. A nota isolada e a ressonancia dos cristais sao vocalizacao
+  // (5); a frase de preparacao e telegrafo (10); o acorde e o tritono sao
+  // execucao (9); o silencio da Catedral e vulnerabilidade (9) e nao e
+  // espacial — o reverb tonal que some e o da SALA. A ressonancia tem trava
+  // de 250 ms porque a onda solta uma camada a cada 300 ms.
+  archcantorNote: { priority: 5, gain: 0.3, minIntervalMs: 300, spatial: true },
+  archcantorPhrase: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+  archcantorChord: { priority: 9, gain: 0.6, minIntervalMs: 60, spatial: true },
+  archcantorTritone: { priority: 9, gain: 0.62, minIntervalMs: 60, spatial: true },
+  archcantorResonance: { priority: 5, gain: 0.32, minIntervalMs: 250, spatial: true },
+  archcantorSilenced: { priority: 9, gain: 0.55, minIntervalMs: 0, spatial: false },
+  archcantorDeath: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+
+  // Leviata. O chamado e presenca (6) e espacial: e "algo enorme navegando
+  // fora da camera". A carga da descarga e a descarga NAO sao espaciais: a
+  // descarga atravessa a arena inteira, entao o aviso e informacao GLOBAL e
+  // tem de ser reconhecido de qualquer lugar. As bolhas (8) sao o "voce esta
+  // seguro" do jogador local; a trava de 500 ms da a elas o ritmo de um
+  // coracao ouvido de dentro. O Diluvio muda o mapa: global tambem.
+  leviathanCall: { priority: 6, gain: 0.42, minIntervalMs: 900, spatial: true },
+  leviathanBreach: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  leviathanDelugeRise: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
+  leviathanShockCharge: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
+  leviathanShockRelease: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+  leviathanBubbleSafe: { priority: 8, gain: 0.36, minIntervalMs: 500, spatial: false },
+  leviathanShockRecover: { priority: 9, gain: 0.5, minIntervalMs: 0, spatial: true },
+
+  // Pulmao. A retencao (pulmao cheio) e telegrafo (10): e o meio segundo de
+  // medo antes do jato. A expiracao e execucao (9); a valvula fechando e
+  // consequencia (7); a expiracao acesa e vulnerabilidade (9). O vazamento
+  // ao levar dano e textura (4), com trava longa — ele leva dano continuo.
+  lungHold: { priority: 10, gain: 0.5, minIntervalMs: 0, spatial: true },
+  lungExhale: { priority: 9, gain: 0.65, minIntervalMs: 0, spatial: true },
+  lungClose: { priority: 7, gain: 0.5, minIntervalMs: 0, spatial: true },
+  lungIgnite: { priority: 9, gain: 0.7, minIntervalMs: 200, spatial: true },
+  lungWound: { priority: 4, gain: 0.3, minIntervalMs: 300, spatial: true },
+
+  // Fornalha. A cunha marcada e telegrafo (10) e ESPACIAL de proposito: o
+  // jogador tem de ouvir de que lado vem a varredura. A onda e execucao (9).
+  // O resfriamento (9) e o reaquecimento (8) sao da SALA, nao do corpo —
+  // globais. Colapso e instabilidade sao fase (10). Os detritos antes da
+  // estalactite sao movimento (7), espaciais: dizem ONDE o teto vai cair.
+  furnaceWedgeWarn: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+  furnaceWave: { priority: 9, gain: 0.7, minIntervalMs: 200, spatial: true },
+  furnaceCooling: { priority: 9, gain: 0.6, minIntervalMs: 0, spatial: false },
+  furnaceReheat: { priority: 8, gain: 0.5, minIntervalMs: 0, spatial: false },
+  furnaceCrack: { priority: 10, gain: 0.85, minIntervalMs: 0, spatial: false },
+  furnaceUnstable: { priority: 10, gain: 0.8, minIntervalMs: 0, spatial: false },
+  furnaceDebris: { priority: 7, gain: 0.4, minIntervalMs: 150, spatial: true },
+
+  // Rainha. Os blings convergindo sao telegrafo (10); a expansao do gelo e
+  // execucao (9); os Espectros saindo sao consequencia (8); o tilintar da
+  // couraça e textura (4) com trava curta — cada tiro absorvido tem de ser
+  // ouvido como absorvido; a couraça quebrando e vulnerabilidade (9).
+  frostQueenFreezeCharge: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+  frostQueenFreeze: { priority: 9, gain: 0.65, minIntervalMs: 60, spatial: true },
+  frostQueenWraithRise: { priority: 8, gain: 0.5, minIntervalMs: 0, spatial: true },
+  frostQueenArmorHit: { priority: 4, gain: 0.28, minIntervalMs: 90, spatial: true },
+  frostQueenArmorBreak: { priority: 9, gain: 0.75, minIntervalMs: 0, spatial: true },
+  frostQueenShatter: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+
+  // Magnetarca. A polaridade e ESTADO GLOBAL (10) e nao espacial: o jogador
+  // tem de saber qual vale sem olhar para o HUD nem para o chefe. O rele
+  // (clack) sai junto da polaridade que entra. O esmagamento e o arco sao
+  // execucao (9); o arco soa onde fecha, longe do corpo.
+  magnetarchAttract: { priority: 10, gain: 0.6, minIntervalMs: 0, spatial: false },
+  magnetarchRepel: { priority: 10, gain: 0.6, minIntervalMs: 0, spatial: false },
+  magnetarchFlip: { priority: 10, gain: 0.55, minIntervalMs: 0, spatial: false },
+  magnetarchCrush: { priority: 9, gain: 0.6, minIntervalMs: 200, spatial: true },
+  magnetarchArc: { priority: 9, gain: 0.55, minIntervalMs: 200, spatial: true },
 };
 
 export const voiceSpec = (id: VoiceId): VoiceSpec => VOICE_SPECS[id];
+
+/**
+ * Os prefixos das vozes de CHEFE — as que passam pela amarrotada lo-fi
+ * (ver `lofi.ts`) em vez do barramento de efeitos limpo. Por prefixo e nao
+ * por flag em cada spec porque a regra e por chefe, nao por voz: ou um chefe
+ * inteiro e amarrotado, ou nenhum. `deathGuardian` e `guardianAwake` entram
+ * por serem do Guardiao; `bishopHeal` entra pelo mesmo motivo.
+ */
+const BOSS_VOICE_PREFIXES: readonly string[] = [
+  'guardian',
+  'deathGuardian',
+  'bishop',
+  'diamandis',
+  'devourer',
+  'archcantor',
+  'leviathan',
+  'lung',
+  'furnace',
+  'frostQueen',
+  'magnetarch',
+];
+
+export const isBossVoice = (id: VoiceId): boolean =>
+  BOSS_VOICE_PREFIXES.some((prefix) => id.startsWith(prefix));
