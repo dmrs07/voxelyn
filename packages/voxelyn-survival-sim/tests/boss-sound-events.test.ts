@@ -18,12 +18,14 @@ import {
   FURNACE_HEART_WAVE_INTERVAL_TICKS,
   FURNACE_HEART_WAVE_WARNING_WAVES,
   LEVIATHAN_CALL_INTERVAL_TICKS,
+  LUNG_MATRIX_BREATH_INTERVAL_TICKS,
   LUNG_MATRIX_CYCLE_TICKS,
   LUNG_MATRIX_HOLD_TICKS,
   MAGNETARCH_CYCLE_TICKS,
   SOLID_CRYSTAL,
   SOLID_NONE,
   SOLID_ROCK,
+  SURF_FIRE,
   SURF_ICE,
   SURF_NONE,
   SURF_WATER,
@@ -71,6 +73,15 @@ const paint = (state: SurvivalState, cx: number, cy: number, r: number, kind: nu
       state.surface[y * w + x] = kind;
       state.surfaceTimer[y * w + x] = 0;
     }
+  }
+};
+
+/** Anda ate o Pulmao estar EXPELINDO (fase 1 do ciclo). */
+const advanceUntilExhaling = (state: SurvivalState): void => {
+  for (let t = 0; t < LUNG_MATRIX_CYCLE_TICKS * 2; t++) {
+    if (Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1) return;
+    stepRun(state, [emptyCommand()]);
+    state.player.hp = state.player.maxHp;
   }
 };
 
@@ -275,6 +286,30 @@ describe('a janela de dano como transicao', () => {
     const thawed = ofType(advanceCollecting(state, 1), 'boss_vulnerable');
     expect(thawed[0]).toMatchObject({ archetype: 'frost_queen', open: true });
     expect(FROST_QUEEN_FREEZE_RADIUS).toBeGreaterThan(0);
+  });
+
+  it('a expiracao acesa abre a janela do Pulmao — mas nao em cima da morte dele', () => {
+    // Fogo colado na boca durante a expiracao: a queimada de retorno.
+    const arm = (seed: number) => {
+      const { state, boss, w } = duel(seed, 'lung_matrix', 4);
+      advanceUntilExhaling(state);
+      paint(state, Math.floor(boss.x), Math.floor(boss.y), 1, SURF_FIRE);
+      state.surfaceTimer[Math.floor(boss.y) * w + Math.floor(boss.x)] = 9999;
+      return { state, boss };
+    };
+    const alive = arm(48);
+    const opened = ofType(
+      advanceCollecting(alive.state, LUNG_MATRIX_BREATH_INTERVAL_TICKS + 1),
+      'boss_vulnerable',
+    );
+    expect(opened.some((e) => e.archetype === 'lung_matrix' && e.open)).toBe(true);
+
+    // Com a vida no fio, a mesma queimada MATA: sai a morte, e nao a janela.
+    const dying = arm(49);
+    dying.boss.hp = 1;
+    const last = advanceCollecting(dying.state, LUNG_MATRIX_BREATH_INTERVAL_TICKS + 1);
+    expect(ofType(last, 'death').some((e) => e.archetype === 'lung_matrix')).toBe(true);
+    expect(ofType(last, 'boss_vulnerable').some((e) => e.archetype === 'lung_matrix')).toBe(false);
   });
 
   it('dano no Guardiao e no Pulmao tem voz de corpo, nunca no dano por tick do chao', () => {

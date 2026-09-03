@@ -4471,14 +4471,18 @@ const lungMatrixStep = (
         markDiscovery(state.stats, DISCOVERY_LUNG_IGNITED);
         events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
         // A expiracao ACESA e a unica janela de dano que o jogador abre: soa
-        // como vulnerabilidade, nao como a explosao comum.
-        events.push({
-          t: 'boss_vulnerable',
-          archetype: 'lung_matrix',
-          x: enemy.x,
-          y: enemy.y,
-          open: true,
-        });
+        // como vulnerabilidade, nao como a explosao comum. So com o corpo
+        // ainda de pe: a queimada que MATA ja emitiu a morte, e anunciar uma
+        // janela abrindo em cima dela seria prometer um golpe que nao existe.
+        if (enemy.alive) {
+          events.push({
+            t: 'boss_vulnerable',
+            archetype: 'lung_matrix',
+            x: enemy.x,
+            y: enemy.y,
+            open: true,
+          });
+        }
       }
     }
   }
