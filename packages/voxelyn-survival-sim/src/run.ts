@@ -3723,6 +3723,11 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
       mix(enemy.action.endsAt);
       mix(Math.round(enemy.action.direction.x * 1000));
       mix(Math.round(enemy.action.direction.y * 1000));
+      // O LATCH DO BOTE decide se este `charge` ainda pode cobrar contato.
+      // Ele e marcado mesmo quando iframes rejeitam dano e frio; deixa-lo fora
+      // faria dois estados com o mesmo HP/geada aceitarem o mesmo hash agora e
+      // divergirem quando os iframes acabassem antes da recovery.
+      mix(enemy.action.landed === true ? 1 : 0);
     }
   }
   for (const proj of state.projectiles) {

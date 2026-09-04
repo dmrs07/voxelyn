@@ -282,6 +282,25 @@ describe('o bote do Espectro e uma dose pequena, e so quando encosta', () => {
     expect(extra.freeze).toBe(0);
   });
 
+  it('o hash distingue explicitamente um bote consumido de um ainda disponivel', () => {
+    const available = iceArena(231);
+    const consumed = iceArena(231);
+    const a = wraithLunge(available, 2);
+    const b = wraithLunge(consumed, 2);
+    const action = {
+      kind: 'charge' as const,
+      phase: 'recovery' as const,
+      startedAt: 10,
+      releaseAt: 20,
+      endsAt: 40,
+      direction: { x: -1, y: 0 },
+    };
+    a.action = { ...action };
+    b.action = { ...action, landed: true };
+
+    expect(hashAuthoritativeState(available)).not.toBe(hashAuthoritativeState(consumed));
+  });
+
   it('um bote fora de alcance nao congela', () => {
     const state = iceArena(24);
     const extra = state.playerExtras[0];
