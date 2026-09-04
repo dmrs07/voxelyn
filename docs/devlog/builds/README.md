@@ -22,16 +22,32 @@ docs/devlog/builds/
 
 São três saídas do mesmo texto, e cada uma existe por um motivo diferente.
 
-O `.md` é a fonte, e é o que se lê no GitHub.
+O `.md` é a fonte, escrito à mão, e é o que se lê no GitHub. As outras duas saem dele:
 
-O `.html` é a **página**: hero com a key art sem branding, imagens em figura com legenda,
-e a faixa do Clevo tocando dentro do post pelo player do YouTube. Abre com dois cliques,
-não depende de servidor, e é o arquivo para mandar para alguém que não lê repositório.
-Os caminhos das imagens são relativos, então a pasta `media/` viaja junto.
+```sh
+node scripts/devlog/build-post.mjs docs/devlog/builds/AAAA-MM-DD-slug.md
+```
 
-O `.itch.html` é o de colar: marca cada imagem com uma linha `[ IMAGE N ... ]`, porque o
-editor do itch é rich text e não sobe imagem por markup. A linha é apagada e a imagem
-entra pelo botão da barra de ferramentas, na ordem listada no comentário do topo.
+O `.html` é a **página**: hero com a key art sem branding, imagens em figura com legenda, e a
+faixa do Clevo tocando dentro do post. Abre com dois cliques, não depende de servidor, e é o
+arquivo para mandar para alguém. Os caminhos das imagens são relativos, então `media/` viaja
+junto.
+
+O `.itch.html` é o de **colar no itch.io**, e é markup semântico puro de propósito. O editor de
+devlog de lá é rich text e SANEIA a colagem: `<style>`, `<iframe>` e atributos de classe não
+sobrevivem. Um embed colado de lá sumiria sem avisar, então imagem e vídeo viram linhas
+vermelhas de marcação que a pessoa troca pelos botões da barra de ferramentas. Um slot visível
+é melhor que uma deleção silenciosa. As instruções e a ordem das imagens ficam no comentário do
+topo do próprio arquivo.
+
+## O que NÃO entra num post destes
+
+A régua é o leitor: alguém que joga, ou que quer jogar. Entra como a mecânica foi pensada, o que
+não estava divertido e virou o quê, e o ofício por trás da arte e do som. Não entra a
+engenharia defensiva que só existe para o jogo não quebrar: versão de protocolo, migração de
+banco, o que entra no hash, ordem de slot em co-op, teto de storage, número de testes. Nada
+disso muda uma decisão de quem está lendo, e cada parágrafo gasto nisso é um parágrafo que não
+foi gasto no Devorador.
 
 ## As imagens
 
