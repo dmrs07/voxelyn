@@ -22,6 +22,7 @@
 // um construtor novo os recriaria zerados, obrigando a copiar de volta campo a
 // campo. Escrever o que muda e menor e diz o que realmente acontece.
 
+import { clearFreeze } from './frost.js';
 import {
   CHUNK,
   CONTAMINATION_CARRYOVER,
@@ -614,6 +615,10 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     extra.dodgeUntil = 0;
     extra.iframesUntil = 0;
     extra.pendingModuleChoice = null;
+    // O frio fica no setor em que foi tomado: a sala nova nao tem a Nova que
+    // o causou, e chegar congelado num mapa que nem se viu seria morrer sem
+    // ter tido a chance de tocar o gatilho.
+    clearFreeze(extra);
   }
 
   populateSector(state, world.enemySpawns, world.guardianSpawn);
@@ -727,6 +732,10 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
     extra.dodgeUntil = 0;
     extra.iframesUntil = 0;
     extra.pendingModuleChoice = null;
+    // O frio fica no setor em que foi tomado: a sala nova nao tem a Nova que
+    // o causou, e chegar congelado num mapa que nem se viu seria morrer sem
+    // ter tido a chance de tocar o gatilho.
+    clearFreeze(extra);
   }
 
   populateSector(state, world.enemySpawns, world.guardianSpawn);

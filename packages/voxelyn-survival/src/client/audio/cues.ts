@@ -329,10 +329,26 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // telegrafo generico como reserva — ver GENERIC_WINDUP_VOICE). Deixar
       // os dois soarem daria dois avisos para um golpe.
       if (ev.archetype && isBossArchetype(ev.archetype)) return [];
+      // O bote do Espectro NAO e o telegrafo generico de investida: o aviso
+      // dele e a nevoa condensando em cristal — e o som e esse.
+      if (ev.archetype === 'frost_wraith' && ev.action === 'charge') {
+        return [{ voice: 'wraithCondense', x: ev.x, y: ev.y, scale: 1 }];
+      }
       const voice = TELEGRAPH_VOICE[ev.action];
       if (!voice) return [];
       return [{ voice, x: ev.x, y: ev.y, scale: 1 }];
     }
+
+    // O ESPECTRO mudando de postura pelo terreno: materializar e dissolver.
+    // A Lampreia emite o mesmo evento e continua muda — o contrato sonoro
+    // dela nao muda por dividir o codigo de espreitador.
+    case 'lurker_state':
+      if (ev.archetype !== 'frost_wraith') return [];
+      return [
+        { voice: ev.hidden ? 'wraithDissolve' : 'wraithCondense', x: ev.x, y: ev.y, scale: 1 },
+      ];
+    case 'wraith_lunge':
+      return [{ voice: 'wraithLunge', x: ev.x, y: ev.y, scale: 1 }];
 
     case 'boss_windup': {
       const own = BOSS_WINDUP_VOICE[ev.archetype]?.[ev.ability];
@@ -511,6 +527,10 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       if (ev.archetype === 'devourer_brood') {
         return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 1 }];
       }
+      // O Espectro nao cai: estilhaca e sublima.
+      if (ev.archetype === 'frost_wraith') {
+        return [{ voice: 'wraithDeath', x: ev.x, y: ev.y, scale: 1 }];
+      }
       if (isBossArchetype(ev.archetype as EnemyArchetype)) {
         const own = BOSS_DEATH_VOICE[ev.archetype as EnemyArchetype];
         return [{ voice: own ?? 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }];
@@ -628,6 +648,20 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 
     case 'overheat':
       return [{ voice: 'overheat', x: ev.x, y: ev.y, scale: 1 }];
+
+    // O CONGELAMENTO DO PROSPECTOR. A dose soa para todo corpo (posicional:
+    // ouvir o parceiro tomando frio do outro lado da sala e informacao); a
+    // crosta fechando, o ciclo e a crosta se partindo sao o que o gatilho
+    // passou a fazer, e soam para quem esta nesse corpo E para o parceiro —
+    // a estatua dele e a coisa mais importante da sala ate se soltar.
+    case 'freeze_dose':
+      return [{ voice: 'freezeDose', x: ev.x, y: ev.y, scale: ev.amount >= 300 ? 1 : 0.7 }];
+    case 'frostbite':
+      return [{ voice: 'frostbite', x: ev.x, y: ev.y, scale: 1 }];
+    case 'thermal_cycle':
+      return [{ voice: 'thermalCycle', x: ev.x, y: ev.y, scale: 1 }];
+    case 'frostbite_break':
+      return [{ voice: 'frostbiteBreak', x: ev.x, y: ev.y, scale: 1 }];
 
     // CANHAO ROTATIVO. O motor CONTINUO nao passa por aqui — ele e um leito
     // (`minigun-bus.ts`), como o fogo e o gas. O que passa sao as bordas: o

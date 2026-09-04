@@ -49,6 +49,9 @@ import {
   FURNACE_HEART_STALACTITE_WARNING_TICKS,
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
+  FREEZE_MAX,
+  FREEZE_THAW_LAYER,
+  freezeFraction,
   FROST_QUEEN_FREEZE_RADIUS,
   HEAT_MAX,
   PURGE_CELL_HEAL,
@@ -113,6 +116,18 @@ import {
   pieceGrow,
   type FrostBurst,
 } from './frost-burst';
+import {
+  frostCracks,
+  frostPieces,
+  frostShell,
+  frostTint,
+  thermalPulse,
+  type FrostPiece,
+} from './frost-shell';
+import { takeFrostHint } from './frost-hints';
+
+/** Altura do Prospector, em raios de corpo, para a geada e a estatua. */
+const FROST_BODY_HEIGHT = 3.8;
 import {
   LEAP_PEAK_PX,
   leapHeight,
@@ -937,6 +952,7 @@ const drawLurkerDisturbance = (
   nowMs: number,
   entityId: number,
   inWater: boolean,
+  facing: { x: number; y: number } = { x: 1, y: 0 },
 ): void => {
   const seed = (Math.imul(entityId, 2654435761) >>> 0) % 1000;
   if (inWater) {
@@ -952,17 +968,104 @@ const drawLurkerDisturbance = (
     }
     return;
   }
-  // Gelo: tres rachaduras curtas em leque, comprimento respirando devagar.
-  const breath = 0.75 + 0.25 * Math.sin(nowMs / 480 + seed);
-  ctx.strokeStyle = 'rgba(123,139,163,0.55)';
-  ctx.lineWidth = Math.max(1, z);
-  for (let c = 0; c < 3; c++) {
-    const angle = ((seed + c * 331) % 628) / 100; // 0..2π deterministico
-    const len = size * (1 + c * 0.35) * breath;
+  // GELO: A NEVOA DE GEADA. O Espectro escondido nao e um corpo, e um volume
+  // baixo e difuso navegando sobre a lamina — forma irregular (nunca uma placa
+  // retangular), bordas dissolvendo em voxels soltos, cristais suspensos por
+  // dentro, um brilho ciano muito sutil no centro, e riscos de condensacao
+  // marcando a DIRECAO. O volume e largo o bastante para dizer "algo se move
+  // aqui" sem entregar uma hitbox pixel-perfect: e a promessa do bioma, a
+  // posicao se le pela lamina e nao pelo corpo.
+  drawFrostMist(ctx, sx, sy, size, z, nowMs, seed, facing, 1);
+};
+
+/**
+ * A nevoa de geada em si — usada viva (na posicao atual) e no rastro, onde
+ * `fade` a apaga. Tudo sai da semente e do relogio: sem sorteio, para o co-op
+ * ver a mesma nevoa no mesmo lugar.
+ */
+const drawFrostMist = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  seed: number,
+  facing: { x: number; y: number },
+  fade: number,
+): void => {
+  const hash = (i: number): number =>
+    ((Math.imul(seed + i * 7919, 2654435761) >>> 0) % 1000) / 1000;
+  const breath = 0.85 + 0.15 * Math.sin(nowMs / 620 + seed);
+  const rx = size * 2.2 * breath;
+  const ry = size * 1.1 * breath;
+  // O brilho ciano no centro: fraco de proposito. E o que separa a nevoa de
+  // uma mancha do chao, e nao uma lanterna.
+  const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, rx * 0.8);
+  glow.addColorStop(0, `rgba(122,184,255,${(0.26 * fade).toFixed(3)})`);
+  glow.addColorStop(1, 'rgba(122,184,255,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, rx * 0.8, ry * 0.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // O volume: lobulos difusos em posicoes semeadas, deslizando devagar. Nove
+  // discos de alpha baixo somam uma forma irregular com bordas que somem.
+  for (let i = 0; i < 9; i++) {
+    const a = hash(i) * Math.PI * 2 + nowMs / (2600 + hash(i + 20) * 1400);
+    const d = 0.25 + hash(i + 40) * 0.7;
+    const px = sx + Math.cos(a) * rx * d;
+    const py = sy + Math.sin(a) * ry * d;
+    const r = size * (0.32 + hash(i + 60) * 0.3);
+    const lobe = ctx.createRadialGradient(px, py, 0, px, py, r);
+    lobe.addColorStop(0, `rgba(210,226,246,${(0.36 * fade).toFixed(3)})`);
+    lobe.addColorStop(1, 'rgba(210,226,246,0)');
+    ctx.fillStyle = lobe;
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    // Achata no eixo Y: a rachadura vive na lamina isometrica, nao de pe.
-    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
+    ctx.ellipse(px, py, r, r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // As bordas dissolvendo: voxels soltos, em dithering, na periferia.
+  const dot = Math.max(1, z * 0.9);
+  ctx.fillStyle = `rgba(232,241,255,${(0.5 * fade).toFixed(3)})`;
+  for (let i = 0; i < 14; i++) {
+    const a = hash(i + 80) * Math.PI * 2;
+    const d = 0.85 + hash(i + 100) * 0.35 + 0.08 * Math.sin(nowMs / 700 + i);
+    ctx.fillRect(
+      sx + Math.cos(a) * rx * d - dot / 2,
+      sy + Math.sin(a) * ry * d - dot / 2,
+      dot,
+      dot,
+    );
+  }
+  // Cristais suspensos por dentro: poucos, brilhantes, subindo e descendo.
+  ctx.fillStyle = `rgba(244,249,255,${(0.9 * fade).toFixed(3)})`;
+  for (let i = 0; i < 4; i++) {
+    const a = hash(i + 120) * Math.PI * 2;
+    const d = 0.2 + hash(i + 140) * 0.5;
+    const bob = Math.sin(nowMs / 520 + i * 1.7) * size * 0.18;
+    const c = Math.max(1, z * 1.2);
+    ctx.fillRect(
+      sx + Math.cos(a) * rx * d - c / 2,
+      sy + Math.sin(a) * ry * d - size * 0.35 + bob - c / 2,
+      c,
+      c,
+    );
+  }
+  // A condensacao marca a direcao: riscos de geada ATRAS do movimento, na
+  // projecao 2:1 do rumo.
+  const fx = facing.x - facing.y;
+  const fy = (facing.x + facing.y) * 0.5;
+  const flen = Math.hypot(fx, fy) || 1;
+  ctx.strokeStyle = `rgba(184,200,224,${(0.45 * fade).toFixed(3)})`;
+  ctx.lineWidth = Math.max(1, z * 0.7);
+  for (let i = 0; i < 3; i++) {
+    const side = (i - 1) * size * 0.45;
+    const x0 = sx - (fx / flen) * size * 0.4 + (-fy / flen) * side;
+    const y0 = sy - (fy / flen) * size * 0.2 + (fx / flen) * side * 0.5;
+    const len = size * (0.9 + hash(i + 160) * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x0 - (fx / flen) * len, y0 - (fy / flen) * len * 0.5);
     ctx.stroke();
   }
 };
@@ -994,18 +1097,11 @@ const drawLurkerTrailPoint = (
     ctx.stroke();
     return;
   }
+  // Gelo: a nevoa que ficou para tras, apagando — mais estreita que a viva,
+  // para o rastro ler como esteira e nao como um segundo corpo.
   const seed =
     (Math.imul(Math.round(sx * 3) + Math.imul(Math.round(sy * 3), 131), 2654435761) >>> 0) % 628;
-  ctx.strokeStyle = `rgba(123,139,163,${(0.42 * fade).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1, z * 0.8);
-  for (let c = 0; c < 2; c++) {
-    const angle = ((seed + c * 271) % 628) / 100;
-    const len = size * (0.7 + c * 0.35);
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
-    ctx.stroke();
-  }
+  drawFrostMist(ctx, sx, sy, size * 0.55, z, 0, seed, { x: 1, y: 0 }, fade * 0.7);
 };
 
 /**
@@ -1565,6 +1661,8 @@ export class SurvivalRenderer {
   private coresChangedAtMs = -1e9;
   /** Quando o Prospector local gastou a ultima Celula de Purga. */
   private purgeUsedAtMs = -1e9;
+  /** Quando a instrucao "segure disparo" foi repetida pela ultima vez (estatua). */
+  private frostHoldNagAtMs = -1e9;
   /** Salões já atravessados neste setor, para SV-04. */
   private readonly route = new RouteMemory();
   /** Estimador de velocidade de alvo, para o marcador de antecipação (IA-03). */
@@ -1744,6 +1842,7 @@ export class SurvivalRenderer {
     this.coresTakenSeen = -1;
     this.coresChangedAtMs = -1e9;
     this.purgeUsedAtMs = -1e9;
+    this.frostHoldNagAtMs = -1e9;
   }
 
   /**
@@ -2258,6 +2357,52 @@ export class SurvivalRenderer {
         case 'overheat':
           if (ev.slot === this.localPlayerId - 1) {
             this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600, tone: 'warn' });
+          }
+          break;
+        // O CONGELAMENTO DO PROSPECTOR. O estado (medidor, latch) e lido do
+        // `playerExtras` a cada quadro; os eventos so dao aos marcos um
+        // instante em tempo real — o clarao, o tremor, a instrucao.
+        case 'freeze_dose':
+          this.addFlash(ev.x, ev.y, 1.4, 0.5, nowMs, 220, PAL.mist);
+          if (
+            ev.slot === this.localPlayerId - 1 &&
+            ev.freeze < FREEZE_MAX &&
+            takeFrostHint('partial')
+          ) {
+            this.messages.push({
+              text: t('hint.freeze.partial'),
+              until: nowMs + 2600,
+              tone: 'info',
+            });
+          }
+          break;
+        case 'frostbite':
+          this.addFlash(ev.x, ev.y, 2.4, 0.9, nowMs, 360, PAL.player);
+          this.shake = { power: 3, until: nowMs + 180 };
+          if (ev.slot === this.localPlayerId - 1) {
+            const hint = takeFrostHint('frostbite');
+            this.messages.push({
+              text: t(hint ? 'hint.freeze.frostbite' : 'hud.freeze.hold'),
+              until: nowMs + (hint ? 4200 : 2400),
+              tone: 'warn',
+            });
+            this.frostHoldNagAtMs = nowMs;
+          }
+          break;
+        case 'thermal_cycle':
+          // O pulso do nucleo e o tremor vem do relogio da apresentacao; aqui
+          // fica so um clarao laranja minusculo — o motor aceso sob o gelo.
+          this.addFlash(ev.x, ev.y, 0.9, 0.35, nowMs, 140, PAL.fire);
+          break;
+        case 'frostbite_break':
+          this.addFlash(ev.x, ev.y, 2.2, 1, nowMs, 300, PAL.player);
+          this.shake = { power: 4, until: nowMs + 200 };
+          if (ev.slot === this.localPlayerId - 1) {
+            this.messages.push({
+              text: t('toast.frostbite.break'),
+              until: nowMs + 1400,
+              tone: 'good',
+            });
           }
           break;
         case 'message':
@@ -3866,6 +4011,7 @@ export class SurvivalRenderer {
               nowMs,
               enemy.id,
               enemy.archetype === 'mud_lamprey',
+              enemy.facing,
             );
             if (enemy.stunnedUntil > state.tick) {
               drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
@@ -4036,7 +4182,14 @@ export class SurvivalRenderer {
         nowMs,
         ex.downed,
         this.minigunViews.get(slot),
+        ex.frostbitten,
       );
+      // O FRIO NO CORPO: o medidor veste o chassi continuamente (ver
+      // frost-shell.ts), e a estatua pulsa e treme a cada ciclo termico.
+      const frostFrac = freezeFraction(ex);
+      const frozen = ex.frostbitten;
+      const frostClocks = this.presentation.frostClocks(pl.id, nowMs);
+      const pulse = frozen ? thermalPulse(frostClocks.sinceCycleMs, prefersReducedMotion()) : null;
       // Superaquecimento: o corpo TREME e o cano solta fumaca preta.
       //
       // O tremor e do corpo inteiro e nao da arma. Quem trava o gatilho e o
@@ -4054,8 +4207,12 @@ export class SurvivalRenderer {
       const reducedMotion = prefersReducedMotion();
       const faultX = fault.active && !reducedMotion ? fault.jitterX * z : 0;
       const faultY = fault.active && !reducedMotion ? fault.jitterY * z : 0;
-      const shakeX = (overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0) + faultX;
-      const shakeY = (overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0) + faultY;
+      const shakeX =
+        (overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0) + faultX + (pulse?.dx ?? 0) * z;
+      const shakeY =
+        (overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0) +
+        faultY +
+        (pulse?.dy ?? 0) * z;
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
@@ -4135,8 +4292,11 @@ export class SurvivalRenderer {
                 psx,
                 psy,
                 spriteZoom,
-                // parceiro (nao-local) recebe leve tint frio para diferenciar
-                isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 },
+                // O veu da geada vence o tint do parceiro: o frio e informacao,
+                // a cor de aliado e convencao — e o visor ja diz quem e quem.
+                frostTint(frostFrac, frozen) ??
+                  // parceiro (nao-local) recebe leve tint frio para diferenciar
+                  (isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }),
                 // O CHASSI E LATAO USINADO: o unico corpo polido que anda pela
                 // tela, e por isso o unico que devolve um realce concentrado em
                 // vez de um veu. E ele que faz o proprio tiro do jogador acender
@@ -4180,6 +4340,36 @@ export class SurvivalRenderer {
                 const gunView = this.minigunViews.get(slot);
                 if (gunView.phase === 'overheated' || ex.heat > HEAT_MAX * 0.82) {
                   this.particles.emitOverheatSmoke(
+                    slot,
+                    pl.x,
+                    pl.y,
+                    nowMs,
+                    this.quality.maxFx / PRESETS.high.maxFx,
+                  );
+                }
+              }
+              // A GEADA, por cima do sprite e antes de tudo o que e leitura de
+              // estado: placas, cristais, a concha da estatua e as fissuras do
+              // degelo. O vapor sai pelas juntas enquanto o motor forca.
+              if (frostFrac > 0 || frozen) {
+                const thaw = frozen
+                  ? Math.max(0, Math.min(1, (FREEZE_MAX - ex.freeze) / FREEZE_THAW_LAYER))
+                  : 0;
+                this.drawFrostOverlay(
+                  ctx,
+                  psx,
+                  psy,
+                  size,
+                  z,
+                  pl.id,
+                  frostFrac,
+                  frozen,
+                  thaw,
+                  pulse?.glow ?? 0,
+                  frostClocks.sinceBreakMs,
+                );
+                if (frozen && pulse?.steam) {
+                  this.particles.emitThawSteam(
                     slot,
                     pl.x,
                     pl.y,
@@ -4835,6 +5025,172 @@ export class SurvivalRenderer {
     this.trackSector(state, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
+  }
+
+  /**
+   * A GEADA NO PROSPECTOR (ver frost-shell.ts). `size` e o raio do corpo em
+   * px; a altura do chassi e `size * 2.7`, como a varredura da Purga usa.
+   * As pecas vem em unidades de corpo e viram quads aqui; a estatua e um
+   * poligono facetado por cima da silhueta, com o nucleo pulsando laranja
+   * durante o ciclo e as fissuras crescendo na proporcao do que derreteu. Na
+   * quebra, a concha se abre por 220 ms — lascas soltas para fora — e some.
+   */
+  private drawFrostOverlay(
+    ctx: CanvasRenderingContext2D,
+    psx: number,
+    psy: number,
+    size: number,
+    z: number,
+    entityId: number,
+    frac: number,
+    frozen: boolean,
+    thaw: number,
+    glow: number,
+    sinceBreakMs: number,
+  ): void {
+    // A altura do chassi em px. O sprite do Prospector mede ~3,8 raios de pe
+    // a cabeca; a varredura da Purga usa 2,7 porque so cobre o tronco.
+    const bodyH = size * FROST_BODY_HEIGHT;
+    const bx = (x: number): number => psx + x * size;
+    const by = (y: number): number => psy - y * bodyH;
+    const seed = Math.imul(entityId, 2654435761) ^ 0xf05;
+    ctx.save();
+    if (!frozen) {
+      // Os degraus parciais: geada, placas, cristais.
+      if (frac > 0) {
+        for (const piece of frostPieces(seed, frac))
+          this.drawFrostPiece(ctx, piece, bx, by, size, z);
+      }
+      // A concha ABRINDO: logo depois da quebra, os fragmentos da estatua
+      // voam para fora por um instante — e o corpo so volta a se mexer quando
+      // a leitura da quebra ja aconteceu.
+      if (sinceBreakMs < 220) {
+        const u = sinceBreakMs / 220;
+        const shell = frostShell(seed);
+        ctx.globalAlpha = (1 - u) * 0.85;
+        ctx.fillStyle = '#dbe9ff';
+        for (let i = 0; i < shell.length; i++) {
+          const [x0, y0] = shell[i];
+          const [x1, y1] = shell[(i + 1) % shell.length];
+          const ox = ((x0 + x1) / 2) * u * 1.6;
+          const oy = -u * 0.5 + ((y0 + y1) / 2 - 0.5) * u * 1.2;
+          ctx.beginPath();
+          ctx.moveTo(bx(x0 + ox), by(y0 + oy));
+          ctx.lineTo(bx(x1 + ox), by(y1 + oy));
+          ctx.lineTo(bx((x0 + x1) / 2 + ox), by((y0 + y1) / 2 - 0.12 + oy));
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      return;
+    }
+    // A ESTATUA. A silhueta continua visivel por baixo (o veu do sprite ja
+    // e frio); a concha e o que diz "selado": faces claras, arestas mais
+    // claras ainda, nada de curva.
+    const shell = frostShell(seed);
+    ctx.beginPath();
+    shell.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(bx(x), by(y)) : ctx.lineTo(bx(x), by(y))));
+    ctx.closePath();
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = '#dbe9ff';
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = Math.max(1, z * 0.9);
+    ctx.strokeStyle = '#f4f9ff';
+    ctx.stroke();
+    // Facetas internas: arestas do centro para vertices alternados.
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = Math.max(1, z * 0.5);
+    for (let i = 0; i < shell.length; i += 4) {
+      ctx.beginPath();
+      ctx.moveTo(bx(0), by(0.5));
+      ctx.lineTo(bx(shell[i][0]), by(shell[i][1]));
+      ctx.stroke();
+    }
+    // O NUCLEO aceso sob o gelo, no ciclo termico.
+    if (glow > 0) {
+      const r = size * (0.45 + glow * 0.35);
+      const grad = ctx.createRadialGradient(bx(0), by(0.52), 0, bx(0), by(0.52), r);
+      grad.addColorStop(0, `rgba(255,178,102,${0.75 * glow})`);
+      grad.addColorStop(0.6, `rgba(255,122,47,${0.35 * glow})`);
+      grad.addColorStop(1, 'rgba(255,122,47,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(bx(0), by(0.52), r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // As FISSURAS: do motor e da arma para o resto da crosta, na proporcao do
+    // que ja derreteu — e o unico progresso que a estatua mostra.
+    const cracks = frostCracks(seed);
+    const shown = Math.round(thaw * cracks.length);
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = '#2e3a4d';
+    ctx.lineWidth = Math.max(1, z * 0.7);
+    for (let i = 0; i < shown; i++) {
+      const c = cracks[i];
+      ctx.beginPath();
+      ctx.moveTo(bx(c.x0), by(c.y0));
+      ctx.lineTo(bx(c.x1), by(c.y1));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawFrostPiece(
+    ctx: CanvasRenderingContext2D,
+    piece: FrostPiece,
+    bx: (x: number) => number,
+    by: (y: number) => number,
+    size: number,
+    z: number,
+  ): void {
+    // A altura do chassi em px. O sprite do Prospector mede ~3,8 raios de pe
+    // a cabeca; a varredura da Purga usa 2,7 porque so cobre o tronco.
+    const bodyH = size * FROST_BODY_HEIGHT;
+    if (piece.kind === 'speck') {
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = '#e8f1ff';
+      ctx.fillRect(
+        bx(piece.x) - (piece.w * size) / 2,
+        by(piece.y),
+        piece.w * size,
+        Math.max(1, piece.h * bodyH),
+      );
+      return;
+    }
+    if (piece.kind === 'plate') {
+      ctx.save();
+      ctx.translate(bx(piece.x), by(piece.y));
+      ctx.rotate(piece.angle);
+      const w = piece.w * size;
+      const h = piece.h * bodyH;
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#dbe9ff';
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#f4f9ff';
+      ctx.lineWidth = Math.max(1, z * 0.5);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+      return;
+    }
+    // Cristal: um triangulo fino apontando para o nucleo.
+    const len = piece.w * size * 1.6;
+    const half = Math.max(1, piece.h * bodyH);
+    const dx = Math.cos(piece.angle);
+    const dy = -Math.sin(piece.angle) * 0.6;
+    const x0 = bx(piece.x);
+    const y0 = by(piece.y);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#e8f1ff';
+    ctx.beginPath();
+    ctx.moveTo(x0 - dy * half, y0 + dx * half);
+    ctx.lineTo(x0 + dx * len, y0 + dy * len);
+    ctx.lineTo(x0 + dy * half, y0 - dx * half);
+    ctx.closePath();
+    ctx.fill();
   }
 
   /**
@@ -5739,6 +6095,7 @@ export class SurvivalRenderer {
           moduleCount: state.playerExtra.activeModules.length,
           surveyHeight: 0,
           objectiveLines: 1,
+          freezeMeter: state.playerExtra.freeze > 0 || state.playerExtra.frostbitten,
         });
         return {
           x: layout.x * hs,
@@ -6166,6 +6523,7 @@ export class SurvivalRenderer {
       moduleCount: extra.activeModules.length,
       surveyHeight,
       objectiveLines: objectiveLines.length,
+      freezeMeter: extra.freeze > 0 || extra.frostbitten,
     });
     // Os leitores do retangulo (caixa-preta, voos) usam o do ULTIMO quadro.
     this.hudPanelRect = {
@@ -6404,6 +6762,88 @@ export class SurvivalRenderer {
         ctx.textAlign = 'right';
         ctx.fillStyle = extra.minigun.phase === 'overheated' ? PAL.blood : PAL.biolum;
         ctx.fillText(label, hpBar.x + hpBar.w, heatRail.y + 6);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // O MEDIDOR DE CONGELAMENTO, colado aos trilhos termicos e inequivoco
+    // ao lado deles: azul-claro, SEGMENTADO em tres, com um floco na origem —
+    // segmento, icone, fissura e cadeado dizem o que a cor sozinha nao diz.
+    // Tres segmentos porque o medidor tem tres leituras: geada, congelamento
+    // avancado e perigo critico. Cheio, trava com a legenda; enquanto o
+    // gatilho derrete, o ultimo segmento racha e recua em azul, ao mesmo
+    // tempo em que o trilho de calor logo acima cresce em laranja — a relacao
+    // termica e um par de barras a tres pixels uma da outra.
+    if (layout.freezeRail) {
+      const rail = layout.freezeRail;
+      const frac = freezeFraction(extra);
+      const frozen = extra.frostbitten;
+      const iconX = hpBar.x - 9;
+      const iconY = rail.y + rail.h / 2;
+      // O floco: tres riscos cruzados.
+      ctx.strokeStyle = frozen ? PAL.player : PAL.electric;
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(iconX - Math.cos(a) * 3.5, iconY - Math.sin(a) * 3.5);
+        ctx.lineTo(iconX + Math.cos(a) * 3.5, iconY + Math.sin(a) * 3.5);
+        ctx.stroke();
+      }
+      const gap = 2;
+      const segW = (railW - gap * 2) / 3;
+      for (let seg = 0; seg < 3; seg++) {
+        const sx = railX + seg * (segW + gap);
+        ctx.fillStyle = 'rgba(0,0,0,0.58)';
+        ctx.fillRect(sx, rail.y, segW, rail.h);
+        const fill = Math.max(0, Math.min(1, frac * 3 - seg));
+        if (fill > 0) {
+          // O terceiro segmento e o perigo, e por isso o mais claro.
+          ctx.fillStyle = frozen ? PAL.player : seg === 2 ? '#bfe0ff' : PAL.electric;
+          ctx.globalAlpha = frozen && !reduced ? 0.8 + 0.2 * Math.sin(nowMs / 120) : 1;
+          ctx.fillRect(sx, rail.y, segW * fill, rail.h);
+          ctx.globalAlpha = 1;
+        }
+        if (frozen && seg === 2) {
+          // As FISSURAS do degelo atravessam o ultimo segmento na proporcao do
+          // que ja derreteu.
+          const thaw = Math.max(0, Math.min(1, (FREEZE_MAX - extra.freeze) / FREEZE_THAW_LAYER));
+          const cracks = Math.round(thaw * 5);
+          ctx.strokeStyle = PAL.dark;
+          for (let c = 0; c < cracks; c++) {
+            const cx = sx + segW * (0.15 + c * 0.18);
+            ctx.beginPath();
+            ctx.moveTo(cx, rail.y);
+            ctx.lineTo(cx + 2, rail.y + rail.h);
+            ctx.stroke();
+          }
+        }
+      }
+      if (frozen) {
+        // O CADEADO no fim do trilho e a legenda por cima: o estado travou.
+        const lx = railX + railW + 3;
+        ctx.strokeStyle = PAL.player;
+        ctx.beginPath();
+        ctx.arc(lx + 2.5, rail.y + 1.5, 1.8, Math.PI, 0);
+        ctx.stroke();
+        ctx.fillStyle = PAL.player;
+        ctx.fillRect(lx, rail.y + 1.5, 5, rail.h - 1.5);
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = PAL.dark;
+        ctx.fillText(t('hud.freeze.critical'), railX + railW / 2, rail.y + rail.h - 1);
+        ctx.textAlign = 'left';
+        // A instrucao repete enquanto a estatua durar: e a unica saida, e o
+        // jogador que entrou depois da primeira frase precisa le-la tambem.
+        if (nowMs - this.frostHoldNagAtMs > 3000) {
+          this.frostHoldNagAtMs = nowMs;
+          this.messages.push({ text: t('hud.freeze.hold'), until: nowMs + 2400, tone: 'warn' });
+        }
+      } else if (frac > 0) {
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = PAL.electric;
+        ctx.fillText(t('hud.freeze.label'), hpBar.x + hpBar.w, rail.y + rail.h - 1);
         ctx.textAlign = 'left';
       }
     }

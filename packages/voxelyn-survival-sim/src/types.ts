@@ -545,6 +545,13 @@ export type EntityAction = {
    * de release unico, como todas as outras.
    */
   salvo?: number;
+  /**
+   * O bote do Espectro ja ENCOSTOU nesta acao. Presente = o golpe deste bote
+   * ja foi resolvido (acertou, ou passou por uma esquiva) e nao se repete
+   * nos ticks seguintes do mesmo impulso; ausente = ainda pode encostar.
+   * So os botes de espreitador o escrevem.
+   */
+  landed?: true;
 };
 
 export type Entity = {
@@ -1068,6 +1075,9 @@ export type WellOffer = {
   takenBy: number | null;
 };
 
+/** De onde veio uma dose de frio. */
+export type FreezeSource = 'frost_queen' | 'frost_wraith';
+
 export type PlayerExtra = {
   aim: Vec2;
   heat: number;
@@ -1134,6 +1144,22 @@ export type PlayerExtra = {
   lastDamage: { cause: DamageCause; tick: number } | null;
   /** A habilidade equipada. Comeca em `pulse` e so muda no poco. */
   ability: AbilityId;
+  /**
+   * O MEDIDOR DE CONGELAMENTO, 0..FREEZE_MAX (inteiro). A Nova da Rainha e o
+   * bote do Espectro somam; o decaimento natural e o calor da arma subtraem.
+   * Ver `frost.ts`. Entra no hash, no viewer e no snapshot dos parceiros.
+   */
+  freeze: number;
+  /**
+   * CONGELADO POR INTEIRO. Trava quando o medidor enche e so solta quando o
+   * gatilho derrete uma camada — nunca pelo decaimento. Nao e morte nem
+   * abatido: o corpo continua vulneravel e o HUD continua funcionando.
+   */
+  frostbitten: boolean;
+  /** Ate quando o decaimento natural fica suspenso depois de uma dose. */
+  freezeGraceUntil: number;
+  /** O proximo tick em que o gatilho pode forcar um ciclo termico. */
+  thermalCycleReadyAt: number;
   /**
    * Reacoes provocadas NESTE setor.
    *
@@ -1387,6 +1413,23 @@ export type SemanticEvent =
    */
   | { t: 'action_end'; entity: number }
   /**
+   * Um ESPREITADOR mudou de postura pelo terreno: entrou no elemento
+   * (`hidden: true`) ou foi desalojado dele. O bote NAO passa por aqui — o
+   * `action_start` do `charge` ja anuncia a exposicao que o bote causa. O
+   * cliente usa isto para a materializacao e a dissolucao do Espectro (som e
+   * particulas); a Lampreia emite o mesmo evento e o cliente nao lhe da voz.
+   */
+  | {
+      t: 'lurker_state';
+      archetype: EnemyArchetype;
+      entity: number;
+      x: number;
+      y: number;
+      hidden: boolean;
+    }
+  /** O bote do Espectro SAIU: o impulso no fim do telegrafo. */
+  | { t: 'wraith_lunge'; entity: number; x: number; y: number; dx: number; dy: number }
+  /**
    * `hazard` marca dano POR TICK do chao cobrando presenca (gas, esporo, fogo
    * sob os pes — os tres ramos de `applyCellHazards`). O audio precisa da
    * distincao para nao tocar o impacto pleno a 20 Hz dentro de uma nuvem.
@@ -1639,6 +1682,29 @@ export type SemanticEvent =
       spin: number;
     }
   | { t: 'overheat'; slot: number; x: number; y: number }
+  /**
+   * O CONGELAMENTO DO PROSPECTOR (ver `frost.ts`). Quatro eventos, e nenhum
+   * deles decide nada: o medidor e o latch sao estado autoritativo; isto e o
+   * que o HUD, o som e as particulas apresentam.
+   *
+   * `freeze_dose`: uma dose entrou, de onde, e em quanto o medidor ficou.
+   * `frostbite`: o medidor encheu e o corpo travou.
+   * `thermal_cycle`: o gatilho forcou o motor por baixo do gelo — um ciclo
+   *   seco, sem tiro — e o medidor desceu para `freeze`.
+   * `frostbite_break`: a camada critica derreteu; a crosta se partiu.
+   */
+  | {
+      t: 'freeze_dose';
+      slot: number;
+      x: number;
+      y: number;
+      amount: number;
+      freeze: number;
+      source: FreezeSource;
+    }
+  | { t: 'frostbite'; slot: number; x: number; y: number }
+  | { t: 'thermal_cycle'; slot: number; x: number; y: number; freeze: number; heat: number }
+  | { t: 'frostbite_break'; slot: number; x: number; y: number }
   /**
    * O chefe do setor acordou. Chamava-se `guardian_awake`: o Guardiao era o
    * unico chefe que dormia ate ser notado, e desde `bossForBiome` a camara

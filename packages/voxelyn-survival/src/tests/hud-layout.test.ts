@@ -110,6 +110,20 @@ describe('as secoes do painel nunca se invadem', () => {
     expect(l.hpBar.y + l.hpBar.h).toBeLessThanOrEqual(l.heatRail.y);
     expect(l.heatRail.y + l.heatRail.h).toBeLessThanOrEqual(l.spinRail.y);
     expect(l.spinRail.y + l.spinRail.h).toBeLessThan(l.dividerA);
+    expect(l.freezeRail).toBeNull();
+    // Com o medidor de congelamento visivel, ele cabe entre a rotacao e o
+    // divisor sem tocar em nenhum dos dois — e tudo abaixo desce junto.
+    const f = hudPanelLayout({
+      viewportWidth: 390,
+      safe: { ...SAFE, top: 20, left: 8 },
+      ...input,
+      freezeMeter: true,
+    });
+    expect(f.freezeRail).not.toBeNull();
+    expect(f.freezeRail!.y).toBeGreaterThanOrEqual(f.spinRail.y + f.spinRail.h);
+    expect(f.freezeRail!.y + f.freezeRail!.h).toBeLessThan(f.dividerA);
+    expect(f.dividerA - l.dividerA).toBe(f.height - l.height);
+    expect(f.height).toBeGreaterThan(l.height);
     // Recursos abaixo do primeiro divisor, com folga para o glifo de 15px.
     expect(l.resources.glyphY - 8).toBeGreaterThan(l.dividerA);
     // Modulos: o card e o badge inteiro (nada orbita fora dele), entre a

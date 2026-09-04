@@ -466,6 +466,57 @@ export const WRAITH_LUNGE_WINDUP_TICKS = 12;
 export const WRAITH_LUNGE_COOLDOWN_TICKS = 70;
 /** Sob o gelo ele desliza mais rapido do que qualquer coisa anda. */
 export const WRAITH_UNDER_ICE_SPEED_SCALE = 1.35;
+/**
+ * O bote que ACERTA: quao perto o corpo do Espectro tem de chegar do
+ * Prospector, durante o impulso do bote, para o golpe contar. Um bote que
+ * passa ao lado, que e esquivado ou que morre na parede nao encosta — e um
+ * bote que nao encosta nao machuca nem congela.
+ */
+export const WRAITH_LUNGE_HIT_MARGIN = 0.35;
+
+/**
+ * O CONGELAMENTO DO PROSPECTOR (ver `frost.ts`).
+ *
+ * O medidor vai de 0 a FREEZE_MAX em inteiros (milesimos, como a rotacao da
+ * Minigun): sem float no hash. As doses e o decaimento estao calibrados por
+ * UMA conta, que o teste `congelamento.test.ts` refaz:
+ *
+ *   tres Novas seguidas (14 s entre elas) TEM de congelar, mesmo com o
+ *   decaimento correndo nos intervalos:
+ *     450 - 120 + 450 - 120 + 450 = 1110 >= 1000
+ *   (120 = (280 ticks - 40 de graca) / 2 ticks por ponto).
+ *
+ * O bote do Espectro e uma dose PEQUENA (12%): um so nao ameaca; uma matilha,
+ * somada a uma Nova, acelera perigosamente. Elite nao escala a dose — o dano
+ * dele e maior, o frio nao. Se um dia escalar, e decisao, com teste.
+ */
+export const FREEZE_MAX = 1000;
+export const FREEZE_QUEEN_DOSE = 450;
+export const FREEZE_WRAITH_DOSE = 120;
+/** Um ponto a cada dois ticks: um ponto percentual por segundo. */
+export const FREEZE_DECAY_INTERVAL_TICKS = 2;
+export const FREEZE_DECAY_PER_INTERVAL = 1;
+/** Depois de uma dose o medidor segura 2 s antes de comecar a descer. */
+export const FREEZE_GRACE_TICKS = 40;
+/**
+ * A CAMADA: quanto tem de derreter, a partir do cheio, para a crosta se
+ * soltar. Um terco. E a histerese que impede o primeiro ciclo de "libertar".
+ */
+export const FREEZE_THAW_LAYER = 330;
+/**
+ * O CICLO TERMICO: a cada 4 ticks com o gatilho apertado, o motor parte por
+ * baixo do gelo e gera 12 de calor — no sistema de calor de sempre. A cadencia
+ * e fixa e igual para toda arma; a Minigun nao aproveita a rotacao dela.
+ *
+ * Com a arma fria: 5 ciclos x 66 = 330 = uma camada, em 20 ticks (1,0 s) —
+ * e 60 de calor gerado menos ~23 dissipados, longe do superaquecimento.
+ * Entrando a 70 de calor, o quarto ciclo trava o cano: e o risco de entrar
+ * quente, e ele e deliberado.
+ */
+export const FREEZE_THERMAL_CYCLE_TICKS = 4;
+export const FREEZE_THERMAL_CYCLE_HEAT = 12;
+/** Quanto de gelo cada unidade de calor NOVO derrete: 12 de calor = 66. */
+export const FREEZE_MELT_PER_HEAT = 5.5;
 
 /**
  * Bombardeiro de Enxofre (Fenda Sulfurosa e Fornalha Abissal).

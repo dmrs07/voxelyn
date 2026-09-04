@@ -104,6 +104,15 @@ export type EntitySnapshot = {
   alive: boolean;
   elite: boolean;
   downed?: boolean; // players abatidos
+  /**
+   * O CONGELAMENTO do parceiro (players). `freeze` e o medidor 0..1000, e
+   * `frostbitten` o latch de corpo inteiro. Viajam porque o parceiro precisa
+   * VER: a geada subindo pelo chassi diz "ele esta perto de travar", e a
+   * estatua diz "ele nao vai chegar ate voce". Derivar do `freeze_dose` nao
+   * serve a quem reconecta — o evento que anunciou nao sobrevive a reconexao.
+   */
+  freeze?: number;
+  frostbitten?: boolean;
   facingX?: number;
   facingY?: number;
   /** Tick autoritativo ate o qual a entidade permanece atordoada. */
@@ -168,6 +177,13 @@ export type ViewerState = {
    * `ability_taken` so alimentava toast e clarao.
    */
   ability: AbilityId;
+  /**
+   * O medidor de congelamento (0..FREEZE_MAX) e o latch. Sao o que o HUD
+   * desenha no medidor azul e o que decide se o gatilho e arma ou motor; o
+   * decaimento e os ciclos sao do servidor, o cliente so le.
+   */
+  freeze: number;
+  frostbitten: boolean;
 };
 
 /**

@@ -139,6 +139,9 @@ export type AgentSnapshot = {
     facing: { x: number; y: number };
     heat: number;
     overheated: boolean;
+    /** Medidor de congelamento 0..1000 e o latch de corpo inteiro. */
+    freeze: number;
+    frostbitten: boolean;
     ability: string;
     abilityReady: boolean;
     dodgeReady: boolean;
@@ -244,6 +247,8 @@ export const buildAgentSnapshot = (
       facing: { x: player.facing.x, y: player.facing.y },
       heat: extra.heat,
       overheated: extra.overheatedUntil > state.tick,
+      freeze: extra.freeze,
+      frostbitten: extra.frostbitten,
       ability: extra.ability,
       abilityReady: state.tick >= extra.abilityCooldownUntil,
       dodgeReady: state.tick >= extra.dodgeCooldownUntil,

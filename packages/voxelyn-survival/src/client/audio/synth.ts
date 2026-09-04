@@ -413,6 +413,170 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     tone(ctx, out, t0 + 0.14, { type: 'sawtooth', from: 495, to: 495, peak: 0.34, decay: 0.16 });
   },
 
+  // --- o congelamento do Prospector ----------------------------------------
+  // A dose: GELO ADERINDO AO METAL. Um estalo curto de cristal e, colado nele,
+  // um "tim" metalico que desce — a chapa contraindo com o frio.
+  freezeDose: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.22, decay: 0.05, type: 'highpass', from: 3800 });
+    iceBling(ctx, out, t0 + 0.01, 3100, 0.16);
+    tone(ctx, out, t0 + 0.03, { type: 'triangle', from: 1900, to: 1200, peak: 0.14, decay: 0.12 });
+  },
+  // A crosta FECHANDO: um baque grave (o corpo parando), o gelo subindo pelo
+  // chassi como um trinado de cristais em ordem, e um "clique" seco de
+  // trava no fim — o instante em que nada mais se mexe.
+  frostbite: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 160, to: 50, peak: 0.45, decay: 0.3, attack: 0.006 });
+    burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.12, type: 'lowpass', from: 700, to: 250 });
+    for (let i = 0; i < 7; i++) {
+      iceBling(ctx, out, t0 + 0.06 + i * 0.045, 1800 + i * 420, 0.11 + i * 0.01);
+    }
+    burst(ctx, out, t0 + 0.4, noise, {
+      peak: 0.3,
+      decay: 0.03,
+      type: 'bandpass',
+      from: 2600,
+      q: 5,
+    });
+    tone(ctx, out, t0 + 0.4, { type: 'square', from: 900, to: 700, peak: 0.12, decay: 0.05 });
+  },
+  // O CICLO TERMICO: o motor tentando partir por baixo do gelo — um rosnado
+  // curto e grave que sobe e engasga, com um chiado de gelo cedendo por
+  // cima. Curto de proposito: sai cinco vezes por segundo.
+  thermalCycle: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 85,
+      to: 150,
+      peak: 0.26,
+      decay: 0.13,
+      attack: 0.01,
+    });
+    tone(ctx, out, t0 + 0.02, { type: 'square', from: 170, to: 240, peak: 0.1, decay: 0.09 });
+    burst(ctx, out, t0 + 0.04, noise, { peak: 0.14, decay: 0.08, type: 'highpass', from: 4200 });
+  },
+  // A crosta se PARTINDO de dentro para fora: um estouro largo de cristal,
+  // uma chuva curta de cacos descendo de altura, e o chiado do vapor.
+  frostbiteBreak: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.5,
+      decay: 0.1,
+      type: 'bandpass',
+      from: 2400,
+      to: 900,
+      q: 1.2,
+    });
+    tone(ctx, out, t0, { type: 'sawtooth', from: 1200, to: 300, peak: 0.24, decay: 0.14 });
+    for (let i = 0; i < 9; i++) {
+      iceBling(ctx, out, t0 + 0.05 + i * 0.035, 4200 - i * 300, 0.12);
+    }
+    burst(ctx, out, t0 + 0.12, noise, {
+      peak: 0.18,
+      decay: 0.5,
+      type: 'highpass',
+      from: 2600,
+      to: 5000,
+      attack: 0.05,
+    });
+  },
+
+  // --- o Espectro de Geada ----------------------------------------------------
+  // Escondido: vento OCO (banda estreita e grave respirando), cristais finos
+  // rocando (dois blings quase inaudiveis) e uma respiracao distante — um
+  // sopro passa-baixas longo e fraco. Nada com ataque duro.
+  wraithWhisper: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.16,
+      decay: 0.7,
+      type: 'bandpass',
+      from: 260,
+      to: 420,
+      q: 6,
+      attack: 0.25,
+    });
+    iceBling(ctx, out, t0 + 0.3, 5200, 0.05);
+    iceBling(ctx, out, t0 + 0.46, 4600, 0.04);
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.08,
+      decay: 0.6,
+      type: 'lowpass',
+      from: 500,
+      to: 200,
+      attack: 0.3,
+    });
+  },
+  // Materializacao: SUCCAO de nevoa (ruido passa-altas varrendo para baixo
+  // com ataque lento — o ar entrando) seguida de CRISTALIZACAO ascendente
+  // (blings subindo de altura, cada um um pouco acima do anterior).
+  wraithCondense: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.28,
+      type: 'highpass',
+      from: 5200,
+      to: 1400,
+      attack: 0.16,
+    });
+    for (let i = 0; i < 6; i++) iceBling(ctx, out, t0 + 0.22 + i * 0.055, 1500 + i * 520, 0.13);
+    sustain(ctx, out, t0 + 0.25, {
+      type: 'triangle',
+      from: 900,
+      to: 2400,
+      peak: 0.14,
+      attack: 0.2,
+      hold: 0.05,
+      release: 0.08,
+    });
+  },
+  // O bote: deslocamento RAPIDO de ar gelado (ruido varrendo de grave para
+  // agudo em 90 ms) e um estalo cortante no fim.
+  wraithLunge: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.36,
+      decay: 0.12,
+      type: 'bandpass',
+      from: 700,
+      to: 3200,
+      q: 1.2,
+    });
+    tone(ctx, out, t0 + 0.06, { type: 'triangle', from: 3400, to: 2200, peak: 0.2, decay: 0.05 });
+    burst(ctx, out, t0 + 0.08, noise, { peak: 0.24, decay: 0.03, type: 'highpass', from: 4200 });
+  },
+  // Volta a nevoa: fragmentos LEVES se desfazendo em vento — blings caindo de
+  // altura e um sopro que abre para o agudo e some.
+  wraithDissolve: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 4; i++) iceBling(ctx, out, t0 + i * 0.06, 3200 - i * 500, 0.09);
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.16,
+      decay: 0.45,
+      type: 'highpass',
+      from: 1800,
+      to: 5200,
+      attack: 0.08,
+    });
+  },
+  // Morte: quebra cristalina mais GRAVE que a do bote (o corpo inteiro), e
+  // depois a sublimacao — o chiado longo do gelo virando ar.
+  wraithDeath: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sawtooth', from: 700, to: 180, peak: 0.28, decay: 0.16 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.36,
+      decay: 0.12,
+      type: 'bandpass',
+      from: 1500,
+      to: 500,
+      q: 1.5,
+    });
+    for (let i = 0; i < 7; i++) iceBling(ctx, out, t0 + 0.04 + i * 0.04, 2600 - i * 220, 0.11);
+    burst(ctx, out, t0 + 0.18, noise, {
+      peak: 0.2,
+      decay: 0.7,
+      type: 'highpass',
+      from: 2200,
+      to: 6000,
+      attack: 0.1,
+    });
+  },
+
   // --- canhao rotativo ----------------------------------------------------
   //
   // O TIMBRE do motor e industrial e nao eletronico: dente de serra grave

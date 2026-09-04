@@ -118,6 +118,15 @@ export {
 export { mawIntensity, mawPull, mawReach } from './maw.js';
 export { hasLineOfSight } from './pathing.js';
 export {
+  FREEZE_THAW_RELEASE_AT,
+  applyFreezeDose,
+  clearFreeze,
+  freezeFraction,
+  frostbiteBreaks,
+  meltFreezeByHeat,
+  stepFreezeDecay,
+} from './frost.js';
+export {
   explodeAt,
   dischargeAt,
   igniteCell,

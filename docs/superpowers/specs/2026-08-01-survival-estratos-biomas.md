@@ -172,9 +172,16 @@ lista de spawns; espreitadores nascem dentro do próprio elemento.
 - **Escoriáceo** (`scoriac`, Fornalha): couraça fria corta todo dano a 45%
   (no funil único de dano). Pisar em brasa/fogo abre a couraça por ~8 s:
   vulnerável e 45% mais rápido. `rangedReadyAt` reusado como "quente até".
-- **Espectro de Geada** (`frost_wraith`, Cripta): desliza SOB o gelo (35% mais
-  rápido), emerge num bote telegrafado. Derreter o lago tira a cobertura: um
-  corpo lento na água condutiva que o jogador acabou de criar.
+- **Espectro de Geada** (`frost_wraith`, Cripta): uma **entidade de névoa** que
+  navega sobre e sob a lâmina (35% mais rápido) e se **condensa num elemental
+  cristalino** — um manawyrm de geada — para o bote telegrafado. Escondido não
+  tem corpo: é névoa baixa e irregular com cristais suspensos e riscos de
+  condensação marcando a direção; exposto, um corpo serpentino arqueado com
+  cabeça cristalina, chifres para trás e núcleo ciano na garganta. O bote que
+  **encosta** aplica dano de contato e uma dose pequena de congelamento (ver a
+  spec de congelamento). Derreter o lago tira a cobertura: sem gelo debaixo
+  dele não há névoa para voltar, e ele fica um corpo lento na água condutiva
+  que o jogador acabou de criar.
 
 Basalto e Sílica não têm assinatura por decisão: o basalto é a referência, e a
 identidade da Sílica é o próprio terreno que cede.

@@ -341,7 +341,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Refractory slag carapace. Vulnerable after thermal exposure — a condition that also makes it considerably worse.',
   'bestiary.code.frost_wraith': 'SPECIMEN GLAC-02',
   'bestiary.note.frost_wraith':
-    'Travels beneath the ice sheet. Reports of "haunting" reflect poor visibility, not anomalous phenomena.',
+    'Freezing-mist entity that travels over and under the ice sheet and condenses into a crystalline elemental to strike. Contact draws heat from the chassis. Reports of "haunting" reflect the diffuse phase, not anomalous phenomena.',
   'bestiary.code.sulfur_bomber': 'SPECIMEN SULF-14',
   'bestiary.note.sulfur_bomber':
     'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
@@ -784,6 +784,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'module.minigun.proc': 'ROUNDS',
   'hud.minigun.spinup': 'SPINNING',
   'hud.minigun.overheated': 'BARREL JAMMED',
+  'hud.freeze.label': 'ICE',
+  'hud.freeze.critical': 'FROSTBITE',
+  'hud.freeze.hold': 'HOLD FIRE TO HEAT',
+  'hint.freeze.partial': 'The cold is building up.',
+  'hint.freeze.frostbite': 'ENGINES AND CHASSIS FROZEN — HOLD FIRE TO HEAT.',
+  'toast.frostbite.break': 'CRUST BROKEN',
   'module.lifetime.charges': '{count} {proc}',
   'module.lifetime.duration': '{seconds}s',
 

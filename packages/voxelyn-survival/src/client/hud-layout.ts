@@ -60,6 +60,12 @@ export type HudPanelInput = {
   moduleCount: number;
   /** Altura reservada aos instrumentos de levantamento (0 quando nao ha). */
   surveyHeight: number;
+  /**
+   * O medidor de CONGELAMENTO esta visivel? Ele so ocupa linha quando ha
+   * frio para mostrar: com o medidor em zero a fileira recolhe e o painel
+   * volta a altura de sempre.
+   */
+  freezeMeter?: boolean;
   /** Em quantas linhas a diretiva quebrou (>= 1). */
   objectiveLines: number;
 };
@@ -74,6 +80,8 @@ export type HudPanelLayout = HudRect & {
   hpBar: { x: number; y: number; w: number; h: number };
   heatRail: { y: number; h: number };
   spinRail: { y: number; h: number };
+  /** O medidor de congelamento, abaixo da rotacao; `null` quando recolhido. */
+  freezeRail: { y: number; h: number } | null;
   dividerA: number;
   /** Linha de recursos: baseline do texto e centro vertical dos glifos. */
   resources: { baseline: number; glyphY: number; purgeGlyphX: number };
@@ -189,6 +197,9 @@ const DENSE: Rhythm = {
   bottomPad: 7,
 };
 
+/** Quanto o medidor de congelamento acrescenta ao painel quando visivel. */
+export const FREEZE_ROW_H = 10;
+
 /** Largura do painel: um terco da tela, presa entre o compacto e o confortavel. */
 export const hudPanelWidth = (viewportWidth: number): number =>
   Math.min(300, Math.max(230, viewportWidth * 0.34));
@@ -214,19 +225,23 @@ export const hudPanelLayout = (input: HudPanelInput): HudPanelLayout => {
   const hpBar = { x: x + 42, y: y + 13, w: width - 54, h: r.hpBarH };
   const heatRail = { y: y + r.heatY, h: 4 };
   const spinRail = { y: y + r.spinY, h: 2 };
-  const dividerA = y + r.dividerA;
+  // O medidor de congelamento entra ENTRE a rotacao e o primeiro divisor, e
+  // empurra tudo abaixo dele pela propria altura — so quando esta visivel.
+  const freezeRail = input.freezeMeter ? { y: spinRail.y + spinRail.h + 3, h: 6 } : null;
+  const shift = freezeRail ? FREEZE_ROW_H : 0;
+  const dividerA = y + r.dividerA + shift;
 
   const resources = {
-    baseline: y + r.resourcesBaseline,
-    glyphY: y + r.resourcesGlyphY,
+    baseline: y + r.resourcesBaseline + shift,
+    glyphY: y + r.resourcesGlyphY + shift,
     purgeGlyphX: x + 18,
   };
 
   const hasModules = input.moduleCount > 0;
   const modules = hasModules
-    ? { x: innerLeft, y: y + r.modulesY, right: x + width, size: r.cardSize }
+    ? { x: innerLeft, y: y + r.modulesY + shift, right: x + width, size: r.cardSize }
     : null;
-  const dividerB = y + (hasModules ? r.dividerBWithModules : r.dividerBWithout);
+  const dividerB = y + (hasModules ? r.dividerBWithModules : r.dividerBWithout) + shift;
 
   const sectorBaseline = dividerB + r.sectorGap;
   const biomeBaseline = sectorBaseline + r.biomeGap;
@@ -249,6 +264,7 @@ export const hudPanelLayout = (input: HudPanelInput): HudPanelLayout => {
     hpBar,
     heatRail,
     spinRail,
+    freezeRail,
     dividerA,
     resources,
     modules,

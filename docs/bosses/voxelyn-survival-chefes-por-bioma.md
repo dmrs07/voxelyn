@@ -535,6 +535,23 @@ dela. Tudo o que o congelamento mostra e toca pendura-se no
   entre si, com caudas de quase um segundo que sobrevivem ao fim dos cacos. O
   `ice_mend` do mesmo tick cala (seria dois sons para um acontecimento).
 
+### A Nova CONGELA o Prospector (`SIMULATION_VERSION` 58)
+
+A Nova deixou de ser só o lago se refazendo: cada Prospector **dentro do raio
+real** da liberação toma uma **dose grande de frio** (45% do medidor de
+congelamento, uma por jogador por Nova), pelo mesmo evento autoritativo que
+recompõe o gelo — não há um segundo raio "visual". Morto, abatido e slot vazio
+não tomam; iframes **não** barram (a esquiva serve para sair do raio antes,
+não para atravessar a Nova imune). A conta que fixa a dose: três Novas seguidas
+a 14 s congelam por inteiro mesmo com o decaimento correndo entre elas
+(`450 − 120 + 450 − 120 + 450 ≥ 1000`). O Espectro é a outra fonte, com uma
+dose pequena (12%) por bote que **encosta**.
+
+O que o congelamento faz, e como se sai dele, está na spec
+`docs/superpowers/specs/2026-09-04-survival-congelamento-frostwraith.md`. O que
+importa para o encontro: a Nova continua **uma** apresentação de chefe (uma
+coroa, um som), e o frio no corpo de cada jogador é apresentado por corpo.
+
 ### O Coro Cardinal
 
 O encontro começava **vazio**: um corpo lento no meio da nave cantando para cristais que

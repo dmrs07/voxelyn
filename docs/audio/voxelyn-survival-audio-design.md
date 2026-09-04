@@ -207,6 +207,23 @@ mesmo telegrafo genérico como reserva deliberada, nunca em silêncio).
 | Rainha da Geada | cristais finos, gelo tensionado, cacos e sinos de gelo | beleza fria antes de ruptura violenta; o congelamento é um saco de gelo quebrado caindo no chão e sinos pendurados; nunca a linguagem do Arquicantor |
 | Magnetarca | magnetismo, inversão, metal | atração e repulsão soam opostas, e sem olhar |
 
+**O Espectro de Geada** não é chefe, mas tem assinatura própria porque muda de
+estado o tempo todo e cada estado pede um som: escondido, **vento oco, cristais
+finos roçando e respiração distante** (`wraithWhisper`, amostrado do estado a
+cada ~1,4 s por névoa, defasado por id); materializando, **sucção de névoa e
+cristalização ascendente** (`wraithCondense`, o telegrafo do bote — substitui o
+`telegraphCharge` genérico); o bote, **ar gelado deslocado e um estalo cortante**
+(`wraithLunge`, no `wraith_lunge` da liberação); o acerto com frio, **gelo
+aderindo ao metal** (`freezeDose`); a volta à névoa, **fragmentos leves se
+desfazendo em vento** (`wraithDissolve`); a morte, **quebra cristalina grave e
+sublimação** (`wraithDeath`). Nada que pareça tecido arrastando.
+
+**O congelamento do Prospector** tem quatro vozes, e cada uma diz o que o
+gatilho passou a fazer: a dose (`freezeDose`, espacial), a crosta fechando
+(`frostbite`, interface, prioridade 9), o ciclo térmico (`thermalCycle`, o motor
+partindo por baixo do gelo — sai a cada 200 ms de gatilho, travado a 150 ms) e a
+crosta se partindo (`frostbiteBreak`, interface, prioridade 9).
+
 **O gelo da Cripta tem voz própria**, e ela não pertence a nenhum chefe: rachadura é
 uma mecânica GLOBAL do estrato e acontece com ou sem a Rainha em campo (por isso os
 eventos são `ice_crack`/`ice_collapse`/`ice_fall`/`ice_mend`, e não `boss_state`

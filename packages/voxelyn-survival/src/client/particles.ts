@@ -45,7 +45,14 @@ export type ParticleKind =
    * placa cedendo tem de ler como a MESMA lamina que o jogador esta pisando,
    * senao o estalo nao aponta para o chao.
    */
-  | 'iceShard';
+  | 'iceShard'
+  /**
+   * VAPOR do degelo: o que escapa pelas juntas do Prospector quando o motor
+   * forca por baixo do gelo, e a nuvem curta da crosta se partindo. Nao e
+   * `ash` (fumaca preta de cano) nem `bubble` (agua): e agua virando ar, e
+   * por isso e a unica rampa que sobe ate quase o branco.
+   */
+  | 'steam';
 
 type Particle = {
   x: number; // tile
@@ -119,6 +126,7 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // A lamina da Cripta: palido frio no topo, caindo para a rocha azul. Mesma
   // familia do tile de gelo, um passo mais claro para a lasca se separar dele.
   iceShard: ['#e8f1ff', '#7b8ba3', '#2e3a4d'],
+  steam: ['#e8f1ff', '#b8a98f', '#7b8ba3'],
 };
 
 /**
@@ -237,6 +245,8 @@ export class VoxelParticles {
   private readonly lastBubbleBucket = new Map<number, number>();
   /** Ultimo bucket de faisca do curto-circuito, por SLOT (ver emitDashJets). */
   private readonly lastShortBucket = new Map<number, number>();
+  /** Ultimo bucket de vapor do degelo, por SLOT (ver emitOverheatSmoke). */
+  private readonly lastSteamBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
@@ -252,6 +262,7 @@ export class VoxelParticles {
     this.lastOverheatBucket.clear();
     this.lastBubbleBucket.clear();
     this.lastShortBucket.clear();
+    this.lastSteamBucket.clear();
   }
 
   private push(p: Particle): void {
@@ -546,8 +557,55 @@ export class VoxelParticles {
           this.burst(ev.x, ev.y, 'oreChip', n(4), 1.4, 1.4, 380, 13);
           break;
         case 'death':
+          if (ev.archetype === 'frost_wraith') {
+            // O Espectro nao vira entulho: o nucleo apaga, o corpo ESTILHACA e
+            // os fragmentos SUBLIMAM em neblina — gelo virando ar.
+            this.burst(ev.x, ev.y, 'iceShard', n(16), 1.6, 2.2, 520, ev.entity, 0.6);
+            this.burst(ev.x, ev.y, 'steam', n(10), 0.6, 1.1, 900, ev.entity + 3, 0.5);
+            break;
+          }
           // Acompanha o desabamento do sprite: a criatura vira materia.
           this.burst(ev.x, ev.y, 'debris', n(9), 1.5, 1.3, 560, ev.entity);
+          break;
+        case 'lurker_state':
+          // So o Espectro tem materia aqui; a Lampreia continua com a ondulacao
+          // dela e nada mais.
+          if (ev.archetype !== 'frost_wraith') break;
+          if (ev.hidden) {
+            // Voltando a nevoa: o corpo perde fragmentos e se dissolve.
+            this.burst(ev.x, ev.y, 'iceShard', n(8), 0.8, 0.9, 420, ev.entity + 11, 0.7);
+            this.burst(ev.x, ev.y, 'steam', n(7), 0.5, 0.8, 700, ev.entity + 13, 0.4);
+          } else {
+            // Condensando: a nevoa converge e cristaliza de baixo para cima —
+            // vapor sobe do chao, cacos assentam.
+            this.burst(ev.x, ev.y, 'steam', n(6), 0.4, 1.5, 480, ev.entity + 17, 0.1);
+            this.burst(ev.x, ev.y, 'iceShard', n(5), 0.5, 0.4, 360, ev.entity + 19, 0.3);
+          }
+          break;
+        case 'wraith_lunge':
+          // A lanca de gelo saindo: uma esteira de cacos ATRAS do impulso.
+          this.burst(
+            ev.x - ev.dx * 0.4,
+            ev.y - ev.dy * 0.4,
+            'iceShard',
+            n(6),
+            0.9,
+            0.6,
+            320,
+            ev.entity + 23,
+            0.5,
+          );
+          this.burst(
+            ev.x - ev.dx * 0.6,
+            ev.y - ev.dy * 0.6,
+            'steam',
+            n(4),
+            0.4,
+            0.5,
+            420,
+            ev.entity + 29,
+            0.4,
+          );
           break;
         case 'ice_crack':
           // Po de gelo, e a quantidade E o aviso: o estagio decide quantas
@@ -580,6 +638,30 @@ export class VoxelParticles {
             this.burst(ev.x, ev.y, 'iceShard', n(30), r * 1.3, 2.8, 680, 67, 0.3);
             this.ring(ev.x, ev.y, 'iceShard', n(20), r, 440, 71, 0.15);
           }
+          break;
+        case 'freeze_dose':
+          // A dose: geada assentando no chassi — po de gelo curto e baixo, na
+          // quantidade da dose. A Nova ja tem a coroa dela; isto e o que
+          // acontece NO corpo, e e por corpo.
+          this.burst(ev.x, ev.y, 'iceShard', n(ev.amount >= 300 ? 8 : 3), 0.5, 0.9, 360, 73, 0.6);
+          break;
+        case 'frostbite':
+          // A crosta FECHANDO: um anel curto de lascas para dentro e vapor
+          // frio subindo — o ar em volta do corpo congelou de uma vez.
+          this.ring(ev.x, ev.y, 'iceShard', n(12), 0.6, 300, 79, 0.3);
+          this.burst(ev.x, ev.y, 'steam', n(6), 0.4, 1.2, 520, 83, 0.8);
+          break;
+        case 'thermal_cycle':
+          // O motor partindo por baixo do gelo: um sopro de vapor por ciclo.
+          this.burst(ev.x, ev.y, 'steam', n(3), 0.5, 1.4, 420, 89, 0.9);
+          break;
+        case 'frostbite_break':
+          // A crosta se PARTE de dentro para fora: cacos arremessados alto e
+          // longe, e a nuvem curta de vapor que a diferenca de temperatura
+          // deixa no lugar do corpo.
+          this.burst(ev.x, ev.y, 'iceShard', n(22), 2.6, 3.4, 720, 97, 0.9);
+          this.ring(ev.x, ev.y, 'iceShard', n(10), 1.3, 380, 101, 0.2);
+          this.burst(ev.x, ev.y, 'steam', n(10), 0.9, 1.8, 640, 103, 0.8);
           break;
         case 'ice_fall':
           // A QUEDA: massa entrando na agua. O respingo sobe alto e volta —
@@ -817,6 +899,35 @@ export class VoxelParticles {
         life: hot ? 520 : 900,
         maxLife: hot ? 520 : 900,
         kind: hot ? 'ember' : 'ash',
+      });
+    }
+  }
+
+  /**
+   * VAPOR pelas juntas da estatua, durante um ciclo termico. Mesmo contrato
+   * do cano superaquecido: chaveado por slot e por bucket de tempo real, para
+   * nascer por segundo e nao por quadro.
+   */
+  emitThawSteam(slot: number, x: number, y: number, nowMs: number, scale: number): void {
+    const bucket = (nowMs / 90) | 0;
+    if (this.lastSteamBucket.get(slot) === bucket) return;
+    this.lastSteamBucket.set(slot, bucket);
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2246822519) ^ (slot + 7)));
+    const count = Math.max(1, Math.round(2 * scale));
+    for (let i = 0; i < count; i++) {
+      // Das juntas: ombros e joelhos, nunca do centro — o centro e o nucleo
+      // aceso, e vapor em cima dele apagaria o unico ponto quente da leitura.
+      const side = rnd() < 0.5 ? -1 : 1;
+      this.push({
+        x: x + side * (0.18 + rnd() * 0.1),
+        y: y + (rnd() - 0.5) * 0.2,
+        z: 0.25 + rnd() * 0.6,
+        vx: side * (0.25 + rnd() * 0.2),
+        vy: (rnd() - 0.5) * 0.2,
+        vz: 0.7 + rnd() * 0.4,
+        life: 480,
+        maxLife: 480,
+        kind: 'steam',
       });
     }
   }
