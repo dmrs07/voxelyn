@@ -397,7 +397,10 @@ buracos no alcance, preserva fogo vivo) → o Prospector desliza e desenha rotas
 → rotas reutilizadas ficam progressivamente perigosas → ele escolhe entre mudar
 o caminho, usar os estabilizadores, ou derreter a célula crítica e aceitar água
 condutiva → o buraco altera temporariamente a circulação → o próximo
-congelamento recompõe parte do tabuleiro.
+congelamento recompõe parte do tabuleiro. A cadência que fecha esse loop é de
+**14 s** entre congelamentos (`SIMULATION_VERSION` 57): maior que os ~11 s de um
+laço apertado até o buraco e que os 12 s de recongelamento natural — a 6 s o
+reparo dela apagava toda rota antes do quarto degrau.
 
 **Subversão da Cripta**: fechar o circuito estabiliza a lâmina INTEIRA — ela
 para de derreter, de escorregar e de rachar, nos quatro estágios. Buracos já

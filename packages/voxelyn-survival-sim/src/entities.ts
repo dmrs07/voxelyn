@@ -5970,7 +5970,12 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
     wraith.hp = wraith.maxHp;
     risen++;
   }
-  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+  // O congelamento NAO emite mais o `pulse` generico. Ele nao empurra nada nem
+  // machuca — e um `pulse` aqui fazia o cliente desenhar a frente branca e
+  // tocar a voz do pulso do JOGADOR por cima do `boss_attack` que ja anuncia o
+  // golpe com nome e dono. A apresentacao (o leque de estilhacos, o som do
+  // gelo) pendura-se no `boss_attack { frost_queen, freeze }`, que sai de
+  // `releaseAction` antes de chegar aqui.
   // Os Espectros SAINDO do gelo sao a consequencia do congelamento, e soam
   // como tal — so quando algum de fato saiu.
   if (risen > 0) {

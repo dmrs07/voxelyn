@@ -499,6 +499,40 @@ O loop da luta, do começo ao fim de um ciclo:
 lago, e o rework acrescenta duas saídas que antes não existiam — trocar de rota
 e gastar calor numa célula crítica antes que ela ceda.
 
+### A cadência do congelamento (`SIMULATION_VERSION` 57)
+
+O ciclo acima não fechava a 6 s entre congelamentos: o reparo dela apaga tudo
+num raio de 6, e nenhuma rota perto dela chegava ao quarto degrau antes de ser
+refeita — o buraco só existia longe do encontro, onde não muda nada. O intervalo
+passou para **14 s** (`FROST_QUEEN_FREEZE_COOLDOWN_TICKS = 280`), fixado por duas
+contas:
+
+- um laço apertado (raio ~2) leva ~2,7 s por volta e abrir um buraco pede quatro
+  passagens pela mesma célula: **~11 s**;
+- o buraco recongela sozinho em 12 s, e a janela precisa ser **maior** que isso
+  para ele viver a vida inteira antes de ela poder selá-lo — senão "esperar" e
+  "ser reparado" seriam a mesma coisa.
+
+O preço é menos Espectros por minuto (saem dois por congelamento): a cadência
+deles vira a de uma fase de chefe, e não a de um spawner. O congelamento também
+deixou de emitir o `pulse` genérico — ele não empurra nem machuca, e o cliente
+desenhava a frente branca e tocava a voz do pulso do JOGADOR por cima do golpe
+dela. Tudo o que o congelamento mostra e toca pendura-se no
+`boss_attack { frost_queen, freeze }`:
+
+- **a coroa de estilhaços** (`frost-burst.ts`): lascas brancas em pé, inclinadas
+  para fora, abrindo em círculo completo até o raio REAL da habilidade, com um
+  disco de geada por baixo e riscos de pó correndo pelo chão para além delas.
+  Salta nos primeiros ~30% dos 900 ms e só então apaga — gelo que JÁ se formou
+  de uma vez. Semeada pelo evento, para o co-op ver o mesmo leque
+  (`docs/media/ice-rework/congelamento-da-rainha.png` e `-2.png`: o salto e o
+  apagar);
+- **o som** (`frostQueenFreeze`): um saco de gelo quebrado despejado no chão — o
+  baque, depois dezenas de estalos que rareiam — e, por cima, sinos de gelo
+  pendurados: pares de senos agudos desafinados por poucos cents, inarmônicos
+  entre si, com caudas de quase um segundo que sobrevivem ao fim dos cacos. O
+  `ice_mend` do mesmo tick cala (seria dois sons para um acontecimento).
+
 ### O Coro Cardinal
 
 O encontro começava **vazio**: um corpo lento no meio da nave cantando para cristais que

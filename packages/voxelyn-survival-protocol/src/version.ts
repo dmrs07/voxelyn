@@ -862,7 +862,13 @@ export const PROTOCOL_VERSION = 30;
 // Tambem aqui: a subversao da Cripta estabiliza os QUATRO estagios (o gelo para
 // de derreter, de escorregar e de rachar), e inimigo terrestre comum nao termina
 // movimento sobre um buraco.
-export const SIMULATION_VERSION = 56;
+//
+// 57: a CADENCIA do congelamento da Rainha. O intervalo entre congelamentos
+// passou de 6 s para 14 s — a 6 s o reparo dela apagava toda rota perto dela
+// antes do quarto degrau, e o buraco so existia longe do encontro. Duas
+// maquinas com cadencias diferentes discordam de quando a arena e refeita e
+// de quantos Espectros existem, e a versao e o que impede a sala de abrir.
+export const SIMULATION_VERSION = 57;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

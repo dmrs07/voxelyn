@@ -2730,7 +2730,24 @@ export const FROST_QUEEN_ICE_ARMOR = 0.22;
 /** Quantas celulas de gelo em volta ainda a mantem blindada. */
 export const FROST_QUEEN_ICE_RADIUS = 5;
 export const FROST_QUEEN_ICE_THRESHOLD = 6;
-export const FROST_QUEEN_FREEZE_COOLDOWN_TICKS = 120;
+/**
+ * Intervalo entre congelamentos: 14 s.
+ *
+ * Eram 6 s, e com o ciclo de rachaduras isso deixou de fechar: o congelamento
+ * REPARA a placa num raio de 6, e a 6 s nenhuma rota perto dela chegava ao
+ * quarto degrau — o buraco, a unica consequencia nova da luta, so aparecia
+ * longe da Rainha, onde nao muda nada. A conta que fixa o numero:
+ *
+ *   - um laco apertado (raio ~2) leva ~2,7 s por volta a PLAYER_SPEED, e
+ *     abrir um buraco pede quatro passagens pela mesma celula: ~11 s;
+ *   - o buraco recongela sozinho em ICE_HOLE_REFREEZE_TICKS (12 s), entao a
+ *     janela precisa ser maior que isso para ele viver a vida inteira antes
+ *     de ela poder sela-lo — senao "esperar" e "reparar" seriam o mesmo.
+ *
+ * O preco e menos Espectros por minuto (saem dois por congelamento): a
+ * cadencia deles vira a de uma fase de chefe, e nao a de um spawner.
+ */
+export const FROST_QUEEN_FREEZE_COOLDOWN_TICKS = 280;
 export const FROST_QUEEN_FREEZE_WINDUP_TICKS = 26;
 export const FROST_QUEEN_FREEZE_RADIUS = 6;
 export const FROST_QUEEN_WRAITHS = 2;

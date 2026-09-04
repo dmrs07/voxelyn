@@ -534,7 +534,7 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // couraça e textura (4) com trava curta — cada tiro absorvido tem de ser
   // ouvido como absorvido; a couraça quebrando e vulnerabilidade (9).
   frostQueenFreezeCharge: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
-  frostQueenFreeze: { priority: 9, gain: 0.65, minIntervalMs: 60, spatial: true },
+  frostQueenFreeze: { priority: 9, gain: 0.7, minIntervalMs: 60, spatial: true },
   frostQueenWraithRise: { priority: 8, gain: 0.5, minIntervalMs: 0, spatial: true },
   frostQueenArmorHit: { priority: 4, gain: 0.28, minIntervalMs: 90, spatial: true },
   frostQueenArmorBreak: { priority: 9, gain: 0.75, minIntervalMs: 0, spatial: true },

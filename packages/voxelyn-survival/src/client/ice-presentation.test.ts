@@ -108,6 +108,34 @@ describe('o som do ciclo de rachaduras', () => {
   it('sem queda no lote, a morte do Prospector continua soando', () => {
     expect(cuesForEvents([death(1)], ctx).map((c) => c.voice)).toEqual(['death']);
   });
+
+  it('o congelamento da Rainha cala o `iceMend` do mesmo tick — e so o dela', () => {
+    // O congelamento ja E o som do lago refeito (os cacos caindo, os sinos);
+    // o reparo por cima seria dois sons para um acontecimento.
+    const freeze: SemanticEvent = {
+      t: 'boss_attack',
+      archetype: 'frost_queen',
+      ability: 'freeze',
+      x: 4,
+      y: 4,
+    };
+    const voices = cuesForEvents([freeze, mend], ctx).map((c) => c.voice);
+    expect(voices).toContain('frostQueenFreeze');
+    expect(voices).not.toContain('iceMend');
+    // O buraco recongelando sozinho (raio zero) continua soando, mesmo que a
+    // Rainha congele no mesmo tick: sao dois lugares diferentes.
+    const selfMend: SemanticEvent = {
+      t: 'ice_mend',
+      x: 40,
+      y: 40,
+      radius: 0,
+      mended: 0,
+      sealed: 1,
+    };
+    expect(cuesForEvents([freeze, selfMend], ctx).map((c) => c.voice)).toContain('iceMend');
+    // E sem o congelamento no lote, o reparo dela soa como sempre.
+    expect(cuesForEvents([mend], ctx).map((c) => c.voice)).toEqual(['iceMend']);
+  });
 });
 
 describe('a queda substitui a lapide', () => {
