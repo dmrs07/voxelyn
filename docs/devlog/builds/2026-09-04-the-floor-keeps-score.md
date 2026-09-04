@@ -78,8 +78,6 @@ protection at all from the thing below.
 
 **The ice cracks in four stages.** Whole, cracked, fractured, critical. Then the hole.
 
-![The ice crust atlas: cracks separating by shape and line density as the stage advances](media/ice-crack-atlas.png)
-
 Every crossing takes a cell down one step, and it counts *entering* the cell, so standing
 still does not progress it, leaving and coming back does, sliding counts, dodging counts.
 Moving fast does not let you skip a step either: every cell you pass through gets its turn.
@@ -128,7 +126,13 @@ while fighting something else entirely.
 
 ## The Frost Wraith is fog until it is not
 
-![Frost Wraith sprite sheets: the hidden fog form and the materialised manawyrm](media/frost-wraith-sheets.png)
+![The Frost Wraith before the rework: a flat slab of a body, four directions, nothing to read](media/frost-wraith-before-rework.png)
+
+This is what it used to be, and it is the reason it got rebuilt. A flat slab that read as a
+piece of scenery with a health bar. Nothing about it said cold, and nothing about it said
+*hiding*, which is the entire thing it does.
+
+![The Frost Wraith now: the hidden fog form and the materialised manawyrm](media/frost-wraith-sheets.png)
 
 The Wraith got rebuilt as a two state creature. Hidden, it is genuinely fog: lobes, loose
 voxels, suspended crystals, a cyan glow, streaks of condensation. Exposed, it is a frost
@@ -136,6 +140,8 @@ manawyrm with a materialisation pose of its own, five voices, and a whisper that
 state, so you can hear roughly where it is before you can see anything at all.
 
 ## The Frost Queen got a cadence, a crown and a sound
+
+![The Frost Queen across her poses, ending on the shattered heap she leaves when she dies](media/frost-queen-poses.png)
 
 Her freeze used to come every six seconds. Once the floor could crack, that turned out to be
 poison: her repair covered a six tile radius, so she erased every route near her before you
@@ -200,7 +206,7 @@ He has a brood now. The brood dies with the mother.
 
 ## The Archcantor sings with four voices
 
-![The Archcantor: the crown of tuned crystal that does the singing, across his poses](media/archcantor-poses.png)
+![The Archcantor: the dark body under a crown of tuned crystal, which is the part that sings](media/archcantor-voxel.jpg)
 
 The Archcantor encounter used to start empty. A slow body in the middle of the nave, singing to
 crystals that the generator may or may not have put nearby. With map luck the whole Cathedral

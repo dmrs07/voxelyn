@@ -144,10 +144,6 @@
 <p>Now the floor keeps a record of you.</p>
 <p><strong>Inertia got real.</strong> Glide goes to 0.915, which is about 2.5 tiles of braking. Reversing crosses zero in roughly 0.4 seconds and completes in 1.7. The gyroscopic stabiliser upgrade now cuts your slide by 60% instead of turning the lake into dry ground, and it buys you no protection at all from the thing below.</p>
 <p><strong>The ice cracks in four stages.</strong> Whole, cracked, fractured, critical. Then the hole.</p>
-<figure>
-  <a href="media/ice-crack-atlas.png" target="_blank" rel="noopener"><img src="media/ice-crack-atlas.png" alt="The ice crust atlas: cracks separating by shape and line density as the stage advances" loading="lazy"></a>
-  <figcaption>The ice crust atlas: cracks separating by shape and line density as the stage advances</figcaption>
-</figure>
 <p>Every crossing takes a cell down one step, and it counts <em>entering</em> the cell, so standing still does not progress it, leaving and coming back does, sliding counts, dodging counts. Moving fast does not let you skip a step either: every cell you pass through gets its turn. Walk the same line four times and you have made a hole in the world.</p>
 <p><strong>And the hole kills.</strong> Deep water kills you at full health, through invulnerability frames, with no body left to revive. It conducts electricity like water. Projectiles pass over it. The Queen and her Wraiths cross it like it is not there. It refreezes after twelve seconds, so the map you broke does come back, on its own schedule and not yours.</p>
 <p><strong>The loop closes, which is the part I am proud of.</strong> Heat melts any cracked stage back to shallow water, and shallow water refreezes as an intact plate, which erases everything you did to it. The Queen's freeze repairs cracks and seals holes inside her radius, but it preserves live fire. And her armour counts a cracked plate as ice, so melting the lake is still the only way through her. The ice is a resource both of you are spending, from opposite directions.</p>
@@ -164,11 +160,20 @@
 <p>So the answer to being frozen is: hold the trigger. Your gun is the heater. And if you walked into that Nova with an already overheated weapon, you wait, and the Queen gets a free window on a statue. Which means "keep some heat headroom near her" is now a real thought you have to have while fighting something else entirely.</p>
 <h2 id="the-frost-wraith-is-fog-until-it-is-not">The Frost Wraith is fog until it is not</h2>
 <figure>
-  <a href="media/frost-wraith-sheets.png" target="_blank" rel="noopener"><img src="media/frost-wraith-sheets.png" alt="Frost Wraith sprite sheets: the hidden fog form and the materialised manawyrm" loading="lazy"></a>
-  <figcaption>Frost Wraith sprite sheets: the hidden fog form and the materialised manawyrm</figcaption>
+  <a href="media/frost-wraith-before-rework.png" target="_blank" rel="noopener"><img src="media/frost-wraith-before-rework.png" alt="The Frost Wraith before the rework: a flat slab of a body, four directions, nothing to read" loading="lazy"></a>
+  <figcaption>The Frost Wraith before the rework: a flat slab of a body, four directions, nothing to read</figcaption>
+</figure>
+<p>This is what it used to be, and it is the reason it got rebuilt. A flat slab that read as a piece of scenery with a health bar. Nothing about it said cold, and nothing about it said <em>hiding</em>, which is the entire thing it does.</p>
+<figure>
+  <a href="media/frost-wraith-sheets.png" target="_blank" rel="noopener"><img src="media/frost-wraith-sheets.png" alt="The Frost Wraith now: the hidden fog form and the materialised manawyrm" loading="lazy"></a>
+  <figcaption>The Frost Wraith now: the hidden fog form and the materialised manawyrm</figcaption>
 </figure>
 <p>The Wraith got rebuilt as a two state creature. Hidden, it is genuinely fog: lobes, loose voxels, suspended crystals, a cyan glow, streaks of condensation. Exposed, it is a frost manawyrm with a materialisation pose of its own, five voices, and a whisper that tracks its state, so you can hear roughly where it is before you can see anything at all.</p>
 <h2 id="the-frost-queen-got-a-cadence-a-crown-and-a-sound">The Frost Queen got a cadence, a crown and a sound</h2>
+<figure>
+  <a href="media/frost-queen-poses.png" target="_blank" rel="noopener"><img src="media/frost-queen-poses.png" alt="The Frost Queen across her poses, ending on the shattered heap she leaves when she dies" loading="lazy"></a>
+  <figcaption>The Frost Queen across her poses, ending on the shattered heap she leaves when she dies</figcaption>
+</figure>
 <p>Her freeze used to come every six seconds. Once the floor could crack, that turned out to be poison: her repair covered a six tile radius, so she erased every route near her before you could get to the fourth step. The only hole you could ever open was far away from the fight, which is the least interesting place for a hole to be.</p>
 <p>The interval is fourteen seconds now, and that number is not vibes. A tight loop needs about eleven seconds to open a hole. Natural refreeze takes twelve. Fourteen guarantees you can open the hole and have at least three seconds of it. It deliberately does not guarantee covering the loop and the refreeze together, which would need about twenty three. You get the window. You do not get to keep it.</p>
 <p>The crown is white shards standing up and tilting outward, opening in a full circle out to the ability's real radius, with a frost disc and dust streaks along the floor. It is seeded from the event, so in co-op both of you see exactly the same fan of ice.</p>
@@ -185,8 +190,8 @@
 <p>He has a brood now. The brood dies with the mother.</p>
 <h2 id="the-archcantor-sings-with-four-voices">The Archcantor sings with four voices</h2>
 <figure>
-  <a href="media/archcantor-poses.png" target="_blank" rel="noopener"><img src="media/archcantor-poses.png" alt="The Archcantor: the crown of tuned crystal that does the singing, across his poses" loading="lazy"></a>
-  <figcaption>The Archcantor: the crown of tuned crystal that does the singing, across his poses</figcaption>
+  <a href="media/archcantor-voxel.jpg" target="_blank" rel="noopener"><img src="media/archcantor-voxel.jpg" alt="The Archcantor: the dark body under a crown of tuned crystal, which is the part that sings" loading="lazy"></a>
+  <figcaption>The Archcantor: the dark body under a crown of tuned crystal, which is the part that sings</figcaption>
 </figure>
 <p>The Archcantor encounter used to start empty. A slow body in the middle of the nave, singing to crystals that the generator may or may not have put nearby. With map luck the whole Cathedral answered you. Without it, he was a statue with a health bar.</p>
 <p>Now four Resonants orbit him as a Cardinal Choir, and three things close the exits that playtesting found.</p>

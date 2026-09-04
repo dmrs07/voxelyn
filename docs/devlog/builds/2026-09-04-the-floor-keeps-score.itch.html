@@ -15,17 +15,18 @@
   01. key-art.png
   02. options-credits.png
   03. frost-queen-crown.png
-  04. ice-crack-atlas.png
-  05. frostbite-statue.png
+  04. frostbite-statue.png
+  05. frost-wraith-before-rework.png
   06. frost-wraith-sheets.png
-  07. archcantor-poses.png
-  08. minigun-module-voxels.png
-  09. dispatch-order-en.png
-  10. dispatch-mode-selector-ptbr.png
-  11. hud-before-after-tall.png
-  12. hud-before-after-wide.png
-  13. prospector-3d-print.jpg
-  14. run-basalt-galleries.png
+  07. frost-queen-poses.png
+  08. archcantor-voxel.jpg
+  09. minigun-module-voxels.png
+  10. dispatch-order-en.png
+  11. dispatch-mode-selector-ptbr.png
+  12. hud-before-after-tall.png
+  13. hud-before-after-wide.png
+  14. prospector-3d-print.jpg
+  15. run-basalt-galleries.png
 
   5. The red [ VIDEO ] line is the soundtrack. Delete it and paste
      https://youtu.be/HsP8OoMEuy8 on a line of its own. itch turns a bare
@@ -67,22 +68,24 @@
 <p>Now the floor keeps a record of you.</p>
 <p><strong>Inertia got real.</strong> Glide goes to 0.915, which is about 2.5 tiles of braking. Reversing crosses zero in roughly 0.4 seconds and completes in 1.7. The gyroscopic stabiliser upgrade now cuts your slide by 60% instead of turning the lake into dry ground, and it buys you no protection at all from the thing below.</p>
 <p><strong>The ice cracks in four stages.</strong> Whole, cracked, fractured, critical. Then the hole.</p>
-<p class="slot">[ IMAGE 4 &nbsp;&middot;&nbsp; ice-crack-atlas.png &nbsp;&middot;&nbsp; The ice crust atlas: cracks separating by shape and line density as the stage advances ]</p>
 <p>Every crossing takes a cell down one step, and it counts <em>entering</em> the cell, so standing still does not progress it, leaving and coming back does, sliding counts, dodging counts. Moving fast does not let you skip a step either: every cell you pass through gets its turn. Walk the same line four times and you have made a hole in the world.</p>
 <p><strong>And the hole kills.</strong> Deep water kills you at full health, through invulnerability frames, with no body left to revive. It conducts electricity like water. Projectiles pass over it. The Queen and her Wraiths cross it like it is not there. It refreezes after twelve seconds, so the map you broke does come back, on its own schedule and not yours.</p>
 <p><strong>The loop closes, which is the part I am proud of.</strong> Heat melts any cracked stage back to shallow water, and shallow water refreezes as an intact plate, which erases everything you did to it. The Queen's freeze repairs cracks and seals holes inside her radius, but it preserves live fire. And her armour counts a cracked plate as ice, so melting the lake is still the only way through her. The ice is a resource both of you are spending, from opposite directions.</p>
 <p>The fall has 820 milliseconds of presentation of its own: the loss of height, the sinking, the fragments, the ripple. No tombstone, no red ring. The result screen waits for it, because it is the last thing that happens to you and it should get to finish.</p>
 <h2>Frostbite: the cold accumulates, and then you are a statue</h2>
-<p class="slot">[ IMAGE 5 &nbsp;&middot;&nbsp; frostbite-statue.png &nbsp;&middot;&nbsp; Frostbite at full meter: the Prospector locked in a faceted ice shell with the orange core pulsing ]</p>
+<p class="slot">[ IMAGE 4 &nbsp;&middot;&nbsp; frostbite-statue.png &nbsp;&middot;&nbsp; Frostbite at full meter: the Prospector locked in a faceted ice shell with the orange core pulsing ]</p>
 <p>The other half of the ice work is a freeze meter, and it is the mechanic I most want people to go and get hit by.</p>
 <p>The Queen's Nova doses 45% to everyone inside its radius, and dodge frames do not save you from cold. The Frost Wraith's lunge doses 12% on contact, and that lunge now actually connects, which it never did before. The meter decays about a point a second after a short grace period, so three Novas inside fourteen seconds will freeze you even with the decay running between them.</p>
 <p>At full, the chassis locks. No movement, no facing, no dodge, no interact, no ability, no shot. Damage still lands.</p>
 <p>The way out is my favourite bit of design in this build. Your fire button gets intercepted before any weapon exists and becomes a thermal cycle instead, five per second, identical whether you are carrying the bolt, the return disc or the Minigun. Those cycles make real heat, and heat melts the shell in about a second.</p>
 <p>So the answer to being frozen is: hold the trigger. Your gun is the heater. And if you walked into that Nova with an already overheated weapon, you wait, and the Queen gets a free window on a statue. Which means "keep some heat headroom near her" is now a real thought you have to have while fighting something else entirely.</p>
 <h2>The Frost Wraith is fog until it is not</h2>
-<p class="slot">[ IMAGE 6 &nbsp;&middot;&nbsp; frost-wraith-sheets.png &nbsp;&middot;&nbsp; Frost Wraith sprite sheets: the hidden fog form and the materialised manawyrm ]</p>
+<p class="slot">[ IMAGE 5 &nbsp;&middot;&nbsp; frost-wraith-before-rework.png &nbsp;&middot;&nbsp; The Frost Wraith before the rework: a flat slab of a body, four directions, nothing to read ]</p>
+<p>This is what it used to be, and it is the reason it got rebuilt. A flat slab that read as a piece of scenery with a health bar. Nothing about it said cold, and nothing about it said <em>hiding</em>, which is the entire thing it does.</p>
+<p class="slot">[ IMAGE 6 &nbsp;&middot;&nbsp; frost-wraith-sheets.png &nbsp;&middot;&nbsp; The Frost Wraith now: the hidden fog form and the materialised manawyrm ]</p>
 <p>The Wraith got rebuilt as a two state creature. Hidden, it is genuinely fog: lobes, loose voxels, suspended crystals, a cyan glow, streaks of condensation. Exposed, it is a frost manawyrm with a materialisation pose of its own, five voices, and a whisper that tracks its state, so you can hear roughly where it is before you can see anything at all.</p>
 <h2>The Frost Queen got a cadence, a crown and a sound</h2>
+<p class="slot">[ IMAGE 7 &nbsp;&middot;&nbsp; frost-queen-poses.png &nbsp;&middot;&nbsp; The Frost Queen across her poses, ending on the shattered heap she leaves when she dies ]</p>
 <p>Her freeze used to come every six seconds. Once the floor could crack, that turned out to be poison: her repair covered a six tile radius, so she erased every route near her before you could get to the fourth step. The only hole you could ever open was far away from the fight, which is the least interesting place for a hole to be.</p>
 <p>The interval is fourteen seconds now, and that number is not vibes. A tight loop needs about eleven seconds to open a hole. Natural refreeze takes twelve. Fourteen guarantees you can open the hole and have at least three seconds of it. It deliberately does not guarantee covering the loop and the refreeze together, which would need about twenty three. You get the window. You do not get to keep it.</p>
 <p>The crown is white shards standing up and tilting outward, opening in a full circle out to the ability's real radius, with a frost disc and dust streaks along the floor. It is seeded from the event, so in co-op both of you see exactly the same fan of ice.</p>
@@ -98,7 +101,7 @@
 <p>The ring was lying, too. A circle in this isometric becomes an ellipse, and the code was missing a square root, so the ring was drawn at 71% of the radius that actually grabs you. A ring that promises a different radius than the one that grabs you is worse than no ring at all.</p>
 <p>He has a brood now. The brood dies with the mother.</p>
 <h2>The Archcantor sings with four voices</h2>
-<p class="slot">[ IMAGE 7 &nbsp;&middot;&nbsp; archcantor-poses.png &nbsp;&middot;&nbsp; The Archcantor: the crown of tuned crystal that does the singing, across his poses ]</p>
+<p class="slot">[ IMAGE 8 &nbsp;&middot;&nbsp; archcantor-voxel.jpg &nbsp;&middot;&nbsp; The Archcantor: the dark body under a crown of tuned crystal, which is the part that sings ]</p>
 <p>The Archcantor encounter used to start empty. A slow body in the middle of the nave, singing to crystals that the generator may or may not have put nearby. With map luck the whole Cathedral answered you. Without it, he was a statue with a health bar.</p>
 <p>Now four Resonants orbit him as a Cardinal Choir, and three things close the exits that playtesting found.</p>
 <p><strong>Replacement costs him the room.</strong> Kill one and the gap is answered a few seconds later by the crystal nearest the body, which crystallises into a new Resonant and stops being a crystal. He eats his own nave to hold the chord, innermost layer first. With no crystal in reach, the gap stays open. So breaking crystal is counterplay twice over: it is his ammunition and it is his choir.</p>
@@ -110,7 +113,7 @@
 <p>And Diamandis speaks. His lines come out as robotic phonemes with a subtitle on the HUD in the same instant. He no longer gets the generic "the Guardian has awoken" banner, because he introduces himself.</p>
 <p>The boss arena has sound at all now, which is embarrassing to type. It was the one mode running the real engine in silence.</p>
 <h2>The Minigun</h2>
-<p class="slot">[ IMAGE 8 &nbsp;&middot;&nbsp; minigun-module-voxels.png &nbsp;&middot;&nbsp; The weapon module voxel models: barrels, drum and the mounted assembly ]</p>
+<p class="slot">[ IMAGE 9 &nbsp;&middot;&nbsp; minigun-module-voxels.png &nbsp;&middot;&nbsp; The weapon module voxel models: barrels, drum and the mounted assembly ]</p>
 <p>A tier 3 module with 300 rounds that <em>replaces</em> your main fire while it has ammunition. Not a bolt modifier. It spins up, it fires, it spins down, it overheats, and none of that is negotiable once you have committed.</p>
 <p>The compatibility matrix is drawn instead of written. Mount the Minigun and your six coupled modules physically disappear from the metal. They are still installed with their charges intact, they just do not apply to her bullets. When round 300 leaves the barrel, the Driver comes back and all six reappear on their own. The body of the bot tells you the rule without a single line of HUD.</p>
 <p>The audio is three identities and no voice per bullet. The motor is a continuous bed whose pitch follows the real rotation, so you can hear how spun up you are without looking. The burst is one voice per window that schedules three transients inside itself, which is five voices a second instead of sixteen, and reads as a mechanism rather than as three identical clicks. And the burst is never allowed to reach telegraph priority, because the strongest weapon in the game does not get to silence the warning that prevents an unfair death.</p>
@@ -123,28 +126,28 @@
 <p><strong>The score is Cores extracted first, then time, and nothing else.</strong> Ore is out. It was a tiebreak, but a tiebreak is also a criterion, and it was a question the scoreboard was asking that the briefing never did. Stars stopped ordering anything at all: a two Core run outside the target time did twice the work of a three star single Core run, and sorting by the grade was punishing people for going deeper. Stars are still how you read a run. They are just not its position any more.</p>
 <p><strong>And there is now one book per sector count.</strong> A three sector descent and a seven sector descent are not the same exam. Put them in the same book and they stop comparing skill and start comparing authorisation, and authorisation is something you buy.</p>
 <h2>The terminal is a form again</h2>
-<p class="slot">[ IMAGE 9 &nbsp;&middot;&nbsp; dispatch-order-en.png &nbsp;&middot;&nbsp; The dispatch order: mode selector on the left, one DESCEND stamp on the right ]</p>
+<p class="slot">[ IMAGE 10 &nbsp;&middot;&nbsp; dispatch-order-en.png &nbsp;&middot;&nbsp; The dispatch order: mode selector on the left, one DESCEND stamp on the right ]</p>
 <p>In phone landscape the authorisation column did not fit. DESCEND plus three secondary buttons, and the Weekly Challenge, the last one and the only one with a deadline, fell off the bottom of the screen. The fix was not a smaller column. It was a different form.</p>
 <p>The requisition is a mode selector now: free descent, online co-op, training op, weekly challenge. The authorisation column keeps the generation stamp and a single DESCEND, which runs whichever row is ticked and says which one in its subline. Four descents, one stamp, and the column can never grow again.</p>
-<p class="slot">[ IMAGE 10 &nbsp;&middot;&nbsp; dispatch-mode-selector-ptbr.png &nbsp;&middot;&nbsp; The same sheet in Portuguese, with the co-op room drawer open and the weekly challenge live ]</p>
+<p class="slot">[ IMAGE 11 &nbsp;&middot;&nbsp; dispatch-mode-selector-ptbr.png &nbsp;&middot;&nbsp; The same sheet in Portuguese, with the co-op room drawer open and the weekly challenge live ]</p>
 <p>Then I audited all five sheets against a real server at six window sizes, down to 320 pixels wide, and it was humbling. Five rail labels had been colliding into "DISPATCHLOG". "OPERATOR" and "CORES" were overlapping until your name became a single letter. The 127 locked Aurix files were an identical grey wall, and are now grouped by clearance level. In short landscape, the portrait stack was hiding three of the four mode cards behind the stamp with nothing on screen to suggest you could scroll.</p>
 <h2>The HUD got denser without losing a line</h2>
-<p class="slot">[ IMAGE 11 &nbsp;&middot;&nbsp; hud-before-after-tall.png &nbsp;&middot;&nbsp; HUD before and after: the panel becomes a closed card with tighter vertical rhythm ]</p>
+<p class="slot">[ IMAGE 12 &nbsp;&middot;&nbsp; hud-before-after-tall.png &nbsp;&middot;&nbsp; HUD before and after: the panel becomes a closed card with tighter vertical rhythm ]</p>
 <p>Small screens used to just get the whole panel shrunk, which still left the whole panel sitting on top of the game. Now they get a tighter rhythm: a shorter health bar, smaller module cards, less air between sections. Same sections, same order. The rhythm takes the space, never a line of information.</p>
-<p class="slot">[ IMAGE 12 &nbsp;&middot;&nbsp; hud-before-after-wide.png &nbsp;&middot;&nbsp; The same change at desktop width ]</p>
+<p class="slot">[ IMAGE 13 &nbsp;&middot;&nbsp; hud-before-after-wide.png &nbsp;&middot;&nbsp; The same change at desktop width ]</p>
 <p>The Purge Cell is a real battery now. The old glyph was a rectangle with a bar in it, which at 13 pixels read like a dimmed letter "i", and a row of them read like a row of nothing.</p>
 <p>Co-op got a fix that was overdue: your partner's messages were showing up on your screen. Their module expiring, the Echo they absorbed, the refusals the shaft gave <em>them</em>. None of it changed a single decision you could make. Notifications are now either yours or the world's, never somebody else's.</p>
 <h2>Latency lives in Options</h2>
 <p>There is a network reading in Options now, and it is in the same sheet whether you open it from the menu or from the pause terminal, so you can check it in the middle of a room. Inside a room it is measured live. Outside one, a button pokes the server, because "can I play co-op right now" is a question people ask <em>before</em> joining.</p>
 <h2>The Prospector exists in real life now</h2>
-<p class="slot">[ IMAGE 13 &nbsp;&middot;&nbsp; prospector-3d-print.jpg &nbsp;&middot;&nbsp; A 3D printed Prospector standing on a lace tablecloth ]</p>
+<p class="slot">[ IMAGE 14 &nbsp;&middot;&nbsp; prospector-3d-print.jpg &nbsp;&middot;&nbsp; A 3D printed Prospector standing on a lace tablecloth ]</p>
 <p>Not a feature. Not in the changelog. Just the best thing that happened during these sixteen days, and proof that the silhouette reads even when you take the pixels away.</p>
 <h2>And there is a second game now</h2>
 <p>Somewhere in the middle of all this I built <strong>Catathon</strong>, a spin-off in the same repo. The biggest hackathon in the world, every developer is an extremely cute cat, and everything that can go wrong will. You do not write code. You carry cats to desks, interpret a vague brief, respect a dependency graph and survive until the demo.</p>
 <p>Four cats, four disciplines, four personalities. Bigode the Siamese backend perfectionist will not let anything merge without your approval. Cheeto the orange frontend cowboy is 25% faster, ships without testing, and bites the build cable. Almofada the Maine Coon does devops at half the stress. Smoking the tuxedo does design and judges you in silence. Bugs are born from stress. Petting is the release valve.</p>
 <p>It has a career mode, a circuit, sprints, sponsors, a persistent rival and alumni. It plays with one finger on a phone. It is a completely different game and I regret nothing.</p>
 <h2>What to actually play in this build</h2>
-<p class="slot">[ IMAGE 14 &nbsp;&middot;&nbsp; run-basalt-galleries.png &nbsp;&middot;&nbsp; A live run in the Basalt Galleries ]</p>
+<p class="slot">[ IMAGE 15 &nbsp;&middot;&nbsp; run-basalt-galleries.png &nbsp;&middot;&nbsp; A live run in the Basalt Galleries ]</p>
 <p>If you are coming back after the last zip, here is the order I would go in:</p>
 <ol>
   <li><strong>Put headphones on.</strong> Genuinely. The sound tells you things the screen has not shown you yet, and now there is also music worth hearing.</li>
