@@ -463,6 +463,42 @@ Notas de desenho que valem registrar:
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
   (fogo, descarga, explosão) as esqueça.
 
+### A Rainha da Geada e o gelo que RACHA (`SIMULATION_VERSION` 56)
+
+O encontro dela sempre foi sobre o chão, e o chão não fazia nada. Com o ciclo de
+rachaduras (ver §_O gelo com MEMÓRIA_ na spec de estratos), a luta passa a
+deixar marcas: cada travessia de Prospector desce um degrau da placa — intacto,
+fina, fraturado, crítico — e a quarta abre um **buraco de água profunda**, que
+mata quem entra e recongela sozinho em ~12 s.
+
+O que muda **no encontro**:
+
+- **A couraça conta qualquer estágio rachado como gelo.** Uma placa trincada
+  continua sendo lâmina; exigir gelo intacto faria o jogador remover a armadura
+  andando em círculos, sem calor nenhum, e o contra-jogo autorado — **derreter o
+  lago** — viraria opcional. Buraco não conta: ali o gelo acabou.
+- **O congelamento REPARA a arena.** Ele já criava gelo onde criava; agora
+  também restaura placas rachadas para intactas e fecha buracos dentro do
+  alcance, emitindo `ice_mend` (o cliente responde com clarão frio e som). Fogo
+  vivo continua preservado, como sempre.
+- **A Rainha e os Espectros não racham o piso** e **atravessam os buracos**: os
+  dois pertencem ao estrato. Se o buraco os prendesse, derreter gelo passaria a
+  ser também um jeito de imobilizar o encontro.
+
+O loop da luta, do começo ao fim de um ciclo:
+
+1. a Rainha congela e recompõe a arena;
+2. o Prospector desliza (~2,5 tiles de frenagem, ~1,0 com MV-04) e desenha rotas;
+3. rotas reutilizadas ficam progressivamente perigosas;
+4. ele escolhe: mudar o caminho, usar os estabilizadores, ou derreter a célula
+   crítica e aceitar água condutiva;
+5. buracos alteram temporariamente a circulação;
+6. o próximo congelamento recompõe parte do tabuleiro.
+
+**Não é aumento de dificuldade puro**: o contra-jogo continua sendo derreter o
+lago, e o rework acrescenta duas saídas que antes não existiam — trocar de rota
+e gastar calor numa célula crítica antes que ela ceda.
+
 ### O Coro Cardinal
 
 O encontro começava **vazio**: um corpo lento no meio da nave cantando para cristais que

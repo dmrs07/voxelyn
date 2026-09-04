@@ -387,14 +387,40 @@ Ramo completo: 805 minério, 10 núcleos. Árvore: 3.220 minério, 40 núcleos.
 
 ### MOBILIDADE — movimento
 
-| ID    | Nome                         | Efeito                 | Campo                |
-| ----- | ---------------------------- | ---------------------- | -------------------- |
-| MV-01 | Servomotores I               | +2% velocidade         | `moveSpeed`          |
-| MV-02 | Relé de Esquiva              | cooldown 18 → 17 ticks | `dodgeCooldownTicks` |
-| MV-03 | Tração Segmentada            | slow de líquidos −8%   | `liquidSlowScale`    |
-| MV-04 | Estabilizadores Giroscópicos | mais controle no gelo  | `iceGlide`           |
-| MV-05 | Servomotores II              | +2% velocidade         | `moveSpeed`          |
-| MV-X  | Firmware Reflexo             | +1 iframe na esquiva   | `dodgeIframeTicks`   |
+| ID    | Nome                         | Efeito                          | Campo                |
+| ----- | ---------------------------- | ------------------------------- | -------------------- |
+| MV-01 | Servomotores I               | +2% velocidade                  | `moveSpeed`          |
+| MV-02 | Relé de Esquiva              | cooldown 18 → 17 ticks          | `dodgeCooldownTicks` |
+| MV-03 | Tração Segmentada            | slow de líquidos −8%            | `liquidSlowScale`    |
+| MV-04 | Estabilizadores Giroscópicos | frenagem no gelo 2,5 → 1,0 tile | `iceGlide`           |
+| MV-05 | Servomotores II              | +2% velocidade                  | `moveSpeed`          |
+| MV-X  | Firmware Reflexo             | +1 iframe na esquiva            | `dodgeIframeTicks`   |
+
+#### MV-04, depois do rework do gelo (`SIMULATION_VERSION` 56)
+
+`iceGlide` deixou de ser um multiplicador que encolhia o embalo e passou a ser
+um **cursor de instalação** (0 = de fábrica, 1 = MV-04 completo). Quem resolve o
+número final é `iceGlideFor(tuning)`, e ninguém mais faz essa conta: a simulação
+lê a função, a arena de teste lê a função, os testes leem a função.
+
+|                                 | sem MV-04         | com MV-04                   |
+| ------------------------------- | ----------------- | --------------------------- |
+| inércia por tick                | `ICE_GLIDE` 0,915 | `ICE_GLIDE_STABILISED` 0,81 |
+| frenagem ao soltar o direcional | ~2,5 tiles        | ~0,98 tile (−60%)           |
+| inversão de rumo: cruzar o zero | ~0,4 s            | ~0,16 s                     |
+| derrapagem numa inversão a toda | ~0,68 tile        | ~0,23 tile                  |
+
+O que ele **não** faz, e a distinção é o que dá valor ao nó:
+
+- **não** transforma o gelo em chão seco — um tile de deslize continua sendo um
+  tile, e a rota continua sendo uma decisão;
+- **não** concede resistência a rachaduras. A placa cede na quarta travessia com
+  ou sem estabilizador. O que MV-04 compra é a **precisão de rota** que permite
+  desviar da célula crítica em vez de deslizar para dentro dela.
+
+A descrição em PT-BR e EN foi reescrita para dizer isso concretamente — "mais
+controle no gelo" não é uma promessa que alguém consiga avaliar antes de gastar
+130 de minério e 2 Núcleos.
 
 ### REATOR — calor e combate
 
@@ -441,6 +467,7 @@ type PlayerTuning = {
   stunDurationScale: number;
   environmentalDamageScale: number;
   liquidSlowScale: number;
+  /** 0..1: fração dos Estabilizadores Giroscópicos instalada. Ver MV-04. */
   iceGlide: number;
   abilityCooldownScale: number;
   projectileSpeedScale: number;

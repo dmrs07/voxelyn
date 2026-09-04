@@ -25,6 +25,10 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_FRACTURED,
+  SURF_ICE_CRITICAL,
+  SURF_DEEP_WATER,
   SURF_GLASS,
   SURF_RAIL,
   SURF_SILT,
@@ -299,6 +303,11 @@ export const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_RAIL_V]: 12,
   [SURF_SILT]: 13,
   [SURF_GLASS]: 14,
+  // O ciclo de rachaduras da Cripta e o buraco. No fim da lista, como o atlas.
+  [SURF_ICE_CRACKED]: 15,
+  [SURF_ICE_FRACTURED]: 16,
+  [SURF_ICE_CRITICAL]: 17,
+  [SURF_DEEP_WATER]: 18,
 };
 
 /**
@@ -335,6 +344,17 @@ export const SURFACE_FALLBACK: Record<number, string> = {
   // Vidro: quase branco, frio. A leitura pretendida e "isto aqui esta selado",
   // e o contraste com a areia e o que conta a historia sozinho.
   [SURF_GLASS]: '#dfe9f2',
+  // O CICLO DE RACHADURAS, escurecendo degrau a degrau a partir do gelo
+  // (#7b8ba3). Sem o atlas nao ha forma nenhuma para ler — so resta a
+  // luminancia —, e o que o recuo precisa entregar e a ORDEM: quanto mais
+  // escura a celula, mais perto de ceder. Nao e a arte; e o minimo para nao se
+  // pisar num buraco invisivel enquanto a imagem nao chega.
+  [SURF_ICE_CRACKED]: '#6c7d94',
+  [SURF_ICE_FRACTURED]: '#5a6b81',
+  [SURF_ICE_CRITICAL]: '#44536b',
+  // O buraco: mais escuro que a agua rasa (#2e3a4d) e que qualquer gelo. O
+  // unico chao do jogo em que entrar mata sem golpe nenhum.
+  [SURF_DEEP_WATER]: '#141b28',
 };
 
 /**
@@ -565,6 +585,8 @@ const PAL = {
   rockShadow: '#1d2430',
   rock: '#2e3a4d',
   rockLight: '#46566e',
+  /** O cinza-azulado palido da paleta mestra: gelo, e a espuma que ele levanta. */
+  mist: '#7b8ba3',
   rust: '#6e4a33',
   bone: '#b8a98f',
   fungusDark: '#1f3d33',
@@ -1439,6 +1461,15 @@ export class SurvivalRenderer {
   private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
+  /**
+   * Quem afundou NESTE lote de eventos.
+   *
+   * Existe por causa da ordem: `ice_fall` chega antes do `death` do mesmo
+   * Prospector, e o ramo de `death` precisa saber que aquela morte ja tem
+   * apresentacao propria para nao carimbar o anel vermelho generico por cima do
+   * buraco. Limpo no comeco de cada lote — a memoria nao atravessa quadros.
+   */
+  private readonly plungedThisTick = new Set<number>();
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -1652,6 +1683,10 @@ export class SurvivalRenderer {
    */
   resetRunPresentation(): void {
     this.presentation.reset();
+    // Quem afundou na run anterior. Os ids de slot recomecam iguais, e sem a
+    // limpeza a run nova nasceria com a morte do slot 0 ja marcada como queda —
+    // o anel de morte sumiria do primeiro tombo comum.
+    this.plungedThisTick.clear();
     // O latao e os cartuchos sao memoria da RUN: sem a limpeza, a run nova
     // comeca com o chao coberto pelas capsulas da anterior e com um cartucho
     // ejetado quicando numa sala que nunca o viu sair.
@@ -1732,6 +1767,7 @@ export class SurvivalRenderer {
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
+    this.plungedThisTick.clear();
     // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
     // O cliente nunca decide que houve explosao — so a desenha.
     this.particles.budget = this.quality.maxFx * 2;
@@ -1813,6 +1849,11 @@ export class SurvivalRenderer {
           if (ev.target === this.localPlayerId) this.shake = { power: 3, until: nowMs + 120 };
           break;
         case 'death':
+          // O ANEL VERMELHO e a linguagem de "isto morreu de dano". Quem afundou
+          // nao morreu de dano — nao houve golpe, nao houve barra —, e o anel
+          // por cima de um buraco contaria a historia errada em cima da unica
+          // que importa. A apresentacao da queda ja saiu no `ice_fall` acima.
+          if (this.plungedThisTick.has(ev.entity)) break;
           this.fxList.push({
             kind: 'ring',
             x: ev.x,
@@ -1823,6 +1864,48 @@ export class SurvivalRenderer {
             life: 260,
             maxLife: 260,
           });
+          break;
+        case 'ice_crack':
+          // O ESTALO tem tres pesos, e o peso e o aviso. Sem cor nova: o clarao
+          // frio curto marca ONDE, e a duracao e a intensidade dizem QUANTO
+          // falta. O estado em si ja mudou no chao pelo diff de chunk.
+          this.addFlash(
+            ev.x,
+            ev.y,
+            0.9 + ev.stage * 0.35,
+            0.18 + ev.stage * 0.12,
+            nowMs,
+            90 + ev.stage * 50,
+            PAL.mist,
+          );
+          if (ev.stage >= 3) this.shake = { power: 2, until: nowMs + 110 };
+          break;
+        case 'ice_collapse':
+          // O chao cedeu: clarao frio largo e um tremor curto. O buraco em si e
+          // superficie e se desenha sozinho.
+          this.addFlash(ev.x, ev.y, 2.6, 0.7, nowMs, 260, PAL.electric);
+          this.shake = { power: 5, until: nowMs + 220 };
+          break;
+        case 'ice_fall':
+          // A QUEDA. O corpo afundando e desenhado pela camada de apresentacao
+          // (ver `IcePlunge`); aqui fica so o que ela nao entrega — o baque na
+          // camera e a marca de que este `death` ja tem dono.
+          this.plungedThisTick.add(ev.slot + 1);
+          this.shake = { power: 7, until: nowMs + 300 };
+          break;
+        case 'ice_mend':
+          // A ARENA RECOMPOSTA. Um clarao frio proporcional ao que voltou: a
+          // Rainha refazendo o lago le como um pulso largo, e um buraco que
+          // recongelou sozinho le como um estalo no lugar dele.
+          this.addFlash(
+            ev.x,
+            ev.y,
+            Math.max(1.4, ev.radius),
+            ev.radius > 0 ? 0.9 : 0.4,
+            nowMs,
+            ev.radius > 0 ? 420 : 220,
+            PAL.mist,
+          );
           break;
         case 'pulse':
           // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
@@ -4152,6 +4235,107 @@ export class SurvivalRenderer {
 
           // O risco de mira que ficava aqui saiu: virou a faixa no chao,
           // desenhada antes das paredes para poder ser coberta por elas.
+        },
+      });
+    }
+
+    // A QUEDA NO BURACO. Antes das lapides na fila, pela mesma razao de sempre:
+    // ordem de insercao com a mesma profundidade decide quem fica por cima, e o
+    // Prospector afundando tem de ficar ATRAS do respingo que ele levanta.
+    //
+    // Nenhum sprite novo: o atlas do Prospector com transformacao e mascara. O
+    // corpo perde altura, escorrega para dentro da celula e e COMIDO de baixo
+    // para cima — o recorte sobe conforme ele afunda, entao a agua sempre cobre
+    // exatamente a parte que ja entrou. Um fade simples faria o Prospector
+    // desaparecer no ar; o recorte faz a agua leva-lo.
+    for (const plunge of this.presentation.plunges(nowMs)) {
+      items.push({
+        depth: plunge.x + plunge.y,
+        draw: () => {
+          const [pxs, pys] = toScreen(plunge.x, plunge.y);
+          const t = Math.max(
+            0,
+            Math.min(1, (nowMs - plunge.startedMs) / (plunge.endsMs - plunge.startedMs)),
+          );
+          // Perda de altura primeiro, afundamento depois: `t^2` concentra o
+          // deslocamento na segunda metade, que e como um corpo cai — devagar
+          // enquanto o apoio cede, rapido quando ele acaba.
+          const sink = t * t;
+          // A MESMA medida do corpo vivo (`pl.radius * TILE_W * 0.9 * z`): a
+          // queda tem de sair na escala em que o Prospector estava andando um
+          // tick atras, e nao numa propria.
+          const size = 0.34 * TILE_W * 0.9 * z;
+          // A LAMINA D'AGUA: o plano em que o corpo desaparece. Meio corpo
+          // acima do centro do tile, que e onde a crosta de agua profunda
+          // desenha a propria superficie.
+          const waterLine = pys - size * 0.5;
+          if (sink < 1) {
+            ctx.save();
+            // Mascara: so o que esta ACIMA da lamina continua visivel. A caixa
+            // e larga e alta o bastante para conter o sprite inteiro do
+            // Prospector — recortar por cima seria cortar a cabeca dele.
+            ctx.beginPath();
+            ctx.rect(pxs - size * 3, waterLine - size * 8, size * 6, size * 8);
+            ctx.clip();
+            // O corpo desce ate uma altura inteira abaixo da lamina e encolhe
+            // um pouco: perspectiva de quem se afasta para baixo.
+            ctx.translate(0, sink * size * 2.6);
+            const shrink = 1 - sink * 0.18;
+            ctx.translate(pxs, pys);
+            ctx.scale(shrink, shrink);
+            ctx.translate(-pxs, -pys);
+            ctx.globalAlpha = 1 - sink * 0.35;
+            const drew = this.sprites.drawEntity(
+              ctx,
+              'prospector',
+              'die',
+              plunge.facingX,
+              plunge.facingY,
+              nowMs - plunge.startedMs,
+              pxs,
+              pys,
+              spriteZoom,
+            );
+            if (!drew) {
+              drawVoxelEntity(ctx, {
+                sx: pxs,
+                sy: pys,
+                z,
+                radius: 0.34,
+                brightness: 0.7,
+                archetype: 'prospector',
+                elite: false,
+                nowMs,
+              });
+            }
+            ctx.restore();
+          }
+          // A ONDULACAO fica depois do corpo e dura ate o fim: e ela que conta
+          // que alguem entrou ali, e ela e a unica coisa na tela nos ultimos
+          // ~220 ms. Dois aneis defasados, no PLANO da agua e nao no chao.
+          ctx.save();
+          for (const [delay, tint] of [
+            [0, PAL.mist],
+            [0.28, PAL.electric],
+          ] as const) {
+            const rt = (t - delay) / (1 - delay);
+            if (rt <= 0 || rt >= 1) continue;
+            ctx.globalAlpha = (1 - rt) * 0.5;
+            ctx.strokeStyle = tint;
+            ctx.lineWidth = Math.max(1, 0.9 * z);
+            ctx.beginPath();
+            ctx.ellipse(
+              pxs,
+              waterLine,
+              size * (0.5 + rt * 1.6),
+              size * (0.25 + rt * 0.8),
+              0,
+              0,
+              Math.PI * 2,
+            );
+            ctx.stroke();
+          }
+          ctx.restore();
         },
       });
     }
@@ -6695,6 +6879,18 @@ export class SurvivalRenderer {
    * acertou; `null` quando nao ha sumario — ou quando quem chamou dispensou o
    * rodape (`actions: false`), e nao ha botao nenhum a acertar.
    */
+  /**
+   * Ha uma queda no buraco em curso?
+   *
+   * Publico porque a Arena de Chefes tem a PROPRIA tela de resultado (um
+   * overlay de HTML, fora do canvas) e ela precisa da mesma espera que
+   * `renderEnd` ja faz por conta propria — senao a ferramenta que existe para
+   * testar a queda seria a unica que nao a mostra.
+   */
+  plungeActive(nowMs: number): boolean {
+    return this.presentation.plungeActive(nowMs);
+  }
+
   renderEnd(
     state: SurvivalState,
     vw: number,
@@ -6705,6 +6901,20 @@ export class SurvivalRenderer {
     const { input, actions = true } = opts;
     const summary = state.summary;
     if (!summary) return null;
+    // A TELA DE RESULTADO ESPERA A QUEDA TERMINAR.
+    //
+    // Afundar num buraco encerra a run no MESMO tick em que a animacao comeca, e
+    // sem esta espera o documento de fim entrava por cima do Prospector no
+    // primeiro quadro — o jogador lia "o gelo cedeu debaixo de voce" sem nunca
+    // ter visto o gelo ceder, e a unica apresentacao que explica esta morte
+    // ficava atras de um painel opaco.
+    //
+    // Aqui e nao nos cinco chamadores: a regra e da tela, e um chamador novo que
+    // esquecesse dela reintroduziria o defeito em silencio. Devolver `null` e o
+    // que os chamadores ja tratam (nao ha sumario para tocar), entao a espera
+    // tambem desarma os botoes — ninguem pode acertar "descer de novo" atras de
+    // uma animacao que ainda esta rodando.
+    if (this.presentation.plungeActive(nowMs)) return null;
     // O relogio da animacao nasce no primeiro quadro DESTE sumario.
     //
     // A chave e feita de campos congelados, e nao da identidade do objeto: no

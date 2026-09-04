@@ -54,6 +54,20 @@ import type { WorldgenProfile } from './worldgen.js';
  * - `glacial`: Cripta Glacial — gelo que derrete em agua condutiva e
  *   recongela, e (desde SIMULATION_VERSION 16) com INERCIA: sobre a lamina o
  *   Prospector desliza (ICE_GLIDE em run.ts).
+ *
+ *   Desde SIMULATION_VERSION 56 a lamina tambem tem MEMORIA. A inercia foi
+ *   recalibrada para cobrar compromisso (~2,5 tiles de frenagem, ~1,0 com os
+ *   Estabilizadores Giroscopicos MV-04) e cada travessia de Prospector desce um
+ *   degrau do CICLO DE RACHADURAS: inteiro -> fina -> fraturado -> critico ->
+ *   BURACO de agua profunda, que mata quem entra e recongela sozinho em ~12 s
+ *   (ICE_HOLE_REFREEZE_TICKS). Calor devolve qualquer estagio a agua rasa; a
+ *   agua rasa recongela como placa INTEIRA. Ver o bloco de SURF_ICE_* em
+ *   constants.ts.
+ *
+ *   A SUBVERSAO (circuito fechado neste estrato) estabiliza a lamina inteira:
+ *   ela para de derreter, para de escorregar e para de rachar — nos quatro
+ *   estagios, nao so na placa intacta. Buracos ja abertos continuam fatais e
+ *   continuam no proprio relogio (ver `isGlacialStabilised` em cells.ts).
  */
 export type StratumId =
   | 'basalt'

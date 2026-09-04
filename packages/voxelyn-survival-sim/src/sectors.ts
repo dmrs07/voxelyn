@@ -44,7 +44,7 @@ import { isConductiveSurface, setSurface } from './cells.js';
 import { ARCHETYPES, SIGNATURE_OF_STRATUM, SIGNATURE_PACK, circleBlocked, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
-import { SURF_ICE } from './constants.js';
+import { isIceSurface } from './constants.js';
 import type { EnemyArchetype, SemanticEvent, SurvivalState, Vec2 } from './types.js';
 
 /**
@@ -185,7 +185,11 @@ const signatureHome = (
           taken.add(i);
           return { x: nx, y: ny };
         }
-        if (wantsIce && state.surface[i] === SURF_ICE) {
+        // Qualquer estagio serve de berco: o Espectro E a lamina, e uma placa
+        // trincada continua sendo lamina. (Na populacao do setor o gelo e
+        // sempre inteiro; a leitura semantica e o que impede isto de mentir no
+        // dia em que alguem repovoar um setor ja pisado.)
+        if (wantsIce && isIceSurface(state.surface[i])) {
           taken.add(i);
           return { x: nx, y: ny };
         }
@@ -520,6 +524,9 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.projectiles = [];
   state.charges = [];
   state.reactionQueue = [];
+  // Buracos sao do setor que ficou para tras: o chao novo nasce inteiro, e um
+  // relogio herdado recongelaria uma celula que hoje pode ser rocha.
+  state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;
@@ -656,6 +663,9 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   state.projectiles = [];
   state.charges = [];
   state.reactionQueue = [];
+  // Buracos sao do setor que ficou para tras: o chao novo nasce inteiro, e um
+  // relogio herdado recongelaria uma celula que hoje pode ser rocha.
+  state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;

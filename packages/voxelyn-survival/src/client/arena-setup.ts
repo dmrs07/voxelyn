@@ -23,9 +23,16 @@ import {
   SOLID_FRAGILE,
   SOLID_ROCK,
   isPipe,
+  isIceSurface,
+  iceCrackStage,
   PIPE_MOUTH,
+  SURF_DEEP_WATER,
+  SURF_ICE,
   SURF_NONE,
+  SURF_SCORCHED,
+  SURF_WATER,
   createRun,
+  derivePlayerTuning,
   grantOrRechargeModule,
   type AbilityId,
   type ModuleId,
@@ -38,6 +45,55 @@ export type ArenaConditions = {
   maxHp: number;
   ability: AbilityId;
   modules: readonly ModuleId[];
+  /**
+   * ESTABILIZADORES GIROSCOPICOS (MV-04) instalados.
+   *
+   * Fica FORA da lista de modulos de proposito, e a distincao nao e cosmetica:
+   * modulo e uma peca que se equipa, gasta cargas e aparece no HUD; MV-04 e
+   * TUNING DE PROGRESSAO — um numero congelado antes do tick zero, que a
+   * simulacao le sem saber que existe uma arvore. Represen-lo como modulo faria
+   * a ferramenta ensinar o modelo errado a quem a usa para tomar decisoes de
+   * balanco.
+   *
+   * A comparacao que ele existe para permitir e uma so, e e a que decide o
+   * valor do upgrade: a MESMA luta contra a Rainha, com ~2,5 tiles de frenagem
+   * e com ~1,0.
+   */
+  stabilisers: boolean;
+};
+
+/**
+ * O que a arena conta sobre o gelo, para o painel de diagnostico.
+ *
+ * DERIVADO por varredura, e nao acumulado por evento: um contador incremental
+ * discordaria do grid na primeira celula que a Rainha reparasse, e o ponto
+ * deste painel e justamente medir o reparo. So a ferramenta o usa — nada disto
+ * chega ao HUD do jogo, onde a informacao correta e o proprio chao.
+ */
+export type ArenaIceCensus = {
+  intact: number;
+  cracked: number;
+  fractured: number;
+  critical: number;
+  holes: number;
+};
+
+export const arenaIceCensus = (state: SurvivalState): ArenaIceCensus => {
+  const census: ArenaIceCensus = { intact: 0, cracked: 0, fractured: 0, critical: 0, holes: 0 };
+  for (let i = 0; i < state.surface.length; i++) {
+    const surf = state.surface[i];
+    if (surf === SURF_DEEP_WATER) {
+      census.holes++;
+      continue;
+    }
+    if (!isIceSurface(surf)) continue;
+    const stage = iceCrackStage(surf);
+    if (stage === 0) census.intact++;
+    else if (stage === 1) census.cracked++;
+    else if (stage === 2) census.fractured++;
+    else census.critical++;
+  }
+  return census;
 };
 
 /** Faixa de HP que a tela de setup oferece. Fora disso nao ha teste util: */
@@ -330,9 +386,82 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   state.entry = { x: spawn % w, y: Math.floor(spawn / w) };
 };
 
+/**
+ * Raio, em passos de caminhada, do LAGO de teste carimbado na arena da Rainha.
+ *
+ * O MESMO raio do recorte: o lago cobre a arena inteira, e nao um disco dentro
+ * dela. Medida a arena da Rainha, o recorte entrega ~480 celulas de chao — com
+ * um raio menor sobrava um lago de 280, e num lago desse tamanho o testador so
+ * consegue repetir o mesmo caminho. Repetir o mesmo caminho e exatamente a
+ * decisao que o rework existe para deixar de ser obrigatoria, entao a bancada
+ * tem de oferecer a alternativa.
+ *
+ * Cobrir a arena inteira tambem e o que a Cripta ja promete: o carimbo de arena
+ * de chefe do estrato glacial e "chao que ESCORREGA por inteiro". A ferramenta
+ * so garante isso onde a seed foi economica.
+ */
+const ARENA_ICE_FIELD_RADIUS = ARENA_KEEP_RADIUS;
+
+/**
+ * Carimba um LAGO AMPLO de gelo INTEIRO em volta da Rainha.
+ *
+ * A Cripta ja nasce com gelo, mas em manchas: as bolhas do worldgen mais a orla
+ * da arena de chefe. Manchas bastam para o encontro e nao bastam para a
+ * ferramenta — testar os quatro degraus exige uma superficie continua em que se
+ * possa ir e voltar pela mesma linha quatro vezes sem sair da lamina no meio.
+ *
+ * So converte chao NU, cinza e agua: rocha, minerio, cristal, trilho e brasa
+ * continuam onde estao. A arena e para ser a camara do bioma, e um disco de
+ * gelo apagando o que a seed pos ali seria a caixa branca que `carveArena`
+ * existe para nao produzir.
+ */
+const stampArenaIceField = (state: SurvivalState, bossArchetype: string): void => {
+  if (bossArchetype !== 'frost_queen') return;
+  const boss = state.enemies.find((e) => e.alive && e.archetype === bossArchetype);
+  if (!boss) return;
+  const w = state.config.width;
+  const h = state.config.height;
+  // Busca em largura, como o recorte: o lago segue os vaos e nao atravessa
+  // parede. Um disco carimbado por cima da rocha poria gelo dentro do maciço,
+  // e o painel de censo contaria celulas que ninguem pode pisar.
+  const start = Math.floor(boss.y) * w + Math.floor(boss.x);
+  if (state.solid[start] !== SOLID_NONE) return;
+  const dist = new Int32Array(w * h).fill(-1);
+  dist[start] = 0;
+  const queue = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head];
+    if (dist[cell] >= ARENA_ICE_FIELD_RADIUS) continue;
+    const cx = cell % w;
+    const cy = (cell - cx) / w;
+    for (const [dx, dy] of NEIGHBORS) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE || dist[i] >= 0) continue;
+      dist[i] = dist[cell] + 1;
+      queue.push(i);
+    }
+  }
+  for (const i of queue) {
+    const surf = state.surface[i];
+    if (surf === SURF_NONE || surf === SURF_SCORCHED || surf === SURF_WATER || isIceSurface(surf)) {
+      state.surface[i] = SURF_ICE;
+      state.surfaceTimer[i] = 0;
+    }
+  }
+  for (let c = 0; c < state.chunkVersion.length; c++) state.chunkVersion[c]++;
+};
+
 export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
   const entry = ARENA_CATALOG[conditions.boss];
-  const tuning = { ...DEFAULT_PLAYER_TUNING, maxHp: clampArenaHp(conditions.maxHp) };
+  // MV-04 entra pela porta da PROGRESSAO, e nao por um campo editado a mao: e a
+  // mesma derivacao que a expedicao usa, entao o que a arena mede e o upgrade
+  // real. Um `iceGlide: 1` escrito aqui mediria um numero que talvez nao exista
+  // na arvore.
+  const base = conditions.stabilisers ? derivePlayerTuning(['MV-04']) : DEFAULT_PLAYER_TUNING;
+  const tuning = { ...base, maxHp: clampArenaHp(conditions.maxHp) };
   const state = createRun({
     seed: entry.seed,
     sector: entry.sector,
@@ -357,7 +486,11 @@ export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
 
   // O recorte vem por ULTIMO, e depende de o chefe ja estar em campo: quem
   // define o centro da arena e o corpo dele, e nao um ponto do mapa.
-  carveArena(state, state.sectorBoss.archetype ?? conditions.boss);
+  const bossArchetype = state.sectorBoss.archetype ?? conditions.boss;
+  carveArena(state, bossArchetype);
+  // E o lago DEPOIS do recorte, para nao pintar gelo em corredores que o
+  // recorte vai emparedar em seguida.
+  stampArenaIceField(state, bossArchetype);
 
   return state;
 };

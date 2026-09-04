@@ -253,6 +253,17 @@ export type DamageCause =
   | { kind: 'explosion'; source: EffectOrigin['source'] }
   | { kind: 'overheat' }
   | { kind: 'bleedout' }
+  /**
+   * O CHAO CEDEU: o Prospector atravessou uma placa de gelo pela quarta vez (ou
+   * entrou num buraco que ja estava aberto) e afundou na agua profunda.
+   *
+   * Causa propria, e nao `unknown` nem um `hit` fabricado, porque a licao e
+   * unica em todo o jogo: nao houve golpe, nao houve barra de vida, nao houve
+   * janela de esquiva. O que matou foi a ROTA — repetir o mesmo caminho ate ele
+   * nao existir mais. Uma tela de morte que dissesse "o Veio te consumiu"
+   * esconderia a unica coisa que o jogador precisa levar dali.
+   */
+  | { kind: 'deep_water' }
   /** Ultimo recurso: nenhum caminho de dano deveria chegar aqui. */
   | { kind: 'unknown' };
 
@@ -1493,6 +1504,37 @@ export type SemanticEvent =
   | { t: 'leyline_circuit'; closed: boolean; lit: number; total: number }
   | { t: 'ignite'; x: number; y: number }
   /**
+   * UMA placa de gelo desceu um degrau do ciclo de rachaduras. `stage` e o
+   * degrau NOVO: 1 rachadura fina, 2 fraturado, 3 critico.
+   *
+   * Eventos proprios, e nao `boss_state` reaproveitado: a rachadura e uma
+   * mecanica GLOBAL do gelo — ela acontece em qualquer Cripta, com ou sem
+   * Rainha em campo —, e pendurar um efeito de mundo no canal de um chefe faz
+   * o som e a particula sumirem no dia em que alguem lutar longe dele.
+   *
+   * O ESTADO em si viaja no diff de chunk (o id da superficie mudou); este
+   * evento so marca o INSTANTE, para o estalo e o po saírem na celula certa e
+   * no quadro certo — inclusive para quem esta assistindo de outra maquina.
+   */
+  | { t: 'ice_crack'; x: number; y: number; stage: number }
+  /** A placa critica cedeu: ali agora ha um buraco de agua profunda. */
+  | { t: 'ice_collapse'; x: number; y: number }
+  /**
+   * Um Prospector CAIU no buraco. `slot` e quem caiu — a apresentacao da queda
+   * (perda de altura, afundamento, respingo pesado) e do corpo dele, e o
+   * cliente precisa saber que aquele `death` no mesmo tick nao e um tombo
+   * comum.
+   */
+  | { t: 'ice_fall'; x: number; y: number; slot: number }
+  /**
+   * O gelo foi RECOMPOSTO. Cobre os dois jeitos de isso acontecer, porque quem
+   * escuta faz a mesma coisa nos dois: a Rainha recongelando a arena
+   * (`radius` > 0, com quantas placas rachadas voltaram e quantos buracos
+   * fecharam) e um buraco recongelando sozinho no fim do relogio (`radius` 0,
+   * `mended` 0, `sealed` 1).
+   */
+  | { t: 'ice_mend'; x: number; y: number; radius: number; mended: number; sealed: number }
+  /**
    * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
    * regeneracao dele seria uma barra que sobe sozinha e o jogador nunca
    * descobriria que o chao e a causa.
@@ -2062,6 +2104,23 @@ export type SurvivalState = {
   contaminationNextSurgeAt: number;
   nextEntityId: number;
   reactionQueue: number[];
+  /**
+   * Os BURACOS abertos no gelo e o tick em que cada um recongela.
+   *
+   * Lista propria, e nao `surfaceTimer`, por duas razoes que se somam:
+   *
+   * - o relogio do buraco e AUTORITATIVO — ele decide quando uma rota fatal
+   *   volta a ser rota — e `surfaceTimer` nao entra no hash. Uma lista curta
+   *   entra inteira, como `bossRuntime.collapseCells` ja faz, sem custar uma
+   *   varredura do grid por tick;
+   * - o buraco tambem pode ser FECHADO antes da hora (a Rainha repara), e
+   *   remover um item de uma lista e uma operacao; zerar um timer no meio de um
+   *   array de 65 mil posicoes e uma varredura.
+   *
+   * Ordem de INSERCAO, como toda lista autoritativa deste estado: as duas
+   * pontas abrem buracos pelo mesmo caminho de codigo, na mesma ordem.
+   */
+  iceHoles: Array<{ idx: number; at: number }>;
   stats: RunStats;
   /** Preenchido uma unica vez, no tick em que a run termina. */
   summary: RunSummary | null;

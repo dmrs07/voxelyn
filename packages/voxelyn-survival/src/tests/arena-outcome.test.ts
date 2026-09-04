@@ -16,18 +16,36 @@ const emptyCommand: PlayerCommand = {
 
 describe('arenaOutcomeFor', () => {
   it('is null while the boss is alive and the Prospector is standing', () => {
-    const state = createArenaRun({ boss: 'guardian', maxHp: 100, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'guardian',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     expect(arenaOutcomeFor(state, 'guardian')).toBeNull();
   });
 
   it("is 'victory' the instant the CHOSEN boss flips to defeated", () => {
-    const state = createArenaRun({ boss: 'guardian', maxHp: 100, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'guardian',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     state.sectorBoss.defeated = true;
     expect(arenaOutcomeFor(state, 'guardian')).toBe('victory');
   });
 
   it("is 'defeat' when the Prospector dies, even if the boss also fell", () => {
-    const state = createArenaRun({ boss: 'guardian', maxHp: 100, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'guardian',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     state.sectorBoss.defeated = true;
     state.phase = 'dead';
     // Dano simultaneo: o Prospector nao sobrevive para comemorar a queda do chefe.
@@ -35,7 +53,13 @@ describe('arenaOutcomeFor', () => {
   });
 
   it('never fires victory for a boss OTHER than the one selected', () => {
-    const state = createArenaRun({ boss: 'guardian', maxHp: 100, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'guardian',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     // `sectorBoss.archetype` so muda por `descend`/`ascend`; simulado aqui so
     // para provar que o predicado compara pelo chefe ESCOLHIDO, nao qualquer um.
     state.sectorBoss.archetype = 'bishop';
@@ -44,7 +68,13 @@ describe('arenaOutcomeFor', () => {
   });
 
   it('stays null across live ticks until the boss is actually brought down', () => {
-    const state = createArenaRun({ boss: 'guardian', maxHp: 500, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'guardian',
+      maxHp: 500,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     for (let i = 0; i < 50 && arenaOutcomeFor(state, 'guardian') === null; i++) {
       stepRun(state, [emptyCommand]);
     }

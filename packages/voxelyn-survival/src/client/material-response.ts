@@ -57,6 +57,10 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GLASS,
   SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_CRITICAL,
+  SURF_ICE_FRACTURED,
+  SURF_DEEP_WATER,
   SURF_RAIL,
   SURF_RAIL_V,
   SURF_SCORCHED,
@@ -107,6 +111,21 @@ const SURFACE_RESPONSE: Record<number, MaterialResponse> = {
   // parecer isso mesmo.
   [SURF_ICE]: { albedo: '#bcdcf0', gloss: 0.86 },
   [SURF_GLASS]: { albedo: '#cfe6f2', gloss: 0.9 },
+  // O CICLO DE RACHADURAS: a placa PERDE o polimento antes de perder a cor.
+  //
+  // Gelo espelha porque e liso. Uma placa trincada nao e — cada fenda espalha o
+  // que devolveria concentrado —, e por isso o `gloss` desce em degraus enquanto
+  // o albedo quase nao muda. O efeito e o que interessa: um clarao de explosao
+  // acende o lago inteiro como um espelho e MORRE nas celulas que ja estao
+  // gastas. O jogador le a rota que ele mesmo abriu na primeira luz forte que
+  // atravessar a arena, sem que nada precise ser desenhado por cima.
+  [SURF_ICE_CRACKED]: { albedo: '#b4d3e6', gloss: 0.62 },
+  [SURF_ICE_FRACTURED]: { albedo: '#a6c4d8', gloss: 0.38 },
+  [SURF_ICE_CRITICAL]: { albedo: '#93aec2', gloss: 0.18 },
+  // O buraco: escuro e MUITO polido. Agua parada e funda e o espelho mais
+  // limpo que existe — e um vao que devolve o clarao inteiro num ponto e a
+  // leitura de perigo que a cor sozinha nao daria no escuro da Cripta.
+  [SURF_DEEP_WATER]: { albedo: '#1b2635', gloss: 0.88 },
   // Queimado devolve quase nada: carvao e o material menos reflexivo que existe.
   [SURF_SCORCHED]: { albedo: '#2a2622', gloss: 0.02 },
   // Fogo e brasa JA emitem; o que chega de fora quase nao muda o que se ve.

@@ -207,6 +207,34 @@ mesmo telegrafo genérico como reserva deliberada, nunca em silêncio).
 | Rainha da Geada | cristais finos, gelo tensionado | beleza fria antes de ruptura violenta; nunca a linguagem do Arquicantor |
 | Magnetarca | magnetismo, inversão, metal | atração e repulsão soam opostas, e sem olhar |
 
+**O gelo da Cripta tem voz própria**, e ela não pertence a nenhum chefe: rachadura é
+uma mecânica GLOBAL do estrato e acontece com ou sem a Rainha em campo (por isso os
+eventos são `ice_crack`/`ice_collapse`/`ice_fall`/`ice_mend`, e não `boss_state`
+reaproveitado — pendurada no canal de um chefe, ela ficaria muda longe dele).
+
+| Voz | Momento | Assinatura |
+| --- | --- | --- |
+| `iceCrackFine` | 1ª travessia | estalo curto e agudo (~3,2 kHz), uma fissura correndo |
+| `iceCrackFractured` | 2ª travessia | mais largo, dois estalos e cauda em banda: tensão |
+| `iceCrackCritical` | 3ª travessia | ruptura grave (900 → 260 Hz): ameaça, não dano |
+| `iceCollapse` | o chão cede | estouro seco e, atrás dele, a banda descendo — o vão enchendo |
+| `icePlunge` | um Prospector afunda | respingo, afundamento e cauda abafada (passa-baixas 2 kHz → 150 Hz) |
+| `iceMend` | a arena recomposta | o inverso da rachadura: a altura SOBE |
+
+A **altura** é o contador: o jogador aprende a contar as próprias travessias de ouvido,
+sem olhar para o chão no meio de uma luta. Por isso o timbre desce a cada degrau em vez
+de o ganho subir — um mesmo estalo três vezes mais alto só diria "de novo".
+
+**Nada disso soa por tick.** O gatilho é o evento de TRANSIÇÃO, emitido uma vez por
+degrau: ficar parado sobre gelo rachado não produz som porque não produz evento. E as
+travas sobem com a frequência do evento (fenda fina 220 ms e prioridade 3 — é textura;
+crítico 140 ms e prioridade 8), porque uma travessia cruza várias células por segundo e
+o co-op dobra isso: sem travas, atravessar um lago rachado calaria todo telegrafo da
+sala. `icePlunge` é o único **não espacial** da família — quando é você que afunda, o
+som não vem "de um lado", e quando é o parceiro você precisa ouvir do mesmo jeito. Ele
+também **cala o `death`** daquele corpo (em `cuesForEvents`): dois stings no mesmo tick
+soariam como falha de mixagem, e o que conta o que houve é o afundamento.
+
 **Prioridade e mixagem** (em `voices.ts`): windup de golpe letal e mudança de fase/estado
 global, 10; execução da habilidade principal e cue de vulnerabilidade, 9; movimento
 importante fora da tela, 7–8; vocalização de personalidade, 5–6; passos, respiração e

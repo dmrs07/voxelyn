@@ -34,7 +34,7 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
-  SURF_ICE,
+  isIceSurface,
   SURF_SCORCHED,
   SURF_SPORES,
 } from './constants.js';
@@ -419,9 +419,11 @@ export const impactSurface = (
     return false;
   }
 
-  if (surface === SURF_ICE && cls === 'thermal') {
+  if (isIceSurface(surface) && cls === 'thermal') {
     // Projetil termico derrete a lamina por onde passa: um rastro de agua
-    // condutiva que vai recongelar. igniteCell ja sabe derreter.
+    // condutiva que vai recongelar — e derrete tambem os estagios rachados,
+    // que e o contra-jogo direto contra uma celula critica. igniteCell ja sabe
+    // derreter.
     igniteCell(state, i, events);
     return false;
   }

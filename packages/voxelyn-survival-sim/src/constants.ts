@@ -125,6 +125,90 @@ export const SURF_ICE = 10;
 export const SURF_SILT = 13;
 export const SURF_GLASS = 14;
 
+/**
+ * O CICLO DE RACHADURAS DA CRIPTA (ids 15..18 — append-only, como toda
+ * superficie: os ids viajam nos diffs de chunk e nao podem mudar de
+ * significado, e nenhum SURF_* existente foi renumerado).
+ *
+ * O gelo deixou de ser um piso que so muda de cor: ele GUARDA MEMORIA de por
+ * onde alguem passou. Cada travessia de um Prospector desce um degrau, e o
+ * quarto degrau nao e um estado — e um buraco.
+ *
+ *   SURF_ICE            placa inteira
+ *   SURF_ICE_CRACKED    rachadura fina    (1a travessia)
+ *   SURF_ICE_FRACTURED  fraturado         (2a travessia)
+ *   SURF_ICE_CRITICAL   critico           (3a travessia)
+ *   SURF_DEEP_WATER     buraco            (4a travessia: o chao cede)
+ *
+ * Os tres estagios rachados CONTINUAM SENDO GELO para tudo o que ja sabia ler
+ * gelo — inercia, couraca da Rainha, elemento do Espectro, iluminacao,
+ * resposta material e degelo por calor. Quem pergunta usa `isIceSurface`, e
+ * nunca uma cadeia de quatro comparacoes espalhada pelo codigo.
+ *
+ * Por que IDs de superficie e nao um contador em `surfaceTimer`: o diff de
+ * chunk sincroniza `solid` e `surface`, e NAO o timer. Um estagio escondido no
+ * timer seria invisivel para quem reconecta — o cliente desenharia placa
+ * inteira sobre uma celula que cede no proximo passo, que e exatamente o tipo
+ * de mentira que este jogo nao conta sobre o chao.
+ */
+export const SURF_ICE_CRACKED = 15;
+export const SURF_ICE_FRACTURED = 16;
+export const SURF_ICE_CRITICAL = 17;
+/**
+ * O BURACO: agua profunda, fria e fatal. Visual e mecanicamente diferente da
+ * agua rasa (`SURF_WATER`), que continua sendo chao molhado por onde se anda.
+ *
+ * Ninguem PERMANECE nela: entrar mata. O que ela mantem da agua e a conducao —
+ * um buraco encostado numa poca fecha o mesmo circuito, e essa leitura
+ * ("liquido conectado = circuito") e a que o jogador ja tem.
+ */
+export const SURF_DEEP_WATER = 18;
+
+/**
+ * Isto e gelo? — a pergunta que substituiu quatro comparacoes soltas.
+ *
+ * Todo estagio rachado responde `true`: a rachadura e um estado do gelo, nao
+ * uma materia nova. Agua profunda responde `false` — ali o gelo ACABOU.
+ */
+export const isIceSurface = (kind: number): boolean =>
+  kind === SURF_ICE ||
+  kind === SURF_ICE_CRACKED ||
+  kind === SURF_ICE_FRACTURED ||
+  kind === SURF_ICE_CRITICAL;
+
+/**
+ * Em que degrau do ciclo esta esta celula: 0 (inteira) a 3 (critica), ou -1
+ * quando a superficie nao e gelo. `ICE_CRACK_STAGES` e o degrau em que a
+ * proxima travessia abre o buraco.
+ */
+export const iceCrackStage = (kind: number): number => {
+  if (kind === SURF_ICE) return 0;
+  if (kind === SURF_ICE_CRACKED) return 1;
+  if (kind === SURF_ICE_FRACTURED) return 2;
+  if (kind === SURF_ICE_CRITICAL) return 3;
+  return -1;
+};
+
+/** A superficie de cada degrau, indexada por `iceCrackStage`. */
+export const ICE_STAGE_SURFACE: readonly number[] = [
+  SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_FRACTURED,
+  SURF_ICE_CRITICAL,
+];
+
+/**
+ * Quantos degraus RACHADOS existem antes do colapso, e quantas travessias uma
+ * placa inteira aguenta.
+ *
+ * Quatro travessias, e o numero e o coracao do loop: a primeira volta pela
+ * mesma rota e de graca, a segunda avisa, a terceira e um ultimato legivel no
+ * zoom de jogo, e a quarta cobra. Menos que isso puniria a primeira decisao;
+ * mais transformaria a arena inteira num piso que nunca cede.
+ */
+export const ICE_CRACK_STAGES = 3;
+export const ICE_CRACK_CROSSINGS_TO_COLLAPSE = ICE_CRACK_STAGES + 1;
+
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
 export const BUDGET_DISCHARGE_CELLS = 256;
@@ -204,14 +288,76 @@ export const ICE_REFREEZE_TICKS = 280;
 
 /**
  * INERCIA DO GELO: por tick, quanto da velocidade ANTERIOR o Prospector
- * mantem sobre a lamina — o rumo comandado entra so no complemento. A 0,82 e
- * 20Hz, mudar de direcao leva ~0,4s para completar e soltar o direcional
- * desliza ~0,7 celula: o gelo vira uma decisao de rota (velocidade nas retas,
- * imprecisao nas curvas), nao um piso que so muda de cor. So o jogador tem
- * inercia — o Espectro ja tem o proprio contrato com a lamina, e os demais
- * bichos manteriam N flows de perseguicao para revisar de uma vez.
+ * mantem sobre a lamina — o rumo comandado entra so no complemento.
+ *
+ * A 0,82 o gelo era dispensavel: soltar o direcional deslizava ~0,7 celula,
+ * menos que a largura do proprio corpo, e a "decisao de rota" que o comentario
+ * prometia nunca chegava a existir. O gelo tem de COBRAR COMPROMISSO — quem
+ * entra nele a toda escolhe onde vai parar antes de entrar.
+ *
+ * De onde sai 0,915: a serie geometrica do embalo. Soltar o comando a
+ * `PLAYER_SPEED` (4,6 tiles/s) percorre `v * dt * g / (1 - g)` =
+ * 4,6 x 0,05 x 10,76 = **~2,5 tiles** — dois a tres corpos de frenagem, a
+ * faixa em que "consigo frear antes daquela area?" vira uma pergunta de
+ * verdade. A inversao brusca cruza o zero em ~0,4 s e so completa o rumo novo
+ * em ~1,7 s: derrapagem e recuperacao VISIVEIS, e nao uma troca de rumo
+ * disfarcada de patinada.
+ *
+ * So o jogador tem inercia — o Espectro ja tem o proprio contrato com a
+ * lamina, e os demais bichos manteriam N flows de perseguicao para revisar de
+ * uma vez.
  */
-export const ICE_GLIDE = 0.82;
+export const ICE_GLIDE = 0.915;
+/**
+ * O MESMO numero com os ESTABILIZADORES GIROSCOPICOS (MV-04) instalados.
+ *
+ * 0,81 percorre 4,6 x 0,05 x 4,26 = **~0,98 tile** de frenagem: 60% menos que
+ * sem o upgrade, e dentro da faixa de 0,7 a 1,3 que o alvo de design pede. A
+ * inversao cruza o zero em ~0,16 s, um quarto do tempo.
+ *
+ * O que ele NAO faz: transformar a lamina em chao seco. Um tile inteiro de
+ * frenagem continua sendo um tile — o Prospector estabilizado ainda escolhe
+ * rota, so escolhe com mais precisao. E ele nao da resistencia nenhuma a
+ * rachadura: a vantagem e poder DESVIAR da celula critica, nunca pisar nela de
+ * graca.
+ *
+ * O tuning interpola entre os dois pelo campo `iceGlide` (0 = de fabrica,
+ * 1 = estabilizado); ver `iceGlideFor`.
+ */
+export const ICE_GLIDE_STABILISED = 0.81;
+/**
+ * TETO do embalo que a lamina aceita carregar, em tiles/s (~1,6x PLAYER_SPEED).
+ *
+ * Existe por causa da esquiva. `DODGE_SPEED` e 11 tiles/s e o embalo do gelo le
+ * o deslocamento REAL do tick anterior, entao sem teto uma esquiva sobre gelo
+ * lancava o Prospector por quase seis tiles — e duas esquivas encadeadas viram
+ * transporte gratuito, nao momento.
+ *
+ * Com teto a esquiva CONTINUA carregando momento (e para isso ela serve no
+ * gelo: sai mais longe do que sairia no chao seco), mas o embalo satura. Nada
+ * no laco pode empilhar velocidade acima disto, porque o proprio recorrente
+ * `v*g + desejado*(1-g)` nunca ultrapassa o maior dos dois termos.
+ */
+export const ICE_MOMENTUM_CAP = 7.4;
+/**
+ * Abaixo disto (tiles/s) o embalo morre de vez: deslizar para sempre por um
+ * epsilon de float seria a lamina mentindo que ainda ha movimento.
+ */
+export const ICE_GLIDE_EPSILON = 0.02;
+/**
+ * Quanto tempo um BURACO fica aberto antes de recongelar como gelo INTEIRO
+ * (~12 s a 20 Hz).
+ *
+ * O buraco muda a circulacao da arena, e mudar a circulacao para sempre e
+ * softlock: fora da luta ninguem repara o chao, e uma galeria de uma celula de
+ * largura que cede fecharia a rota sozinha. Doze segundos e o tempo de uma
+ * troca de posicao inteira — longo o bastante para a decisao valer, curto o
+ * bastante para o mapa nunca ficar devendo.
+ *
+ * A Rainha da Geada fecha antes disso, e essa e a diferenca entre o buraco na
+ * luta (temporario, dela) e o buraco fora dela (temporario, do relogio).
+ */
+export const ICE_HOLE_REFREEZE_TICKS = 240;
 
 /**
  * TRILHOS DA OPERACAO (SURF_RAIL, id 11 — append-only, como toda superficie).

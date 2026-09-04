@@ -279,6 +279,7 @@ import {
   SOLID_CRYSTAL,
   SURF_EMBER,
   SURF_GAS,
+  SURF_DEEP_WATER,
   SURF_ICE,
   WRAITH_LUNGE_COOLDOWN_TICKS,
   WRAITH_LUNGE_RANGE,
@@ -299,6 +300,7 @@ import {
   UNDERTAKER_SLAM_DAMAGE,
   UNDERTAKER_SLAM_RANGE,
   UNDERTAKER_SLAM_WINDUP_TICKS,
+  isIceSurface,
 } from './constants.js';
 import {
   breakSolid,
@@ -315,6 +317,7 @@ import {
   meltIce,
   openArena,
   ripSolid,
+  sealIceHole,
   setSurface,
 } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
@@ -710,6 +713,38 @@ export const circleBlocked = (state: SurvivalState, x: number, y: number, r: num
   isSolidAt(state, x - r, y + r) ||
   isSolidAt(state, x + r, y + r);
 
+/**
+ * Quem CRUZA um buraco de agua profunda sem afundar nele.
+ *
+ * A Rainha e os Espectros: os dois pertencem a Cripta e nao pisam no gelo do
+ * mesmo jeito que o resto do elenco — ela paira sobre o proprio lago, eles SAO
+ * a lamina. Se o buraco os prendesse, abrir um seria uma armadilha contra o
+ * dono do estrato, e derreter gelo (que ja e o contra-jogo da couraca) viraria
+ * tambem um jeito de imobilizar o encontro inteiro.
+ */
+const CROSSES_DEEP_WATER: ReadonlySet<string> = new Set(['frost_queen', 'frost_wraith']);
+
+/**
+ * O buraco barra ESTE corpo?
+ *
+ * So bicho de chao, e so como DESTINO: o buraco nao e parede (projetil passa
+ * por cima, o Prospector entra e afunda), e o que ele nao aceita e um inimigo
+ * terrestre PARADO em cima dele. Sem esta regra o comportamento apareceria por
+ * acidente e da pior forma — um Britador plantado dentro da agua, ileso,
+ * atacando de um lugar onde o jogador morre so de chegar.
+ *
+ * Fica dentro de `moveEntity` porque e exatamente o conjunto certo: quem anda
+ * por aqui e quem respeita parede, e quem nao respeita (o que voa, o que cava,
+ * o que e arrastado) nunca passou por esta funcao.
+ */
+const deepWaterBlocks = (state: SurvivalState, ent: Entity, x: number, y: number): boolean => {
+  if (ent.kind !== 'enemy' || CROSSES_DEEP_WATER.has(ent.archetype)) return false;
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  if (cx < 0 || cy < 0 || cx >= state.config.width || cy >= state.config.height) return false;
+  return state.surface[cy * state.config.width + cx] === SURF_DEEP_WATER;
+};
+
 export const moveEntity = (
   state: SurvivalState,
   ent: Entity,
@@ -721,16 +756,18 @@ export const moveEntity = (
   let blockedY = false;
   if (dx !== 0) {
     const nx = ent.x + dx;
-    if (!circleBlocked(state, nx, ent.y, ent.radius)) ent.x = nx;
-    else {
+    if (!circleBlocked(state, nx, ent.y, ent.radius) && !deepWaterBlocks(state, ent, nx, ent.y)) {
+      ent.x = nx;
+    } else {
       blockedX = true;
       blockCell = { x: Math.floor(nx + Math.sign(dx) * ent.radius), y: Math.floor(ent.y) };
     }
   }
   if (dy !== 0) {
     const ny = ent.y + dy;
-    if (!circleBlocked(state, ent.x, ny, ent.radius)) ent.y = ny;
-    else {
+    if (!circleBlocked(state, ent.x, ny, ent.radius) && !deepWaterBlocks(state, ent, ent.x, ny)) {
+      ent.y = ny;
+    } else {
       blockedY = true;
       blockCell = { x: Math.floor(ent.x), y: Math.floor(ny + Math.sign(dy) * ent.radius) };
     }
@@ -2341,7 +2378,7 @@ const lurkerStep = (
   const inElement = (i: number): boolean =>
     i >= 0 &&
     i < state.surface.length &&
-    (isLamprey ? isConductiveSurface(state.surface[i]) : state.surface[i] === SURF_ICE);
+    (isLamprey ? isConductiveSurface(state.surface[i]) : isIceSurface(state.surface[i]));
 
   const hidden = inElement(cellUnder(state, enemy));
   enemy.mood = hidden ? LURKER_HIDDEN : LURKER_EXPOSED;
@@ -5858,7 +5895,12 @@ const frostQueenIceAround = (state: SurvivalState, enemy: Entity): number => {
       const x = cx + dx;
       const y = cy + dy;
       if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
-      if (state.surface[y * w + x] === SURF_ICE) ice++;
+      // QUALQUER ESTAGIO RACHADO conta. A couraca e a EXTENSAO do estrato em volta
+      // dela, e uma placa trincada continua sendo lamina: exigir gelo intacto
+      // faria o jogador remover a armadura andando em circulos, sem calor
+      // nenhum — e o contra-jogo autorado (derreter o lago) viraria opcional.
+      // Buraco NAO conta: ali o gelo acabou.
+      if (isIceSurface(state.surface[y * w + x])) ice++;
     }
   }
   return ice;
@@ -5869,6 +5911,13 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
   const r = FROST_QUEEN_FREEZE_RADIUS;
   const cx = Math.floor(enemy.x);
   const cy = Math.floor(enemy.y);
+  // O congelamento deixou de so PINTAR gelo: ele RECOMPOE a arena. Depois de um
+  // ciclo inteiro de luta o chao em volta dela e um mapa das rotas do jogador —
+  // trilhas rachadas e buracos —, e a habilidade que define o encontro tem de
+  // conseguir apaga-lo. E o que fecha o loop: a Rainha redesenha o tabuleiro, e
+  // as rotas que estavam gastas voltam a valer uma vez.
+  let mended = 0;
+  let sealed = 0;
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
       if (dx * dx + dy * dy > r * r) continue;
@@ -5881,8 +5930,30 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
       // jogador acendeu desfaria a acao dele — a mesma regra da Supernova.
       const surf = state.surface[i];
       if (surf === SURF_FIRE) continue;
+      // O BURACO vem antes de tudo: `sealIceHole` tambem apaga o relogio de
+      // recongelamento, e pintar gelo por cima sem isso deixaria um relogio
+      // orfao que "recongelaria" uma celula ja congelada mais tarde.
+      if (surf === SURF_DEEP_WATER) {
+        if (sealIceHole(state, i)) sealed++;
+        continue;
+      }
+      if (isIceSurface(surf)) {
+        // Placa trincada volta INTEIRA. A couraca ja contava com ela; o que o
+        // reparo devolve e a rota — e a contagem de travessias daquela celula.
+        if (surf !== SURF_ICE) {
+          setSurface(state, i, SURF_ICE, 0);
+          mended++;
+        }
+        continue;
+      }
       if (surf === SURF_NONE || isConductiveSurface(surf)) setSurface(state, i, SURF_ICE, 0);
     }
+  }
+  // O REPARO se anuncia. Sem isto, a parte mais legivel da habilidade — a arena
+  // quebrada voltando inteira — acontecia em silencio, e o jogador so descobria
+  // que sua rota tinha sido devolvida pisando nela.
+  if (mended > 0 || sealed > 0) {
+    events.push({ t: 'ice_mend', x: enemy.x, y: enemy.y, radius: r, mended, sealed });
   }
   // Os Espectros saem do gelo, em volta dela.
   let risen = 0;

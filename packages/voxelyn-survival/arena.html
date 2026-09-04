@@ -144,6 +144,43 @@
       #setup button[type='submit']:hover {
         background: #1f8069;
       }
+      /* O PAINEL DE GELO: diagnostico da ferramenta, e so dela.
+         Canto inferior direito, acima da nota — ele e lido ENTRE as tentativas
+         ("quantas celulas eu gastei nessa passagem?"), nunca no meio da luta,
+         e por isso nao pode disputar espaco com o HP nem com a nota. Fica
+         oculto fora da arena da Rainha: um censo de gelo numa Fornalha seria
+         cinco zeros permanentes. */
+      #ice-panel {
+        position: fixed;
+        right: calc(10px + var(--safe-area-inset-right));
+        bottom: calc(28px + var(--safe-area-inset-bottom));
+        z-index: 5;
+        pointer-events: none;
+        font-size: 11px;
+        line-height: 1.5;
+        text-align: right;
+        color: #9fb3cc;
+        background: rgba(10, 12, 16, 0.62);
+        border: 1px solid #2a2d38;
+        border-radius: 6px;
+        padding: 6px 9px;
+      }
+      #ice-panel b {
+        color: #d8cfc0;
+        font-weight: 600;
+      }
+      #ice-panel .crit {
+        color: #ffb066;
+      }
+      #ice-panel .hole {
+        color: #ff7a6b;
+      }
+      @media (max-width: 640px) {
+        #ice-panel {
+          bottom: calc(34px + var(--safe-area-inset-bottom));
+          font-size: 10px;
+        }
+      }
       /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo, e a
          nota sobreposta ao HP era o primeiro pixel que o playtest via. */
       #hud-note {
@@ -215,6 +252,7 @@
     <div id="hud-note" class="hidden">
       Arena de teste — sem telemetria, sem placar, sem gravação de replay.
     </div>
+    <div id="ice-panel" class="hidden"></div>
 
     <div id="setup">
       <form id="setup-form">
@@ -244,6 +282,25 @@
         <div class="field">
           <label>Módulos ativos</label>
           <div class="check-grid" id="module-grid"></div>
+        </div>
+
+        <!-- FORA da grade de módulos, e a separação é o ponto: MV-04 não é uma
+             peça equipada, é tuning de progressão congelado antes do tick zero.
+             Misturá-lo aos módulos ensinaria o modelo errado a quem usa esta
+             ferramenta para decidir balanço. -->
+        <div class="field">
+          <label>Matriz Geracional</label>
+          <div class="check-grid">
+            <label>
+              <input type="checkbox" id="stabilisers" name="stabilisers" />
+              <span>Estabilizadores Giroscópicos (MV-04)</span>
+            </label>
+          </div>
+          <span class="place-hint">
+            Sem o upgrade o Prospector freia ~2,5 tiles no gelo; com ele, ~1,0 — e recupera o rumo
+            quatro vezes mais rápido. Não protege contra rachaduras: o que ele compra é a precisão
+            de rota que permite desviar da célula crítica.
+          </span>
         </div>
 
         <button type="submit">Entrar na arena</button>

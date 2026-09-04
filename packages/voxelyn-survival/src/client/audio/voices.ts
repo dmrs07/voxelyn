@@ -64,6 +64,20 @@ export type VoiceId =
   | 'chip'
   | 'spit'
   | 'rock'
+  // --- O GELO DA CRIPTA ----------------------------------------------------
+  //
+  // Cinco vozes para um ciclo so, e a razao e que elas nao dizem a mesma coisa
+  // com volumes diferentes: dizem QUANTO FALTA. O jogador aprende a contar as
+  // proprias travessias pelo ouvido, sem olhar para o chao no meio de uma luta —
+  // e e por isso que o timbre desce a cada degrau em vez de o ganho subir. Um
+  // mesmo estalo tres vezes mais alto so diria "de novo".
+  | 'iceCrackFine'
+  | 'iceCrackFractured'
+  | 'iceCrackCritical'
+  | 'iceCollapse'
+  | 'icePlunge'
+  /** O gelo voltando: a Rainha refazendo a arena, ou um buraco selando sozinho. */
+  | 'iceMend'
   // --- objetivos e UI (nao espaciais) -------------------------------------
   | 'terminalStart'
   | 'terminalDone'
@@ -335,6 +349,31 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   chip: { priority: 1, gain: 0.25, minIntervalMs: 120, spatial: true },
   spit: { priority: 5, gain: 0.3, minIntervalMs: 60, spatial: true },
   rock: { priority: 6, gain: 0.45, minIntervalMs: 60, spatial: true },
+
+  // O CICLO DE RACHADURAS. As travas sao a peca de mixagem que importa aqui.
+  //
+  // Uma travessia atravessa VARIAS celulas por segundo, e no co-op sao dois
+  // Prospectors fazendo isso ao mesmo tempo: sem trava, atravessar um lago
+  // rachado viraria uma metralhadora de estalos que calaria todo telegrafo da
+  // sala. As travas sobem com a raridade do evento — a fenda fina acontece o
+  // tempo todo e e a mais contida (220 ms, prioridade baixa: e textura); o
+  // critico e raro e passa quase sempre.
+  //
+  // NENHUMA delas soa por tick: o gatilho e o evento de TRANSICAO, que a
+  // simulacao emite uma vez por degrau. Ficar parado em cima de gelo rachado
+  // nao produz som nenhum, porque nao produz evento nenhum.
+  iceCrackFine: { priority: 3, gain: 0.34, minIntervalMs: 220, spatial: true },
+  iceCrackFractured: { priority: 5, gain: 0.42, minIntervalMs: 180, spatial: true },
+  iceCrackCritical: { priority: 8, gain: 0.55, minIntervalMs: 140, spatial: true },
+  // O colapso e a queda sao os dois eventos que NAO podem ser engolidos: um diz
+  // que a arena mudou, o outro que alguem morreu. Prioridade de telegrafo, e a
+  // queda nao e espacial — quando e voce que afunda, o som nao vem "de um
+  // lado", e quando e o parceiro voce precisa ouvir do mesmo jeito.
+  iceCollapse: { priority: 9, gain: 0.6, minIntervalMs: 90, spatial: true },
+  icePlunge: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
+  // O reparo e alivio, e alivio nao disputa: prioridade media, trava longa (a
+  // Rainha conserta dezenas de celulas num pulso, e sai UM evento por pulso).
+  iceMend: { priority: 5, gain: 0.4, minIntervalMs: 300, spatial: true },
 
   terminalStart: { priority: 6, gain: 0.5, minIntervalMs: 0, spatial: false },
   terminalDone: { priority: 6, gain: 0.55, minIntervalMs: 0, spatial: false },

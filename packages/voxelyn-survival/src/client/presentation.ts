@@ -45,6 +45,42 @@ export type DeathTombstone = {
   expiresMs: number;
 };
 
+/**
+ * A QUEDA NO BURACO, e o unico motivo de ela nao ser um `DeathTombstone`.
+ *
+ * O tombo comum e o sprite `die` desabando no lugar: o corpo fica. Aqui o corpo
+ * NAO fica — a agua o leva —, e "o corpo fica" e justamente o que o jogador nao
+ * pode ver, porque um Prospector boiando sobre um buraco diz que ha algo ali
+ * para resgatar. A queda substitui a lapide, e nao se soma a ela.
+ *
+ * A duracao vive aqui e nao no renderer para o cliente inteiro concordar sobre
+ * quando a apresentacao acaba: a tela de resultado a respeita (ver
+ * `ICE_PLUNGE_MS`), e a lapide e o eco de morte sao suprimidos por exatamente
+ * este intervalo.
+ */
+export type IcePlunge = {
+  entity: number;
+  slot: number;
+  x: number;
+  y: number;
+  facingX: number;
+  facingY: number;
+  startedMs: number;
+  endsMs: number;
+};
+
+/**
+ * Quanto dura a queda, em ms.
+ *
+ * 820: dentro da faixa de 650 a 900 que o alvo de design pede, e a divisao
+ * interna e o que faz o numero ser esse. Sao tres tempos e nao um fade —
+ * ~180 ms de perda de altura (o chao sai debaixo dos pes), ~420 ms de
+ * afundamento com a agua comendo o corpo de baixo para cima, e ~220 ms de
+ * cauda so de ondulacao, sem corpo nenhum. Menos que isso e o Prospector
+ * simplesmente sumindo; mais e o jogador esperando para poder recomecar.
+ */
+export const ICE_PLUNGE_MS = 820;
+
 type ActionIntent = {
   action: EntityActionKind;
   startTick: number;
@@ -312,6 +348,7 @@ export class EntityPresentation {
 
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
+  private readonly plungesById = new Map<number, IcePlunge>();
   private readonly facingHysteresis = new FacingHysteresis();
 
   reset(): void {
@@ -320,6 +357,7 @@ export class EntityPresentation {
     this.downedAt.clear();
     this.reviveUntil.clear();
     this.tombstonesById.clear();
+    this.plungesById.clear();
     this.facingHysteresis.clear();
   }
 
@@ -380,6 +418,25 @@ export class EntityPresentation {
         const id = event.slot + 1;
         this.downedAt.delete(id);
         this.reviveUntil.set(id, { startMs: nowMs, endMs: nowMs + 750 });
+      } else if (event.t === 'ice_fall') {
+        // O `death` do mesmo Prospector chega LOGO DEPOIS deste evento, no
+        // mesmo lote — a simulacao emite a queda antes de `killPlayer`. Registrar
+        // a queda primeiro e o que permite ao ramo de `death` abaixo reconhecer
+        // que aquela morte ja tem apresentacao propria e nao criar lapide.
+        const entity = event.slot + 1;
+        this.plungesById.set(entity, {
+          entity,
+          slot: event.slot,
+          x: event.x,
+          y: event.y,
+          // Provisorio: o `death` do mesmo tick traz o rumo autoritativo e o
+          // corrige logo abaixo. Enquanto isso, de frente para a camera — quem
+          // afunda nao escolhe pose.
+          facingX: 0,
+          facingY: 1,
+          startedMs: nowMs,
+          endsMs: nowMs + ICE_PLUNGE_MS,
+        });
       } else if (event.t === 'death') {
         this.actions.delete(event.entity);
         this.actionVisualClocks.delete(event.entity);
@@ -387,6 +444,14 @@ export class EntityPresentation {
         this.reviveUntil.delete(event.entity);
         this.facingHysteresis.forget(event.entity * 2 + FACING_BODY);
         this.facingHysteresis.forget(event.entity * 2 + FACING_UPPER);
+        // Quem afundou nao deixa lapide. Ver `IcePlunge`. O rumo autoritativo
+        // vem daqui — o `ice_fall` chega antes e nao o carrega.
+        const plunge = this.plungesById.get(event.entity);
+        if (plunge) {
+          plunge.facingX = event.facingX;
+          plunge.facingY = event.facingY;
+          continue;
+        }
         this.tombstonesById.set(event.entity, {
           entity: event.entity,
           archetype: event.archetype,
@@ -669,6 +734,23 @@ export class EntityPresentation {
       facingX: heading.x,
       facingY: heading.y,
     };
+  }
+
+  /**
+   * As quedas em curso. Vencidas saem sozinhas, como as lapides — e o renderer
+   * chama isto uma vez por quadro, que e a batida natural da limpeza.
+   */
+  plunges(nowMs: number): IcePlunge[] {
+    for (const [id, plunge] of this.plungesById) {
+      if (nowMs >= plunge.endsMs) this.plungesById.delete(id);
+    }
+    return [...this.plungesById.values()];
+  }
+
+  /** Ha uma queda em curso? A tela de resultado espera por ela. */
+  plungeActive(nowMs: number): boolean {
+    for (const plunge of this.plungesById.values()) if (nowMs < plunge.endsMs) return true;
+    return false;
   }
 
   tombstones(nowMs: number): DeathTombstone[] {

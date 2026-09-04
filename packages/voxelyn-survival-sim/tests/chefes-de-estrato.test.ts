@@ -79,6 +79,7 @@ import {
   SURF_FIRE,
   SURF_GAS,
   SURF_ICE,
+  isIceSurface,
   SURF_EMBER,
   SURF_NONE,
   SURF_WATER,
@@ -1531,7 +1532,10 @@ describe('Rainha da Geada — a couraça e o estrato', () => {
     let ice = 0;
     for (let y = Math.floor(boss.y) - 6; y <= Math.floor(boss.y) + 6; y++) {
       for (let x = Math.floor(boss.x) - 6; x <= Math.floor(boss.x) + 6; x++) {
-        if (state.surface[y * w + x] === SURF_ICE) ice++;
+        // QUALQUER estagio conta: a pergunta e "o lago voltou?", e uma placa
+        // que o jogador trincou enquanto esquivava continua sendo o lago. Contar
+        // so gelo intacto aqui faria o teste medir por onde o testador andou.
+        if (isIceSurface(state.surface[y * w + x])) ice++;
       }
     }
     expect(ice, 'o lago nao voltou').toBeGreaterThanOrEqual(FROST_QUEEN_ICE_THRESHOLD);

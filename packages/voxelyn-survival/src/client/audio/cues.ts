@@ -517,6 +517,37 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       }
       return [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
 
+    // O CICLO DE RACHADURAS. Uma voz por DEGRAU, e o degrau vem do evento: o
+    // cliente nao conta travessias nem le o chao — se contasse, discordaria da
+    // simulacao no primeiro tick perdido e o aviso sonoro passaria a mentir
+    // sobre quanto falta.
+    case 'ice_crack':
+      return [
+        {
+          voice:
+            ev.stage >= 3
+              ? 'iceCrackCritical'
+              : ev.stage === 2
+                ? 'iceCrackFractured'
+                : 'iceCrackFine',
+          x: ev.x,
+          y: ev.y,
+          scale: 1,
+        },
+      ];
+
+    case 'ice_collapse':
+      return [{ voice: 'iceCollapse', x: ev.x, y: ev.y, scale: 1 }];
+
+    // A QUEDA. O `death` do mesmo corpo e calado por `cuesForEvents` (ver la):
+    // dois stings no mesmo tick soariam como falha de mixagem, e o que conta o
+    // que houve e o afundamento. Prioridade maxima no banco (ver VOICE_SPECS).
+    case 'ice_fall':
+      return [{ voice: 'icePlunge', x: ev.x, y: ev.y, scale: 1 }];
+
+    case 'ice_mend':
+      return [{ voice: 'iceMend', x: ev.x, y: ev.y, scale: 1 }];
+
     // A cura do bispo E a informacao da luta. Sem som, o jogador so descobre que
     // nao esta progredindo comparando a barra de vida com a memoria do que ela
     // era ha dez segundos — que e a forma mais lenta possivel de aprender uma
@@ -700,10 +731,25 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
   }
 };
 
-/** Traduz uma leva inteira de eventos, preservando a ordem de chegada. */
+/**
+ * Traduz uma leva inteira de eventos, preservando a ordem de chegada.
+ *
+ * A UNICA leitura de contexto entre eventos vive aqui: a queda no buraco emite
+ * `ice_fall` e, logo em seguida, o `death` do mesmo corpo. Os dois tem voz, e as
+ * duas juntas no mesmo tick soam como falha de mixagem em vez de um
+ * acontecimento — e a que conta o que houve e o afundamento. Cala-se o `death`
+ * daquele corpo, e so daquele.
+ *
+ * Feito no laco e nao em `cuesForEvent` porque a decisao depende de OUTRO evento
+ * do lote; a funcao por evento continua pura, e e ela que os testes exercitam
+ * caso a caso.
+ */
 export const cuesForEvents = (events: readonly SemanticEvent[], ctx: CueContext): Cue[] => {
+  const plunged = new Set<number>();
+  for (const ev of events) if (ev.t === 'ice_fall') plunged.add(ev.slot + 1);
   const out: Cue[] = [];
   for (const ev of events) {
+    if (ev.t === 'death' && plunged.has(ev.entity)) continue;
     for (const cue of cuesForEvent(ev, ctx)) out.push(cue);
   }
   return out;

@@ -9,6 +9,9 @@ export {
   createSnapshot,
   hashAuthoritativeState,
   hashStaticWorld,
+  // A caminhada de celulas do segmento de movimento. Exportada porque o
+  // contrato "nenhuma celula e pulada" e testado diretamente sobre ela.
+  cellsCrossed,
   emptyCommand,
   resolveChainedEvents,
   standingPlayers,
@@ -127,6 +130,13 @@ export {
   delugeFront,
   delugeDepth,
   meltIce,
+  // O CICLO DE RACHADURAS. `advanceIceCrack` e a regra inteira num lugar so;
+  // as outras tres existem porque a arena de teste e os testes precisam abrir,
+  // fechar e perguntar sem reimplementar o vocabulario dos quatro ids.
+  advanceIceCrack,
+  openIceHole,
+  sealIceHole,
+  isGlacialStabilised,
   heatFungalCell,
   breakSolid,
   setSurface,
@@ -196,6 +206,7 @@ export {
   findUpgrade,
   generationsReached,
   hashPlayerTuning,
+  iceGlideFor,
   isProspectorGeneration,
   isValidRunDepth,
   isValidUpgradeSet,

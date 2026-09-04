@@ -22,7 +22,71 @@ describe('contrato visual das materias organicas e volateis', () => {
       'rail-v',
       'silt',
       'glass',
+      'ice-cracked',
+      'ice-fractured',
+      'ice-critical',
+      'deep-water',
     ]);
+  });
+
+  /**
+   * O CICLO DE RACHADURAS SE LE PELA FORMA, NUNCA PELA COR.
+   *
+   * A Cripta inteira e a mesma familia fria, e um jogador que precisasse
+   * comparar dois tons de azul-claro no meio de uma luta nao leria nada. O
+   * contrato e geometrico e e este: a cada degrau MENOS placa intacta e MAIS
+   * fenda, e a diferenca entre dois degraus vizinhos e grande o bastante para
+   * sobreviver ao zoom de jogo.
+   */
+  it('as rachaduras progridem por densidade de fenda, e nao por cor', () => {
+    for (let variant = 0; variant < VARIANTS; variant++) {
+      // Colunas de placa INTEIRA (o voxel de gelo de altura cheia) por estagio.
+      const intact = (kind) =>
+        surfaceModel(kind, variant, 0).filter((b) => b.mat === 'ice' && b.h === 1).length;
+      const whole = intact('ice');
+      const cracked = intact('ice-cracked');
+      const fractured = intact('ice-fractured');
+      const critical = intact('ice-critical');
+
+      expect(whole, `v${variant}`).toBeGreaterThan(cracked);
+      expect(cracked, `v${variant}`).toBeGreaterThan(fractured);
+      expect(fractured, `v${variant}`).toBeGreaterThan(critical);
+      // O critico perdeu pelo menos um terco da placa: e o estado que precisa
+      // CHAMAR, e chamar sem cor so se faz com area.
+      expect(critical / whole, `v${variant}`).toBeLessThan(0.67);
+
+      // E todos continuam sendo GELO: nenhum deles pode ter deixado de usar a
+      // materia da lamina, ou a rachadura teria virado outro chao.
+      for (const kind of ['ice-cracked', 'ice-fractured', 'ice-critical']) {
+        expect(surfaceModel(kind, variant, 0).some((b) => b.mat === 'ice')).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * A agua profunda tem de se separar da RASA sem depender de cor lida lado a
+   * lado: confundir as duas custa a vida do jogador, e e a unica crosta do jogo
+   * de que isso se pode dizer.
+   */
+  it('agua profunda le como vazio, e nao como poca funda', () => {
+    for (let variant = 0; variant < VARIANTS; variant++) {
+      const deep = surfaceModel('deep-water', variant, 0);
+      const shallow = surfaceModel('water', variant, 0);
+
+      // A rasa mostra o leito e mineral emergindo dele; a funda nao tem fundo
+      // nenhum — nada de `rock` em lugar algum.
+      expect(shallow.some((b) => b.mat === 'rock')).toBe(true);
+      expect(
+        deep.every((b) => b.mat !== 'rock'),
+        `v${variant}`,
+      ).toBe(true);
+
+      // E ela guarda a BORDA de gelo de pe: e o que diz de onde o buraco veio.
+      const rim = deep.filter((b) => b.mat === 'ice');
+      expect(rim.length, `v${variant}`).toBeGreaterThan(0);
+      // A borda e o ANEL, nao o miolo: no maximo um quinto das colunas.
+      expect(rim.length / deep.length, `v${variant}`).toBeLessThan(0.2);
+    }
   });
 
   // As duas crostas dos Sumidouros significam coisas OPOSTAS — a areia e por

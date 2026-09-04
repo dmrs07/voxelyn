@@ -158,6 +158,17 @@ export const describeCause = (cause: DamageCause | null): CauseText => {
         headline: t('summary.cause.bleedout.headline'),
         lesson: t('summary.cause.bleedout.lesson'),
       };
+    case 'deep_water':
+      // NAO diz "afogou".
+      //
+      // Mesma regra do `bleedout`: o texto que o jogador le nao pode decidir do
+      // que o Prospector e feito nem se ele respira. "O gelo cedeu" e o que
+      // aconteceu, e e tambem a licao inteira — a causa nao foi a agua, foi a
+      // rota repetida ate a quarta vez.
+      return {
+        headline: t('summary.cause.deepWater.headline'),
+        lesson: t('summary.cause.deepWater.lesson'),
+      };
     case 'player_shot':
     case 'unknown':
     default:

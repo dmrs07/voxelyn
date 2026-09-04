@@ -18,6 +18,10 @@ import {
   SURF_GAS,
   SURF_GLASS,
   SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_CRITICAL,
+  SURF_ICE_FRACTURED,
+  SURF_DEEP_WATER,
   SURF_NONE,
   SURF_RAIL,
   SURF_RAIL_V,
@@ -104,6 +108,7 @@ describe('toda superficie tem tile', () => {
     SURF_NONE, SURF_FUNGAL, SURF_BIOFLUID, SURF_GAS, SURF_FIRE, SURF_SCORCHED,
     SURF_SPORES, SURF_FUNGAL_HEATED, SURF_WATER, SURF_EMBER, SURF_ICE,
     SURF_RAIL, SURF_RAIL_V, SURF_SILT, SURF_GLASS,
+    SURF_ICE_CRACKED, SURF_ICE_FRACTURED, SURF_ICE_CRITICAL, SURF_DEEP_WATER,
   ];
 
   it('mapeia cada SURF_* para um tipo que existe no atlas', () => {
@@ -129,6 +134,27 @@ describe('toda superficie tem tile', () => {
   it('separa silica de vidro no recuo, que e a decisao do encontro', () => {
     expect(SURFACE_FALLBACK[SURF_SILT]).not.toBe(SURFACE_FALLBACK[SURF_GLASS]);
     expect(SURFACE_FALLBACK[SURF_GLASS]).not.toBe(SURFACE_FALLBACK[SURF_ICE]);
+  });
+
+  /**
+   * Sem o atlas nao ha FORMA para ler — so resta a luminancia —, e o que o
+   * recuo do gelo precisa entregar e a ORDEM: quanto mais escura a celula,
+   * mais perto de ceder. E o buraco tem de ser o mais escuro de todos, porque
+   * confundi-lo com gelo (ou com a agua rasa) custa a vida do jogador.
+   */
+  it('o recuo do ciclo de rachaduras escurece degrau a degrau ate o buraco', () => {
+    const luminance = (surf: number): number => {
+      const hex = SURFACE_FALLBACK[surf];
+      const n = Number.parseInt(hex.slice(1), 16);
+      return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+    };
+    const ladder = [SURF_ICE, SURF_ICE_CRACKED, SURF_ICE_FRACTURED, SURF_ICE_CRITICAL, SURF_DEEP_WATER];
+    for (let k = 1; k < ladder.length; k++) {
+      expect(luminance(ladder[k]), `degrau ${k}`).toBeLessThan(luminance(ladder[k - 1]));
+    }
+    // E o buraco nao pode ser confundido com a agua RASA, que e chao seguro.
+    expect(luminance(SURF_DEEP_WATER)).toBeLessThan(luminance(SURF_WATER));
+    expect(SURFACE_FALLBACK[SURF_DEEP_WATER]).not.toBe(SURFACE_FALLBACK[SURF_WATER]);
   });
 });
 
