@@ -609,6 +609,10 @@ export class NetClient {
           pl.facing.y = snap.facingY ?? pl.facing.y;
           pl.stunnedUntil = snap.stunnedUntil ?? 0;
           state.playerExtras[slot].downed = snap.downed ?? false;
+          // O frio do parceiro: o corpo dele mostra a geada e a estatua pelo
+          // mesmo caminho que o local — o estado, nunca um eco de evento.
+          state.playerExtras[slot].freeze = snap.freeze ?? 0;
+          state.playerExtras[slot].frostbitten = snap.frostbitten ?? false;
           pl.action = snap.action
             ? {
                 kind: snap.action.kind,
@@ -761,6 +765,10 @@ export class NetClient {
       // duracao do radial e a projecao do canal saem do cooldown DELA, e o
       // espelho local nascia com `pulse` e nunca sabia da troca no poco.
       ex.ability = this.viewer.ability;
+      // O CONGELAMENTO e do servidor: medidor e latch chegam prontos, e e por
+      // eles que o HUD desenha o medidor azul e troca o gatilho por motor.
+      ex.freeze = this.viewer.freeze ?? 0;
+      ex.frostbitten = this.viewer.frostbitten ?? false;
     }
 
     // o renderer segue state.player/playerExtra (camera, HUD, mira): aponta-os

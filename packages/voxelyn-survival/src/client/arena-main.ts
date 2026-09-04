@@ -14,7 +14,7 @@
 // uma arena que existe so para testar uma luta isolada. O volume/mudo segue
 // o que o jogador ja configurou na run normal (mesmo localStorage) — a
 // arena nao tem sliders proprios de proposito, e uma ferramenta de playtest.
-import { TICK_MS, stepRun } from '@voxelyn/survival-sim';
+import { TICK_MS, emptyCommand, stepRun } from '@voxelyn/survival-sim';
 import type { AbilityId, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalInput, type TouchSafeArea } from './input';
 import { EngagementMemory, applyCombatAssist } from './combat-assist';
@@ -36,6 +36,24 @@ import {
   createArenaRun,
   type ArenaConditions,
 } from './arena-setup';
+import {
+  FROST_SCENARIOS,
+  applyFastDecay,
+  applyFrostScenario,
+  arenaFrostReadout,
+  type FrostScenario,
+} from './arena-frost-debug';
+
+const FROST_SCENARIO_LABELS: Record<FrostScenario, string> = {
+  clear: 'Medidor vazio',
+  queen: '+1 Nova (450)',
+  queen2: '+2 Novas',
+  nearFull: 'Quase cheio (950)',
+  frostbite: 'Frostbite agora',
+  hotWeapon: 'Arma quente (85)',
+  wraith: 'Espectro ao lado',
+  partnerHalf: 'Parceiro a 60%',
+};
 
 const ABILITY_LABELS: Record<AbilityId, string> = {
   pulse: 'Pulso Cinético',
@@ -72,6 +90,11 @@ const hpInput = document.getElementById('hp') as HTMLInputElement;
 const abilityGrid = document.getElementById('ability-grid') as HTMLDivElement;
 const moduleGrid = document.getElementById('module-grid') as HTMLDivElement;
 const stabilisersInput = document.getElementById('stabilisers') as HTMLInputElement;
+const coopInput = document.getElementById('coop') as HTMLInputElement;
+const frostPanel = document.getElementById('frost-panel') as HTMLDivElement;
+const frostReadout = document.getElementById('frost-readout') as HTMLDivElement;
+const frostButtons = document.getElementById('frost-buttons') as HTMLDivElement;
+const frostFastDecay = document.getElementById('frost-fast-decay') as HTMLInputElement;
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
@@ -132,7 +155,57 @@ const readConditions = (): ArenaConditions => {
     formEl.querySelectorAll<HTMLInputElement>('input[name="module"]:checked'),
     (el) => el.value as ModuleId,
   );
-  return { boss, maxHp, ability, modules, stabilisers: stabilisersInput.checked };
+  return {
+    boss,
+    maxHp,
+    ability,
+    modules,
+    stabilisers: stabilisersInput.checked,
+    coop: coopInput.checked,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// O painel de congelamento: cenarios e leitura exata (arena-frost-debug.ts).
+// Os botoes agem sobre a run ATIVA; `activeFrostState` e trocado a cada run.
+// ---------------------------------------------------------------------------
+let activeFrostState: SurvivalState | null = null;
+let activeFrostEvents: ((events: SemanticEvent[]) => void) | null = null;
+for (const scenario of FROST_SCENARIOS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = FROST_SCENARIO_LABELS[scenario];
+  button.dataset.scenario = scenario;
+  button.addEventListener('click', () => {
+    if (!activeFrostState) return;
+    const events = applyFrostScenario(activeFrostState, scenario);
+    // Os eventos que a simulacao emitiria passam pelo mesmo funil dos de
+    // verdade: a apresentacao (som, clarao, dica) e o que se esta testando.
+    if (events.length > 0) activeFrostEvents?.(events);
+  });
+  frostButtons.appendChild(button);
+}
+const FROST_READOUT_INTERVAL_MS = 100;
+let frostReadoutAt = -1;
+const updateFrostPanel = (state: SurvivalState, nowMs: number): void => {
+  if (frostReadoutAt >= 0 && nowMs - frostReadoutAt < FROST_READOUT_INTERVAL_MS) return;
+  frostReadoutAt = nowMs;
+  const r = arenaFrostReadout(state, frostFastDecay.checked);
+  const rows: string[] = [
+    `medidor <b>${r.freeze}</b>/1000`,
+    `<b>${r.percent}%</b>`,
+    `frostbitten <b class="${r.frostbitten ? 'lock' : ''}">${r.frostbitten ? 'SIM' : 'não'}</b>`,
+    `decaimento <b>${r.decayPerSecond.toFixed(1)}%/s</b>`,
+    `última dose <b>${r.lastDoseTicksAgo === null ? '—' : `${r.lastDoseTicksAgo} ticks`}</b>`,
+    `calor <b>${r.heat}</b>`,
+    `lockout <b>${r.overheatLockTicks} ticks</b>`,
+    `próx. ciclo <b>${r.nextCycleInTicks} ticks</b>`,
+    `espectros <b>${r.wraiths.total}</b> (névoa ${r.wraiths.hidden})`,
+    r.partner
+      ? `parceiro <b>${r.partner.freeze}</b>${r.partner.frostbitten ? ' <b class="lock">FROSTBITE</b>' : ''}`
+      : 'parceiro <b>—</b>',
+  ];
+  frostReadout.innerHTML = rows.map((row) => `<span>${row}</span>`).join('');
 };
 
 // ---------------------------------------------------------------------------
@@ -259,10 +332,13 @@ const runArena = (conditions: ArenaConditions): void => {
   // O censo so faz sentido onde ha gelo. Nos outros chefes o painel seria cinco
   // zeros permanentes tapando um canto da tela.
   icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
+  frostPanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   icePanelAt = -1;
+  frostReadoutAt = -1;
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
+  activeFrostState = state;
   audio.setLocalPlayerId(1);
   audio.reset();
   // Reiniciar a arena e uma RUN NOVA com os mesmos ids: sem isto, a queda, a
@@ -280,6 +356,10 @@ const runArena = (conditions: ArenaConditions): void => {
     renderer.ingestEvents(events, frameNow);
     audio.ingest(events, frameNow, state);
   });
+  activeFrostEvents = (events) => {
+    renderer.ingestEvents(events, frameNow);
+    audio.ingest(events, frameNow, state);
+  };
   let queuedChoice: 0 | 1 | null = null;
   let ended = false;
 
@@ -340,7 +420,9 @@ const runArena = (conditions: ArenaConditions): void => {
         queuedChoice = null;
       }
       applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
-      const result = stepRun(state, [raw]);
+      // O parceiro de apresentacao nao recebe comando: fica onde nasceu.
+      const result = stepRun(state, conditions.coop ? [raw, emptyCommand()] : [raw]);
+      if (frostFastDecay.checked && conditions.boss === 'frost_queen') applyFastDecay(state);
       playout.capture(state);
       eventQueue.push(state.tick, result.events);
       accumulator -= TICK_MS;
@@ -356,7 +438,10 @@ const runArena = (conditions: ArenaConditions): void => {
     audio.update(view, now);
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, now);
-    if (conditions.boss === 'frost_queen') updateIcePanel(state, now);
+    if (conditions.boss === 'frost_queen') {
+      updateIcePanel(state, now);
+      updateFrostPanel(state, now);
+    }
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
@@ -407,6 +492,9 @@ btnReconfigure.addEventListener('click', () => {
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');
   icePanel.classList.add('hidden');
+  frostPanel.classList.add('hidden');
+  activeFrostState = null;
+  activeFrostEvents = null;
   endOverlay.classList.add('hidden');
   setupEl.classList.remove('hidden');
 });

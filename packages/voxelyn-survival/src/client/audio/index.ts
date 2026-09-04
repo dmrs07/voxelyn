@@ -12,6 +12,7 @@
 // no primeiro toque e o que garante que o primeiro tiro da run ja tenha som.
 
 import {
+  LURKER_HIDDEN,
   BOSS_PHASE_OVERHEAT,
   BOSS_PHASE_UNSTABLE,
   MINIGUN_SPIN_MAX,
@@ -23,7 +24,7 @@ import {
 import type { Entity, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
 import { AmbienceBus } from './ambience-bus';
-import { cuesForEvents } from './cues';
+import { cuesForEvents, type Cue } from './cues';
 import { DevourerVortexBus } from './devourer-vortex-bus';
 import { FurnaceHeartBus } from './furnace-heart-bus';
 import { LungBreathBus } from './lung-breath-bus';
@@ -134,6 +135,8 @@ export class AudioDirector {
   private targetLevels: AmbienceLevels = SILENT_AMBIENCE;
   private lastSampleMs = 0;
   private lastUpdateMs = 0;
+  /** Ultimo sussurro de cada Espectro escondido, por id (ver `whisperWraiths`). */
+  private readonly wraithWhisperAt = new Map<number, number>();
 
   private volume = 0.8;
   private musicVolume = 0.7;
@@ -476,6 +479,7 @@ export class AudioDirector {
 
     if (this.lastPhase === 'running' && state.phase === 'dead') this.ui('died');
     this.lastPhase = state.phase;
+    if (state.phase === 'running') this.whisperWraiths(state, nowMs);
 
     if (state.phase === 'running' && this.bossTrackActive(state)) {
       // O ENCONTRO tem trilha propria: ela assume e as duas da run calam. As
@@ -587,6 +591,7 @@ export class AudioDirector {
     this.targetLevels = SILENT_AMBIENCE;
     this.lastSampleMs = 0;
     this.lastUpdateMs = 0;
+    this.wraithWhisperAt.clear();
     this.lastPhase = null;
     this.lastStratum = null;
     this.lastOccupation = null;
@@ -690,6 +695,38 @@ export class AudioDirector {
 
   resume(): void {
     if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
+  }
+
+  /**
+   * O SUSSURRO dos Espectros escondidos: vento oco e cristal fino, uma vez a
+   * cada ~1,4 s por nevoa, com a fase deslocada pelo id para uma matilha nao
+   * soar em coro. Nao ha evento para isto — e um estado, nao um instante — e
+   * por isso sai daqui, da amostragem do estado, pelo mesmo mixer das vozes.
+   * A distancia e o mixer que cobra: uma nevoa do outro lado da sala e quase
+   * inaudivel, e e assim que o jogador aprende a ouvir a lamina.
+   */
+  private whisperWraiths(state: SurvivalState, nowMs: number): void {
+    const listener = this.listenerPosition(state);
+    const cues: Cue[] = [];
+    const alive = new Set<number>();
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || enemy.archetype !== 'frost_wraith' || enemy.mood !== LURKER_HIDDEN)
+        continue;
+      alive.add(enemy.id);
+      const last = this.wraithWhisperAt.get(enemy.id) ?? nowMs - 1400 + ((enemy.id * 337) % 1400);
+      if (nowMs - last < 1400) {
+        if (!this.wraithWhisperAt.has(enemy.id)) this.wraithWhisperAt.set(enemy.id, last);
+        continue;
+      }
+      this.wraithWhisperAt.set(enemy.id, nowMs);
+      cues.push({ voice: 'wraithWhisper', x: enemy.x, y: enemy.y, scale: 1 });
+    }
+    for (const id of this.wraithWhisperAt.keys())
+      if (!alive.has(id)) this.wraithWhisperAt.delete(id);
+    if (cues.length === 0) return;
+    for (const planned of this.mixer.plan(cues, listener, nowMs)) {
+      this.play(planned.voice, planned.gain, planned.pan, planned.cutoffHz);
+    }
   }
 
   private listenerPosition(state?: SurvivalState): { x: number; y: number } {

@@ -196,7 +196,17 @@
 // o pior — sem a apresentacao da queda, que vira um `death` seco em cima de
 // agua. Cliente NOVO contra servidor antigo nunca recebe nenhum deles e desenha
 // um gelo que nao racha. O bump transforma os dois em recusa no handshake.
-export const PROTOCOL_VERSION = 30;
+// 31: O CONGELAMENTO DO PROSPECTOR entra no wire. O `you` ganha `freeze`
+//     (o medidor, 0..1000) e `frostbitten` (o latch de corpo inteiro); o
+//     snapshot de cada player ganha os mesmos dois campos, para o parceiro
+//     ver a geada subindo e a estatua. Quatro eventos novos — `freeze_dose`,
+//     `frostbite`, `thermal_cycle` e `frostbite_break` — alimentam HUD, som e
+//     particulas. Cliente novo contra servidor antigo: medidor sempre vazio e
+//     um gatilho que "nao atira" sem explicacao nenhuma na tela — o pior
+//     silencio possivel. Cliente antigo contra servidor novo: campos e eventos
+//     desconhecidos, ignorados; um Prospector travado sem nada que o diga. O
+//     bump transforma os dois em recusa no handshake.
+export const PROTOCOL_VERSION = 31;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -868,7 +878,16 @@ export const PROTOCOL_VERSION = 30;
 // antes do quarto degrau, e o buraco so existia longe do encontro. Duas
 // maquinas com cadencias diferentes discordam de quando a arena e refeita e
 // de quantos Espectros existem, e a versao e o que impede a sala de abrir.
-export const SIMULATION_VERSION = 57;
+// 58: O CONGELAMENTO DO PROSPECTOR (ver `frost.ts`). A Nova da Rainha e o
+//     bote do Espectro passam a ENCHER um medidor autoritativo por jogador;
+//     cheio, o corpo trava (`frostbitten`): sem movimento, rumo, esquiva,
+//     interacao, habilidade ou tiro, e o gatilho vira ciclos termicos de
+//     cadencia fixa que geram calor de verdade e derretem o gelo. O
+//     decaimento natural e por tick e nunca liberta o latch. Tambem aqui: o
+//     bote do Espectro passa a RESOLVER contato (antes era um impulso sem
+//     dano), com dose de frio so quando encosta. Duas versoes discordam de
+//     quando um Prospector para de andar — e o hash carrega os quatro campos.
+export const SIMULATION_VERSION = 58;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1041,7 +1060,12 @@ export const SIMULATION_VERSION = 57;
 // distancia em que a informacao importa. A agua profunda e um vazio frio, mais
 // escura que a rasa, com movimento interno lento e uma borda de gelo quebrado
 // que diz de onde ela veio.
-export const CONTENT_VERSION = 32;
+// 33: o ESPECTRO DE GEADA e outro bicho (enemy-frost-wraith v3): de laje
+//     rasa de 64 px para um manawyrm de geada num quadro de 96 px, com a
+//     animacao nova `special` (a materializacao). O contrato do manifesto nao
+//     mudou; o que muda e o PNG e a geometria dele, e um cliente com o atlas
+//     antigo em cache desenharia o corpo velho — o bump invalida a precache.
+export const CONTENT_VERSION = 33;
 
 export type VersionTriple = {
   protocolVersion: number;

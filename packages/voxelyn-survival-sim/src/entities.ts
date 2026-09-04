@@ -285,6 +285,9 @@ import {
   WRAITH_LUNGE_RANGE,
   WRAITH_LUNGE_WINDUP_TICKS,
   WRAITH_UNDER_ICE_SPEED_SCALE,
+  WRAITH_LUNGE_HIT_MARGIN,
+  FREEZE_QUEEN_DOSE,
+  FREEZE_WRAITH_DOSE,
   SULFUR_BOMBER_GAS_LIFE_TICKS,
   SULFUR_BOMBER_GAS_RADIUS,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
@@ -320,6 +323,7 @@ import {
   sealIceHole,
   setSurface,
 } from './cells.js';
+import { applyFreezeDose } from './frost.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
 import { mawPull, mawReach } from './maw.js';
@@ -1858,6 +1862,19 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     if (enemy.archetype === 'fungal_horse') return;
     enemy.vx = action.direction.x * 7;
     enemy.vy = action.direction.y * 7;
+    // O bote do Espectro SAINDO: o instante do impulso e o que o cliente
+    // precisa para o deslocamento de ar gelado — o `action_start` foi o
+    // aviso, isto e o golpe.
+    if (enemy.archetype === 'frost_wraith') {
+      events.push({
+        t: 'wraith_lunge',
+        entity: enemy.id,
+        x: enemy.x,
+        y: enemy.y,
+        dx: action.direction.x,
+        dy: action.direction.y,
+      });
+    }
   } else if (action.kind === 'slam' && enemy.archetype === 'miner') {
     // Cleave de picareta: CIRCULAR em volta dele, e nao um golpe direcional.
     //
@@ -2365,6 +2382,49 @@ const resonantPulse = (state: SurvivalState, enemy: Entity, events: SemanticEven
  * Lampreia (regra generica de descarga); derreter o gelo tira a cobertura do
  * Espectro e o deixa lento na agua que o proprio jogador tornou condutiva.
  */
+/**
+ * O BOTE DO ESPECTRO, passo a passo: o golpe que ENCOSTA.
+ *
+ * O bote e uma acao `charge` cujo release e so um impulso de velocidade — e
+ * so isso. Nada no caminho generico resolvia o contato de um espreitador,
+ * entao o Espectro atravessava o Prospector sem tocar nele. Este passo roda
+ * durante o impulso (fora do windup) e, no primeiro tick em que o corpo dele
+ * chega ao do Prospector, resolve o golpe UMA vez por bote (`action.landed`):
+ * o dano de contato pelo funil de sempre e, se o golpe de fato entrou — nao
+ * foi esquivado por iframes nem caiu em abatido —, a dose pequena de frio.
+ * Um bote que passa ao lado, que morre na parede ou que a esquiva atravessa
+ * nao encosta, e um bote que nao encosta nao congela.
+ *
+ * So o Espectro: a Lampreia divide o `lurkerStep`, mas o contrato de dano
+ * dela nao muda aqui — e outra criatura, com outro balanco.
+ */
+const frostWraithLungeStride = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  const action = enemy.action;
+  if (!action || action.kind !== 'charge' || action.phase === 'windup' || action.landed) return;
+  const victim = nearestTarget(state, enemy.x, enemy.y);
+  if (!victim) return;
+  if (distTo(enemy, victim) >= enemy.radius + victim.radius + WRAITH_LUNGE_HIT_MARGIN) return;
+  action.landed = true;
+  const slot = victim.slot ?? 0;
+  const extra = state.playerExtras[slot];
+  // Decidido ANTES do dano, com a mesma regra do funil: iframes e abatido
+  // rejeitam o golpe, e o que o funil rejeita nao congela.
+  const connects = extra.iframesUntil <= state.tick && !extra.downed;
+  damageEntity(
+    state,
+    victim,
+    ARCHETYPES.frost_wraith.contactDamage * (enemy.elite ? 1.4 : 1),
+    events,
+    { kind: 'enemy_contact', archetype: 'frost_wraith', elite: enemy.elite },
+  );
+  // A dose NAO escala com elite: o dano dele e maior, o frio nao.
+  if (connects) applyFreezeDose(state, slot, FREEZE_WRAITH_DOSE, 'frost_wraith', events);
+};
+
 const lurkerStep = (
   state: SurvivalState,
   enemy: Entity,
@@ -2381,7 +2441,22 @@ const lurkerStep = (
     (isLamprey ? isConductiveSurface(state.surface[i]) : isIceSurface(state.surface[i]));
 
   const hidden = inElement(cellUnder(state, enemy));
+  const wasHidden = enemy.mood === LURKER_HIDDEN;
   enemy.mood = hidden ? LURKER_HIDDEN : LURKER_EXPOSED;
+  // A troca de postura PELO TERRENO e um evento: e o que o cliente precisa
+  // para a materializacao e a dissolucao terem som e materia. A exposicao
+  // causada pelo bote nao passa por aqui (ver abaixo) — o `action_start`
+  // dela ja diz tudo.
+  if (hidden !== wasHidden) {
+    events.push({
+      t: 'lurker_state',
+      archetype: enemy.archetype as EnemyArchetype,
+      entity: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+      hidden,
+    });
+  }
   if (!player) return;
 
   const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
@@ -5955,6 +6030,16 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
   if (mended > 0 || sealed > 0) {
     events.push({ t: 'ice_mend', x: enemy.x, y: enemy.y, radius: r, mended, sealed });
   }
+  // O FRIO NOS PROSPECTORES. Quem esta dentro do raio REAL da Nova — a mesma
+  // origem e o mesmo raio que acabaram de refazer o lago — toma uma dose
+  // grande, uma por jogador por liberacao. Iframes nao barram: a esquiva
+  // serve para sair do raio antes, nao para atravessar a Nova imune. Morto,
+  // abatido e slot vazio nao tomam (ver `applyFreezeDose`).
+  for (let slot = 0; slot < state.players.length; slot++) {
+    const p = state.players[slot];
+    if (Math.hypot(p.x - enemy.x, p.y - enemy.y) > r) continue;
+    applyFreezeDose(state, slot, FREEZE_QUEEN_DOSE, 'frost_queen', events);
+  }
   // Os Espectros saem do gelo, em volta dela.
   let risen = 0;
   for (let k = 0; k < FROST_QUEEN_WRAITHS; k++) {
@@ -6551,6 +6636,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         enemy.action.phase !== 'windup'
       ) {
         archcantorChainStride(state, enemy, events);
+      } else if (enemy.archetype === 'frost_wraith') {
+        // O bote do Espectro: o impulso de sempre, e depois dele o passo que
+        // resolve o contato (ver `frostWraithLungeStride`).
+        driftByVelocity(state, enemy, dt, events, false);
+        frostWraithLungeStride(state, enemy, events);
       } else driftByVelocity(state, enemy, dt, events, false);
       // A varredura do feixe roda DURANTE o telegrafo: e ela que promete a
       // linha, e o cliente redesenha a cada emissao porque o chefe continua

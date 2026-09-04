@@ -58,6 +58,13 @@ export type DeathTombstone = {
  * `ICE_PLUNGE_MS`), e a lapide e o eco de morte sao suprimidos por exatamente
  * este intervalo.
  */
+/** Ver `EntityPresentation.frostClocks`. Infinito = nunca aconteceu. */
+export type FrostClocks = {
+  sinceFrostbiteMs: number;
+  sinceCycleMs: number;
+  sinceBreakMs: number;
+};
+
 export type IcePlunge = {
   entity: number;
   slot: number;
@@ -350,6 +357,15 @@ export class EntityPresentation {
   private readonly tombstonesById = new Map<number, DeathTombstone>();
   private readonly plungesById = new Map<number, IcePlunge>();
   private readonly facingHysteresis = new FacingHysteresis();
+  /**
+   * Os relogios do FRIO, por entidade: quando a crosta fechou, o ultimo ciclo
+   * termico e quando ela se partiu. O estado (medidor, latch) e autoritativo e
+   * vem do `playerExtras`; isto e so o que o render precisa para o pulso do
+   * nucleo, o tremor e a quebra terem duracao em tempo real.
+   */
+  private readonly frostbiteAt = new Map<number, number>();
+  private readonly thermalCycleAt = new Map<number, number>();
+  private readonly frostbiteBreakAt = new Map<number, number>();
 
   reset(): void {
     this.actions.clear();
@@ -359,6 +375,22 @@ export class EntityPresentation {
     this.tombstonesById.clear();
     this.plungesById.clear();
     this.facingHysteresis.clear();
+    this.frostbiteAt.clear();
+    this.thermalCycleAt.clear();
+    this.frostbiteBreakAt.clear();
+  }
+
+  /** Quanto tempo faz, em ms, desde cada marco do frio desta entidade. */
+  frostClocks(entityId: number, nowMs: number): FrostClocks {
+    const since = (map: Map<number, number>): number => {
+      const at = map.get(entityId);
+      return at === undefined ? Number.POSITIVE_INFINITY : nowMs - at;
+    };
+    return {
+      sinceFrostbiteMs: since(this.frostbiteAt),
+      sinceCycleMs: since(this.thermalCycleAt),
+      sinceBreakMs: since(this.frostbiteBreakAt),
+    };
   }
 
   /**
@@ -412,6 +444,15 @@ export class EntityPresentation {
           intent.dx = event.dx;
           intent.dy = event.dy;
         }
+      } else if (event.t === 'frostbite') {
+        this.frostbiteAt.set(event.slot + 1, nowMs);
+        this.frostbiteBreakAt.delete(event.slot + 1);
+      } else if (event.t === 'thermal_cycle') {
+        this.thermalCycleAt.set(event.slot + 1, nowMs);
+      } else if (event.t === 'frostbite_break') {
+        this.frostbiteBreakAt.set(event.slot + 1, nowMs);
+        this.frostbiteAt.delete(event.slot + 1);
+        this.thermalCycleAt.delete(event.slot + 1);
       } else if (event.t === 'player_down') {
         this.downedAt.set(event.slot + 1, nowMs);
       } else if (event.t === 'revive') {
@@ -500,6 +541,12 @@ export class EntityPresentation {
      * canos ainda estao girando.
      */
     gunView?: MinigunGunView,
+    /**
+     * CONGELADO POR INTEIRO: a estatua. A pose e o repouso composto com o
+     * relogio PARADO — nem o cano respira — e o rumo travado no que era.
+     * E a unica pose do jogo que nao anda no tempo, e e essa a leitura.
+     */
+    frostbitten = false,
   ): PresentedAnimation {
     // Resolvido no ponto de SAIDA, nunca antes: cada camada so pode ser gravada
     // uma vez por quadro, com o vetor que de fato vai ser desenhado. Resolver o
@@ -521,6 +568,25 @@ export class EntityPresentation {
         };
       }
       this.reviveUntil.delete(entity.id);
+    }
+
+    if (frostbitten && entity.archetype === 'prospector') {
+      const layered = layeredPlayerAnimation(
+        entity,
+        { ...base, anim: 'idle' },
+        null,
+        0,
+        nowMs,
+        facing,
+        gunStateOf(entity, state),
+        gunView,
+      );
+      return {
+        anim: layered,
+        elapsedMs: 0,
+        facingX: layered.upper.facingX,
+        facingY: layered.upper.facingY,
+      };
     }
 
     if (downed) {

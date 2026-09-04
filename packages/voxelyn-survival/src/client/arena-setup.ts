@@ -60,6 +60,13 @@ export type ArenaConditions = {
    * e com ~1,0.
    */
   stabilisers: boolean;
+  /**
+   * Um SEGUNDO Prospector na arena (slot 1), parado, para ver o congelamento
+   * do parceiro: a geada dele, a estatua dele, os dois medidores em niveis
+   * diferentes. Ninguem o controla — a ferramenta e de um jogador so — e e
+   * exatamente por isso que ele serve: o que se olha nele e a APRESENTACAO.
+   */
+  coop?: boolean;
 };
 
 /**
@@ -465,6 +472,7 @@ export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
   const state = createRun({
     seed: entry.seed,
     sector: entry.sector,
+    playerCount: conditions.coop ? 2 : 1,
     tuning,
     depth: {
       generation: entry.generation,
@@ -491,6 +499,12 @@ export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
   // E o lago DEPOIS do recorte, para nao pintar gelo em corredores que o
   // recorte vai emparedar em seguida.
   stampArenaIceField(state, bossArchetype);
+  // O parceiro nasce a um passo do jogador: o recorte pos os dois na mesma
+  // celula, e dois corpos no mesmo pixel nao sao "dois jogadores".
+  if (conditions.coop && state.players[1]) {
+    state.players[1].x += 1.2;
+    state.players[1].hp = state.players[1].maxHp;
+  }
 
   return state;
 };

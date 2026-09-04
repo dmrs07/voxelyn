@@ -357,7 +357,7 @@ export const PT_BR = {
     'Carapaça refratária de escória. Vulnerável após exposição térmica — condição que também o torna consideravelmente pior.',
   'bestiary.code.frost_wraith': 'ESPÉCIME GLAC-02',
   'bestiary.note.frost_wraith':
-    'Desloca-se sob a lâmina de gelo. Relatos de "assombração" refletem baixa visibilidade, não fenômeno anômalo.',
+    'Entidade de névoa congelante que navega sobre e sob a lâmina e se condensa num elemental cristalino para atacar. O contato subtrai calor do chassi. Relatos de "assombração" refletem a fase difusa, não fenômeno anômalo.',
   'bestiary.code.sulfur_bomber': 'ESPÉCIME SULF-14',
   'bestiary.note.sulfur_bomber':
     'Variante mineral do vetor FUNG-23. Carga interna inflamável. Recomenda-se neutralização a distância de fontes de calor — recomendação reiterada após o incidente da galeria 7.',
@@ -813,6 +813,12 @@ export const PT_BR = {
   'module.minigun.proc': 'BALAS',
   'hud.minigun.spinup': 'GIRANDO',
   'hud.minigun.overheated': 'CANO TRAVADO',
+  'hud.freeze.label': 'GELO',
+  'hud.freeze.critical': 'CONGELAMENTO CRÍTICO',
+  'hud.freeze.hold': 'SEGURE DISPARO PARA AQUECER',
+  'hint.freeze.partial': 'O frio está se acumulando.',
+  'hint.freeze.frostbite': 'MOTORES E CHASSI CONGELADOS — SEGURE DISPARO PARA AQUECER.',
+  'toast.frostbite.break': 'CROSTA ROMPIDA',
   'module.lifetime.charges': '{count} {proc}',
   'module.lifetime.duration': '{seconds}s',
 

@@ -78,6 +78,30 @@ export type VoiceId =
   | 'icePlunge'
   /** O gelo voltando: a Rainha refazendo a arena, ou um buraco selando sozinho. */
   | 'iceMend'
+  // --- O CONGELAMENTO DO PROSPECTOR ----------------------------------------
+  //
+  // Quatro vozes para um estado so, e cada uma diz uma coisa diferente: o
+  // frio ENTRANDO (gelo aderindo ao metal), a crosta FECHANDO (o corpo
+  // inteiro selado), o motor FORCANDO por baixo dela (um ciclo seco, sem
+  // tiro — e o som e o que confirma que o gatilho foi lido) e a crosta se
+  // PARTINDO. A Nova da Rainha continua com o som dela; isto e o que acontece
+  // no corpo de cada Prospector, e e por corpo.
+  | 'freezeDose'
+  | 'frostbite'
+  | 'thermalCycle'
+  | 'frostbiteBreak'
+  // --- O ESPECTRO DE GEADA ---------------------------------------------------
+  //
+  // Uma entidade de nevoa que se condensa num elemental de cristal. Nada aqui
+  // pode soar como tecido arrastando: escondido e vento oco e cristal fino
+  // rocando; materializar e succao e cristalizacao subindo; o bote e ar
+  // gelado deslocado e um estalo cortante; voltar a nevoa sao fragmentos leves
+  // se desfazendo em vento; morrer e a quebra grave e a sublimacao.
+  | 'wraithWhisper'
+  | 'wraithCondense'
+  | 'wraithLunge'
+  | 'wraithDissolve'
+  | 'wraithDeath'
   // --- objetivos e UI (nao espaciais) -------------------------------------
   | 'terminalStart'
   | 'terminalDone'
@@ -270,6 +294,23 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   dodge: { priority: 6, gain: 0.35, minIntervalMs: 60, spatial: true },
   pulse: { priority: 7, gain: 0.5, minIntervalMs: 60, spatial: true },
   overheat: { priority: 8, gain: 0.6, minIntervalMs: 400, spatial: false },
+  // O frio no corpo. A dose e espacial (o parceiro tomando frio do outro lado
+  // da sala e informacao); a crosta fechando e a crosta se partindo sao
+  // estados que mudam o que o gatilho FAZ, e por isso soam como interface —
+  // no centro, sem distancia. O ciclo e travado a 150 ms: ele sai a cada
+  // 200 ms de gatilho, e dois ciclos no mesmo quadro seriam um zumbido.
+  freezeDose: { priority: 6, gain: 0.4, minIntervalMs: 120, spatial: true },
+  frostbite: { priority: 9, gain: 0.7, minIntervalMs: 300, spatial: false },
+  thermalCycle: { priority: 5, gain: 0.34, minIntervalMs: 150, spatial: true },
+  frostbiteBreak: { priority: 9, gain: 0.75, minIntervalMs: 300, spatial: false },
+  // O Espectro. O sussurro e textura de mundo (baixo, espacial, travado para
+  // uma matilha nao virar um coro); a condensacao e o TELEGRAFO do bote e
+  // manda como todo telegrafo; o bote e o golpe.
+  wraithWhisper: { priority: 2, gain: 0.22, minIntervalMs: 600, spatial: true },
+  wraithCondense: { priority: 9, gain: 0.5, minIntervalMs: 120, spatial: true },
+  wraithLunge: { priority: 7, gain: 0.45, minIntervalMs: 80, spatial: true },
+  wraithDissolve: { priority: 3, gain: 0.3, minIntervalMs: 200, spatial: true },
+  wraithDeath: { priority: 6, gain: 0.5, minIntervalMs: 60, spatial: true },
 
   // O arranque e a parada do motor. Espaciais porque o parceiro remoto tambem
   // as emite, e ouvir de que lado da sala uma minigun esta pegando no tranco e

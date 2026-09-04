@@ -113,7 +113,7 @@ describe('limites de payload: ingresso vs egresso', () => {
       })),
       entities: [],
       projectiles: [],
-      you: { slot: 0, heat: 0, purgeCells: 1, activeModules: [], pendingModuleChoice: null, hasCore: false, downed: false, aimX: 1, aimY: 0, overheated: false },
+      you: { slot: 0, heat: 0, purgeCells: 1, activeModules: [], pendingModuleChoice: null, hasCore: false, coreCount: 0, downed: false, aimX: 1, aimY: 0, overheated: false, dodgeCooldownUntil: 0, abilityCooldownUntil: 0, channelingUntil: 0, ability: 'pulse', freeze: 0, frostbitten: false },
       world: { salvageSites: [], coreTaken: false, bossAwake: false },
       authHash: 'deadbeef',
     } as never);

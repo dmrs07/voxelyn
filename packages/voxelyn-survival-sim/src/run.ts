@@ -69,6 +69,9 @@ import {
   SURF_BIOFLUID,
   SURF_EMBER,
   EMBER_HEAT_DECAY_SCALE,
+  FREEZE_GRACE_TICKS,
+  FREEZE_THERMAL_CYCLE_HEAT,
+  FREEZE_THERMAL_CYCLE_TICKS,
   SURF_FIRE,
   SURF_DEEP_WATER,
   ICE_GLIDE_EPSILON,
@@ -96,6 +99,7 @@ import {
   WORLD_W,
 } from './constants.js';
 import { emptyBossRuntime } from './bosses.js';
+import { clearFreeze, frostbiteBreaks, meltFreezeByHeat, stepFreezeDecay } from './frost.js';
 import {
   ABILITY_SHAPE,
   STARTING_ABILITY,
@@ -301,6 +305,10 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   lastDamage: null,
   ability: STARTING_ABILITY,
   resonance: emptyResonance(),
+  freeze: 0,
+  frostbitten: false,
+  freezeGraceUntil: 0,
+  thermalCycleReadyAt: 0,
 });
 
 /**
@@ -329,6 +337,7 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.lastDamage = null;
   extra.ability = STARTING_ABILITY;
   extra.resonance = emptyResonance();
+  clearFreeze(extra);
 };
 
 export const createRun = (config: RunConfig): SurvivalState => {
@@ -1389,6 +1398,7 @@ const fireMinigunRound = (
   });
 
   extra.heat += MINIGUN_HEAT_PER_SHOT;
+  meltFreezeByHeat(extra, MINIGUN_HEAT_PER_SHOT);
   extra.minigun.pendingRounds++;
   state.stats.shotsFired += 1;
   return true;
@@ -1652,6 +1662,89 @@ const applyIceLoad = (
   }
 };
 
+/**
+ * Calor decai — DEVAGAR em cima de uma fissura incandescente da Fornalha.
+ * A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
+ * sair dela e a decisao que devolve a dissipacao normal.
+ */
+const decayHeat = (state: SurvivalState, slot: number): void => {
+  const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  const tuning = state.config.tuning;
+  const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
+  extra.heat = Math.max(
+    0,
+    extra.heat -
+      tuning.heatDecayPerTick *
+        // Circuito fechado na Fornalha: a fissura para de segurar o calor da
+        // arma. E uma das duas subversoes assimetricas — brasa so pressiona o
+        // jogador —, e o preco dela esta no custo de fechar, nao no premio.
+        (onEmber && !(state.stratumSubverted && state.stratum === 'furnace')
+          ? EMBER_HEAT_DECAY_SCALE
+          : 1),
+  );
+};
+
+/**
+ * O tick de um Prospector CONGELADO POR INTEIRO.
+ *
+ * Tudo o que e acao esta fora: movimento, rumo, esquiva, interacao,
+ * habilidade, canal do sopro (cancelado cobrando o cooldown, como a pedra do
+ * Britador faz) e o gatilho como arma. Os canos da Minigun desaceleram — o
+ * passo roda com o gatilho SOLTO — e o calor dissipa como sempre. O corpo
+ * continua vulneravel: o dano entra pelo funil de sempre, sem reducao.
+ *
+ * O gatilho e interceptado AQUI, antes de qualquer arma existir: apertar nao
+ * cria bolt, disco nem bala, nao consome carga, nao incrementa `shotsFired`,
+ * nao emite `shot` e nao deixa nada enfileirado. O que ele faz e um CICLO
+ * TERMICO seco, de cadencia fixa: o motor tenta partir por baixo da crosta,
+ * gera calor de verdade no sistema de calor de sempre, e e esse calor novo
+ * que derrete o gelo. O superaquecimento continua valendo — o ciclo passa
+ * por `settleOverheat` como um tiro passaria — e durante o lockout os ciclos
+ * ficam suspensos, sem perder o que ja derreteu.
+ *
+ * A crosta se parte quando uma camada inteira foi embora (`frostbiteBreaks`).
+ * O tick da libertacao NAO dispara: o ciclo consumiu o gatilho; o proximo
+ * aperto elegivel atira normalmente.
+ */
+const stepFrostbitten = (
+  state: SurvivalState,
+  slot: number,
+  cmd: PlayerCommand,
+  events: SemanticEvent[],
+): void => {
+  const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  player.vx = 0;
+  player.vy = 0;
+  extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
+  settleBreathChannel(state, slot, events);
+  decayHeat(state, slot);
+  stepMinigun(state, slot, false, events);
+
+  if (cmd.fire && state.tick >= extra.thermalCycleReadyAt && state.tick >= extra.overheatedUntil) {
+    extra.thermalCycleReadyAt = state.tick + FREEZE_THERMAL_CYCLE_TICKS;
+    extra.heat += FREEZE_THERMAL_CYCLE_HEAT;
+    meltFreezeByHeat(extra, FREEZE_THERMAL_CYCLE_HEAT);
+    events.push({
+      t: 'thermal_cycle',
+      slot,
+      x: player.x,
+      y: player.y,
+      freeze: extra.freeze,
+      heat: extra.heat,
+    });
+    settleOverheat(state, slot, events);
+    if (frostbiteBreaks(extra)) {
+      extra.frostbitten = false;
+      extra.freezeGraceUntil = state.tick + FREEZE_GRACE_TICKS;
+      // O gatilho deste tick foi o ciclo; o cano so volta a valer no proximo.
+      extra.nextShotAt = Math.max(extra.nextShotAt, state.tick + 1);
+      events.push({ t: 'frostbite_break', slot, x: player.x, y: player.y });
+    }
+  }
+};
+
 const stepPlayer = (
   state: SurvivalState,
   slot: number,
@@ -1686,12 +1779,18 @@ const stepPlayer = (
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
     settleBreathChannel(state, slot, events);
     extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
+    stepFreezeDecay(state, slot);
     // A pedra do Britador para o gatilho, e os canos DESACELERAM enquanto o
     // Prospector esta atordoado — com a fase e o evento saindo normalmente,
     // para o som do motor descer junto em vez de congelar no ar.
     stepMinigun(state, slot, false, events);
     return;
   }
+
+  // O FRIO. O decaimento natural corre para todo Prospector em campo, antes
+  // de qualquer coisa que o gatilho faca neste tick; travado, ele nao corre
+  // (ver `stepFreezeDecay`).
+  stepFreezeDecay(state, slot);
 
   // Escolha privada do slot: idempotente e nao pausa movimento/simulacao.
   if (cmd.choose !== null && extra.pendingModuleChoice) {
@@ -1710,6 +1809,14 @@ const stepPlayer = (
       sourceSiteId: pending.sourceSiteId,
       recharged,
     });
+  }
+
+  // CONGELADO POR INTEIRO. A estatua nao anda, nao gira, nao esquiva, nao
+  // interage e nao usa habilidade; o cano nao dispara. O que resta e o
+  // gatilho, e ele faz outra coisa aqui: forca o motor por baixo do gelo.
+  if (extra.frostbitten) {
+    stepFrostbitten(state, slot, cmd, events);
+    return;
   }
 
   // mira e rumo visual. `extra.aim` e a MIRA (bolts e sopro saem por ela);
@@ -1819,21 +1926,7 @@ const stepPlayer = (
     if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
-  // Calor decai — DEVAGAR em cima de uma fissura incandescente da Fornalha.
-  // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
-  // sair dela e a decisao que devolve a dissipacao normal.
-  const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
-  extra.heat = Math.max(
-    0,
-    extra.heat -
-      tuning.heatDecayPerTick *
-        // Circuito fechado na Fornalha: a fissura para de segurar o calor da
-        // arma. E uma das duas subversoes assimetricas — brasa so pressiona o
-        // jogador —, e o preco dela esta no custo de fechar, nao no premio.
-        (onEmber && !(state.stratumSubverted && state.stratum === 'furnace')
-          ? EMBER_HEAT_DECAY_SCALE
-          : 1),
-  );
+  decayHeat(state, slot);
 
   // Canal do sopro que chegou ao proprio fim: liquida ANTES do gate de cast —
   // o cooldown recem-cobrado ja bloqueia um recast neste mesmo tick, e o
@@ -1890,6 +1983,9 @@ const stepPlayer = (
   ) {
     extra.nextShotAt = state.tick + BOLT_COOLDOWN_TICKS;
     extra.heat += HEAT_PER_SHOT;
+    // O tiro de verdade tambem derrete o gelo residual de quem ja se soltou:
+    // e o mesmo calor novo, so que agora saindo pelo cano.
+    meltFreezeByHeat(extra, HEAT_PER_SHOT);
 
     // O disparo apenas ARMA os modulos ativos; nenhuma carga e debitada aqui.
     // Cobrar no gatilho punia o tiro que errava tudo — e, pior, obrigava o
@@ -2017,6 +2113,7 @@ const stepPlayer = (
         if (Math.hypot(player.x - op.x, player.y - op.y) <= REVIVE_RADIUS) {
           oe.downed = false;
           oe.bleedoutAt = 0;
+          clearFreeze(oe);
           op.hp = Math.max(1, Math.floor(op.maxHp * REVIVE_HP_FRACTION));
           events.push({ t: 'revive', x: op.x, y: op.y, slot: other, tick: state.tick });
           state.stats.revivesGiven += 1;
@@ -3066,6 +3163,9 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
   p.alive = false;
   e.activeModules = [];
   e.pendingModuleChoice = null;
+  // Morrer congelado nao deixa a estatua para a proxima vida: o revive e o
+  // reset partem de um corpo limpo, e a crosta e da run que acabou.
+  clearFreeze(e);
   if (e.carriedCoreMask !== 0) {
     // Cada Nucleo volta AO PEDESTAL DELE, e nao "ao pedestal": o portador de
     // uma run de G-04 pode estar carregando o do setor 3 e o do setor 7, e
@@ -3117,6 +3217,10 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
       if (hasStandingAlly) {
         // co-op: entra em estado abatido, revivel pelo parceiro
         e.downed = true;
+        // Cair DESFAZ o congelamento: o abatido nao age de qualquer jeito, e
+        // um revivido que voltasse preso na estatua morreria de novo sem ter
+        // tocado o gatilho uma vez.
+        clearFreeze(e);
         // O corpo PARA ao cair: sem isto, vx/vy congelam com o valor do tick
         // anterior e a inercia do gelo consumiria esse embalo velho segundos
         // depois, no revive — o revivido deslizando sozinho na direcao antiga.
@@ -3420,6 +3524,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     } else {
       mix(0);
     }
+    // O FRIO, no fim do bloco do slot (append-only, como tudo aqui). Duas
+    // simulacoes que discordam do medidor discordam de quando um Prospector
+    // trava — e o travamento e a decisao mais visivel do encontro.
+    mix(e.freeze);
+    mix(e.frostbitten ? 1 : 0);
+    mix(e.freezeGraceUntil);
+    mix(e.thermalCycleReadyAt);
   }
   for (const site of state.salvageSites) {
     mix(site.id);

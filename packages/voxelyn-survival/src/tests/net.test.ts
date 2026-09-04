@@ -112,6 +112,30 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(view.playerExtras[0].purgeCells).toBe(1);
   });
 
+  it('o congelamento do viewer e do parceiro chegam ao espelho local', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    const b = loop.connect('B');
+    a.connect();
+    b.connect();
+    loop.advance(2);
+    const room = loop.server.roomForClient('A');
+    if (!room) throw new Error('sala nao criada');
+    room.state.playerExtras[0].freeze = 420;
+    // Sem decaimento durante a amostra: o que se mede e o wire, nao o relogio.
+    room.state.playerExtras[0].freezeGraceUntil = 10_000;
+    room.state.playerExtras[1].freeze = 1000;
+    room.state.playerExtras[1].frostbitten = true;
+    // O render corre dois ticks atrasado (INTERP_DELAY_TICKS): a mudanca so
+    // aparece quando a linha de render alcanca o tick dela.
+    loop.advance(1 + 3);
+    const view = a.sampleRenderState(loop['now'] as number)!;
+    expect(view.playerExtras[0].freeze).toBe(420);
+    expect(view.playerExtras[0].frostbitten).toBe(false);
+    expect(view.playerExtras[1].freeze).toBe(1000);
+    expect(view.playerExtras[1].frostbitten).toBe(true);
+  });
+
   it('espelha o stun autoritativo de players e inimigos no cliente online', () => {
     const loop = new Loop();
     const a = loop.connect('A');

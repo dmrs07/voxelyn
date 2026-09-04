@@ -225,6 +225,30 @@ describe('servidor autoritativo de co-op', () => {
     expect(snap.you.channelingUntil).toBe(extra.channelingUntil);
   });
 
+  it('o `you` e o snapshot do parceiro transportam o congelamento', () => {
+    // O medidor decide se o gatilho e arma ou motor, e a estatua do parceiro
+    // e o que diz "ele nao vai chegar ate voce". Nenhum dos dois pode ser
+    // derivado de eventos por quem reconecta.
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A');
+    if (!room) throw new Error('sala nao criada');
+    h.drain('A');
+
+    room.state.playerExtra.freeze = 640;
+    room.state.playerExtra.frostbitten = true;
+    h.tick(1);
+
+    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
+    if (snap?.t !== 'snapshot' || !snap.you) throw new Error('snapshot sem viewer');
+    expect(snap.you.freeze).toBe(640);
+    expect(snap.you.frostbitten).toBe(true);
+    const me = snap.entities.find((e) => e.kind === 'player' && e.id === 1);
+    expect(me?.freeze).toBe(640);
+    expect(me?.frostbitten).toBe(true);
+  });
+
   it('resync reconstroi o mundo de um cliente divergente', () => {
     const h = new Harness();
     h.connect('A');

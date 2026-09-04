@@ -181,6 +181,60 @@
           font-size: 10px;
         }
       }
+      /* O PAINEL DE CONGELAMENTO fica acima do censo de gelo, no mesmo canto,
+         e ao contrario dele ACEITA cliques: os cenarios sao botoes. */
+      #frost-panel {
+        position: fixed;
+        right: calc(10px + var(--safe-area-inset-right));
+        bottom: calc(76px + var(--safe-area-inset-bottom));
+        z-index: 6;
+        width: 260px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #9fb3cc;
+        background: rgba(10, 12, 16, 0.78);
+        border: 1px solid #2a2d38;
+        border-radius: 6px;
+        padding: 6px 9px;
+      }
+      #frost-panel b {
+        color: #bfe0ff;
+        font-weight: 600;
+      }
+      #frost-panel .lock {
+        color: #ffb066;
+      }
+      #frost-readout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 8px;
+        margin-bottom: 6px;
+      }
+      #frost-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+      #frost-buttons button {
+        font: inherit;
+        font-size: 10px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid #2a2d38;
+        background: #141821;
+        color: #d8cfc0;
+        cursor: pointer;
+      }
+      #frost-buttons button:hover {
+        background: #1f2532;
+      }
+      @media (max-width: 640px) {
+        #frost-panel {
+          width: 220px;
+          bottom: calc(96px + var(--safe-area-inset-bottom));
+        }
+      }
       /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo, e a
          nota sobreposta ao HP era o primeiro pixel que o playtest via. */
       #hud-note {
@@ -253,6 +307,14 @@
       Arena de teste — sem telemetria, sem placar, sem gravação de replay.
     </div>
     <div id="ice-panel" class="hidden"></div>
+    <!-- O PAINEL DE CONGELAMENTO: cenarios de debug do medidor e a leitura
+         exata dele. So existe nesta ferramenta — nada aqui e importado pelo
+         jogo — e so aparece na arena da Rainha. -->
+    <div id="frost-panel" class="hidden">
+      <div id="frost-readout"></div>
+      <div id="frost-buttons"></div>
+      <label><input type="checkbox" id="frost-fast-decay" /> decaimento ×10 (debug)</label>
+    </div>
 
     <div id="setup">
       <form id="setup-form">
@@ -300,6 +362,20 @@
             Sem o upgrade o Prospector freia ~2,5 tiles no gelo; com ele, ~1,0 — e recupera o rumo
             quatro vezes mais rápido. Não protege contra rachaduras: o que ele compra é a precisão
             de rota que permite desviar da célula crítica.
+          </span>
+        </div>
+
+        <div class="field">
+          <label>Co-op de apresentação</label>
+          <div class="check-grid">
+            <label>
+              <input type="checkbox" id="coop" name="coop" />
+              <span>Segundo Prospector parado (slot 1)</span>
+            </label>
+          </div>
+          <span class="place-hint">
+            Ninguém o controla: serve para ver o congelamento do parceiro — geada, estátua e os dois
+            medidores em níveis diferentes.
           </span>
         </div>
 

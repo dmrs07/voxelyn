@@ -1191,31 +1191,120 @@ const scoriacModel = (anim, f) => {
 const scoriacFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(scoriacModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
 
-// enemy-frost-wraith 64x64 — o Espectro de Geada: um risco palido e raso.
-// Ele passa o jogo SOB o gelo (o cliente desenha a trilha de rachaduras);
-// este corpo e o bote e o encalhe — um peixe-lamina de gelo leitoso.
+// enemy-frost-wraith 64x64 — o Espectro de Geada: um MANAWYRM de geada.
+//
+// Ele passa quase todo o jogo como NEVOA sob a lamina (o cliente desenha a
+// nevoa; este corpo nunca aparece escondido). O que se ve aqui e a criatura
+// CONDENSADA: um corpo serpentino curto e arqueado flutuando acima do chao,
+// cabeca cristalina separada do tronco por um pescoco, focinho angular,
+// chifres de gelo voltados para tras, nucleo ciano na garganta, vertebras de
+// gelo escuro com costelas palidas, e uma cauda que se desfaz em fragmentos.
+//
+// A silhueta e mais ALTA que larga de proposito. A versao anterior era uma
+// laje comprida rente ao chao com dois pontos azuis — lia como pano sujo. Aqui
+// a leitura vem por ORDEM: primeiro criatura (arco, cabeca, mandibula, olhos),
+// so depois gelo (material). O tronco e escuro (rockDeep) para nao sumir sobre
+// o chao branco; o claro fica na cabeca, nos chifres e nas costelas.
+//
+// Autorado com a frente em +x, como a Lampreia; `quarterTurn` leva para -y.
+const WRAITH_SEGMENTS = 5;
+/** Altura do arco de cada vertebra: cauda baixa, meio alto, pescoco alto. */
+const wraithArch = (s) => 1.0 + 3.5 * Math.sin((Math.PI * (s + 0.6)) / (WRAITH_SEGMENTS + 0.4));
 const frostWraithModel = (anim, f) => {
-  const rise = anim === 'attack' ? [0, 1, 3, 2][f % 4] : 0;
-  const glide =
-    anim === 'walk' ? [0, 0.5, 1, 0.5, 0, -0.5][f % 6] : anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
-  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // O bote: recolhe (cabeca para tras, corpo comprimido) e DISPARA (corpo
+  // esticado para frente como uma lanca). Quatro quadros: -0.5, -0.9, +1.8, +1.2.
+  const coil = anim === 'attack' ? [-0.4, -0.7, 0.8, 0.5][f % 4] : 0;
+  // O planar: ondulacao lenta ao longo do corpo; o repouso so respira.
+  // Tudo em passos de 0,5: e a grade de voxel fino, e valores fora dela
+  // arredondam de um jeito por quadro e ocluem os olhos num quadro sim, outro
+  // nao — o que o teste de estroboscopio pega.
+  const wave = (s) => (anim === 'walk' ? 0.5 * Math.round(Math.sin((s + f) * 1.05)) : 0);
+  const hover = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : anim === 'walk' ? [0, 0.5, 0.5, 0.5, 0, 0][f % 6] : 0;
+  const flinch = anim === 'hit' ? [0.6, 0][f % 2] : 0;
+  // A materializacao (`special`, o telegrafo do bote): a nevoa converge e
+  // cristaliza DE BAIXO PARA CIMA. `form` e a fracao do corpo que ja existe.
+  const form = anim === 'special' ? [0.15, 0.45, 0.75, 1][f % 4] : 1;
   const b = [];
-  // Corpo raso e comprido, afinando para tras: quatro segmentos de gelo.
-  for (let s = 0; s < 4; s++) {
-    const x = -4 + s * 2;
-    const d = 3 - s * 0.5;
-    b.push(box(x, -d / 2 + glide * (s % 2 === 0 ? 0.4 : -0.4), 0.5 + rise * (s >= 2 ? 0.6 : 0.2) + flinch * 0.3, 2, d, 1.5, 'ice'));
+
+  // A cauda que se desfaz: fragmentos soltos atras do ultimo segmento.
+  const tailX = -3.4;
+  const frag = (i) => {
+    const phase = (i * 2.3 + (anim === 'idle' || anim === 'walk' ? f : 0)) % 4;
+    const dx = -0.5 - i * 0.55 - phase * 0.08;
+    const dz = 0.4 + i * 0.3 + Math.abs(Math.sin(i + phase)) * 0.4;
+    return box(tailX + dx, -0.25 + (i % 2 ? 0.35 : -0.35), dz + hover * 0.5, 0.5, 0.5, 0.5, i % 2 ? 'ice' : 'glass');
+  };
+  if (form >= 0.15) for (let i = 0; i < 2; i++) b.push(frag(i));
+
+  // O TRONCO: vertebras escuras em arco, costelas palidas, espinhos dorsais.
+  for (let s = 0; s < WRAITH_SEGMENTS; s++) {
+    const t = s / (WRAITH_SEGMENTS - 1);
+    // Cristaliza de baixo para cima: a cauda (baixa) primeiro, o pescoco depois.
+    if (form < 0.3 + t * 0.6) continue;
+    const stretch = coil > 0 ? 1 + coil * 0.12 : 1 + coil * 0.1;
+    const x = tailX + 0.8 + s * 0.95 * stretch + (coil > 0 ? coil * 0.25 : 0);
+    const z = wraithArch(s) + hover + wave(s) * 0.5 + flinch * 0.2 - (coil < 0 ? 0.3 : 0);
+    const y = -0.65 + wave(s) * 0.4;
+    // Vertebra: gelo escuro, mais alta que larga.
+    b.push(box(x, y, z, 1.0, 1.3, 1.5, 'rockDeep'));
+    // Costela: uma lamina palida ESTREITA que sai dos dois lados, so nos
+    // segmentos do meio — larga demais ela virava uma laje branca por cima do
+    // corpo, e o bicho lia como trenó.
+    if (s >= 1 && s <= 3) b.push(box(x + 0.25, y - 0.3, z + 0.5, 0.5, 1.9, 0.5, 'ice'));
+    // Espinho dorsal: cristal claro, inclinado para tras (mais alto atras).
+    if (s >= 1 && s <= 4) b.push(box(x + 0.25, y + 0.4, z + 1.5, 0.5, 0.5, 0.5 + (4 - s) * 0.15, 'glass'));
   }
-  // Nadadeira dorsal translucida — a lamina que corta o gelo por baixo.
-  b.push(box(-1, -0.4, 2 + rise * 0.6, 3, 0.8, 1.5 + rise * 0.5, 'ice'));
-  // Cabeca em cunha, com dois olhos de corrente: o unico ponto que brilha.
-  b.push(box(3.4, -1.2 + glide * 0.3, 0.8 + rise, 2, 2.4, 1.6, 'ice'));
-  b.push(box(4.6, -1.2 + glide * 0.3, 1.8 + rise, 0.6, 0.6, 0.6, 'electric'));
-  b.push(box(4.6, 0.6 + glide * 0.3, 1.8 + rise, 0.6, 0.6, 0.6, 'electric'));
+
+  // O PESCOCO e o NUCLEO: a ligacao entre tronco e cabeca, com a luz ciana
+  // na garganta — o unico ponto emissivo, e ele fica ENTRE as costelas.
+  const neckX = tailX + 0.8 + (WRAITH_SEGMENTS - 1) * 0.95 + 0.95 + (coil > 0 ? coil * 0.9 : coil * 0.4);
+  const neckZ = wraithArch(WRAITH_SEGMENTS - 1) + hover + 0.2 - (coil < 0 ? 0.5 : 0);
+  if (form >= 0.85) {
+    b.push(box(neckX, -0.45, neckZ, 0.9, 0.9, 1.0, 'rockDeep'));
+    // O nucleo na GARGANTA, saindo da frente do pescoco (dentro dele nao se
+    // veria). Pisca no hit (dois quadros: aceso, apagado) — uma transicao so.
+    const coreMat = anim === 'hit' && f % 2 === 1 ? 'ice' : anim === 'die' ? 'rockDeep' : 'electric';
+    b.push(box(neckX + 0.7, -0.3, neckZ - 0.3, 0.6, 0.6, 0.6, coreMat));
+  }
+
+  // A CABECA: cristal claro, claramente separada do tronco, com mandibula
+  // angular escura por baixo, focinho em cunha, chifres para tras e dois
+  // olhos de corrente. Fica ACIMA do pescoco: e o ponto mais alto do bicho.
+  if (form >= 1) {
+    const hx = neckX + 0.8;
+    const hz = neckZ + 1.3 + (coil > 0 ? -0.4 : coil < 0 ? 0.4 : 0);
+    b.push(box(hx, -0.8, hz, 1.4, 1.6, 1.3, 'glass')); // cranio
+    b.push(box(hx + 0.3, -0.6, hz - 0.5, 1.8, 1.2, 0.5, 'rockDeep')); // mandibula angular
+    b.push(box(hx + 1.4, -0.45, hz + 0.1, 1.0, 0.9, 0.6, 'ice')); // focinho em cunha
+    // Chifres varridos para tras, subindo em dois degraus.
+    b.push(box(hx - 1.0, -1.1, hz + 1.1, 1.4, 0.4, 0.4, 'glass'));
+    b.push(box(hx - 1.0, 0.7, hz + 1.1, 1.4, 0.4, 0.4, 'glass'));
+    b.push(box(hx - 1.7, -1.05, hz + 1.5, 0.8, 0.35, 0.35, 'ice'));
+    b.push(box(hx - 1.7, 0.7, hz + 1.5, 0.8, 0.35, 0.35, 'ice'));
+    // Olhos: sempre acesos (a unica outra luz), SALTADOS da frente do cranio
+    // para nunca serem ocluidos por ele — fora do ciclo do nucleo.
+    b.push(box(hx + 1.2, -0.8, hz + 0.8, 0.5, 0.4, 0.4, 'electric'));
+    b.push(box(hx + 1.2, 0.4, hz + 0.8, 0.5, 0.4, 0.4, 'electric'));
+  }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
+/**
+ * O Espectro e desenhado 1,4x maior que os outros de 64 px, num quadro de
+ * 96 px. Nao e poder nem hitbox — e LEITURA: no zoom real do jogo um corpo
+ * de 64 px com cabeca, chifres, nucleo e cauda vira um borrao de vinte
+ * pixels, e a silhueta que este redesenho existe para dar se perde. O
+ * alcance, o raio e o dano ficam onde estavam.
+ */
+const WRAITH_SCALE = 1.4;
 const frostWraithFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(frostWraithModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
+  renderVoxels(
+    quarterTurn(scaleBoxes(frostWraithModel(anim, f), WRAITH_SCALE)),
+    DIR_INDEX[dir],
+    96,
+    96,
+    44,
+    84,
+  );
 
 // enemy-sulfur-bomber 64x64 — a MESMA silhueta do Spore Bomber, outra quimica.
 //
@@ -2989,6 +3078,13 @@ const living = {
   hit: { frames: 2, fps: 12, loop: false },
   die: { frames: 5, fps: 10, loop: false },
 };
+/**
+ * O Espectro tem uma pose a mais: a MATERIALIZACAO (`special`), que o cliente
+ * usa no telegrafo do bote (o `charge` cai no slot `special`). Quatro quadros
+ * a 7 fps cobrem os 12 ticks (0,6 s) do windup — a nevoa cristalizando de
+ * baixo para cima e o proprio aviso.
+ */
+const wraithLiving = { ...living, special: { frames: 4, fps: 7, loop: false } };
 // `version` sobe junto com qualquer mudanca de pixel no atlas (production spec
 // §13). A subdivisao da grade (MODEL_SCALE) redesenhou TODO atlas de entidade,
 // entao o piso agora e 3.
@@ -3059,7 +3155,7 @@ export const ENTITY_SPECS = [
   base('enemy-mud-lamprey', 64, 64, 32, 60, { w: 0.8, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, mudLampreyFrame, 'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes', 2),
   base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 2),
   base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 2),
-  base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 2),
+  base('enemy-frost-wraith', 96, 96, 48, 90, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, wraithLiving, frostWraithFrame, 'voxel-isometric frost manawyrm elemental: short arched serpentine body floating above the ground, dark ice vertebrae with pale rib plates and swept-back dorsal spikes, crystalline head clearly separated from the trunk with angular dark jaw, wedge snout, backswept ice horns, twin electric eyes and a glowing cyan core in the throat, tail dissolving into drifting ice fragments', 3),
   // Fauna afinada por bioma. O de enxofre herda o `special` do Spore Bomber
   // (mesmo telegrafo de pod inchando), e o Coveiro tem o proprio: a carga do
   // eletroima, que e o aviso mais importante do bicho.
