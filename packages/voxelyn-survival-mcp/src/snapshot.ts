@@ -20,7 +20,11 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_GLASS,
+  SURF_DEEP_WATER,
   SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_CRITICAL,
+  SURF_ICE_FRACTURED,
   SURF_NONE,
   SURF_RAIL,
   SURF_RAIL_V,
@@ -59,6 +63,10 @@ const SURFACE_NAMES: Record<number, string> = {
   [SURF_RAIL_V]: 'rail_v',
   [SURF_SILT]: 'silt',
   [SURF_GLASS]: 'glass',
+  [SURF_ICE_CRACKED]: 'ice_cracked',
+  [SURF_ICE_FRACTURED]: 'ice_fractured',
+  [SURF_ICE_CRITICAL]: 'ice_critical',
+  [SURF_DEEP_WATER]: 'deep_water',
 };
 
 const solidName = (id: number): string => SOLID_NAMES[id] ?? `unknown_${id}`;

@@ -1,6 +1,6 @@
 {
   "id": "surface-tiles",
-  "version": 7,
+  "version": 8,
   "atlas": "surface-tiles.png",
   "frameWidth": 64,
   "frameHeight": 76,
@@ -82,6 +82,26 @@
       "name": "glass",
       "frames": 2,
       "frameMs": 900
+    },
+    {
+      "name": "ice-cracked",
+      "frames": 2,
+      "frameMs": 760
+    },
+    {
+      "name": "ice-fractured",
+      "frames": 2,
+      "frameMs": 700
+    },
+    {
+      "name": "ice-critical",
+      "frames": 3,
+      "frameMs": 300
+    },
+    {
+      "name": "deep-water",
+      "frames": 4,
+      "frameMs": 520
     }
   ],
   "variants": 3,

@@ -72,6 +72,27 @@ export const SURFACE_KINDS = [
   // areia morna com ondulacao e o outro placa fria, lisa e brilhante.
   { name: 'silt', frames: 2, frameMs: 620 },
   { name: 'glass', frames: 2, frameMs: 900 },
+  // O CICLO DE RACHADURAS DA CRIPTA (SURF_ICE_CRACKED 15, SURF_ICE_FRACTURED
+  // 16, SURF_ICE_CRITICAL 17) e o BURACO (SURF_DEEP_WATER 18). No fim da lista,
+  // como toda materia nova: os ids viajam nos diffs de chunk.
+  //
+  // Os tres estagios se separam por FORMA E DENSIDADE DE LINHA, nunca por cor:
+  // a Cripta inteira e a mesma familia fria, e um jogador que precisasse
+  // comparar dois tons de azul-claro no meio de uma luta nao leria nada. A
+  // progressao e geometrica e le a distancia — uma fenda, uma malha, e depois
+  // o vao ESCURO entre cacos soltos.
+  //
+  // Quadros curtos de proposito: gelo rachado nao se mexe. O que anda entre os
+  // dois quadros e so o reflexo, como no gelo inteiro — e cada quadro a mais
+  // aqui custa 0,45 MiB de RGBA no boot, num orcamento que ja esta encostado.
+  { name: 'ice-cracked', frames: 2, frameMs: 760 },
+  { name: 'ice-fractured', frames: 2, frameMs: 700 },
+  // O critico ganha um quadro a mais: e o unico estado do ciclo que precisa
+  // CHAMAR, e a unica coisa que chama sem cor e movimento. O vao escuro pulsa.
+  { name: 'ice-critical', frames: 3, frameMs: 300 },
+  // Agua profunda: o vazio frio. Quatro quadros como a agua rasa, mas mais
+  // lentos — o que se move la dentro nao e onda, e massa.
+  { name: 'deep-water', frames: 4, frameMs: 520 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -558,6 +579,147 @@ export const surfaceModel = (kind, variant, frame) => {
         const band = (fx + fy + frame) % FINE_COLS;
         const sparkle = band === 0 && (h & 7) === 0;
         boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, sparkle ? 'electric' : 'ice'));
+      }
+    }
+    return boxes;
+  }
+
+  // -------------------------------------------------------------------------
+  // O CICLO DE RACHADURAS
+  // -------------------------------------------------------------------------
+  // Os tres estagios compartilham a placa do gelo inteiro e diferem so no que
+  // esta ESCRITO nela. Uma funcao de traçado por estagio, e nao tres copias da
+  // placa: a placa e a mesma materia, e tres copias divergiriam no primeiro
+  // ajuste de brilho — o jogador veria a rachadura mudar a cor do gelo.
+  //
+  // `fissure(cx, cy, h, stage)` responde "esta coluna fina esta sobre uma
+  // fenda?" e devolve a PROFUNDIDADE dela: 0 nenhuma, 1 sulco raso (meio voxel
+  // abaixo do topo), 2 vao aberto (o gelo sumiu ali, ve-se o escuro).
+  //
+  // As linhas nao seguem a diagonal da projecao. Rachadura de gelo IRRADIA de um
+  // ponto de impacto — e um leque, nao uma grade —, e um leque desenhado no eixo
+  // do mundo sai obliquo na tela, que e o que impede o campo inteiro de ler como
+  // ladrilho. O centro do leque vem da variante, entao as tres celulas vizinhas
+  // rachadas nunca mostram o mesmo desenho.
+  if (kind === 'ice-cracked' || kind === 'ice-fractured' || kind === 'ice-critical') {
+    const stage = kind === 'ice-cracked' ? 1 : kind === 'ice-fractured' ? 2 : 3;
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    // Foco do leque, deslocado por variante: cada celula racha a partir de um
+    // ponto proprio, e nao do centro geometrico do tile.
+    const focusX = FINE_COLS / 2 + ((variant * 5) % 7) - 3;
+    const focusY = FINE_COLS / 2 + ((variant * 3) % 7) - 3;
+    // Quantos ramos partem do foco, e quao largo e cada um EM COLUNAS FINAS.
+    // Largura em colunas (e nao em angulo) e o detalhe que faz a fenda parecer
+    // fenda: a meia-abertura angular tem de encolher com a distancia, senao o
+    // ramo abre em cunha e o estagio inicial le como um pedaco arrancado.
+    const arms = stage === 1 ? 2 : stage === 2 ? 4 : 6;
+    const halfWidth = stage === 1 ? 0.55 : stage === 2 ? 0.85 : 1.15;
+    // Aneis CONCENTRICOS: a segunda familia de fendas. So a partir do
+    // fraturado, e e o que impede o critico de ler como "o fraturado com mais
+    // linhas" — gelo que cede de verdade se solta em CACOS, e caco tem contorno
+    // fechado, nao raio.
+    const ringPeriod = stage === 3 ? 3.4 : 5.2;
+    const fissure = (fx, fy, h) => {
+      const dx = fx - focusX;
+      const dy = fy - focusY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1) return stage >= 3 ? 2 : 1; // o proprio ponto de impacto
+      // Setor angular do ramo mais proximo. A meia-largura vira setores
+      // dividindo a abertura em radianos pelo tamanho de um setor.
+      const ang = Math.atan2(dy, dx) + Math.PI;
+      const sector = (ang / (Math.PI * 2)) * arms;
+      const offBranch = Math.abs(sector - Math.round(sector));
+      const width = (arms * (halfWidth / dist)) / (Math.PI * 2);
+      const wob = ((h >>> 5) % 3) * 0.012;
+      if (offBranch > width + wob) {
+        if (stage >= 2 && Math.abs((dist % ringPeriod) - ringPeriod / 2) < 0.5 && h % 6 !== 0) {
+          return 1;
+        }
+        return 0;
+      }
+      if (h % 7 === 0) return 0; // falhas: a fenda e tracejada, nao um corte
+      // O VAO so aparece quando o gelo ja perdeu material. Uma rachadura FINA
+      // nao abre nada — se ela mostrasse agua, o primeiro degrau ja diria
+      // "buraco" e os tres seguintes nao teriam o que escalar.
+      if (stage >= 3 && dist < 5.5) return 2;
+      if (stage === 2 && dist < 1.8) return 2;
+      return 1;
+    };
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 53, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        const depth = fissure(fx, fy, h);
+        if (depth === 2) {
+          // O VAO. Nada de gelo por cima: o que se ve e a agua escura por baixo
+          // da placa. No critico ela PULSA com o quadro — o unico movimento do
+          // estado, e o que o faz chamar sem mudar de cor.
+          const lit = stage >= 3 && ((h >>> 9) + frame) % 3 === 0;
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, lit ? 'water' : 'floor'));
+          continue;
+        }
+        if (depth === 1) {
+          // Sulco: meio voxel abaixo do topo da placa, como a rachadura do gelo
+          // inteiro ja fazia — e um degrau mais escuro nos estagios avancados,
+          // para a malha ganhar peso sem ganhar cor.
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, stage >= 2 ? 'rockDeep' : 'rock'));
+          continue;
+        }
+        // Placa intacta entre as fendas. O reflexo continua andando um passo
+        // por quadro; no critico ele some — a placa ja nao e lisa, e um
+        // cintilar ali diria "polido" sobre a superficie mais gasta do ciclo.
+        const band = (fx + fy + frame) % FINE_COLS;
+        const sparkle = band === 0 && (h & 7) === 0 && stage < 3;
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, sparkle ? 'electric' : 'ice'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'deep-water') {
+    // O BURACO: um vazio frio, e nao uma poca funda.
+    //
+    // Tres decisoes carregam a leitura inteira, e nenhuma delas e cor sozinha:
+    //
+    // - o LEITO some. Toda outra crosta liquida deste atlas assenta sobre a laje
+    //   de rocha e mostra pedra emergindo dela — e por isso que a agua rasa le
+    //   como chao molhado. Aqui nao ha ilha, nao ha mineral, nao ha fundo: so
+    //   escuro ate embaixo, e a ausencia e a informacao;
+    // - a lamina AFUNDA meio voxel abaixo do nivel das crostas vizinhas. Em
+    //   projecao isometrica o degrau e o que diz "isto e mais fundo que o
+    //   ladrilho ao lado" antes de qualquer tom;
+    // - a BORDA de gelo quebrado fica de pe no anel externo. Ela diz de onde o
+    //   buraco veio, e amarra o tile ao gelo em volta — sem ela o vao parecia um
+    //   recorte no chao, e nao uma placa que cedeu.
+    //
+    // O movimento interno e LENTO e nao ondula: duas correntes largas em
+    // sentidos opostos, com periodos primos entre si, que fazem a massa girar
+    // sem nunca piscar. Agua parada rasa ONDULA (faixa fina, rapida); massa
+    // funda GIRA, e a diferenca de ritmo entre as duas e proposital.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    const rim = 1; // colunas finas de gelo remanescente na borda
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 71, variant);
+        const onRim = fx < rim || fy < rim || fx >= FINE_COLS - rim || fy >= FINE_COLS - rim;
+        if (onRim && h % 4 !== 0) {
+          // Lasca de gelo de pe na quina do buraco: altura cheia, quebrada por
+          // falhas (o `h % 4` acima) para a borda ficar DENTADA e nao moldurada.
+          boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, 'ice'));
+          continue;
+        }
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        const flowA = (fx * 2 + fy + frame * 3) % 11;
+        const flowB = (fx - fy * 2 + FINE_COLS * 4 - frame * 2) % 13;
+        const cold = flowA === 0 || (flowB === 0 && (h & 1) === 0);
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, cold ? 'water' : 'floor'));
       }
     }
     return boxes;

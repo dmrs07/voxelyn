@@ -70,8 +70,10 @@ import {
   SURF_EMBER,
   EMBER_HEAT_DECAY_SCALE,
   SURF_FIRE,
-  SURF_ICE,
-  ICE_GLIDE,
+  SURF_DEEP_WATER,
+  ICE_GLIDE_EPSILON,
+  ICE_MOMENTUM_CAP,
+  isIceSurface,
   SURF_RAIL,
   SURF_RAIL_V,
   CART_SPEED,
@@ -104,11 +106,13 @@ import {
   resonanceOffers,
 } from './abilities.js';
 import {
+  advanceIceCrack,
   chargeCells,
   dischargeAt,
   explodeAt,
   igniteCell,
   isConductiveSurface,
+  isGlacialStabilised,
   markDirty,
   setSurface,
   stepCells,
@@ -183,6 +187,7 @@ import {
 import {
   DEFAULT_PLAYER_TUNING,
   TUNING_HASH_ORDER,
+  iceGlideFor,
   normalizeRunDepth,
   type PlayerTuning,
 } from './progression.js';
@@ -450,6 +455,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
     reactionQueue: [],
+    iceHoles: [],
     stats: emptyStats(),
     summary: null,
   };
@@ -1498,6 +1504,154 @@ const stepMinigun = (
   return equipped;
 };
 
+/**
+ * AS CELULAS QUE ESTE SEGMENTO DE MOVIMENTO ATRAVESSOU, em ordem.
+ *
+ * Nao e "a celula do centro depois de andar": a 20 Hz um Prospector no embalo
+ * do gelo percorre mais de meio tile por tick, e uma esquiva percorre bem mais
+ * de um. Ler so o destino faria a diagonal pular quinas e a esquiva pular
+ * placas inteiras — e uma placa pulada e uma travessia que nao contou, ou pior,
+ * um buraco que nao matou ninguem.
+ *
+ * A caminhada e um DDA por eixo: a cada passo cruza-se a proxima fronteira em
+ * X ou em Y, a que estiver mais perto (empate resolve em X, deterministicamente
+ * — as duas maquinas de uma sala precisam do mesmo desempate). O resultado e um
+ * caminho conexo por ARESTA: nunca ha um salto na diagonal por cima de uma
+ * quina, que e exatamente onde um buraco poderia ser atravessado de graca.
+ *
+ * A celula de PARTIDA nao entra: quem ja estava ali nao acabou de entrar. Ficar
+ * parado devolve lista vazia pela mesma razao, e e assim que "permanecer imovel
+ * nao progride a rachadura" cai da geometria em vez de virar um caso especial.
+ */
+export const cellsCrossed = (
+  state: SurvivalState,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): number[] => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const clampX = (v: number): number => Math.max(0, Math.min(w - 1, v));
+  const clampY = (v: number): number => Math.max(0, Math.min(h - 1, v));
+  let cx = clampX(Math.floor(x0));
+  let cy = clampY(Math.floor(y0));
+  const ex = clampX(Math.floor(x1));
+  const ey = clampY(Math.floor(y1));
+  const out: number[] = [];
+  if (cx === ex && cy === ey) return out;
+
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const stepX = dx > 0 ? 1 : -1;
+  const stepY = dy > 0 ? 1 : -1;
+  // Parametro t em [0,1] ate a proxima fronteira de cada eixo. Eixo parado
+  // recebe infinito: ele nunca e escolhido, e a caminhada vira reta pura.
+  const invX = dx !== 0 ? 1 / Math.abs(dx) : Infinity;
+  const invY = dy !== 0 ? 1 / Math.abs(dy) : Infinity;
+  let tX = dx !== 0 ? (dx > 0 ? cx + 1 - x0 : x0 - cx) * invX : Infinity;
+  let tY = dy !== 0 ? (dy > 0 ? cy + 1 - y0 : y0 - cy) * invY : Infinity;
+
+  // Teto de passos: a soma das distancias em celulas mais folga. Um segmento
+  // nunca cruza mais fronteiras que isso, e o limite impede que um NaN vindo de
+  // uma posicao corrompida transforme a caminhada em laco infinito.
+  const budget = Math.abs(ex - cx) + Math.abs(ey - cy) + 2;
+  for (let n = 0; n < budget; n++) {
+    if (tX <= tY) {
+      cx += stepX;
+      tX += invX;
+    } else {
+      cy += stepY;
+      tY += invY;
+    }
+    if (cx < 0 || cy < 0 || cx >= w || cy >= h) break;
+    out.push(cy * w + cx);
+    if (cx === ex && cy === ey) break;
+  }
+  return out;
+};
+
+/**
+ * O CHAO CEDEU SOB ESTE PROSPECTOR.
+ *
+ * Nao passa por `damageEntity`: a queda nao e dano. HP cheio nao salva, iframe
+ * de esquiva nao salva, e nao ha estado abatido no fundo do buraco — um corpo
+ * revivivel dentro de agua profunda seria um resgate que o mundo nao permite
+ * executar, e o co-op ficaria esperando por ele ate o sangramento.
+ *
+ * O que ela REUSA e todo o resto: `killPlayer` devolve os Nucleos aos pedestais
+ * certos, emite o `death` que o cliente ja sabe apresentar, e
+ * `resolveDownedAndDeaths` fecha a run no mesmo tick se ninguem mais estiver de
+ * pe. `lastDamage` recebe a causa propria para a tela de fim dizer o que
+ * aconteceu em vez de cair no "o Veio te consumiu".
+ */
+const plungeIntoDeepWater = (
+  state: SurvivalState,
+  slot: number,
+  cellIdx: number,
+  events: SemanticEvent[],
+): void => {
+  const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  const w = state.config.width;
+  // O corpo para NO buraco. Sem isto o `death` sai na posicao pos-movimento,
+  // que pode ser a celula seguinte — e o afundamento apareceria ao lado da
+  // agua, com o Prospector boiando sobre gelo intacto.
+  player.x = (cellIdx % w) + 0.5;
+  player.y = Math.floor(cellIdx / w) + 0.5;
+  player.vx = 0;
+  player.vy = 0;
+  player.hp = 0;
+  // Abatido que cai deixa de estar abatido: ele MORREU. Sem limpar a flag,
+  // `resolveDownedAndDeaths` continuaria contando o sangramento de um corpo que
+  // nao existe e a run nao fecharia.
+  extra.downed = false;
+  extra.bleedoutAt = 0;
+  extra.lastDamage = { cause: { kind: 'deep_water' }, tick: state.tick };
+  events.push({ t: 'ice_fall', x: player.x, y: player.y, slot });
+  killPlayer(state, slot, events);
+};
+
+/**
+ * A CARGA DESTE PROSPECTOR SOBRE O GELO, ao longo do que ele acabou de andar.
+ *
+ * Roda depois do movimento e le o segmento inteiro, entao vale igual para
+ * caminhada, deslize e esquiva — nao ha "modo de andar" que atravesse de graca.
+ *
+ * Uma celula avanca NO MAXIMO um degrau por Prospector por passo: a caminhada
+ * visita cada indice uma vez, e o `Set` guarda contra um segmento degenerado
+ * que voltasse sobre si mesmo. Em co-op cada slot roda o proprio passo na ordem
+ * autoritativa dos slots, entao dois Prospectors na mesma celula no mesmo tick
+ * descem dois degraus, sempre na mesma ordem, nas duas maquinas.
+ */
+const applyIceLoad = (
+  state: SurvivalState,
+  slot: number,
+  fromX: number,
+  fromY: number,
+  events: SemanticEvent[],
+): void => {
+  const player = state.players[slot];
+  const crossed = cellsCrossed(state, fromX, fromY, player.x, player.y);
+  if (crossed.length === 0) return;
+  const seen = new Set<number>();
+  for (const i of crossed) {
+    if (seen.has(i)) continue;
+    seen.add(i);
+    // O buraco que JA estava aberto mata na entrada, antes de qualquer outra
+    // leitura: atravessar um vao de agua profunda no embalo nao e uma travessia
+    // bem-sucedida, e o segmento acaba ali.
+    if (state.surface[i] === SURF_DEEP_WATER) {
+      plungeIntoDeepWater(state, slot, i, events);
+      return;
+    }
+    if (advanceIceCrack(state, i, events) === 'collapsed') {
+      plungeIntoDeepWater(state, slot, i, events);
+      return;
+    }
+  }
+};
+
 const stepPlayer = (
   state: SurvivalState,
   slot: number,
@@ -1602,13 +1756,17 @@ const stepPlayer = (
       extra.dodgeDir.x * DODGE_SPEED * dt,
       extra.dodgeDir.y * DODGE_SPEED * dt,
     );
-  } else if (state.surface[cellUnder(state, player)] === SURF_ICE) {
+  } else if (isIceSurface(state.surface[cellUnder(state, player)])) {
     // INERCIA DO GELO: o pe nao morde a lamina. O rumo comandado entra aos
     // poucos na velocidade real, e soltar o direcional NAO para na hora — o
     // Prospector desliza ate o atrito residual vencer. `vx/vy` ja e o
     // deslocamento REAL do tick anterior (pos-colisao), entao bater na parede
     // zera o embalo sozinho, sem caso especial. Fora do gelo nada muda: o
     // ramo historico abaixo segue byte a byte.
+    //
+    // QUALQUER ESTAGIO RACHADO E GELO aqui. A rachadura muda o que a celula aguenta,
+    // nunca o que ela faz com os pes: um piso que parasse de escorregar ao
+    // rachar recompensaria gastar a propria rota, que e o oposto do loop.
     const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
     let desiredX = 0;
     let desiredY = 0;
@@ -1618,18 +1776,21 @@ const stepPlayer = (
       desiredX = (cmd.move.x / moveLen) * clamped * speed;
       desiredY = (cmd.move.y / moveLen) * clamped * speed;
     }
-    // `iceGlide` do tuning ENCOLHE a persistencia do embalo anterior em vez de
-    // remove-la: MV-04 promete "mais controle no gelo", nao chao seco. Com a
-    // arvore inteira o embalo cai de 0,82 para ~0,62 — o Prospector ainda
-    // escorrega, so nao patina por tres tiles depois de soltar o comando.
+    // A inercia sai de `iceGlideFor`: o tuning interpola entre a lamina de
+    // fabrica (~2,5 tiles de frenagem) e a estabilizada por MV-04 (~0,98). A
+    // conta vive na progressao porque a arena e os testes precisam da MESMA
+    // resposta sem reimplementa-la.
     // Circuito fechado na Cripta: a inercia da lamina some junto com o degelo.
-    const glide =
-      state.stratumSubverted && state.stratum === 'glacial' ? 0 : ICE_GLIDE * (1 - tuning.iceGlide);
-    const vx = player.vx * glide + desiredX * (1 - glide);
-    const vy = player.vy * glide + desiredY * (1 - glide);
-    // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
-    // epsilon de float seria a lamina mentindo que ainda ha movimento.
-    if (Math.hypot(vx, vy) > 0.02) moveEntity(state, player, vx * dt, vy * dt);
+    const glide = isGlacialStabilised(state) ? 0 : iceGlideFor(tuning);
+    // O embalo QUE ENTRA no gelo e limitado: a esquiva sai a DODGE_SPEED (11
+    // tiles/s) e sem teto ela viraria transporte — quase seis tiles de deslize
+    // por toque, encadeaveis. Com teto ela continua carregando momento (sai
+    // mais longe do que sairia no chao seco) e satura em vez de acumular.
+    const carried = Math.hypot(player.vx, player.vy);
+    const carryScale = carried > ICE_MOMENTUM_CAP ? ICE_MOMENTUM_CAP / carried : 1;
+    const vx = player.vx * carryScale * glide + desiredX * (1 - glide);
+    const vy = player.vy * carryScale * glide + desiredY * (1 - glide);
+    if (Math.hypot(vx, vy) > ICE_GLIDE_EPSILON) moveEntity(state, player, vx * dt, vy * dt);
   } else {
     const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
     if (moveLen > 0.01) {
@@ -1642,6 +1803,12 @@ const stepPlayer = (
   }
   player.vx = (player.x - beforeMoveX) / dt;
   player.vy = (player.y - beforeMoveY) / dt;
+
+  // A CARGA SOBRE O GELO. Depois do movimento e antes de tudo o mais: se o chao
+  // cedeu, este Prospector saiu de campo e nada abaixo (calor, habilidade,
+  // gatilho) deve rodar para um corpo que ja afundou.
+  applyIceLoad(state, slot, beforeMoveX, beforeMoveY, events);
+  if (!player.alive) return;
 
   // extracao so libera depois de deixar a zona de entrada uma vez
   if (!state.leftEntryZone) {
@@ -3064,6 +3231,21 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepCollapse(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
+  // A REDE DE SEGURANCA DO BURACO. `applyIceLoad` ja cobre o caminho comum
+  // (andar, deslizar, esquivar), mas o Prospector nem sempre se move por conta
+  // propria: o eletroima do Coveiro ARRASTA, e um abatido pode ser puxado. Se a
+  // agua profunda so matasse quem entra nela por vontade propria, a regra
+  // "entrar e fatal" teria uma excecao que ninguem escreveu.
+  //
+  // Uma varredura por tick sobre os slots (dois, no maximo) — barata, e o unico
+  // lugar em que a pergunta e feita sobre TODO deslocamento, venha ele de onde
+  // vier.
+  for (let slot = 0; slot < state.players.length; slot++) {
+    const p = state.players[slot];
+    if (!state.playerExtras[slot].joined || !p.alive) continue;
+    const i = cellIndexAt(state, p.x, p.y);
+    if (state.surface[i] === SURF_DEEP_WATER) plungeIntoDeepWater(state, slot, i, events);
+  }
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
   finalizeRun(state);
@@ -3312,6 +3494,19 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.arenaClosed ? 1 : 0);
   mix(state.bossRuntime.arenaBarrierCells.length);
   for (const cell of state.bossRuntime.arenaBarrierCells) mix(cell);
+  // OS BURACOS NO GELO e o relogio de cada um.
+  //
+  // O id da superficie ja entra no hash pela varredura do grid — o buraco em si
+  // nao poderia divergir sem ser notado. O que NAO entrava e o RELOGIO: duas
+  // simulacoes que discordem de quando a rota volta a existir parecem iguais
+  // por doze segundos e divergem quando uma delas recongela primeiro (e um
+  // Prospector atravessa por cima do que na outra ainda e agua). Curto por
+  // construcao — sao os buracos abertos, nao as celulas de gelo.
+  mix(state.iceHoles.length);
+  for (const hole of state.iceHoles) {
+    mix(hole.idx);
+    mix(hole.at);
+  }
   // As cargas MARCADAS: duas simulacoes que discordem de onde a Salva de
   // Demolicao cai divergem no estrago, um telegrafo depois.
   mix(state.bossRuntime.blastCells.length);

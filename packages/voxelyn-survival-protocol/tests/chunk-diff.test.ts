@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SOLID_NONE,
+  SURF_DEEP_WATER,
+  SURF_ICE,
+  SURF_ICE_CRACKED,
+  SURF_ICE_CRITICAL,
+  SURF_ICE_FRACTURED,
+  advanceIceCrack,
   breakSolid,
   createRun,
   emptyCommand,
   explodeAt,
+  openIceHole,
+  setSurface,
   stepRun,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -108,6 +117,46 @@ describe('codec de chunk diff', () => {
     const full = tracker.fullSnapshot(server);
     mirror.apply(full);
     expect(worldsEqual(server, mirror)).toBe(true);
+  });
+
+  /**
+   * Os quatro estados novos do gelo viajam pelo diff como qualquer outra
+   * superficie — e e por isso que eles sao IDS DE SUPERFICIE e nao um contador
+   * escondido em `surfaceTimer`, que o diff nao sincroniza. Um cliente que
+   * reconectasse no meio de uma luta na Cripta veria placa inteira em cima de
+   * uma celula que cede no proximo passo.
+   */
+  it('os estados do gelo e o buraco atravessam o diff e o full resync', () => {
+    const server = createRun({ seed: 20260904 });
+    const w = server.config.width;
+    const tracker = new ChunkTracker(w, server.config.height);
+    tracker.seed(server);
+    const mirror = new ClientWorldMirror(w, server.config.height, server.solid, server.surface);
+
+    // Uma faixa aberta com um estagio diferente em cada celula, mais o buraco.
+    const base = 40 * w + 40;
+    for (let k = 0; k < 5; k++) {
+      server.solid[base + k] = SOLID_NONE;
+      setSurface(server, base + k, SURF_ICE, 0);
+    }
+    for (let k = 1; k <= 3; k++) {
+      for (let n = 0; n < k; n++) advanceIceCrack(server, base + k, []);
+    }
+    openIceHole(server, base + 4, []);
+
+    mirror.apply(tracker.diff(server));
+    const stages = [SURF_ICE, SURF_ICE_CRACKED, SURF_ICE_FRACTURED, SURF_ICE_CRITICAL, SURF_DEEP_WATER];
+    for (let k = 0; k < stages.length; k++) {
+      expect(server.surface[base + k], `origem k=${k}`).toBe(stages[k]);
+      expect(mirror.surface[base + k], `espelho k=${k}`).toBe(stages[k]);
+    }
+    expect(worldsEqual(server, mirror)).toBe(true);
+
+    // E um cliente que chega depois (full resync) recebe os mesmos ids.
+    const late = new ClientWorldMirror(w, server.config.height);
+    late.apply(new ChunkTracker(w, server.config.height).fullSnapshot(server));
+    expect(worldsEqual(server, late)).toBe(true);
+    for (let k = 0; k < stages.length; k++) expect(late.surface[base + k]).toBe(stages[k]);
   });
 
   it('diffs obsoletos (versao menor) sao ignorados na aplicacao', () => {

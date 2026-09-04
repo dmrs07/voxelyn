@@ -5,7 +5,10 @@ import {
   COAL_FIRE_FUEL_TICKS,
   DISCHARGE_TICKS,
   FIRE_FUEL_TICKS,
+  ICE_CRACK_STAGES,
+  ICE_HOLE_REFREEZE_TICKS,
   ICE_REFREEZE_TICKS,
+  ICE_STAGE_SURFACE,
   FIRE_SPREAD_BIOFLUID,
   FUNGAL_FIRE_FUEL_TICKS,
   FUNGAL_HEAT_IMPACT_TICKS,
@@ -32,6 +35,7 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
+  SURF_DEEP_WATER,
   SURF_ICE,
   SURF_GLASS,
   SURF_SCORCHED,
@@ -40,6 +44,8 @@ import {
   SURF_WATER,
   VENT_BASE_INTERVAL_TICKS,
   VENT_CYCLE_TICKS,
+  iceCrackStage,
+  isIceSurface,
 } from './constants.js';
 import { markDiscovery } from './stats.js';
 import {
@@ -68,9 +74,14 @@ const isReactiveSurface = (kind: number): boolean =>
  * carga atravessar os dois. E deliberado — a conducao territorial do Aquifero
  * so funciona se o jogador puder ler "liquido conectado = circuito", sem
  * decorar excecoes por materia.
+ *
+ * O BURACO de agua profunda entra na mesma regra, e entra apesar de ninguem
+ * poder ficar de pe nele: um buraco encostado numa poca fecha o circuito para
+ * quem esta na poca. Abrir gelo no lugar errado nao e so mudar a rota — e
+ * estender o condutor.
  */
 export const isConductiveSurface = (kind: number): boolean =>
-  kind === SURF_BIOFLUID || kind === SURF_WATER;
+  kind === SURF_BIOFLUID || kind === SURF_WATER || kind === SURF_DEEP_WATER;
 
 /**
  * O raio ja alcancado pela frente do Diluvio, ou -1 se ele nunca aconteceu.
@@ -224,15 +235,114 @@ export const setSurface = (state: SurvivalState, i: number, kind: number, timer:
   if (isReactiveSurface(kind) || (kind === SURF_WATER && timer > 0)) state.reactionQueue.push(i);
 };
 
-/** Derrete uma celula de gelo em agua condutiva que vai recongelar sozinha. */
+/**
+ * Derrete uma celula de gelo em agua condutiva que vai recongelar sozinha.
+ *
+ * QUALQUER estagio derrete, e nao so a placa inteira: o calor nao pergunta
+ * quantas vezes alguem ja passou por ali. E o que sobra e agua RASA — a mesma
+ * poca segura e condutiva de sempre —, entao derreter uma celula critica e o
+ * contra-jogo direto contra ela: troca-se um buraco futuro por uma poca agora,
+ * e paga-se com conducao. Quando o relogio da agua vencer, ela volta como gelo
+ * INTEIRO: o degelo apaga a memoria das travessias, e essa e a segunda metade
+ * do que o jogador compra.
+ */
 export const meltIce = (state: SurvivalState, i: number): boolean => {
   // Circuito fechado na Cripta: a lamina para de derreter. Some junto a agua
   // condutiva que o degelo criava — e some a janela de rota que ela abria,
   // que e o lado da moeda que o jogador paga.
-  if (state.stratumSubverted && state.stratum === 'glacial') return false;
-  if (state.surface[i] !== SURF_ICE) return false;
+  if (isGlacialStabilised(state)) return false;
+  if (!isIceSurface(state.surface[i])) return false;
   setSurface(state, i, SURF_WATER, ICE_REFREEZE_TICKS);
   return true;
+};
+
+/**
+ * A CRIPTA SUBVERTIDA: o circuito fechou e a lamina parou de ser lamina.
+ *
+ * Uma funcao so porque a estabilizacao e uma promessa unica com tres bracos —
+ * o gelo para de derreter, para de escorregar e para de RACHAR —, e as tres
+ * tem de valer para todos os estagios. Enquanto a pergunta era feita a mao em
+ * cada lugar, uma variante rachada podia escapar da regra em qualquer um deles.
+ *
+ * O que a subversao NAO desfaz: buracos ja abertos. Eles continuam fatais e
+ * continuam recongelando pelo proprio relogio — fechar o circuito estabiliza o
+ * chao daqui para frente, nao apaga o que ja cedeu.
+ */
+export const isGlacialStabilised = (state: SurvivalState): boolean =>
+  state.stratumSubverted && state.stratum === 'glacial';
+
+/**
+ * ABRE UM BURACO nesta celula e arma o relogio de recongelamento.
+ *
+ * Exportada porque tres caminhos chegam nela — a quarta travessia, a arena de
+ * teste e os proprios testes — e o registro em `state.iceHoles` nao pode
+ * depender de quem chamou lembrar de faze-lo.
+ */
+export const openIceHole = (state: SurvivalState, i: number, events: SemanticEvent[]): void => {
+  const x = i % W(state);
+  const y = (i - x) / W(state);
+  setSurface(state, i, SURF_DEEP_WATER, 0);
+  // Idempotente por indice: reabrir um buraco que ja existe nao pode empilhar
+  // dois relogios na mesma celula (o primeiro a vencer recongelaria o chao com
+  // o segundo ainda pendente, e o segundo recongelaria gelo inteiro de novo).
+  const existing = state.iceHoles.find((hole) => hole.idx === i);
+  if (existing) existing.at = state.tick + ICE_HOLE_REFREEZE_TICKS;
+  else state.iceHoles.push({ idx: i, at: state.tick + ICE_HOLE_REFREEZE_TICKS });
+  events.push({ t: 'ice_collapse', x: x + 0.5, y: y + 0.5 });
+};
+
+/**
+ * FECHA um buraco: a celula volta a ser gelo INTEIRO e o relogio some.
+ *
+ * Devolve `false` quando nao havia buraco ali, para quem repara poder contar
+ * quantos de fato fechou sem varrer a lista duas vezes.
+ */
+export const sealIceHole = (state: SurvivalState, i: number): boolean => {
+  if (state.surface[i] !== SURF_DEEP_WATER) return false;
+  const at = state.iceHoles.findIndex((hole) => hole.idx === i);
+  if (at >= 0) state.iceHoles.splice(at, 1);
+  setSurface(state, i, SURF_ICE, 0);
+  return true;
+};
+
+/**
+ * O que uma travessia faz com esta celula.
+ *
+ * `'cracked'` desceu um degrau, `'collapsed'` o chao cedeu (ha um buraco ali
+ * agora), `null` a celula nao era gelo — quem chama nao precisa saber o
+ * vocabulario dos quatro ids para reagir.
+ */
+export type IceCrackResult = 'cracked' | 'collapsed' | null;
+
+/**
+ * UMA travessia de Prospector nesta celula de gelo.
+ *
+ * A regra inteira do ciclo mora aqui, e so aqui: um lugar unico para "quantas
+ * travessias" ser respondido, e um lugar unico para a subversao da Cripta
+ * desligar o ciclo em todos os estagios de uma vez.
+ */
+export const advanceIceCrack = (
+  state: SurvivalState,
+  i: number,
+  events: SemanticEvent[],
+): IceCrackResult => {
+  const stage = iceCrackStage(state.surface[i]);
+  if (stage < 0) return null;
+  // A lamina estabilizada nao guarda mais memoria de pisada: o mesmo degelo que
+  // some tambem para o ciclo de rachaduras. Sem isto, o premio de fechar o
+  // circuito na Cripta seria "o gelo parou de escorregar e continuou te
+  // matando", que e a metade errada da promessa.
+  if (isGlacialStabilised(state)) return null;
+  const x = i % W(state);
+  const y = (i - x) / W(state);
+  if (stage >= ICE_CRACK_STAGES) {
+    openIceHole(state, i, events);
+    return 'collapsed';
+  }
+  const next = stage + 1;
+  setSurface(state, i, ICE_STAGE_SURFACE[next], 0);
+  events.push({ t: 'ice_crack', x: x + 0.5, y: y + 0.5, stage: next });
+  return 'cracked';
 };
 
 const announceIgnite = (state: SurvivalState, i: number, events: SemanticEvent[]): void => {
@@ -302,9 +412,11 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
     announceIgnite(state, i, events);
     return true;
   }
-  if (surf === SURF_ICE) {
-    // Calor nao acende gelo: derrete. A agua que sobra e condutiva e vai
-    // recongelar — quem derreteu abriu uma janela, nao editou o mapa.
+  if (isIceSurface(surf)) {
+    // Calor nao acende gelo: derrete — e derrete QUALQUER estagio, do inteiro
+    // ao critico. A agua que sobra e condutiva e vai recongelar como placa
+    // INTEIRA: quem derreteu abriu uma janela e apagou a memoria das travessias
+    // daquela celula, nao editou o mapa.
     meltIce(state, i);
     return false;
   }
@@ -499,6 +611,33 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
   // descargas expiram
   state.charges = state.charges.filter((c) => c.until > state.tick);
 
+  // OS BURACOS RECONGELAM. Fora da fila de reacao de proposito: a fila tem
+  // orcamento por passo e um excedente de fogo poderia adiar indefinidamente o
+  // fechamento de uma rota — e "a galeria voltou" nao pode depender de quanto
+  // esta queimando do outro lado do mapa. A lista e curta por construcao e a
+  // varredura e integral.
+  if (state.iceHoles.length > 0) {
+    const pending: Array<{ idx: number; at: number }> = [];
+    for (const hole of state.iceHoles) {
+      if (state.surface[hole.idx] !== SURF_DEEP_WATER) continue; // ja fechado por outra via
+      if (state.tick < hole.at) {
+        pending.push(hole);
+        continue;
+      }
+      setSurface(state, hole.idx, SURF_ICE, 0);
+      const hx = hole.idx % w;
+      events.push({
+        t: 'ice_mend',
+        x: hx + 0.5,
+        y: (hole.idx - hx) / w + 0.5,
+        radius: 0,
+        mended: 0,
+        sealed: 1,
+      });
+    }
+    state.iceHoles = pending;
+  }
+
   const queue = state.reactionQueue;
   const budget = Math.min(queue.length, BUDGET_REACTING_CELLS);
   const nextQueue: number[] = [];
@@ -560,10 +699,12 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
         } else if (nsurf === SURF_BIOFLUID && state.rng.nextFloat01() < FIRE_SPREAD_BIOFLUID) {
           igniteCell(state, ni, events);
           markDiscovery(state.stats, DISCOVERY_FIRE_SPREAD);
-        } else if (nsurf === SURF_ICE) {
+        } else if (isIceSurface(nsurf)) {
           // Fogo derrete o gelo vizinho — e a agua que nasce disso apaga este
           // mesmo fogo no proximo passo. A troca e deliberada: derreter uma
-          // ponte custa a chama que a derreteu.
+          // ponte custa a chama que a derreteu. Vale para a placa inteira e
+          // para os tres estagios rachados: para o calor eles sao a mesma agua
+          // congelada.
           meltIce(state, ni);
         }
       }
@@ -602,6 +743,11 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
     } else if (kind === SURF_WATER) {
       // So agua DERRETIDA chega aqui (timer > 0): a contagem regressiva do
       // recongelamento. Expirou, vira gelo de novo — a janela fechou.
+      //
+      // Volta INTEIRA, e nunca no estagio rachado que havia antes do degelo.
+      // Nao e conveniencia: derreter e a resposta do jogador a uma celula que
+      // ele mesmo gastou, e devolve-la critica transformaria o contra-jogo num
+      // adiamento. O que o calor apaga e a memoria das travessias.
       const t = state.surfaceTimer[i];
       if (t <= CELL_STEP_INTERVAL) {
         setSurface(state, i, SURF_ICE, 0);

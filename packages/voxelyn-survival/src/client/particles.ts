@@ -37,7 +37,14 @@ export type ParticleKind =
   | 'spore'
   | 'stone'
   | 'mycelium'
-  | 'bubble';
+  | 'bubble'
+  /**
+   * Caco de gelo. Nao e `crystalShard` (verde, e cristal E outra materia com
+   * outra mecanica) nem `rubble` (marrom, e pedra): a lasca que salta de uma
+   * placa cedendo tem de ler como a MESMA lamina que o jogador esta pisando,
+   * senao o estalo nao aponta para o chao.
+   */
+  | 'iceShard';
 
 type Particle = {
   x: number; // tile
@@ -108,6 +115,9 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // por isso e a unica das tres rampas de criatura que nao tem pedra no fundo.
   mycelium: ['#7ab8ff', '#59f2c2', '#2f6b4f'],
   bubble: ['#e8f7ff', '#9fd8f2', '#4b86a6'],
+  // A lamina da Cripta: palido frio no topo, caindo para a rocha azul. Mesma
+  // familia do tile de gelo, um passo mais claro para a lasca se separar dele.
+  iceShard: ['#e8f1ff', '#7b8ba3', '#2e3a4d'],
 };
 
 /**
@@ -537,6 +547,35 @@ export class VoxelParticles {
         case 'death':
           // Acompanha o desabamento do sprite: a criatura vira materia.
           this.burst(ev.x, ev.y, 'debris', n(9), 1.5, 1.3, 560, ev.entity);
+          break;
+        case 'ice_crack':
+          // Po de gelo, e a quantidade E o aviso: o estagio decide quantas
+          // lascas saltam e quao alto. Poucas e rasteiras na fenda fina, um
+          // punhado erguido no critico.
+          this.burst(
+            ev.x,
+            ev.y,
+            'iceShard',
+            n(2 + ev.stage * 2),
+            0.7 + ev.stage * 0.25,
+            0.5 + ev.stage * 0.4,
+            300 + ev.stage * 90,
+            ev.stage * 31,
+          );
+          break;
+        case 'ice_collapse':
+          // A placa CEDE: um anel de cacos saindo da borda do buraco (a placa
+          // se abriu para os lados) mais o esguicho da agua que apareceu.
+          this.ring(ev.x, ev.y, 'iceShard', n(10), 0.85, 460, 47);
+          this.burst(ev.x, ev.y, 'bubble', n(6), 1.1, 2.1, 520, 53);
+          break;
+        case 'ice_fall':
+          // A QUEDA: massa entrando na agua. O respingo sobe alto e volta —
+          // `bubble` e a unica rampa de agua do banco, e e a certa: o que se ve
+          // aqui e liquido, nao gelo. Os cacos que sobram sao a borda do buraco
+          // levando o baque.
+          this.burst(ev.x, ev.y, 'bubble', n(14), 1.5, 3.2, 700, 59);
+          this.ring(ev.x, ev.y, 'iceShard', n(7), 0.7, 420, 61);
           break;
         case 'overheat':
           this.burst(ev.x, ev.y, 'ember', n(6), 1.0, 2.0, 380, 37);

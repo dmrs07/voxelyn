@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_PLAYER_TUNING,
+  ICE_GLIDE,
+  ICE_GLIDE_STABILISED,
   SOLID_CRYSTAL,
   SOLID_ORE,
   SOLID_NONE,
+  SURF_DEEP_WATER,
+  SURF_ICE,
+  SURF_ICE_CRITICAL,
   SURF_WATER,
+  advanceIceCrack,
   createRun,
   emptyCommand,
+  iceGlideFor,
+  isIceSurface,
   isPipe,
+  openIceHole,
+  setSurface,
   stepRun,
 } from '@voxelyn/survival-sim';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from '../client/arena-catalog';
@@ -15,6 +26,7 @@ import {
   ARENA_MAX_HP,
   ARENA_MIN_FLOOR,
   ARENA_MIN_HP,
+  arenaIceCensus,
   clampArenaHp,
   createArenaRun,
 } from '../client/arena-setup';
@@ -57,6 +69,7 @@ describe('createArenaRun', () => {
       maxHp: 250,
       ability: 'flamethrower',
       modules: ['piercing', 'explosive'],
+      stabilisers: false,
     });
     expect(state.player.hp).toBe(250);
     expect(state.player.maxHp).toBe(250);
@@ -67,7 +80,13 @@ describe('createArenaRun', () => {
   });
 
   it('nao equipa nenhum modulo quando a lista vem vazia', () => {
-    const state = createArenaRun({ boss: 'bishop', maxHp: 100, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'bishop',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     expect(state.playerExtra.activeModules).toHaveLength(0);
   });
 });
@@ -95,7 +114,7 @@ describe('clampArenaHp', () => {
  */
 describe('createArenaRun — o recorte da arena', () => {
   const arena = (boss: ArenaBossId) =>
-    createArenaRun({ boss, maxHp: 200, ability: 'pulse', modules: [] });
+    createArenaRun({ boss, maxHp: 200, ability: 'pulse', modules: [], stabilisers: false });
 
   it('deixa em campo o chefe e o que E DELE, e mais nada', () => {
     // A fauna comum do setor sai: a arena existe para testar UMA luta, e um
@@ -262,7 +281,13 @@ describe('createArenaRun — o recorte da arena', () => {
 
 describe('arena.html — Catedral Prismatica', () => {
   it('preserva a rotunda aberta e muitos cristais no recorte do Arquicantor', () => {
-    const state = createArenaRun({ boss: 'archcantor', maxHp: 200, ability: 'pulse', modules: [] });
+    const state = createArenaRun({
+      boss: 'archcantor',
+      maxHp: 200,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
     const boss = state.enemies.find((e) => e.archetype === 'archcantor');
     expect(boss).toBeDefined();
     const w = state.config.width;
@@ -286,5 +311,111 @@ describe('arena.html — Catedral Prismatica', () => {
       state.bossRuntime.choir.filter((id) => id !== 0),
       'arena.html nao chamou o quarteto',
     ).toHaveLength(4);
+  });
+});
+
+describe('arena.html — Cripta Glacial: a bancada do gelo', () => {
+  const queenArena = (stabilisers = false) =>
+    createArenaRun({
+      boss: 'frost_queen',
+      maxHp: 200,
+      ability: 'pulse',
+      modules: [],
+      stabilisers,
+    });
+
+  it('carimba um lago AMPLO e inteiro em volta da Rainha', () => {
+    const state = queenArena();
+    expect(state.enemies.some((e) => e.archetype === 'frost_queen')).toBe(true);
+    let ice = 0;
+    let open = 0;
+    for (let i = 0; i < state.solid.length; i++) {
+      if (state.solid[i] !== SOLID_NONE) continue;
+      open++;
+      if (isIceSurface(state.surface[i])) ice++;
+    }
+    // Amplo o bastante para uma reta longa de frenagem E rota lateral: sem
+    // area, o testador so consegue repetir o mesmo caminho, que e exatamente a
+    // decisao que o rework quer poder observar sendo evitada.
+    expect(ice, 'o lago de teste nasceu pequeno demais').toBeGreaterThanOrEqual(ARENA_MIN_FLOOR);
+    // O chao alcancavel da arena e TODO lamina: e o que a Cripta ja promete
+    // ("chao que escorrega por inteiro"), garantido onde a seed foi economica.
+    expect(ice).toBe(open);
+    // E nasce INTEIRO: uma arena que ja comecasse rachada nao teria os quatro
+    // degraus para testar.
+    const census = arenaIceCensus(state);
+    expect(census.cracked + census.fractured + census.critical).toBe(0);
+    expect(census.holes).toBe(0);
+    expect(census.intact).toBe(ice);
+  });
+
+  it('nao apaga a materia que a seed pos ali', () => {
+    // O lago converte chao nu, cinza e agua. Rocha, minerio e cristal ficam —
+    // a arena e para ser a camara do bioma, e nao uma caixa branca.
+    const state = queenArena();
+    let solids = 0;
+    for (let i = 0; i < state.solid.length; i++) if (state.solid[i] !== SOLID_NONE) solids++;
+    expect(solids).toBeGreaterThan(0);
+  });
+
+  it('o censo acompanha o ciclo, do intacto ao buraco', () => {
+    const state = queenArena();
+    const boss = state.enemies.find((e) => e.archetype === 'frost_queen')!;
+    const w = state.config.width;
+    const base = Math.floor(boss.y) * w + Math.floor(boss.x) + 4;
+    const before = arenaIceCensus(state);
+
+    setSurface(state, base, SURF_ICE, 0);
+    advanceIceCrack(state, base, []);
+    setSurface(state, base + 1, SURF_ICE_CRITICAL, 0);
+    openIceHole(state, base + 2, []);
+
+    const after = arenaIceCensus(state);
+    expect(after.cracked).toBe(before.cracked + 1);
+    expect(after.critical).toBeGreaterThan(before.critical);
+    expect(after.holes).toBe(before.holes + 1);
+    expect(state.surface[base + 2]).toBe(SURF_DEEP_WATER);
+  });
+
+  it('o controle de MV-04 muda o tuning, e nao a lista de modulos', () => {
+    const plain = queenArena(false);
+    const stabilised = queenArena(true);
+    // MV-04 e TUNING DE PROGRESSAO: ele aparece no `iceGlide` congelado da run,
+    // nunca como um modulo equipado no HUD.
+    expect(iceGlideFor(plain.config.tuning)).toBe(ICE_GLIDE);
+    expect(iceGlideFor(stabilised.config.tuning)).toBe(ICE_GLIDE_STABILISED);
+    expect(plain.playerExtra.activeModules).toHaveLength(0);
+    expect(stabilised.playerExtra.activeModules).toHaveLength(0);
+    // E ele nao toca em mais nada do Prospector: a comparacao que a ferramenta
+    // oferece e a MESMA luta com uma variavel a menos.
+    for (const key of Object.keys(DEFAULT_PLAYER_TUNING) as Array<
+      keyof typeof DEFAULT_PLAYER_TUNING
+    >) {
+      if (key === 'iceGlide') continue;
+      expect(stabilised.config.tuning[key], `MV-04 mexeu em ${key}`).toEqual(
+        plain.config.tuning[key],
+      );
+    }
+  });
+
+  it('reiniciar a arena devolve gelo intacto, timers e estado de queda', () => {
+    const state = queenArena();
+    const boss = state.enemies.find((e) => e.archetype === 'frost_queen')!;
+    const w = state.config.width;
+    const base = Math.floor(boss.y) * w + Math.floor(boss.x) + 4;
+    openIceHole(state, base, []);
+    advanceIceCrack(state, base + 1, []);
+    expect(state.iceHoles).toHaveLength(1);
+
+    // "Tentar de novo (mesmas condicoes)" reconstroi o estado do zero.
+    const restarted = queenArena();
+    const census = arenaIceCensus(restarted);
+    expect(restarted.iceHoles).toHaveLength(0);
+    expect(census.holes).toBe(0);
+    expect(census.cracked + census.fractured + census.critical).toBe(0);
+    expect(restarted.player.alive).toBe(true);
+    for (let i = 0; i < restarted.surfaceTimer.length; i++) {
+      if (isIceSurface(restarted.surface[i])) expect(restarted.surfaceTimer[i]).toBe(0);
+    }
   });
 });

@@ -24,6 +24,26 @@ mkdirSync(OUT, { recursive: true });
 
 const MAX_TEXTURE = 4096;
 
+/**
+ * COMO OS PNGs SAO COMPRIMIDOS. Uma constante, e nao um literal repetido em
+ * cinco chamadas — divergir aqui faria dois atlas do mesmo pacote pesarem
+ * diferente sem ninguem saber por que.
+ *
+ * `deflateStrategy: 0` (Z_DEFAULT_STRATEGY) e o unico campo que nao e o
+ * default do pngjs, e ele vale mais que tudo o mais junto: a biblioteca usa
+ * Z_RLE (3), que so olha para repeticao imediata e e otimo para faixas chapadas
+ * longas. Arte voxel nao e isso — e ruido estruturado com padrao que se repete
+ * A DISTANCIA (o mesmo cubo, a mesma rampa de tres cores, celula apos celula),
+ * exatamente o que a busca de casamento completa do deflate encontra e o RLE
+ * nao. Medido sobre o atlas de crostas: 1 850 KiB com Z_RLE contra 708 KiB com
+ * a estrategia padrao — 62% a menos, sem um pixel de diferenca.
+ *
+ * Isto e o que paga os quatro estados novos do gelo. A regra escrita em
+ * `validate.mjs` e explicita: peso novo nao se paga com teto maior. Nenhum teto
+ * subiu; o pacote inteiro encolheu.
+ */
+const PNG_WRITE = { colorType: 6, inputColorType: 6, deflateStrategy: 0 };
+
 const orderedAnims = (spec) => ANIM_ORDER.filter((a) => spec.animations[a]);
 
 /**
@@ -191,7 +211,7 @@ const buildEntity = (spec) => {
 
   const png = new PNG({ width: atlas.w, height: atlas.h });
   png.data = Buffer.from(atlas.buf);
-  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  const pngBytes = PNG.sync.write(png, PNG_WRITE);
   writeFileSync(resolve(OUT, `${spec.id}.png`), pngBytes);
 
   // O ATLAS DE FACES, em meia resolucao e na mesma grade de frames do sprite:
@@ -208,7 +228,7 @@ const buildEntity = (spec) => {
     half.forEach((frame, i) => blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)));
     const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
     normalPng.data = Buffer.from(normalAtlas.buf);
-    const bytes = PNG.sync.write(normalPng, { colorType: 6, inputColorType: 6 });
+    const bytes = PNG.sync.write(normalPng, PNG_WRITE);
     writeFileSync(resolve(OUT, `${spec.id}.normal.png`), bytes);
     normalBytes = bytes.byteLength;
   }
@@ -278,7 +298,7 @@ const buildTerrain = () => {
 
   const png = new PNG({ width: atlas.w, height: atlas.h });
   png.data = Buffer.from(atlas.buf);
-  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  const pngBytes = PNG.sync.write(png, PNG_WRITE);
   writeFileSync(resolve(OUT, 'terrain-blocks.png'), pngBytes);
 
   const manifest = {
@@ -331,7 +351,7 @@ const buildSurfaces = () => {
 
   const png = new PNG({ width: atlas.w, height: atlas.h });
   png.data = Buffer.from(atlas.buf);
-  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  const pngBytes = PNG.sync.write(png, PNG_WRITE);
   writeFileSync(resolve(OUT, 'surface-tiles.png'), pngBytes);
 
   const manifest = {
@@ -342,7 +362,10 @@ const buildSurfaces = () => {
     // vertical) — a crosta da armadilha de carrinho.
     // 7: silica solta (SURF_SILT 13) e vidro (SURF_GLASS 14), os dois lados do
     // contra-jogo do Devorador Branco.
-    version: 7,
+    // 8: o CICLO DE RACHADURAS da Cripta (SURF_ICE_CRACKED 15,
+    // SURF_ICE_FRACTURED 16, SURF_ICE_CRITICAL 17) e o BURACO de agua profunda
+    // (SURF_DEEP_WATER 18) — os quatro no fim da lista, como sempre.
+    version: 8,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
@@ -388,7 +411,7 @@ const buildProps = () => {
 
   const png = new PNG({ width: atlas.w, height: atlas.h });
   png.data = Buffer.from(atlas.buf);
-  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  const pngBytes = PNG.sync.write(png, PNG_WRITE);
   writeFileSync(resolve(OUT, 'world-props.png'), pngBytes);
 
   // MAPA DE FACES dos props. Mesma grade, meia resolucao, mesmas ancoras.
@@ -412,7 +435,7 @@ const buildProps = () => {
   normalPng.data = Buffer.from(normalAtlas.buf);
   writeFileSync(
     resolve(OUT, 'world-props.normal.png'),
-    PNG.sync.write(normalPng, { colorType: 6, inputColorType: 6 }),
+    PNG.sync.write(normalPng, PNG_WRITE),
   );
 
   const manifest = {

@@ -7,7 +7,7 @@
 // bloqueia, nunca identifica ninguem. A Arena reusa o MESMO opt-out da
 // campanha (`isOptedOut`) — e a mesma pessoa, e um segundo interruptor de
 // privacidade so criaria confusao sobre qual dos dois desliga o que.
-import { DEFAULT_PLAYER_TUNING, hashPlayerTuning, type SurvivalState } from '@voxelyn/survival-sim';
+import { hashPlayerTuning, type SurvivalState } from '@voxelyn/survival-sim';
 import { ARENA_CATALOG } from './arena-catalog';
 import type { ArenaOutcome } from './arena-outcome';
 import type { ArenaConditions } from './arena-setup';
@@ -45,7 +45,6 @@ export const reportArenaOutcome = (
   if (isOptedOut()) return;
 
   const entry = ARENA_CATALOG[conditions.boss];
-  const tuning = { ...DEFAULT_PLAYER_TUNING, maxHp: conditions.maxHp };
   const kills = Object.values(state.stats.kills).reduce((a, b) => a + b, 0);
 
   const body = JSON.stringify({
@@ -59,7 +58,22 @@ export const reportArenaOutcome = (
       // Ordenado: duas submissoes do MESMO conjunto de modulos tem de cair no
       // mesmo balde de loadout no digest, nao um por ordem de clique.
       modules: [...conditions.modules].sort(),
-      tuningHash: hashPlayerTuning(tuning),
+      /**
+       * O tuning que a run REALMENTE usou, e nao um reconstruido aqui.
+       *
+       * Isto era `{ ...DEFAULT_PLAYER_TUNING, maxHp }`, e a reconstrucao so
+       * funcionava enquanto o HP fosse a unica condicao que tocava o tuning.
+       * Com os Estabilizadores Giroscopicos (MV-04) deixou de ser: as duas
+       * lutas que o controle existe para COMPARAR caiam no mesmo digest, e a
+       * telemetria agregava configuracoes de movimento materialmente
+       * diferentes num balde so.
+       *
+       * Ler `state.config.tuning` fecha a classe inteira do defeito em vez de
+       * remendar este caso: qualquer condicao futura que altere o tuning entra
+       * no digest sozinha, porque o que se hasheia e o que a simulacao
+       * congelou antes do tick zero.
+       */
+      tuningHash: hashPlayerTuning(state.config.tuning),
       outcome: OUTCOME_MAP[outcome],
       ticks: state.tick,
       hpRemaining: Math.max(0, Math.round(state.player.hp)),

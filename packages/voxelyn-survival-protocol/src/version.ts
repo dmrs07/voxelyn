@@ -181,7 +181,22 @@
 // quatro tipos que ele nao conhece caem no `default` do switch e sao
 // ignorados em silencio — nada quebra, mas e exatamente o "nada quebra, so
 // falta" que um bug mudo e. O bump transforma os dois em recusa no handshake.
-export const PROTOCOL_VERSION = 29;
+// 30: OS EVENTOS DO GELO entram no wire. Quatro tipos novos — `ice_crack`
+// (uma placa desceu um degrau, com o degrau novo), `ice_collapse` (o chao
+// cedeu), `ice_fall` (um Prospector afundou, com o slot) e `ice_mend` (a
+// arena quebrada foi recomposta, pela Rainha ou pelo relogio do buraco).
+//
+// Tipos proprios, e nao `boss_state` reaproveitado: a rachadura e uma mecanica
+// GLOBAL do gelo e acontece em qualquer Cripta, com ou sem Rainha em campo —
+// pendurada no canal de um chefe, ela ficaria muda longe dele.
+//
+// As duas metades doem de formas diferentes. Cliente ANTIGO contra servidor
+// novo cai no `default` do switch e ignora os quatro em silencio: o chao muda
+// de estado no diff de chunk (a rachadura APARECE) mas sem estalo, sem po e —
+// o pior — sem a apresentacao da queda, que vira um `death` seco em cima de
+// agua. Cliente NOVO contra servidor antigo nunca recebe nenhum deles e desenha
+// um gelo que nao racha. O bump transforma os dois em recusa no handshake.
+export const PROTOCOL_VERSION = 30;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -817,7 +832,37 @@ export const PROTOCOL_VERSION = 29;
 // solistas e vozes recem-cristalizadas. Como isso muda HP e, portanto, o hash
 // autoritativo depois do primeiro choque sobre um Ressonante, cliente 54 e
 // servidor 55 nao podem compartilhar a mesma simulacao.
-export const SIMULATION_VERSION = 55;
+// 56: O GELO PASSA A TER MEMORIA — o rework inteiro da Cripta Glacial.
+//
+// Quatro mudancas autoritativas na mesma leva, e nenhuma delas sobrevive a um
+// par de versoes diferentes:
+//
+// - a INERCIA foi recalibrada. `ICE_GLIDE` sobe de 0,82 para 0,915 (frenagem de
+//   ~0,7 para ~2,5 tiles), o embalo que entra na lamina ganha teto
+//   (`ICE_MOMENTUM_CAP`, para a esquiva carregar momento sem virar transporte)
+//   e MV-04 deixa de encolher o embalo por multiplicacao: ele INTERPOLA ate
+//   `ICE_GLIDE_STABILISED` (~0,98 tile). Duas simulacoes em versoes diferentes
+//   divergem na primeira pisada da Cripta;
+// - o CICLO DE RACHADURAS. Quatro superficies novas (SURF_ICE_CRACKED 15,
+//   SURF_ICE_FRACTURED 16, SURF_ICE_CRITICAL 17, SURF_DEEP_WATER 18, todas
+//   append-only) e a carga por travessia de Prospector: a quarta entrada numa
+//   celula abre um buraco. Os ids viajam no diff de chunk e entram no hash pela
+//   varredura do grid;
+// - o BURACO MATA e RECONGELA. Entrar em agua profunda mata independentemente
+//   de HP, iframe ou esquiva (DamageCause `deep_water`), sem deixar corpo
+//   revivivel; o buraco fecha sozinho em ICE_HOLE_REFREEZE_TICKS, e o relogio
+//   de cada buraco (`state.iceHoles`) entra no HASH — duas maquinas que
+//   discordem de quando uma rota volta a existir divergem doze segundos depois
+//   da causa;
+// - a RAINHA DA GEADA repara. O congelamento passa a restaurar placas rachadas
+//   e a fechar buracos no alcance, e a couraca dela conta qualquer estagio
+//   rachado como gelo. Um par de versoes diferentes discorda de quando ela esta
+//   blindada, que e a decisao central do encontro.
+//
+// Tambem aqui: a subversao da Cripta estabiliza os QUATRO estagios (o gelo para
+// de derreter, de escorregar e de rachar), e inimigo terrestre comum nao termina
+// movimento sobre um buraco.
+export const SIMULATION_VERSION = 56;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -981,7 +1026,16 @@ export const SIMULATION_VERSION = 55;
 // numeros redondos com folga, exatamente o que aquele comentario avisa.
 //
 // Boot fecha em 166,3 MiB, com 1,4 MiB de folga.
-export const CONTENT_VERSION = 31;
+// 32: o ATLAS DE CROSTAS ganha os quatro estados novos do gelo, no fim da
+// lista (surface-tiles v8): os tres estagios de rachadura e a agua profunda.
+//
+// As rachaduras se separam por FORMA e DENSIDADE de linha, e nao por cor: uma
+// fenda fina e isolada, uma malha fraturada com placas visiveis, e a critica
+// com o vao ja escuro entre os cacos — legivel no zoom de jogo, que e a unica
+// distancia em que a informacao importa. A agua profunda e um vazio frio, mais
+// escura que a rasa, com movimento interno lento e uma borda de gelo quebrado
+// que diz de onde ela veio.
+export const CONTENT_VERSION = 32;
 
 export type VersionTriple = {
   protocolVersion: number;

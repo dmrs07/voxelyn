@@ -738,6 +738,95 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       attack: 0.05,
     });
   },
+  // -------------------------------------------------------------------------
+  // O CICLO DE RACHADURAS DA CRIPTA
+  // -------------------------------------------------------------------------
+  // Uma familia so, descendo de altura a cada degrau. A frequencia e o
+  // contador: agudo curto e "voce marcou o chao", medio largo e "isto nao
+  // aguenta muito", grave e "a proxima abre". O ganho quase nao muda entre os
+  // tres — subir volume diria "de novo", e o que precisa ser dito e "MAIS
+  // perto".
+  iceCrackFine: (ctx, out, t0, noise) => {
+    // Estalo curto e agudo: uma unica fissura correndo pela placa.
+    tone(ctx, out, t0, { type: 'triangle', from: 3200, to: 2400, peak: 0.2, decay: 0.05 });
+    burst(ctx, out, t0, noise, { peak: 0.16, decay: 0.06, type: 'highpass', from: 3400 });
+  },
+  iceCrackFractured: (ctx, out, t0, noise) => {
+    // Mais largo, com TENSAO: dois estalos quase juntos (a placa se partindo em
+    // duas) e uma cauda filtrada em banda que sustenta o desconforto.
+    tone(ctx, out, t0, { type: 'triangle', from: 2100, to: 1300, peak: 0.24, decay: 0.1 });
+    tone(ctx, out, t0 + 0.045, { type: 'triangle', from: 1500, to: 900, peak: 0.16, decay: 0.14 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.2,
+      decay: 0.22,
+      type: 'bandpass',
+      from: 2200,
+      to: 1100,
+      q: 3.2,
+    });
+  },
+  iceCrackCritical: (ctx, out, t0, noise) => {
+    // RUPTURA GRAVE. A altura desaba quase uma oitava e meia e a cauda desce em
+    // banda estreita: o som de alguma coisa grande cedendo por dentro sem ainda
+    // ter aberto. E o ultimo aviso, e tem de soar como ameaca e nao como dano.
+    tone(ctx, out, t0, { type: 'sawtooth', from: 900, to: 260, peak: 0.26, decay: 0.3 });
+    tone(ctx, out, t0 + 0.06, { type: 'triangle', from: 620, to: 200, peak: 0.2, decay: 0.34 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.24,
+      decay: 0.36,
+      type: 'bandpass',
+      from: 1400,
+      to: 380,
+      q: 4,
+    });
+  },
+  iceCollapse: (ctx, out, t0, noise) => {
+    // A QUEBRA GRANDE, e logo atras dela a agua: primeiro o estouro seco da
+    // placa, depois a banda larga descendo que e o vao se enchendo. Sao dois
+    // acontecimentos em sequencia, nao um som so — e a sequencia e o que diz
+    // "abriu" em vez de "trincou".
+    tone(ctx, out, t0, { type: 'sawtooth', from: 1400, to: 180, peak: 0.32, decay: 0.16 });
+    burst(ctx, out, t0, noise, { peak: 0.34, decay: 0.14, type: 'highpass', from: 1800 });
+    burst(ctx, out, t0 + 0.11, noise, {
+      peak: 0.3,
+      decay: 0.5,
+      type: 'lowpass',
+      from: 1200,
+      to: 240,
+      attack: 0.04,
+    });
+  },
+  icePlunge: (ctx, out, t0, noise) => {
+    // A QUEDA: respingo pesado, afundamento e cauda abafada. O corte do
+    // passa-baixas fechando de 2 kHz para 150 Hz e literalmente a agua se
+    // fechando por cima — quem afunda para de ouvir o mundo, e o mixer nao tem
+    // outro jeito de dizer isso sem inventar um efeito global.
+    burst(ctx, out, t0, noise, { peak: 0.42, decay: 0.18, type: 'bandpass', from: 1600, q: 1.2 });
+    tone(ctx, out, t0 + 0.03, { type: 'sine', from: 420, to: 90, peak: 0.3, decay: 0.42 });
+    burst(ctx, out, t0 + 0.08, noise, {
+      peak: 0.34,
+      decay: 0.7,
+      type: 'lowpass',
+      from: 2000,
+      to: 150,
+      attack: 0.06,
+    });
+  },
+  iceMend: (ctx, out, t0, noise) => {
+    // O inverso da rachadura: a altura SOBE. Um cristal se fechando, e nao um
+    // se abrindo — a mesma familia de timbre lida ao contrario, que e o jeito
+    // mais barato de o ouvido entender "desfez" sem uma voz estranha ao lugar.
+    tone(ctx, out, t0, { type: 'triangle', from: 700, to: 2600, peak: 0.2, decay: 0.34 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.16,
+      decay: 0.4,
+      type: 'bandpass',
+      from: 900,
+      to: 3000,
+      q: 2.6,
+      attack: 0.08,
+    });
+  },
   chip: (ctx, out, t0, noise) => {
     tone(ctx, out, t0, { type: 'triangle', from: 1700, to: 1100, peak: 0.28, decay: 0.06 });
     burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.05, type: 'highpass', from: 3000 });

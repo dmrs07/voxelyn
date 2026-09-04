@@ -31,6 +31,7 @@ import { reportArenaOutcome } from './arena-telemetry-client';
 import {
   ARENA_MAX_HP,
   ARENA_MIN_HP,
+  arenaIceCensus,
   clampArenaHp,
   createArenaRun,
   type ArenaConditions,
@@ -70,9 +71,11 @@ const bossPlaceEl = document.getElementById('boss-place') as HTMLSpanElement;
 const hpInput = document.getElementById('hp') as HTMLInputElement;
 const abilityGrid = document.getElementById('ability-grid') as HTMLDivElement;
 const moduleGrid = document.getElementById('module-grid') as HTMLDivElement;
+const stabilisersInput = document.getElementById('stabilisers') as HTMLInputElement;
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
+const icePanel = document.getElementById('ice-panel') as HTMLDivElement;
 const endOverlay = document.getElementById('end-overlay') as HTMLDivElement;
 const endTitle = document.getElementById('end-title') as HTMLHeadingElement;
 const endSummary = document.getElementById('end-summary') as HTMLDivElement;
@@ -129,7 +132,7 @@ const readConditions = (): ArenaConditions => {
     formEl.querySelectorAll<HTMLInputElement>('input[name="module"]:checked'),
     (el) => el.value as ModuleId,
   );
-  return { boss, maxHp, ability, modules };
+  return { boss, maxHp, ability, modules, stabilisers: stabilisersInput.checked };
 };
 
 // ---------------------------------------------------------------------------
@@ -225,16 +228,47 @@ const showEnd = (outcome: ArenaOutcome, state: SurvivalState): void => {
   endOverlay.classList.remove('hidden');
 };
 
+/**
+ * O CENSO DO GELO, no painel de diagnostico.
+ *
+ * Uma vez por segundo, e nao por quadro: a varredura le o grid inteiro, e a
+ * informacao que ela entrega ("quantas celulas eu ja gastei?") nao muda em
+ * 16 ms — atualizar a 60 Hz gastaria seis milhoes de leituras por segundo para
+ * escrever o mesmo texto. `lastAt` de -1 forca a primeira escrita.
+ */
+const ICE_PANEL_INTERVAL_MS = 1000;
+let icePanelAt = -1;
+const updateIcePanel = (state: SurvivalState, nowMs: number): void => {
+  if (icePanelAt >= 0 && nowMs - icePanelAt < ICE_PANEL_INTERVAL_MS) return;
+  icePanelAt = nowMs;
+  const c = arenaIceCensus(state);
+  icePanel.innerHTML = [
+    `gelo <b>${c.intact}</b>`,
+    `rachado <b>${c.cracked}</b>`,
+    `fraturado <b>${c.fractured}</b>`,
+    `crítico <b class="crit">${c.critical}</b>`,
+    `buracos <b class="hole">${c.holes}</b>`,
+  ].join(' · ');
+};
+
 const runArena = (conditions: ArenaConditions): void => {
   setupEl.classList.add('hidden');
   endOverlay.classList.add('hidden');
   canvas.classList.remove('hidden');
   hudNote.classList.remove('hidden');
+  // O censo so faz sentido onde ha gelo. Nos outros chefes o painel seria cinco
+  // zeros permanentes tapando um canto da tela.
+  icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
+  icePanelAt = -1;
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
   audio.setLocalPlayerId(1);
   audio.reset();
+  // Reiniciar a arena e uma RUN NOVA com os mesmos ids: sem isto, a queda, a
+  // lapide e os rastros da tentativa anterior atravessariam para a proxima —
+  // um Prospector afundando num buraco que ja recongelou.
+  renderer.resetRunPresentation();
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -287,7 +321,11 @@ const runArena = (conditions: ArenaConditions): void => {
       if (state.phase !== 'running') {
         renderer.renderEnd(state, vw, vh, now, { input: input.state, actions: false });
       }
-      if (!ended) {
+      // A APRESENTACAO DA QUEDA TERMINA ANTES DO RESULTADO. O overlay e HTML e
+      // fica por cima do canvas: aberto no primeiro quadro, ele tapa
+      // exatamente a animacao que esta ferramenta existe para deixar testar.
+      // Mesma espera que `renderEnd` ja faz sozinho por dentro.
+      if (!ended && !renderer.plungeActive(now)) {
         ended = true;
         showEnd(outcome, state);
       }
@@ -318,6 +356,7 @@ const runArena = (conditions: ArenaConditions): void => {
     audio.update(view, now);
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, now);
+    if (conditions.boss === 'frost_queen') updateIcePanel(state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
@@ -367,6 +406,7 @@ btnReconfigure.addEventListener('click', () => {
   audio.ui();
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');
+  icePanel.classList.add('hidden');
   endOverlay.classList.add('hidden');
   setupEl.classList.remove('hidden');
 });

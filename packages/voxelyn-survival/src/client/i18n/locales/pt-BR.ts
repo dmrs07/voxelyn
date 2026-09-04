@@ -491,6 +491,9 @@ export const PT_BR = {
   'summary.cause.bleedout.headline': 'Você se apagou no escuro',
   'summary.cause.bleedout.lesson':
     'Abatido dura 20 s. Caia perto do parceiro, não no meio da sala.',
+  'summary.cause.deepWater.headline': 'O gelo cedeu debaixo de você',
+  'summary.cause.deepWater.lesson':
+    'Cada travessia racha a placa: fina, fraturada, crítica, buraco. Troque de rota, derreta a célula crítica, ou espere a Rainha recompor o chão.',
   'summary.cause.unknown.headline': 'O Veio te consumiu',
 
   // ---------------------------------------------------------------------
@@ -630,7 +633,8 @@ export const PT_BR = {
   'upgrade.MV-03.name': 'Tração Segmentada',
   'upgrade.MV-03.desc': 'slow de líquidos −8%',
   'upgrade.MV-04.name': 'Estabilizadores Giroscópicos',
-  'upgrade.MV-04.desc': 'mais controle no gelo',
+  'upgrade.MV-04.desc':
+    'freia em ~1 tile no gelo (contra ~2,5) e recupera o rumo 4x mais rápido — não impede rachaduras',
   'upgrade.MV-05.name': 'Servomotores II',
   'upgrade.MV-05.desc': 'movimento +2%',
   'upgrade.MV-X.name': 'Firmware Reflexo',

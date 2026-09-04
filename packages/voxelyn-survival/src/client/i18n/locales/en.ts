@@ -474,6 +474,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.cause.bleedout.headline': 'You went out in the dark',
   'summary.cause.bleedout.lesson':
     'Downed lasts 20 s. Fall near your partner, not in the middle of the room.',
+  'summary.cause.deepWater.headline': 'The ice gave way under you',
+  'summary.cause.deepWater.lesson':
+    'Every crossing cracks the plate: hairline, fractured, critical, hole. Change your route, melt the critical cell, or wait for the Queen to rebuild the floor.',
   'summary.cause.unknown.headline': 'The Vein consumed you',
 
   // ---------------------------------------------------------------------
@@ -612,7 +615,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'upgrade.MV-03.name': 'Segmented Traction',
   'upgrade.MV-03.desc': 'liquid slow −8%',
   'upgrade.MV-04.name': 'Gyroscopic Stabilisers',
-  'upgrade.MV-04.desc': 'more control on ice',
+  'upgrade.MV-04.desc':
+    'brakes in ~1 tile on ice (down from ~2.5) and recovers heading 4x faster — no protection from cracking',
   'upgrade.MV-05.name': 'Servomotors II',
   'upgrade.MV-05.desc': 'movement +2%',
   'upgrade.MV-X.name': 'Reflex Firmware',

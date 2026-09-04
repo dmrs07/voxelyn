@@ -12,12 +12,14 @@ import {
   findUpgrade,
   generationsReached,
   hashPlayerTuning,
+  iceGlideFor,
   isValidUpgradeSet,
   normalizeUpgradeIds,
   upgradesOfBranch,
   type PlayerTuning,
   type UpgradeId,
 } from '../src/progression';
+import { ICE_GLIDE_STABILISED, PLAYER_SPEED, TICK_HZ } from '../src/constants';
 import { PLAYER_HP, PLAYER_SPEED } from '../src/constants';
 
 const ALL: UpgradeId[] = UPGRADES.map((u) => u.id);
@@ -197,9 +199,19 @@ describe('teto de poder da arvore completa', () => {
     expect(full.overheatSelfDamage).toBeGreaterThan(0);
   });
 
-  it('o gelo continua escorregando: iceGlide nao chega a controle total', () => {
-    expect(full.iceGlide).toBeGreaterThan(0);
-    expect(full.iceGlide).toBeLessThan(1);
+  it('o gelo continua escorregando: MV-04 estabiliza, nao seca a lamina', () => {
+    // O teto se mede na INERCIA resolvida, e nao no campo do tuning: `iceGlide`
+    // e um cursor de instalacao (0..1) e MV-04 o instala inteiro. Ler o campo
+    // aqui verificaria a aritmetica da tabela, e nao a promessa de design —
+    // que e "o gelo continua sendo gelo".
+    const stabilised = iceGlideFor(full);
+    expect(stabilised).toBeGreaterThan(0);
+    expect(stabilised).toBeLessThan(1);
+    expect(stabilised).toBe(ICE_GLIDE_STABILISED);
+    // E continua escorregando de verdade: pelo menos meio tile de frenagem
+    // depois de soltar o comando. A distancia da serie geometrica do embalo.
+    const braking = (PLAYER_SPEED / TICK_HZ) * (stabilised / (1 - stabilised));
+    expect(braking).toBeGreaterThan(0.5);
   });
 });
 

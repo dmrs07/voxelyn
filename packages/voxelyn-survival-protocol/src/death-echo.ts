@@ -20,6 +20,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ORE_CHIPPED,
+  SURF_DEEP_WATER,
   SURF_NONE,
   type DamageCause,
   type EnemyArchetype,
@@ -209,6 +210,7 @@ export const isDeathEchoCause = (value: unknown): value is DamageCause => {
     case 'overheat':
     case 'bleedout':
     case 'leviathan_discharge':
+    case 'deep_water':
     case 'unknown':
       return true;
     case 'discharge':
@@ -591,6 +593,11 @@ const squaredDistance = (ax: number, ay: number, bx: number, by: number): number
   (ax - bx) ** 2 + (ay - by) ** 2;
 
 const isReservedCell = (state: SurvivalState, x: number, y: number): boolean => {
+  // Um BURACO nao recebe carcaca. O eco e um corpo deitado no chao, e a agua
+  // profunda nao tem chao: a peca ficaria boiando sobre o unico lugar do mapa
+  // em que entrar mata, dizendo "ha algo aqui" no exato ponto em que a resposta
+  // certa e nao chegar perto.
+  if (state.surface[cellIndex(state.config.width, x, y)] === SURF_DEEP_WATER) return true;
   if (squaredDistance(x, y, state.entry.x, state.entry.y) < 7 ** 2) return true;
   if (squaredDistance(x, y, state.corePos.x, state.corePos.y) < 6 ** 2) return true;
   for (const site of state.salvageSites) {

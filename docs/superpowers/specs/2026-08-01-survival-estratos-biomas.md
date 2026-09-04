@@ -348,6 +348,70 @@ landmark → ritmo → micro — e ganhou a dimensão vertical:
   retas, impreciso nas curvas, deslize ao soltar. Colisão mata o embalo via
   `vx/vy` reais; fora do gelo o passo é byte a byte o histórico. Só o
   jogador: o Espectro tem o próprio contrato com a lâmina.
+
+### O gelo com MEMÓRIA (`SIMULATION_VERSION` 56)
+
+A inércia de 0,82 nunca chegou a cobrar nada: soltar o direcional deslizava
+~0,7 célula, menos que a largura do próprio corpo, e a "decisão de rota" que a
+12ª etapa prometia não existia na prática. O rework troca o piso decorativo por
+um terreno que **guarda por onde alguém passou**.
+
+**Valores escolhidos** (todos em `sim/src/constants.ts`):
+
+| Parâmetro | Valor | O que produz |
+| --- | --- | --- |
+| `ICE_GLIDE` | 0,915 | ~2,5 tiles de frenagem; inversão cruza o zero em ~0,4 s e completa em ~1,7 s |
+| `ICE_GLIDE_STABILISED` | 0,81 | com MV-04: ~0,98 tile (−60%), inversão em ~0,16 s |
+| `ICE_MOMENTUM_CAP` | 7,4 tiles/s | teto do embalo que entra na lâmina (~1,6× `PLAYER_SPEED`): a esquiva carrega momento sem virar transporte |
+| `ICE_CRACK_CROSSINGS_TO_COLLAPSE` | 4 | a quarta travessia abre o buraco |
+| `ICE_HOLE_REFREEZE_TICKS` | 240 (12 s) | o buraco recongela como gelo INTEIRO |
+| `ICE_REFREEZE_TICKS` | 280 (14 s) | inalterado: a água derretida volta a ser gelo |
+
+**Os cinco estados**, IDs append-only (nenhum `SURF_*` foi renumerado):
+
+| Estado | ID | Travessias | Inércia | Couraça da Rainha | Calor |
+| --- | --- | --- | --- | --- | --- |
+| `SURF_ICE` intacto | 10 | — | sim | conta | vira água rasa |
+| `SURF_ICE_CRACKED` | 15 | 1ª | sim | conta | vira água rasa |
+| `SURF_ICE_FRACTURED` | 16 | 2ª | sim | conta | vira água rasa |
+| `SURF_ICE_CRITICAL` | 17 | 3ª | sim | conta | vira água rasa |
+| `SURF_DEEP_WATER` | 18 | 4ª (colapso) | — | **não** conta | nada (já é água) |
+
+**A carga** é do Prospector e só dele: a Rainha e os Espectros não racham o
+piso (eles *são* a lâmina). Conta ENTRADA na célula — ficar parado nunca
+progride, sair e voltar conta de novo, deslizar e esquivar contam. Todas as
+células cruzadas pelo segmento de movimento são processadas (`cellsCrossed`,
+DDA por eixo com desempate em X), então velocidade alta não pula nada; cada
+célula avança no máximo um degrau por Prospector por passo, e o co-op resolve
+na ordem autoritativa dos slots.
+
+**O buraco** mata quem entra, independentemente de HP, iframe ou esquiva
+(`DamageCause` `deep_water`), sem deixar corpo revivível; conduz eletricidade
+como água; projétil passa por cima; a Rainha e os Espectros o atravessam;
+inimigo terrestre comum não termina movimento nele. O relógio de cada buraco
+vive em `state.iceHoles` e entra no **hash autoritativo** — sem isso, duas
+máquinas discordariam de quando uma rota volta a existir.
+
+**O loop**: a Rainha congela e recompõe a arena (restaura rachaduras, fecha
+buracos no alcance, preserva fogo vivo) → o Prospector desliza e desenha rotas
+→ rotas reutilizadas ficam progressivamente perigosas → ele escolhe entre mudar
+o caminho, usar os estabilizadores, ou derreter a célula crítica e aceitar água
+condutiva → o buraco altera temporariamente a circulação → o próximo
+congelamento recompõe parte do tabuleiro.
+
+**Subversão da Cripta**: fechar o circuito estabiliza a lâmina INTEIRA — ela
+para de derreter, de escorregar e de rachar, nos quatro estágios. Buracos já
+abertos continuam fatais e continuam no próprio relógio.
+
+O ciclo, capturado na Arena de Chefes (intacto → rachadura fina → fraturado →
+crítico → buraco → recongelado):
+
+![ciclo do gelo](../../media/ice-rework/ciclo-do-gelo.png)
+
+E a queda, quadro a quadro (~820 ms: perda de altura, afundamento com a água
+comendo o corpo de baixo para cima, e a cauda só de ondulação):
+
+![queda no buraco](../../media/ice-rework/queda-no-buraco.png)
 - **Fratura por camada na Sílica** (13ª): quebrar frágil racha os vizinhos
   frágeis da MESMA faixa horizontal para o estágio enfraquecido (avisa, não
   derruba; o vertical não sente). E o minério corre em **seams horizontais**

@@ -38,6 +38,8 @@ import {
   DODGE_IFRAME_TICKS,
   HEAT_DECAY_PER_TICK,
   HEAT_MAX,
+  ICE_GLIDE,
+  ICE_GLIDE_STABILISED,
   MAX_LINEAGE_SECTORS,
   OVERHEAT_LOCK_TICKS,
   OVERHEAT_SELF_DAMAGE,
@@ -84,7 +86,15 @@ export type PlayerTuning = {
   environmentalDamageScale: number;
   /** Multiplicador da PENALIDADE de movimento em liquido. */
   liquidSlowScale: number;
-  /** 0 = gelo como sempre foi; acima disso, mais autoridade do comando. */
+  /**
+   * ESTABILIZADORES GIROSCOPICOS, em fracao instalada: 0 = Prospector de
+   * fabrica, 1 = MV-04 completo.
+   *
+   * Nao e um delta nem um multiplicador: e o cursor que interpola a inercia da
+   * lamina entre `ICE_GLIDE` (~2,5 tiles de frenagem) e `ICE_GLIDE_STABILISED`
+   * (~0,98). Quem resolve o numero final e `iceGlideFor`, e ninguem mais faz
+   * essa conta — a simulacao le a funcao, nao o campo.
+   */
   iceGlide: number;
 
   abilityCooldownScale: number;
@@ -188,6 +198,24 @@ export const DEFAULT_PLAYER_TUNING: PlayerTuning = Object.freeze({
     autoAcquire: false,
   }),
 }) as PlayerTuning;
+
+/**
+ * A INERCIA REAL da lamina para este Prospector.
+ *
+ * Uma funcao e nao um numero espalhado: `run.ts` precisa dela para andar, a
+ * arena precisa dela para comparar as duas lutas e os testes precisam dela para
+ * medir frenagem sem reimplementar a interpolacao. Tres copias divergiriam no
+ * primeiro ajuste, e a divergencia apareceria como uma frenagem que o teste
+ * aprova e o jogo nao entrega.
+ *
+ * Clampeada em [0, 1] por defesa: um tuning vindo de um ticket antigo (onde
+ * `iceGlide` era 0,25 e significava outra coisa) resolve para uma inercia
+ * intermediaria valida em vez de extrapolar para fora da faixa autorada.
+ */
+export const iceGlideFor = (tuning: Pick<PlayerTuning, 'iceGlide'>): number => {
+  const installed = Math.max(0, Math.min(1, tuning.iceGlide));
+  return ICE_GLIDE + (ICE_GLIDE_STABILISED - ICE_GLIDE) * installed;
+};
 
 /** Custo por tier. Igual entre ramificacoes — a escolha e de ROTA, nao de preco. */
 export const TIER_ORE_COST: readonly number[] = [35, 55, 85, 130, 200, 300];
@@ -310,7 +338,12 @@ const UPGRADE_SPECS: readonly Omit<UpgradeDefinition, 'oreCost' | 'coreCost' | '
     branch: 'mobility',
     tier: 4,
     loreFragmentId: 'AX-INC-023',
-    apply: (t) => ({ ...t, iceGlide: 0.25 }),
+    // Instalado, o estabilizador entra INTEIRO: a frenagem cai de ~2,5 para
+    // ~0,98 tile e a recuperacao de rumo fica quatro vezes mais rapida. Ele nao
+    // desliga o gelo (um tile de deslize continua sendo um tile) e nao da
+    // resistencia nenhuma a rachadura — o que ele compra e a precisao de rota
+    // que permite DESVIAR da celula critica.
+    apply: (t) => ({ ...t, iceGlide: 1 }),
   },
   {
     id: 'MV-05',
