@@ -49,6 +49,7 @@ import {
   FURNACE_HEART_STALACTITE_WARNING_TICKS,
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
+  FROST_QUEEN_FREEZE_RADIUS,
   HEAT_MAX,
   PURGE_CELL_HEAL,
   PURGE_CELL_RADIUS,
@@ -105,6 +106,13 @@ import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
+import {
+  FROST_BURST_MS,
+  frostBurst,
+  frostBurstFrame,
+  pieceGrow,
+  type FrostBurst,
+} from './frost-burst';
 import {
   LEAP_PEAK_PX,
   leapHeight,
@@ -619,6 +627,22 @@ export type Fx =
       r: number;
       maxR: number;
       color: string;
+      life: number;
+      maxLife: number;
+    }
+  | {
+      /**
+       * A coroa de estilhacos do congelamento da Rainha: lascas em pe abrindo
+       * em circulo completo e riscos de po correndo pelo chao. A geometria vem
+       * pronta de `frost-burst.ts` (pura, semeada pelo evento) e aqui so se
+       * desenha — o unico efeito 2D que sobrou junto ao anel, e por decisao:
+       * uma lasca de gelo e uma LAMINA fina inclinada, e um cubo de voxel nao
+       * tem como ler assim.
+       */
+      kind: 'frostBurst';
+      x: number;
+      y: number;
+      burst: FrostBurst;
       life: number;
       maxLife: number;
     }
@@ -1906,6 +1930,28 @@ export class SurvivalRenderer {
             ev.radius > 0 ? 420 : 220,
             PAL.mist,
           );
+          break;
+        case 'boss_attack':
+          if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
+            // O CONGELAMENTO: a coroa de estilhacos abrindo em volta dela, com
+            // o alcance REAL da habilidade — e o clarao frio curto do lago
+            // virando lamina de uma vez. O disco de geada, as lascas e os
+            // riscos vivem no `fxList`; os cacos que voam sao voxel em
+            // `VoxelParticles.ingest`, pelo mesmo evento.
+            this.fxList.push({
+              kind: 'frostBurst',
+              x: ev.x,
+              y: ev.y,
+              burst: frostBurst(
+                (Math.round(ev.x * 16) | 0) ^ ((Math.round(ev.y * 16) | 0) << 7) ^ 0x1ce,
+                FROST_QUEEN_FREEZE_RADIUS,
+              ),
+              life: FROST_BURST_MS,
+              maxLife: FROST_BURST_MS,
+            });
+            this.addFlash(ev.x, ev.y, FROST_QUEEN_FREEZE_RADIUS * 1.6, 1.1, nowMs, 320, PAL.player);
+            this.shake = { power: 3, until: nowMs + 160 };
+          }
           break;
         case 'pulse':
           // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
@@ -4759,6 +4805,8 @@ export class SurvivalRenderer {
         ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
+      } else if (fx.kind === 'frostBurst') {
+        this.drawFrostBurst(ctx, fx.x, fx.y, fx.burst, t, toScreen, z);
       } else {
         const [sx, sy] = toScreen(fx.x + fx.offsetX, fx.y);
         // O numero segura opaco na primeira metade e so entao some. Desvanecer
@@ -4787,6 +4835,103 @@ export class SurvivalRenderer {
     this.trackSector(state, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
+  }
+
+  /**
+   * A coroa de estilhacos do congelamento, no plano do chao.
+   *
+   * Todo ponto do chao passa por `toScreen`, e a altura e subtraida em
+   * pixels de tile — o mesmo contrato das particulas — para a coroa cair na
+   * mesma projecao que o resto da cena, seja qual for o angulo da camera.
+   * Tres camadas, de tras para frente: o disco de geada (o lago que virou
+   * lamina de uma vez), os riscos de po correndo para fora, e as lascas em pe,
+   * pintadas em ordem de pintor para as de tras nao cobrirem as da frente.
+   */
+  private drawFrostBurst(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    burst: FrostBurst,
+    t: number,
+    toScreen: (x: number, y: number) => [number, number],
+    z: number,
+  ): void {
+    const frame = frostBurstFrame(t);
+    if (frame.alpha <= 0 && frame.disc <= 0) return;
+    const [cx, cy] = toScreen(x, y);
+    const unit = TILE_W * 0.5 * z;
+    // 1. O disco de geada.
+    const discR = burst.radius * unit * (0.55 + 0.45 * frame.grow);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, 0.5);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, discR);
+    grad.addColorStop(0, `rgba(232,241,255,${frame.disc})`);
+    grad.addColorStop(0.5, `rgba(196,216,242,${frame.disc * 0.5})`);
+    grad.addColorStop(1, 'rgba(160,184,220,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, discR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // 2. Os riscos de po, para alem da coroa.
+    ctx.lineWidth = Math.max(1, z * 0.8);
+    ctx.strokeStyle = PAL.player;
+    for (const st of burst.streaks) {
+      const g = pieceGrow(frame.grow, st.delay);
+      if (g <= 0) continue;
+      const to = st.from + (st.to - st.from) * g;
+      const [ax, ay] = toScreen(x + Math.cos(st.angle) * st.from, y + Math.sin(st.angle) * st.from);
+      const [bx, by] = toScreen(x + Math.cos(st.angle) * to, y + Math.sin(st.angle) * to);
+      ctx.globalAlpha = frame.alpha * 0.55 * g;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+    // 3. As lascas, de tras para frente.
+    for (const sh of burst.shards) {
+      const g = pieceGrow(frame.grow, sh.delay);
+      if (g <= 0) continue;
+      const px = -Math.sin(sh.angle) * sh.halfWidth;
+      const py = Math.cos(sh.angle) * sh.halfWidth;
+      const bx = x + Math.cos(sh.angle) * sh.base;
+      const by = y + Math.sin(sh.angle) * sh.base;
+      const reach = sh.base + (sh.reach - sh.base) * g;
+      const [lx, ly] = toScreen(bx + px, by + py);
+      const [rx, ry] = toScreen(bx - px, by - py);
+      const [tx, tyGround] = toScreen(
+        x + Math.cos(sh.angle) * reach,
+        y + Math.sin(sh.angle) * reach,
+      );
+      const ty = tyGround - sh.height * g * TILE_H * z;
+      const [mx, my] = toScreen(bx, by);
+      // A face: clara, com a borda de tras um pouco mais funda para a lasca
+      // ter espessura — e nao ser um triangulo branco chapado.
+      ctx.globalAlpha = frame.alpha * (0.6 + 0.4 * g);
+      ctx.fillStyle = '#dbe9ff';
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(tx, ty);
+      ctx.lineTo(rx, ry);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#f4f9ff';
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.lineTo(tx, ty);
+      ctx.lineTo(rx, ry);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = PAL.mist;
+      ctx.lineWidth = Math.max(1, z * 0.6);
+      ctx.globalAlpha = frame.alpha * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**

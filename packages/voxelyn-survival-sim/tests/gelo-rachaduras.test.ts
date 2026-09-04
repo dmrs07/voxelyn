@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DODGE_TICKS,
+  FROST_QUEEN_FREEZE_COOLDOWN_TICKS,
   ICE_CRACK_CROSSINGS_TO_COLLAPSE,
   ICE_GLIDE,
   ICE_GLIDE_STABILISED,
@@ -685,6 +686,63 @@ describe('a Rainha da Geada', () => {
     expect((mend as { sealed: number }).sealed).toBe(1);
   });
 
+  it('a janela entre congelamentos deixa abrir um buraco perto dela, e usa-lo', () => {
+    // A 6 s (o valor antigo) o reparo dela apagava toda rota perto dela antes
+    // do quarto degrau: o buraco, a unica consequencia nova da luta, so
+    // existia longe do encontro. O que a janela garante: um laco apertado
+    // (quatro passagens por uma celula, ~11 s a PLAYER_SPEED) abre o buraco
+    // E sobram pelo menos 3 s dele antes de o congelamento seguinte poder
+    // sela-lo. A garantia e a SOMA, nao cada parcela: comparar o intervalo
+    // so com o laco deixaria um buraco que abre e fecha no mesmo tick.
+    const lapTicks = Math.ceil(((2 * Math.PI * 2) / PLAYER_SPEED) * TICK_HZ);
+    const openTicks = lapTicks * ICE_CRACK_CROSSINGS_TO_COLLAPSE;
+    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS - openTicks).toBeGreaterThanOrEqual(3 * TICK_HZ);
+    // E o que ela NAO garante, de proposito: dentro do raio dela o buraco vive
+    // o que restar da janela, nunca o relogio natural inteiro. Cobrir o laco e
+    // o recongelamento juntos pediria ~23 s, um chefe que ataca duas vezes por
+    // minuto.
+    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS).toBeLessThan(openTicks + ICE_HOLE_REFREEZE_TICKS);
+  });
+
+  it('dois congelamentos seguidos respeitam a cadencia, e o segundo nao vem antes', () => {
+    const state = iceArena(9, { radius: 30 });
+    const queen = spawnEnemy(
+      state,
+      'frost_queen',
+      Math.floor(state.player.x) + 5,
+      Math.floor(state.player.y),
+      false,
+    );
+    queen.alertedUntil = state.tick + 100_000;
+    const starts: number[] = [];
+    for (let t = 0; t < FROST_QUEEN_FREEZE_COOLDOWN_TICKS * 2 + 200 && starts.length < 2; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === queen.id && ev.action === 'freeze') {
+          starts.push(state.tick);
+        }
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(starts, 'a Rainha nao congelou duas vezes').toHaveLength(2);
+    expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(FROST_QUEEN_FREEZE_COOLDOWN_TICKS);
+  });
+
+  it('o congelamento anuncia-se como golpe DELA, e nao como o pulso generico', () => {
+    // O `pulse` e o evento do pulso do jogador (e da Supernova): o cliente
+    // desenha a frente branca e toca a voz do pulso. O congelamento nao
+    // empurra nem machuca — o que ele tem de anunciar e o `boss_attack` com
+    // nome e dono, que e onde o leque de estilhacos e o som do gelo se penduram.
+    const { state, queen } = queenArena();
+    const events: SemanticEvent[] = [];
+    freezeNow(state, queen, events);
+    expect(
+      events.some(
+        (e) => e.t === 'boss_attack' && e.archetype === 'frost_queen' && e.ability === 'freeze',
+      ),
+    ).toBe(true);
+    expect(events.some((e) => e.t === 'pulse')).toBe(false);
+  });
+
   it('os Espectros nao quebram o gelo por onde passam', () => {
     const state = iceArena(7, { radius: 30 });
     const w = state.config.width;
@@ -824,7 +882,16 @@ function freezeNow(state: SurvivalState, queen: { id: number }, events: Semantic
     const before = events.length;
     updateEnemies(state, events);
     state.tick += 1;
-    if (events.slice(before).some((e) => e.t === 'ice_mend')) return;
+    // O golpe saiu quando o `boss_attack` dela saiu — o `ice_mend` vem no
+    // mesmo tick, mas so quando havia o que reparar.
+    if (
+      events
+        .slice(before)
+        .some(
+          (e) => e.t === 'boss_attack' && e.archetype === 'frost_queen' && e.ability === 'freeze',
+        )
+    )
+      return;
   }
   throw new Error('a Rainha nao congelou dentro da janela do teste');
 }

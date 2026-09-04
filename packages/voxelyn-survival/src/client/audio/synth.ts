@@ -298,6 +298,23 @@ const iceBling = (
 // tocam no mesmo instante com o mesmo ganho. Volume nao resolveria isso: dois
 // ruidos de banda larga se mascaram por mais alto que um deles esteja.
 
+/** Quantos cacos caem no congelamento da Rainha. */
+const FREEZE_CRUNCHES = 22;
+/**
+ * Os sinos de gelo do congelamento: [altura em Hz, inicio em s, cauda em s].
+ * Inarmonicos entre si de proposito — nenhum par forma intervalo afinado —, e
+ * espalhados por quase um segundo para que o ultimo comece quando a avalanche
+ * de cacos ja acabou.
+ */
+const FREEZE_CHIMES: ReadonlyArray<readonly [number, number, number]> = [
+  [4180, 0.14, 0.9],
+  [5230, 0.32, 1.1],
+  [3660, 0.5, 1.3],
+  [6120, 0.62, 0.8],
+  [4740, 0.86, 1.2],
+  [5710, 1.05, 1.0],
+];
+
 export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // --- telegrafos ---------------------------------------------------------
   // Dois toques subindo: "vem na sua direcao".
@@ -2192,27 +2209,59 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       release: 0.1,
     });
   },
-  // Congelamento: expansao rapida de gelo — varias fissuras atravessando a
-  // arena, agudas e curtas, sobre um subgrave de massa congelando.
+  // Congelamento: um SACO DE GELO QUEBRADO despejado no chao, e depois os
+  // cacos pendurados tilintando uns nos outros — sinos de gelo.
+  //
+  // Tres acontecimentos em sequencia, e a ordem e o que conta a historia:
+  //   1. o baque surdo do saco chegando ao chao (subgrave curto + banda baixa);
+  //   2. a avalanche de cacos: dezenas de estalos curtos em banda aguda, densos
+  //      no comeco e rareando (o tempo de cada um cresce com expoente > 1),
+  //      cada um numa altura tirada da mesma tabela por um passo primo, para
+  //      que nenhum par soe como o mesmo caco duas vezes;
+  //   3. os sinos: pares de senos agudos DESAFINADOS por poucos cents — o
+  //      batimento lento e o "pendurado", o caco balancando — com caudas de
+  //      quase um segundo que atravessam o fim da avalanche e morrem sozinhas.
+  //      Cada sino recebe um segundo toque mais fraco: dois cacos batendo.
+  //
+  // O que NAO ha aqui: tom de varredura, ruido largo, nada da linguagem do
+  // Arquicantor (notas afinadas em acorde). Os sinos sao inarmonicos de
+  // proposito — e o que diz "gelo" e nao "cristal".
   frostQueenFreeze: (ctx, out, t0, noise) => {
-    tone(ctx, out, t0, { type: 'sine', from: 120, to: 40, peak: 0.5, decay: 0.4, attack: 0.01 });
-    for (let i = 0; i < 7; i++) {
-      burst(ctx, out, t0 + 0.03 + i * 0.06, noise, {
-        peak: 0.3,
-        decay: 0.05,
-        type: 'highpass',
-        from: 3000 + i * 300,
+    // 1. o baque
+    tone(ctx, out, t0, { type: 'sine', from: 140, to: 42, peak: 0.5, decay: 0.28, attack: 0.008 });
+    burst(ctx, out, t0, noise, { peak: 0.34, decay: 0.12, type: 'lowpass', from: 900, to: 220 });
+    // 2. a avalanche de cacos
+    for (let i = 0; i < FREEZE_CRUNCHES; i++) {
+      const u = i / FREEZE_CRUNCHES;
+      const at = t0 + 0.015 + 0.62 * Math.pow(u, 1.7);
+      const hz = 1600 + ((i * 7919) % 23) * 210;
+      burst(ctx, out, at, noise, {
+        peak: 0.3 - u * 0.18,
+        decay: 0.025 + (i % 3) * 0.012,
+        type: 'bandpass',
+        from: hz,
+        q: 3 + (i % 4),
+      });
+      if (i % 4 === 1) iceBling(ctx, out, at + 0.01, 2400 + ((i * 104729) % 9) * 330, 0.1);
+    }
+    // 3. os sinos
+    for (const [hz, at, decay] of FREEZE_CHIMES) {
+      tone(ctx, out, t0 + at, { type: 'sine', from: hz, to: hz * 0.995, peak: 0.13, decay });
+      tone(ctx, out, t0 + at, {
+        type: 'sine',
+        from: hz,
+        peak: 0.09,
+        decay: decay * 0.9,
+        detune: 1.5,
+      });
+      tone(ctx, out, t0 + at + 0.19, {
+        type: 'triangle',
+        from: hz * 1.5,
+        to: hz * 1.49,
+        peak: 0.05,
+        decay: 0.4,
       });
     }
-    burst(ctx, out, t0 + 0.1, noise, {
-      peak: 0.22,
-      decay: 0.5,
-      type: 'bandpass',
-      from: 4000,
-      to: 1500,
-      q: 1.4,
-      attack: 0.02,
-    });
   },
   // Espectros: som INVERTIDO de cristal quebrando — os fragmentos parecem se
   // reconstruir. Ataques lentos e cauda cortada, o contrario do `breakCrystal`.

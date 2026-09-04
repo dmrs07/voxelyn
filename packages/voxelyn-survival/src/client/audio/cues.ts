@@ -747,9 +747,18 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 export const cuesForEvents = (events: readonly SemanticEvent[], ctx: CueContext): Cue[] => {
   const plunged = new Set<number>();
   for (const ev of events) if (ev.t === 'ice_fall') plunged.add(ev.slot + 1);
+  // O congelamento da Rainha ja E o som do lago refeito — os cacos caindo e os
+  // sinos de gelo. O `ice_mend` que sai no mesmo tick descreve a mesma coisa
+  // (o reparo dela), e tocar o cristal se fechando por cima seria dois sons
+  // para um acontecimento. O reparo continua soando sozinho quando e o buraco
+  // recongelando por conta propria (raio zero), longe de qualquer chefe.
+  const queenFroze = events.some(
+    (ev) => ev.t === 'boss_attack' && ev.archetype === 'frost_queen' && ev.ability === 'freeze',
+  );
   const out: Cue[] = [];
   for (const ev of events) {
     if (ev.t === 'death' && plunged.has(ev.entity)) continue;
+    if (ev.t === 'ice_mend' && ev.radius > 0 && queenFroze) continue;
     for (const cue of cuesForEvent(ev, ctx)) out.push(cue);
   }
   return out;

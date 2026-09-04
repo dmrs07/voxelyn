@@ -14,6 +14,7 @@
 import {
   ARCHCANTOR_CHOIR_LANCE_LENGTH,
   archcantorChoirLanceSpread,
+  FROST_QUEEN_FREEZE_RADIUS,
   SOLID_CRYSTAL,
 } from '@voxelyn/survival-sim';
 import { COMBAT_PLANE_TILES } from './combat-plane';
@@ -568,6 +569,17 @@ export class VoxelParticles {
           // se abriu para os lados) mais o esguicho da agua que apareceu.
           this.ring(ev.x, ev.y, 'iceShard', n(10), 0.85, 460, 47);
           this.burst(ev.x, ev.y, 'bubble', n(6), 1.1, 2.1, 520, 53);
+          break;
+        case 'boss_attack':
+          if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
+            // O CONGELAMENTO: um saco de cacos despejado no chao. Um leque de
+            // lascas saltando alto e caindo para fora (o `burst`, com impulso
+            // vertical) e, rente ao chao, a frente de cacos que chega ao raio
+            // REAL da habilidade — ate onde o lago foi refeito — e para ali.
+            const r = FROST_QUEEN_FREEZE_RADIUS;
+            this.burst(ev.x, ev.y, 'iceShard', n(30), r * 1.3, 2.8, 680, 67, 0.3);
+            this.ring(ev.x, ev.y, 'iceShard', n(20), r, 440, 71, 0.15);
+          }
           break;
         case 'ice_fall':
           // A QUEDA: massa entrando na agua. O respingo sobe alto e volta —

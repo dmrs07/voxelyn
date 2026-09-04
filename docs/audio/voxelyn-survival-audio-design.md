@@ -204,7 +204,7 @@ mesmo telegrafo genérico como reserva deliberada, nunca em silêncio).
 | Leviatã do Lençol | baleia abissal, água, eletricidade abafada | o canto anuncia intenção; o estalo, perigo |
 | Pulmão-Matriz | inspiração, pressão, membrana, gás | o ciclo respiratório é o relógio da luta |
 | Coração da Fornalha | pulsação, pressão, combustão | não vocaliza; a sala é a voz dele |
-| Rainha da Geada | cristais finos, gelo tensionado | beleza fria antes de ruptura violenta; nunca a linguagem do Arquicantor |
+| Rainha da Geada | cristais finos, gelo tensionado, cacos e sinos de gelo | beleza fria antes de ruptura violenta; o congelamento é um saco de gelo quebrado caindo no chão e sinos pendurados; nunca a linguagem do Arquicantor |
 | Magnetarca | magnetismo, inversão, metal | atração e repulsão soam opostas, e sem olhar |
 
 **O gelo da Cripta tem voz própria**, e ela não pertence a nenhum chefe: rachadura é
