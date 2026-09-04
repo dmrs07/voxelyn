@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Voxelyn Survival build notes 2026-09-04 for itch.io</title>
+<!--
+  TO PUBLISH ON ITCH.IO
+  1. Open this file in the browser.
+  2. Ctrl+A, Ctrl+C.
+  3. Paste into the Content field of the devlog form.
+  The itch editor is rich text and does not understand Markdown, so pasting
+  rendered HTML is what preserves headings, bold and tables.
+  4. Wherever a [ IMAGE N ... ] line appears, delete the line and insert the
+  image with the toolbar image button.
+
+  IMAGES (14): key-art.png, options-credits.png, frost-queen-crown.png, ice-crack-atlas.png, frostbite-statue.png, frost-wraith-sheets.png, frost-wraith-idle.png, minigun-module-voxels.png, dispatch-order-en.png, dispatch-mode-selector-ptbr.png, hud-before-after-tall.png, hud-before-after-wide.png, prospector-3d-print.jpg, run-basalt-galleries.png
+-->
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         max-width: 46em; margin: 3em auto; padding: 0 1.2em; line-height: 1.6; color: #111; }
+  .slot { border: 1px dashed #b00; color: #b00; padding: .5em .8em; font-weight: 700; }
+  table { border-collapse: collapse; }
+  th, td { text-align: left; }
+</style>
+
+<h1>Sixteen days, and the floor started keeping score</h1>
+<p><strong>2026-09-04</strong> · build notes · PRs #154 to #200 · 179 commits</p>
+<p class="slot">[ IMAGE 1 &middot; key-art.png &middot; Voxelyn Survival key art: the Guardian standing over the Core cradle, rendered from the game&#x27;s own voxel models ]</p>
+<p>The last zip I handed out was sixteen days old by this morning. Sixteen days is nothing. Sixteen days is also, apparently, forty seven pull requests, a soundtrack, a boss that eats the room, an ice sheet that remembers where you walked, and a second game that has nothing to do with mining.</p>
+<p>So this is not a normal devlog. Normally I write one post about one problem and I go deep on it. This one is a build note, and it has to cover a lot of ground, so I am going to move fast and stop for the parts I actually care about.</p>
+<p>Let me start with the part that is not mine.</p>
+<h2>Clevo wrote the music</h2>
+<p class="slot">[ IMAGE 2 &middot; options-credits.png &middot; The Options sheet: audio sliders, soundtrack selector, network latency, and the credits line ]</p>
+<p>Voxelyn Survival has had procedural music for months. Eight themes, one per stratum, synthesised at runtime. They were fine. They were exactly as good as free music that a programmer wrote in a text editor can be, which is to say they filled silence and they never once made anybody feel anything.</p>
+<p>Then <strong>Clevo (<a href="https://instagram.com/clevoclevoclevo">@clevoclevoclevo</a>)</strong> wrote three tracks for the game, and I have been playing my own build differently ever since.</p>
+<p>There is the run theme, which plays in every stratum. There is the title theme, which now opens over the dispatch terminal and goes quiet under the veil when a descent begins. And there is a third one, written for the Diamandis encounter, which takes over the moment he wakes up and stands, and hands the run theme back when he falls.</p>
+<p>The engineering around them is a contract, and I want to write the contract down because it is the reason the music does not fight the game:</p>
+<ul>
+  <li><strong>Lossless, end to end.</strong> The run and menu tracks ship as FLAC. There is a test that fails the build if somebody swaps in an mp3. The Diamandis track is mp3 on purpose, because the master only exists as mp3 and re-wrapping a lossy file in FLAC gives you back nothing and costs ten times the precache.</li>
+  <li><strong>The stereo image is untouched.</strong> Clevo mixed with the sides occupied and roughly the inner 40% of the field left free for the game&#x27;s own sounds. So the audio path does not sum to mono, does not pan it, does not filter it. Two bass layers coexist because he put them there.</li>
+  <li><strong>Sound effects still win.</strong> Same ceiling as the procedural music, same ducking. Under a boss telegraph the track drops to -30 LUFS and gets out of the way.</li>
+</ul>
+<p>That last one is where I got it wrong the first time. I shipped the track at -30 LUFS resting, sixteen decibels under the studio ident, and I told myself the mixing was conservative. It was not conservative, it was inaudible. The masters were sitting at -15.0 and -17.1 LUFS with true peak almost on the ceiling. Nothing was wrong with the files. The gain chain was strangling them.</p>
+<p>The fix is a pair of numbers that only work together. The music ceiling goes up 9.0 dB and the ducking goes 9.1 dB deeper:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>state</th><th>gain</th><th>result</th></tr>
+  <tr><td>resting</td><td>0.366 × 1.74</td><td>-21.0 LUFS</td></tr>
+  <tr><td>under a telegraph</td><td>× 0.35</td><td>-30.1 LUFS</td></tr>
+</table>
+<p>For the 40 milliseconds a telegraph is speaking, the mix is bit for bit what it was before. Between telegraphs, the music is finally music. I gave up static headroom in silence, which nobody was using, and kept headroom in the only instant where it protects anybody. Clevo&#x27;s calibration trims did not move a single decimal, because the trims normalise the two tracks against each other and the ceiling is what sets absolute level.</p>
+<p>Play this build with headphones. That sentence is now in the terminal footer for a reason.</p>
+<h2>The game opens like a game now</h2>
+<p>It used to be: black screen, then the menu, sometime. There was no first frame, only an absence of one.</p>
+<p>Now there is a sequence. The developer identity comes up first, the DaniTools mark, with the studio&#x27;s sound logo over it. Then real loading, with a progress bar that is measuring something instead of pretending. Then the terminal, with the title theme already playing.</p>
+<p>Two decisions in there I would defend in a fight.</p>
+<p>The identity is <strong>the developer&#x27;s mark, not Aurix Dynamics</strong>. Aurix is the fictional company inside the game. It employs the Prospector, it signs the dispatch order, it stamps the key art. Putting its logo on the first screen would tell a player that Aurix made this game.</p>
+<p>And the mark <strong>waits for the sound, but only if the sound actually plays</strong>. There is an event that stretches the identity phase to the last chord. It never shortens the phase, it ignores audio that arrives too late, and it has a 5.2 second cap so a wrong file can never trap somebody on a black screen. Where the browser refuses to play audio without a gesture, the sting returns null, the identity stays short and silent, and nothing is held. Holding a black screen for the length of an audio file nobody heard is the same lie as a fake progress bar.</p>
+<p>The key art at the top of this post is also new, and it is rendered from the game&#x27;s own systems: the real 96x96 worldgen, the canonical voxel models, the art bible palette. Only the projection changed. The game camera is a fixed 2:1 isometric, which is right for gameplay and wrong for a poster, so the splash uses a perspective voxel tracer with real normals, shadows, ambient occlusion and volumetric scattering. Same matter, different lens.</p>
+<h2>The ice remembers where you walked</h2>
+<p class="slot">[ IMAGE 3 &middot; frost-queen-crown.png &middot; The Glacial Crypt: the Frost Queen&#x27;s freeze crown opening across the lake ]</p>
+<p>Here is a confession. The Glacial Crypt has had an ice floor since it existed, and that floor did nothing. It had a glide inertia of 0.82, which sounds like a number until you measure it: letting go of the stick slid you about 0.7 of a cell, less than the width of your own body. There was an upgrade in the tree that reduced that nothing by a further quarter. The ice was a floor that changed colour.</p>
+<p>Now the floor keeps a record of you.</p>
+<p><strong>Inertia got real.</strong> Glide goes from 0.82 to 0.915, which is about 2.5 tiles of braking. Reversing crosses zero in roughly 0.4 seconds and completes in 1.7. The gyroscopic stabiliser upgrade stopped multiplying and started interpolating toward a stabilised value, so it cuts your slide by 60% without turning the lake into dry ground, and it buys you no protection at all from the thing below.</p>
+<p><strong>The cracking cycle.</strong> Four new surfaces, appended, nothing renumbered: cracked, fractured, critical, deep water.</p>
+<p class="slot">[ IMAGE 4 &middot; ice-crack-atlas.png &middot; The ice crust atlas: cracks separating by shape and line density as the stage advances ]</p>
+<p>Every Prospector crossing takes a cell down one step. The fourth opens the hole. It counts <em>entry</em> into the cell, so standing still does not progress it, leaving and coming back does, sliding counts, dodging counts. Every cell along a movement segment gets processed, so moving fast does not let you skip a step. At most one step per Prospector per movement step. In co-op it resolves in slot order, so both clients agree.</p>
+<p><strong>The hole kills.</strong> Entering deep water kills at full health, through invulnerability frames, with no revivable body. It conducts like water, projectiles pass over it, the Queen and the Wraiths cross it, ordinary ground enemies will not end a move in it. It refreezes as whole ice after 12 seconds, and that clock lives in authoritative state and enters the hash.</p>
+<p><strong>And the loop closes.</strong> Heat melts any stage back to shallow water. Shallow water refreezes as an intact plate, which erases the memory of every crossing. The Queen&#x27;s freeze repairs cracks and seals holes inside her radius while preserving live fire, and her armour counts any cracked stage as ice, so melting the lake is still the only counterplay. That last sentence is the whole design: the ice is a resource both of you are spending.</p>
+<p>The fall has 820 milliseconds of presentation of its own, height loss, sinking under a mask, fragments, ripple. No tombstone, no red ring, and the result screen waits for it.</p>
+<p>I paid for the new art without raising the budget. The atlas PNGs now use the default deflate strategy instead of Z_RLE, and the whole pack dropped from 8.9 MiB to 3.2 MiB.</p>
+<h2>Frostbite: the cold accumulates, and then you are a statue</h2>
+<p class="slot">[ IMAGE 5 &middot; frostbite-statue.png &middot; Frostbite at full meter: the Prospector locked in a faceted ice shell with the orange core pulsing ]</p>
+<p>The other half of the ice work is a per-player freeze meter, and it is the mechanic I most want people to go and get hit by.</p>
+<p>The Queen&#x27;s Nova doses 45% to every Prospector inside its real radius. Invulnerability frames do not block it. The Frost Wraith&#x27;s lunge doses 12% on contact, and that lunge now actually resolves contact, which it never did before. The meter decays at 1 percentage point per second after a two second grace, so three Novas inside fourteen seconds will freeze you even with decay running between them.</p>
+<p>At full, <strong>frostbite</strong>. The chassis locks. Speed and inertia go to zero. No facing, no dodge, no interact, no ability, no shot. Damage still lands.</p>
+<p>The way out is the part I like. The fire trigger gets intercepted before any weapon exists and becomes thermal cycles at a fixed cadence, five per second, identical whether you are carrying the bolt, the return disc or the Minigun. Those cycles produce real heat and melt 66 per cycle. One layer of shell is 330, so with a cold weapon you break out in about a second. Overheating suspends the process without losing progress.</p>
+<p>So the answer to being frozen is: hold the trigger. Your gun is the heater. If you came into the fight already overheated, you wait, and the Queen gets a free window.</p>
+<p>It clears on death, on being downed, on revive, on reset and on descent. It is in the hash, in the viewer, in the partner snapshot and in the MCP surface. There are localised hints the first three times it happens to you, because a mechanic that locks your controls needs to explain itself before it becomes a bug report.</p>
+<h2>The Frost Wraith is fog until it is not</h2>
+<p class="slot">[ IMAGE 6 &middot; frost-wraith-sheets.png &middot; Frost Wraith sprite sheets: the hidden fog form and the materialised manawyrm ]</p>
+<p>The Wraith got a proper reskin, and it is a two-state creature now. Hidden, it is fog: lobes, loose voxels, suspended crystals, cyan glow, condensation streaks. Exposed, it is a frost manawyrm in a 96 pixel frame, with a materialisation pose of its own and five voices, and a whisper sampled from its state so you can hear roughly where it is before you can see it.</p>
+<p class="slot">[ IMAGE 7 &middot; frost-wraith-idle.png &middot; The Frost Wraith idle voxel model ]</p>
+<h2>The Frost Queen got a cadence, a crown and a sound</h2>
+<p>Her freeze used to come every 6 seconds. Combined with the new cracking cycle, that meant her repair inside a 6 tile radius erased every route near her before you could reach the fourth step. The hole only existed far away from the fight, which is the opposite of interesting.</p>
+<p>The interval is now 14 seconds, and that number is not vibes. A tight loop needs about 11 seconds to open a hole, and natural refreeze takes 12. Fourteen guarantees you can open the hole and have at least 3 seconds of it. It deliberately does <em>not</em> guarantee covering the loop and the refreeze together, which would need about 23. The guarantee is the sum, not each instalment, and the docs and the test now say so out loud.</p>
+<p>The crown is white shards standing up and tilting outward, opening in a full circle to the ability&#x27;s <em>real</em> radius, with a frost disc and dust streaks along the floor. Pure geometry, seeded from the event, so both players in co-op see the same fan.</p>
+<p>And the sound is a bag of ice emptied onto concrete: the thud, then dozens of cracks thinning out, plus hanging ice bells, pairs of high sines detuned by a few cents, inharmonic, with tails just under a second. She also shatters on death now.</p>
+<h2>The White Devourer stopped being a tower and became a mouth</h2>
+<p>This one is my favourite change in the build.</p>
+<p>The Devourer&#x27;s vulnerable window used to be a stationary, harmless target. He did not move, did not charge contact, had no sand absorbing shots. Walking up to him was free, and the only real decision in the encounter (having saved your overheat) happened <em>before</em> the window instead of inside it.</p>
+<p>Now that same window is a maw. He stays still and stays unarmoured, so everything the opening promised is still true. But while it lasts, he swallows the sector into himself.</p>
+<p>The suction is gradual on two axes, and that is what separates it from a trap. <strong>In time</strong>, the reach grows from zero to 7.5 tiles over 4.5 seconds. Since the arc&#x27;s landing is aimed at you, the window always opens with you on top of the centre, so the throat only starts charging about a second later. <strong>In space</strong>, the force at each distance is fixed, 0.7 tiles per second at the rim and 7.6 at the throat, and it crosses walking speed at 3.47 tiles. That is the point of no return, and the game draws it on the floor.</p>
+<p>There are three ways out and none of them are automatic: walk (outside the line), dodge (2.2 tiles in 0.2 seconds puts you back on the line), and glass (suction drops to 45% over glass and never beats walking). Walls stop the drag too. The throat charges 200, which is double a full health bar, and it charges fauna the same way, so dragging a pack in solves two problems at once.</p>
+<p>The sand vortex is not decoration, it is the drawing of the radius, made out of the stratum&#x27;s own matter. The mouth eats the loose silica the reach covers, and the border between sand and clean floor tells you exactly how far the suction goes right now.</p>
+<p>I got the vortex wrong twice, publicly, and the fix taught me something. A playtester said &quot;the vortex looks bad, nothing flies toward the centre, particles just circle&quot;. They were right and it was measurable: with the path fixing two full turns, between 89% and 96% of every grain&#x27;s step was orbit. I had calibrated the number to read as rotation, which is the wrong reading, because the mechanic says it swallows. The path is now a constant pitch spiral where every step is 56% radial and 44% tangential at every radius, because the angle is a property of the curve and not of the speed you traverse it at.</p>
+<p>Also the ring was lying. A circle of radius R in this isometric becomes an ellipse whose horizontal extreme sits at R times root two, and the code was omitting the root, so the ring was drawn at 71% of the radius that actually grabs you. A ring that promises a different radius than the one that grabs you is worse than no ring.</p>
+<p>He also has a brood now, and the brood dies with the mother.</p>
+<h2>The Archcantor sings with four voices</h2>
+<p>The Archcantor encounter used to start empty. A slow body in the middle of the nave singing to crystals that the generator may or may not have put nearby. With map luck the whole Cathedral answered. Without it, he was a stationary target.</p>
+<p>Now four Resonants orbit him as a Cardinal Choir, and three things close the exits that playtesting found:</p>
+<p><strong>Replacement costs the room.</strong> An open slot is answered 80 ticks later by the crystal nearest the body, which crystallises into a new Resonant and stops existing. He consumes his own nave to hold the chord, innermost layer first. With no crystal in reach, the slot stays empty. That is how replacement preserves your progress instead of erasing it, and it is why breaking crystal is counterplay for two reasons at once.</p>
+<p><strong>A full turn spits out a soloist.</strong> With the chord full, each turn of the dance crystallises a voice that does not fit and throws it out on the diagonal, capped at two. The diagonals were the safe answer to the cross, and now they are exactly where the soloist comes from.</p>
+<p><strong>The corridors reverberate.</strong> Twelve tiles by three, and each one charges twice: the response, then the echo a beat later. Without the echo, a corridor that had just flashed was the safest place in the room.</p>
+<h2>Every boss has a sound signature now</h2>
+<p>Nine identities: mass, machine, friction, tuned crystal, abyssal whale, breathing, boiler, tensioned ice, magnetism. Each ability uses its boss&#x27;s identity to say three separate things: windup, execution, consequence. About 65 new voices, with a strict priority policy. Lethal windup and phase change sit at 10. Execution and vulnerability at 9. Offscreen movement at 7 to 8. Vocalisation at 5 to 6. Texture at 2 to 4.</p>
+<p>A playtester asked me to &quot;lower the bit rate to make it scarier&quot;, and they were onto something. The recipes are clean, and clean sounds like a synthesiser. So there is a crumple chain now, light saturation, 8 bit mid-tread quantisation, low pass at 5.4 kHz, and it applies <strong>only</strong> to boss voices and boss beds. The rest of the bank stays clean, because the generic telegraph has to stay legible.</p>
+<p>Diamandis speaks. His lines are robotic phonemes, and the same table that picks the voice line raises a subtitle on the HUD at the same instant. His awakening no longer shows the generic &quot;the Guardian has awoken&quot;, because he introduces himself.</p>
+<p>And the boss arena finally has sound at all. It was the one mode running the real render and input engine in silence.</p>
+<h2>The Minigun</h2>
+<p class="slot">[ IMAGE 8 &middot; minigun-module-voxels.png &middot; The weapon module voxel models: barrels, drum and the mounted assembly ]</p>
+<p>A tier 3 module with 300 rounds that <em>replaces</em> your main fire while it has ammunition. Not a bolt modifier, which is why it does not share the shot with anything.</p>
+<p>The state machine (idle, spinning up, firing, spinning down, overheated) is pure arithmetic, and everything in it is an integer. Rotation in thousandths, rate of fire in thousandths of a shot per tick, accumulator in thousandths. A <code>spin += 0.05</code> per tick would accumulate float error, and two peers disagreeing on the third decimal would cross the operational threshold on different ticks. That divergence shows up to a player as &quot;my partner fired and I did not&quot;.</p>
+<p>The compatibility matrix is drawn instead of written. With the Minigun mounted, the six coupled modules disappear from the metal. They are still installed with their charges intact, they just do not apply to her bullets. When round 300 leaves, the Driver comes back and all six reappear on their own. The body of the bot tells you the rule without a line of HUD.</p>
+<p>Audio is three identities and no voice per bullet. The motor is a continuous bed whose pitch follows the authoritative RPM. The burst is one voice per four tick window that schedules three transients inside itself, so five voices a second instead of sixteen. And the burst never reaches telegraph priority, because the strongest weapon in the game is not allowed to silence the warning that prevents an unfair death.</p>
+<h2>You can watch your runs back</h2>
+<p>Two of them, actually.</p>
+<p>The server now stores the canonical log next to every solo leaderboard entry, along with the tuning and depth config it was verified under, and every row with a replay available gets a play button. It opens an isolated tool that re-simulates the run through the same deterministic engine and draws every tick, with play, pause, scrubbing and restart.</p>
+<p>And then the obvious gap: the ranking only accepts runs that extracted, so the run where you <em>died</em> never goes anywhere, and that is exactly the one you want to see again. Those now live on your device, the last eight, with a 1 MB cap and pruning by age. The Log panel gets the same play button. It does not claim to be authoritative, because nothing about it was verified by any server, and the banner says so.</p>
+<h2>The ranking is one book per depth</h2>
+<p>Two changes that are really one change: the leaderboard was comparing things that are not comparable, and sorting by a grade that is not the score.</p>
+<p><strong>The score is Cores extracted first, then time, and nothing else.</strong> Ore is out. It was a tiebreak, but a tiebreak is also a criterion, and it was a question the scoreboard asked that the briefing never did. Stars stopped ordering anything. A two Core run outside the target time did twice the work of a three star single Core run, and sorting by the grade punished going deeper. Stars are still how you read a run. They are just not its position.</p>
+<p><strong>And there is one book per sector count.</strong> A three sector descent and a seven sector descent are not the same exam. In the same book they do not compare skill, they compare authorisation, and authorisation is something you buy.</p>
+<h2>The terminal is a form again</h2>
+<p class="slot">[ IMAGE 9 &middot; dispatch-order-en.png &middot; The dispatch order: mode selector on the left, one DESCEND stamp on the right ]</p>
+<p>In phone landscape the authorisation column did not fit. DESCEND plus three secondary buttons, and the Weekly Challenge, the last one and the only one with a deadline, fell off the screen. The fix is not a smaller column, it is a different form.</p>
+<p>The requisition is a mode selector now: free descent, online co-op, training op, weekly challenge (that last one only when the server announces a contract). The authorisation column keeps the generation stamp and a single DESCEND, which runs whichever row is ticked and says which one in its subline. Four descents, one stamp, and the column never grows again.</p>
+<p class="slot">[ IMAGE 10 &middot; dispatch-mode-selector-ptbr.png &middot; The same sheet in Portuguese, with the co-op room drawer open and the weekly challenge live ]</p>
+<p>Then I audited all five sheets against a real server, with ore in the profile, descents in the log, a simulated ranking, and windows at 320x568, 667x375, 390x844, 844x390, 1280x800 and 1920x1080. It found plenty. Five rail labels colliding into &quot;DISPATCHLOG&quot;. The menu header painting the brand over the document code. &quot;OPERATOR&quot; and &quot;CORES&quot; overlapping until the name became a single letter. 127 identical locked Aurix files turning into a wall (they are grouped by clearance level now). A portrait stack in short landscape hiding three of the four cards behind the stamp with no scroll hint.</p>
+<h2>The HUD got denser without losing a line</h2>
+<p class="slot">[ IMAGE 11 &middot; hud-before-after-tall.png &middot; HUD before and after: the panel becomes a closed card with tighter vertical rhythm ]</p>
+<p>Small screens used to get the panel scaled down uniformly, which still left the whole panel stacked on top of the game. Now they also get a tight vertical rhythm: 12 pixel health bar instead of 15, 24 pixel module cards instead of 30, less air between sections. The sections are the same, in the same order. The rhythm takes space, never a line of information.</p>
+<p class="slot">[ IMAGE 12 &middot; hud-before-after-wide.png &middot; The same change at desktop width ]</p>
+<p>The Purge Cell is a real battery now. The old glyph was a 6x8 rectangle with a bar in it, which at 13 pixels read like a dimmed letter &quot;i&quot;, and a row of them read like a row of nothing.</p>
+<p>And co-op notifications got fixed, which was overdue. Both clients receive the same events, and the renderer was pushing messages without checking the slot, so your partner&#x27;s module expiring showed up as MODULE SPENT on <em>your</em> screen, along with the Echo they absorbed and the refusals the shaft gave <em>them</em>. None of that changes a decision you can make. Messages now carry a slot when they are a response to a player&#x27;s action, and stay slotless when they are an announcement from the world, and the client only raises the personal ones for the local player.</p>
+<h2>Latency lives in Options</h2>
+<p>The protocol always had ping and pong. The server always answered. The client never asked.</p>
+<p>Inside a room the number is measured by the pong. Outside one, a button probes the server over HTTP, because &quot;can I play co-op right now&quot; is a question people ask <em>before</em> joining.</p>
+<p>Two things the measurement taught me, both now in the code. The ping timestamp is taken inside <code>ping()</code>, not from the frame&#x27;s <code>now</code>. Against a localhost server the frame clock said 46 ms, which was this client&#x27;s render loop with the network hidden inside it. Read at send time: 14 ms. And the <em>variance</em> of that window deliberately does not reach the screen, because the pong is only read when the loop yields the thread, so the spread carries the device&#x27;s frame rate.</p>
+<h2>The Prospector exists in real life now</h2>
+<p class="slot">[ IMAGE 13 &middot; prospector-3d-print.jpg &middot; A 3D printed Prospector standing on a lace tablecloth ]</p>
+<p>Not a feature. Not in the changelog. Just the best thing that happened during these sixteen days, and proof that the silhouette reads even when you take the pixels away.</p>
+<h2>And there is a second game now</h2>
+<p>Somewhere in the middle of all this I built <strong>Catathon</strong>, a spin-off in the same monorepo. The biggest hackathon in the world, every developer is an extremely cute cat, and everything that can go wrong will. You do not write code. You carry cats to desks, interpret a vague brief, respect a dependency graph and survive until the demo.</p>
+<p>Four cats, four disciplines, four personalities. Bigode the Siamese backend perfectionist will not let anything merge without your approval. Cheeto the orange frontend cowboy is 25% faster, ships without testing, and bites the build cable. Almofada the Maine Coon does devops at half the stress. Smoking the tuxedo does design and judges you in silence. Bugs are born from stress. Petting is the release valve.</p>
+<p>It has a career mode, a circuit, sprints, sponsors, a persistent rival and alumni. It plays with one finger on a phone. It is a completely different game and I regret nothing.</p>
+<h2>What to actually play in this build</h2>
+<p class="slot">[ IMAGE 14 &middot; run-basalt-galleries.png &middot; A live run in the Basalt Galleries ]</p>
+<p>If you are coming back after the last zip, here is the order I would go in:</p>
+<ol>
+  <li><strong>Put headphones on.</strong> Genuinely. The sound tells you things the screen has not shown you yet, and now there is also music worth hearing.</li>
+  <li><strong>Run the Training Op</strong> if you have never finished a descent. It is two to three minutes, fully playable, and it is the real game with one sector and one Core rather than a separate tutorial.</li>
+  <li><strong>Do a free descent</strong> and pay attention to the new HUD, the module cards and the Purge Cell battery.</li>
+  <li><strong>Get to the Glacial Crypt</strong> and let the Queen freeze you at least once, on purpose. Hold the trigger to break out. Then walk the same line across the lake four times and watch what the floor does.</li>
+  <li><strong>Find the White Devourer</strong> and stand inside the maw window instead of running from it. Watch where the line on the floor is. Learn where 3.47 tiles is.</li>
+  <li><strong>Check the ranking</strong> and hit play on somebody&#x27;s run, including your own.</li>
+  <li><strong>Open the arena</strong> if you want the bosses without the campaign around them. It has sound now.</li>
+  <li><strong>The weekly challenge</strong> is the only thing here with a deadline.</li>
+</ol>
+<h2>The numbers</h2>
+<p>Forty seven pull requests. 179 commits. Simulation version went from 41 to 58, protocol from 25 to 31, content from 25 to 33. Three composed tracks, one sound logo, roughly 65 new boss voices. Boot budget went from 179 MiB to 147 against a 160 ceiling, mostly by fixing an atlas packer that was filling the first row to 4096 pixels and leaving about 27 MiB of white space in the pack. 867 simulation tests and 1465 client tests pass.</p>
+<p>The thing I am least sure about is 14 seconds. The only way to settle it is to watch somebody who is not me get caught on the far side of the lake when the Queen decides to repair it.</p>
+<p>Music by <strong>Clevo (<a href="https://instagram.com/clevoclevoclevo">@clevoclevoclevo</a>)</strong>. Game by <strong>DaniTools (<a href="https://instagram.com/dani.tools">@dani.tools</a>)</strong>. Go break some ice.</p>
