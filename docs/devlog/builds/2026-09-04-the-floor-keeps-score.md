@@ -164,6 +164,8 @@ inharmonic, tails just under a second. She shatters when she dies now, too.
 
 ## The White Devourer stopped being a tower and became a mouth
 
+![The maw open: the ring is how far the suction reaches right now, the streaks are the sector being pulled in, and the red arc is the line past which walking stops working](media/maw-open.gif)
+
 This one is my favourite change in the build.
 
 The Devourer's vulnerable window used to be a stationary, harmless target. He did not move, did
