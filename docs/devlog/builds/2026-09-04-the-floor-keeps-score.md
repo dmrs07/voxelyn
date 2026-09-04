@@ -135,8 +135,6 @@ voxels, suspended crystals, a cyan glow, streaks of condensation. Exposed, it is
 manawyrm with a materialisation pose of its own, five voices, and a whisper that tracks its
 state, so you can hear roughly where it is before you can see anything at all.
 
-![The Frost Wraith idle model](media/frost-wraith-idle.png)
-
 ## The Frost Queen got a cadence, a crown and a sound
 
 Her freeze used to come every six seconds. Once the floor could crack, that turned out to be
@@ -201,6 +199,8 @@ promises a different radius than the one that grabs you is worse than no ring at
 He has a brood now. The brood dies with the mother.
 
 ## The Archcantor sings with four voices
+
+![The Archcantor: the crown of tuned crystal that does the singing, across his poses](media/archcantor-poses.png)
 
 The Archcantor encounter used to start empty. A slow body in the middle of the nave, singing to
 crystals that the generator may or may not have put nearby. With map luck the whole Cathedral
