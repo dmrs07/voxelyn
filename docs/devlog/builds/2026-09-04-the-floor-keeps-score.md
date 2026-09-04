@@ -251,7 +251,7 @@ the real engine in silence.
 
 ## The Minigun
 
-![The Minigun in three moments: the burst with the barrel already smoking, the module mounted on the arm with brass piling up under it, and the Resonants counting five a bullet](media/minigun-montage.png)
+![The Minigun in three moments: the burst with five flechettes in the air at once, the module's own barrels and drum, and the Resonants counting five a bullet](media/minigun-montage.png)
 
 A tier 3 module with 300 rounds that *replaces* your main fire while it has ammunition. Not a
 bolt modifier. It spins up, it fires, it spins down, it overheats, and none of that is
