@@ -15,13 +15,23 @@ recebem número de fila e não são regeradas por script nenhum.
 ```
 docs/devlog/builds/
   AAAA-MM-DD-slug.md            # o post do repositório, escrito à mão
-  AAAA-MM-DD-slug.itch.html     # a mesma coisa em HTML, para colar no itch.io
+  AAAA-MM-DD-slug.html          # a página pronta: imagens embutidas e trilha tocando
+  AAAA-MM-DD-slug.itch.html     # a mesma coisa em HTML cru, para colar no itch.io
   media/                        # as imagens referenciadas pelos posts
 ```
 
-O `.itch.html` marca cada imagem com uma linha `[ IMAGE N ... ]`: o editor do itch é rich
-text e não sobe imagem por markup, então a linha é apagada e a imagem entra pelo botão da
-barra de ferramentas, na ordem listada no comentário do topo do arquivo.
+São três saídas do mesmo texto, e cada uma existe por um motivo diferente.
+
+O `.md` é a fonte, e é o que se lê no GitHub.
+
+O `.html` é a **página**: hero com a key art sem branding, imagens em figura com legenda,
+e a faixa do Clevo tocando dentro do post pelo player do YouTube. Abre com dois cliques,
+não depende de servidor, e é o arquivo para mandar para alguém que não lê repositório.
+Os caminhos das imagens são relativos, então a pasta `media/` viaja junto.
+
+O `.itch.html` é o de colar: marca cada imagem com uma linha `[ IMAGE N ... ]`, porque o
+editor do itch é rich text e não sobe imagem por markup. A linha é apagada e a imagem
+entra pelo botão da barra de ferramentas, na ordem listada no comentário do topo.
 
 ## As imagens
 
@@ -34,4 +44,4 @@ e comparativos antes/depois vêm das ferramentas que os produziram.
 
 | Data | Post | Cobertura |
 | --- | --- | --- |
-| 2026-09-04 | [Sixteen days, and the floor started keeping score](2026-09-04-the-floor-keeps-score.md) | PRs #154 a #200 |
+| 2026-09-04 | [Sixteen days, and the floor started keeping score](2026-09-04-the-floor-keeps-score.md) ([página](2026-09-04-the-floor-keeps-score.html)) | PRs #154 a #200 |
