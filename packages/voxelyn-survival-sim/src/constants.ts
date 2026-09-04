@@ -2740,9 +2740,12 @@ export const FROST_QUEEN_ICE_THRESHOLD = 6;
  *
  *   - um laco apertado (raio ~2) leva ~2,7 s por volta a PLAYER_SPEED, e
  *     abrir um buraco pede quatro passagens pela mesma celula: ~11 s;
- *   - o buraco recongela sozinho em ICE_HOLE_REFREEZE_TICKS (12 s), entao a
- *     janela precisa ser maior que isso para ele viver a vida inteira antes
- *     de ela poder sela-lo — senao "esperar" e "reparar" seriam o mesmo.
+ *   - sobram ~3 s entre esse buraco abrir e o proximo congelamento poder
+ *     sela-lo. E ESSA a garantia — nao "o buraco vive os 12 s inteiros de
+ *     ICE_HOLE_REFREEZE_TICKS": dentro do raio dela, a vida do buraco e o
+ *     que restar da janela; so fora do raio a vida inteira e a do relogio
+ *     natural. Uma janela que cobrisse o laco E o recongelamento (~23 s)
+ *     faria dela um chefe que ataca duas vezes por minuto.
  *
  * O preco e menos Espectros por minuto (saem dois por congelamento): a
  * cadencia deles vira a de uma fase de chefe, e nao a de um spawner.

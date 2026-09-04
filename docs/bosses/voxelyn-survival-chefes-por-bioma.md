@@ -509,9 +509,11 @@ contas:
 
 - um laço apertado (raio ~2) leva ~2,7 s por volta e abrir um buraco pede quatro
   passagens pela mesma célula: **~11 s**;
-- o buraco recongela sozinho em 12 s, e a janela precisa ser **maior** que isso
-  para ele viver a vida inteira antes de ela poder selá-lo — senão "esperar" e
-  "ser reparado" seriam a mesma coisa.
+- sobram **~3 s** entre esse buraco abrir e o próximo congelamento poder selá-lo.
+  É essa a garantia, e ela é a SOMA das duas parcelas — não "o buraco vive os 12 s
+  do recongelamento natural": dentro do raio dela a vida do buraco é o que restar
+  da janela; só fora do raio vale o relógio inteiro. Cobrir o laço E o
+  recongelamento (~23 s) faria dela um chefe que ataca duas vezes por minuto.
 
 O preço é menos Espectros por minuto (saem dois por congelamento): a cadência
 deles vira a de uma fase de chefe, e não a de um spawner. O congelamento também

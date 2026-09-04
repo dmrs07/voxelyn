@@ -686,18 +686,22 @@ describe('a Rainha da Geada', () => {
     expect((mend as { sealed: number }).sealed).toBe(1);
   });
 
-  it('a janela entre congelamentos deixa um buraco viver a vida inteira', () => {
+  it('a janela entre congelamentos deixa abrir um buraco perto dela, e usa-lo', () => {
     // A 6 s (o valor antigo) o reparo dela apagava toda rota perto dela antes
     // do quarto degrau: o buraco, a unica consequencia nova da luta, so
-    // existia longe do encontro. A janela tem de ser maior que o
-    // recongelamento natural — senao "esperar" e "ser reparado" seriam o
-    // mesmo — e maior que o que um laco apertado gasta para abrir o buraco
-    // (quatro passagens por uma celula, ~11 s a PLAYER_SPEED).
-    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS).toBeGreaterThan(ICE_HOLE_REFREEZE_TICKS);
+    // existia longe do encontro. O que a janela garante: um laco apertado
+    // (quatro passagens por uma celula, ~11 s a PLAYER_SPEED) abre o buraco
+    // E sobram pelo menos 3 s dele antes de o congelamento seguinte poder
+    // sela-lo. A garantia e a SOMA, nao cada parcela: comparar o intervalo
+    // so com o laco deixaria um buraco que abre e fecha no mesmo tick.
     const lapTicks = Math.ceil(((2 * Math.PI * 2) / PLAYER_SPEED) * TICK_HZ);
-    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS).toBeGreaterThan(
-      lapTicks * ICE_CRACK_CROSSINGS_TO_COLLAPSE,
-    );
+    const openTicks = lapTicks * ICE_CRACK_CROSSINGS_TO_COLLAPSE;
+    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS - openTicks).toBeGreaterThanOrEqual(3 * TICK_HZ);
+    // E o que ela NAO garante, de proposito: dentro do raio dela o buraco vive
+    // o que restar da janela, nunca o relogio natural inteiro. Cobrir o laco e
+    // o recongelamento juntos pediria ~23 s, um chefe que ataca duas vezes por
+    // minuto.
+    expect(FROST_QUEEN_FREEZE_COOLDOWN_TICKS).toBeLessThan(openTicks + ICE_HOLE_REFREEZE_TICKS);
   });
 
   it('dois congelamentos seguidos respeitam a cadencia, e o segundo nao vem antes', () => {
