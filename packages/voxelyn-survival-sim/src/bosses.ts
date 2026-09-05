@@ -74,6 +74,16 @@ export const emptyBossRuntime = (): BossRuntime => ({
   leviathanShockRecoverAt: -1,
   leviathanShockSeq: 0,
   protectiveBubbles: [],
+  // A primeira fase do Leviata nasce sem Sondagem marcada, sem destino e sem
+  // bacia aberta. -1 pelo mesmo motivo dos relogios acima: zero e uma celula
+  // (e um tick) legitimos.
+  leviathanProbeCell: -1,
+  leviathanProbeDeepen: false,
+  leviathanProbeSeq: 0,
+  leviathanAnchorProbes: 0,
+  leviathanDest: -1,
+  leviathanSurfaceAt: -1,
+  leviathanPools: [],
   frostArmored: -1,
   archcantorSilent: false,
   // Quatro assentos VAZIOS, e nao quatro ids inventados: nenhuma entidade tem

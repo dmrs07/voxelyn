@@ -5,8 +5,8 @@ Documento irmão da art bible (`docs/art/voxelyn-survival-art-bible.md`) e da sp
 
 ## 0. Por que o áudio existe aqui
 
-A spec estabelece como invariante de design (§2.1) que *"todo perigo tem telegraph
-visual **e/ou sonoro**"*. Até este ponto do projeto a metade sonora não existia, o que
+A spec estabelece como invariante de design (§2.1) que _"todo perigo tem telegraph
+visual **e/ou sonoro**"_. Até este ponto do projeto a metade sonora não existia, o que
 significava que 100% da carga de legibilidade caía sobre o visual — numa tela de celular
 em landscape, com a câmera apertada e a escuridão como mecânica deliberada.
 
@@ -57,25 +57,25 @@ state.stratum    ──►  music.ts    (temas, compasso, notas)        │ puro
 state.tick            music-bus.ts (drone/pad + scheduler)        │ browser
 ```
 
-A fronteira é deliberada e segue o mesmo *seam* de `flash.ts`: **a parte que decide o que o
+A fronteira é deliberada e segue o mesmo _seam_ de `flash.ts`: **a parte que decide o que o
 jogador escuta é aritmética e roda em Node**; só a produção de som precisa de browser. As
 suítes (`cues.test.ts`, `mixer.test.ts`, `ambience.test.ts`) rodam sem `AudioContext`.
 
-| Arquivo | Papel |
-| --- | --- |
-| `voices.ts` | Catálogo de vozes + política (prioridade, ganho, trava, espacial) |
-| `cues.ts` | Evento semântico → pedido de som |
-| `mixer.ts` | Atenuação, paneamento, corte de agudos, prioridade, teto de vozes |
-| `synth.ts` | Receitas de síntese, uma por voz |
-| `ambience.ts` | Amostragem da grade → níveis contínuos 0..1 |
-| `ambience-bus.ts` | Osciladores e loops persistentes dos leitos |
-| `music.ts` | Temas por estrato, timeline por tick, notas por compasso (puro) |
-| `music-bus.ts` | Drone/pad persistentes + scheduler lookahead do riff |
-| `minigun-bus.ts` | O motor contínuo do canhão rotativo (§4.5) |
-| `devourer-vortex-bus.ts` | O vórtice da boca do Devorador Branco (§4.6) |
-| `lung-breath-bus.ts` | A respiração contínua do Pulmão-Matriz (§4.6) |
-| `furnace-heart-bus.ts` | O batimento e a pressão da sala do Coração da Fornalha (§4.6) |
-| `index.ts` | `AudioDirector`: ciclo de vida, unlock, volume, mudo |
+| Arquivo                  | Papel                                                             |
+| ------------------------ | ----------------------------------------------------------------- |
+| `voices.ts`              | Catálogo de vozes + política (prioridade, ganho, trava, espacial) |
+| `cues.ts`                | Evento semântico → pedido de som                                  |
+| `mixer.ts`               | Atenuação, paneamento, corte de agudos, prioridade, teto de vozes |
+| `synth.ts`               | Receitas de síntese, uma por voz                                  |
+| `ambience.ts`            | Amostragem da grade → níveis contínuos 0..1                       |
+| `ambience-bus.ts`        | Osciladores e loops persistentes dos leitos                       |
+| `music.ts`               | Temas por estrato, timeline por tick, notas por compasso (puro)   |
+| `music-bus.ts`           | Drone/pad persistentes + scheduler lookahead do riff              |
+| `minigun-bus.ts`         | O motor contínuo do canhão rotativo (§4.5)                        |
+| `devourer-vortex-bus.ts` | O vórtice da boca do Devorador Branco (§4.6)                      |
+| `lung-breath-bus.ts`     | A respiração contínua do Pulmão-Matriz (§4.6)                     |
+| `furnace-heart-bus.ts`   | O batimento e a pressão da sala do Coração da Fornalha (§4.6)     |
+| `index.ts`               | `AudioDirector`: ciclo de vida, unlock, volume, mudo              |
 
 ## 3. As três decisões do mixer
 
@@ -163,12 +163,12 @@ primeira coisa a sumir quando o orçamento aperta — é textura, e o design ped
 A trava de 130 ms transforma a chuva inteira em até sete toques por segundo, agregados: um
 som por cápsula seria a mesma armadilha do som por bala, um andar abaixo.
 
-| Voz | Prioridade | Trava | O que é |
-| --- | --- | --- | --- |
-| `minigunSpinStart` | 6 | 200 ms | O motor pegando no tranco. Sobe. |
-| `minigunSpinStop` | 4 | 200 ms | O motor perdendo rotação. Desce. |
-| `minigunBurst` | 6 | 150 ms | A saraivada de uma janela inteira, em uma voz |
-| `minigunCasing` | 1 | 130 ms | O latão no chão. Some primeiro. |
+| Voz                | Prioridade | Trava  | O que é                                       |
+| ------------------ | ---------- | ------ | --------------------------------------------- |
+| `minigunSpinStart` | 6          | 200 ms | O motor pegando no tranco. Sobe.              |
+| `minigunSpinStop`  | 4          | 200 ms | O motor perdendo rotação. Desce.              |
+| `minigunBurst`     | 6          | 150 ms | A saraivada de uma janela inteira, em uma voz |
+| `minigunCasing`    | 1          | 130 ms | O latão no chão. Some primeiro.               |
 
 `minigun_spin` só soa nas transições para `spinning_up` e `spinning_down`. `firing` fica
 mudo porque quem anuncia que a arma cuspiu é a própria rajada, um instante depois;
@@ -194,18 +194,18 @@ arquétipo e habilidade/momento, sem nenhuma decisão acústica: que voz soa é 
 o ator é um chefe — o `boss_windup` do mesmo tick fala por ele (com a assinatura, ou com o
 mesmo telegrafo genérico como reserva deliberada, nunca em silêncio).
 
-| Chefe | Identidade sonora | A regra |
-| --- | --- | --- |
-| Guardião de Pedra | massa, rocha, subgrave | lento e tectônico; não fala, desloca massa |
-| Bispo | matéria orgânica, fungo | preserva a subida da cura, agora na preparação da Supernova |
-| Diamandis | máquina industrial + voz corporativa | toda habilidade é uma operação de mineração |
-| Devorador Branco | fricção subterrânea, garganta, vácuo | o som localiza o que não pode ser visto |
-| Arquicantor | cristal afinado, acordes | ataques são frases: nota, intervalo, acorde — ou trítono |
-| Leviatã do Lençol | baleia abissal, água, eletricidade abafada | o canto anuncia intenção; o estalo, perigo |
-| Pulmão-Matriz | inspiração, pressão, membrana, gás | o ciclo respiratório é o relógio da luta |
-| Coração da Fornalha | pulsação, pressão, combustão | não vocaliza; a sala é a voz dele |
-| Rainha da Geada | cristais finos, gelo tensionado, cacos e sinos de gelo | beleza fria antes de ruptura violenta; o congelamento é um saco de gelo quebrado caindo no chão e sinos pendurados; nunca a linguagem do Arquicantor |
-| Magnetarca | magnetismo, inversão, metal | atração e repulsão soam opostas, e sem olhar |
+| Chefe               | Identidade sonora                                                                                               | A regra                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guardião de Pedra   | massa, rocha, subgrave                                                                                          | lento e tectônico; não fala, desloca massa                                                                                                                                                    |
+| Bispo               | matéria orgânica, fungo                                                                                         | preserva a subida da cura, agora na preparação da Supernova                                                                                                                                   |
+| Diamandis           | máquina industrial + voz corporativa                                                                            | toda habilidade é uma operação de mineração                                                                                                                                                   |
+| Devorador Branco    | fricção subterrânea, garganta, vácuo                                                                            | o som localiza o que não pode ser visto                                                                                                                                                       |
+| Arquicantor         | cristal afinado, acordes                                                                                        | ataques são frases: nota, intervalo, acorde — ou trítono                                                                                                                                      |
+| Leviatã do Lençol   | cetáceo abissal, pressão subaquática, deslocamento pesado de água, estalos elétricos, silêncio antes dos golpes | o canto grave anuncia a Sondagem (nunca um agudo elétrico prolongado); a água puxada para baixo anuncia o mergulho; o borbulhar identifica a poça de destino sem visão; o estalo é a descarga |
+| Pulmão-Matriz       | inspiração, pressão, membrana, gás                                                                              | o ciclo respiratório é o relógio da luta                                                                                                                                                      |
+| Coração da Fornalha | pulsação, pressão, combustão                                                                                    | não vocaliza; a sala é a voz dele                                                                                                                                                             |
+| Rainha da Geada     | cristais finos, gelo tensionado, cacos e sinos de gelo                                                          | beleza fria antes de ruptura violenta; o congelamento é um saco de gelo quebrado caindo no chão e sinos pendurados; nunca a linguagem do Arquicantor                                          |
+| Magnetarca          | magnetismo, inversão, metal                                                                                     | atração e repulsão soam opostas, e sem olhar                                                                                                                                                  |
 
 **O Espectro de Geada** não é chefe, mas tem assinatura própria porque muda de
 estado o tempo todo e cada estado pede um som: escondido, **vento oco, cristais
@@ -229,14 +229,14 @@ uma mecânica GLOBAL do estrato e acontece com ou sem a Rainha em campo (por iss
 eventos são `ice_crack`/`ice_collapse`/`ice_fall`/`ice_mend`, e não `boss_state`
 reaproveitado — pendurada no canal de um chefe, ela ficaria muda longe dele).
 
-| Voz | Momento | Assinatura |
-| --- | --- | --- |
-| `iceCrackFine` | 1ª travessia | estalo curto e agudo (~3,2 kHz), uma fissura correndo |
-| `iceCrackFractured` | 2ª travessia | mais largo, dois estalos e cauda em banda: tensão |
-| `iceCrackCritical` | 3ª travessia | ruptura grave (900 → 260 Hz): ameaça, não dano |
-| `iceCollapse` | o chão cede | estouro seco e, atrás dele, a banda descendo — o vão enchendo |
-| `icePlunge` | um Prospector afunda | respingo, afundamento e cauda abafada (passa-baixas 2 kHz → 150 Hz) |
-| `iceMend` | a arena recomposta | o inverso da rachadura: a altura SOBE |
+| Voz                 | Momento              | Assinatura                                                          |
+| ------------------- | -------------------- | ------------------------------------------------------------------- |
+| `iceCrackFine`      | 1ª travessia         | estalo curto e agudo (~3,2 kHz), uma fissura correndo               |
+| `iceCrackFractured` | 2ª travessia         | mais largo, dois estalos e cauda em banda: tensão                   |
+| `iceCrackCritical`  | 3ª travessia         | ruptura grave (900 → 260 Hz): ameaça, não dano                      |
+| `iceCollapse`       | o chão cede          | estouro seco e, atrás dele, a banda descendo — o vão enchendo       |
+| `icePlunge`         | um Prospector afunda | respingo, afundamento e cauda abafada (passa-baixas 2 kHz → 150 Hz) |
+| `iceMend`           | a arena recomposta   | o inverso da rachadura: a altura SOBE                               |
 
 A **altura** é o contador: o jogador aprende a contar as próprias travessias de ouvido,
 sem olhar para o chão no meio de uma luta. Por isso o timbre desce a cada degrau em vez
@@ -283,7 +283,29 @@ dirigidos pelo estado autoritativo e nunca por um relógio do cliente):
 
 As **bolhas protetoras** do Leviatã são o único "você está seguro" sonoro do jogo: pulsos ocos
 e regulares enquanto o jogador local está dentro de uma durante a carga, lidos do estado (as
-bolhas viajam no snapshot) e passando pelo mixer como qualquer cue.
+bolhas viajam no snapshot) e passando pelo mixer como qualquer cue. "Dentro" é o **mesmo
+predicado** que decide o dano (`playerProtectedByBubble`, raio seguro para o centro). Dentro,
+a carga (`leviathanShockCharge`) é **abafada** — low-pass e metade do ganho, pelos nós que
+`play()` guarda — e fora volta inteira; a reconexão no meio da carga toca o tempo restante
+(`play(..., elapsedSeconds)`).
+
+**A primeira fase do Leviatã** (SIMULATION_VERSION 59) tem assinatura própria, toda grave e
+aquática, sem o agudo da descarga: `leviathanProbeCall` (o canto curto de cetáceo, no corpo),
+`leviathanProbeMark` (a resposta abafada **no ponto** marcado, bolhas e pedra cedendo — mais
+pesada quando afunda a poça), `leviathanProbeRelease` (o golpe hidráulico), `leviathanDiveWarn`
+(água sendo puxada para baixo: quem está sobre o corpo tem de sair), `leviathanDive` (três
+camadas descendentes acompanhando cabeça, corpo e cauda), `leviathanGulp` (o último gulp — a
+poça voltou a ser fatal), `leviathanBubbling` (o borbulhar crescente no destino),
+`leviathanEmerge` (a ruptura pesada da lâmina e as membranas molhadas abrindo) e
+`leviathanBreath` (a respiração funda quando o corpo termina de cobrir a poça). A queda no
+Aquífero é `aquiferPlunge` — grave, abafada, uma coluna de bolhas, nenhum gelo — distinta de
+`icePlunge` pela mesma morte (`ice_fall` com `medium`).
+
+**A carga ficou mais leve** (ganho 0,7 → 0,45): a versão anterior sustentava saw e ruído
+high-pass por dois segundos e meio e era ensurdecedora. Agora é pressão grave como base, uma
+vocalização de cetáceo crescendo, estalos curtos que aceleram, saw só no último segundo e
+baixo, e três pulsos finais sincronizados às três contrações do corpo — perceptualmente abaixo
+da própria descarga (0,9), com headroom, e ainda prioridade 10.
 
 **A amarrotada** (`lofi.ts`). Feedback de playtest: "baixar a taxa de bit, pra ficar um pouco
 mais amedrontador". As receitas são limpas — osciladores ideais, ruído branco filtrado — e
@@ -314,13 +336,13 @@ comum).
 Cinco leitos contínuos, todos amostrados do estado autoritativo a cada 100 ms e
 interpolados a cada quadro:
 
-| Leito | Fonte | O que informa |
-| --- | --- | --- |
-| `fire` | células `SURF_FIRE` (+ `FUNGAL_HEATED` a meio peso) num raio de 14 | incêndio por perto, inclusive fora da tela |
-| `gas` | células `SURF_GAS` / `SURF_SPORES` | sala contaminada adiante |
-| `heat` | `playerExtra.heat` acima de 50% | **quanto falta** para o travamento — tique metálico que acelera de 2,2 a 14 Hz |
-| `dread` | `state.contamination` | o relógio da run, audível sem HUD |
-| `threat` | inimigos vivos no raio | densidade de pressão |
+| Leito    | Fonte                                                              | O que informa                                                                  |
+| -------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `fire`   | células `SURF_FIRE` (+ `FUNGAL_HEATED` a meio peso) num raio de 14 | incêndio por perto, inclusive fora da tela                                     |
+| `gas`    | células `SURF_GAS` / `SURF_SPORES`                                 | sala contaminada adiante                                                       |
+| `heat`   | `playerExtra.heat` acima de 50%                                    | **quanto falta** para o travamento — tique metálico que acelera de 2,2 a 14 Hz |
+| `dread`  | `state.contamination`                                              | o relógio da run, audível sem HUD                                              |
+| `threat` | inimigos vivos no raio                                             | densidade de pressão                                                           |
 
 A interpolação **sobe mais rápido do que desce** (τ 180 ms vs 900 ms): perigo aparecendo
 tem de ser imediato, perigo sumindo pode relaxar devagar. A constante é em tempo, não em
@@ -354,20 +376,20 @@ medido a −8,6 dB.
 ## 5.5 Música por estrato
 
 Um tema de doom/drone por estrato — lento (50–66 BPM), grave (fundamentais em E1–D2),
-esparso. Referências declaradas: Deftones (*Cherry Waves*), Electric Wizard
-(*Funeralopolis*), a trilha de Absolum. A música diz "você está em OUTRO lugar" pelo
+esparso. Referências declaradas: Deftones (_Cherry Waves_), Electric Wizard
+(_Funeralopolis_), a trilha de Absolum. A música diz "você está em OUTRO lugar" pelo
 mesmo motivo que o véu de cor do render diz: identidade no primeiro relance.
 
-| Estrato | Root | Caráter |
-| --- | --- | --- |
-| `basalt` | E1 | a âncora neutra; pentatônica menor, quinta no pad |
-| `prismatic` | B1 | menor com nona; a catedral canta |
-| `aquifer` | G1 | frígio, o mais lento; swells, b9 no pad |
-| `sulfur` | A1 | lócrio; o tritono do riff é o ar errado |
-| `furnace` | F1 | o mais pesado; sawtooth, riff arrastado |
-| `silica` | D2 | riff sempre descendente, seco, silêncios largos |
-| `glacial` | Bb1 | quase sem baixo; pad detunado de ataque lento |
-| `ferric` | Ab1 | pulso metronômico de duas notas; industrial |
+| Estrato     | Root | Caráter                                           |
+| ----------- | ---- | ------------------------------------------------- |
+| `basalt`    | E1   | a âncora neutra; pentatônica menor, quinta no pad |
+| `prismatic` | B1   | menor com nona; a catedral canta                  |
+| `aquifer`   | G1   | frígio, o mais lento; swells, b9 no pad           |
+| `sulfur`    | A1   | lócrio; o tritono do riff é o ar errado           |
+| `furnace`   | F1   | o mais pesado; sawtooth, riff arrastado           |
+| `silica`    | D2   | riff sempre descendente, seco, silêncios largos   |
+| `glacial`   | Bb1  | quase sem baixo; pad detunado de ataque lento     |
+| `ferric`    | Ab1  | pulso metronômico de duas notas; industrial       |
 
 Ocupações variam o tema sem trocá-lo: `mycelial` detuna uma **cópia** do drone (8 cents,
 batimento orgânico) e soma uma terça menor; `aurix` põe um portão de tremolo no pad e um
@@ -383,7 +405,7 @@ As quatro decisões estruturais:
    `Math.random()` em `music.ts`: variação sai de hash de (compasso, índice).
 2. **Teto de mixagem.** O barramento inteiro vive sob `MUSIC_CEILING = 0.366`, que põe a
    trilha em −21 LUFS no jogo. Em repouso isso passa do menor telegrafo de propósito; quem
-   mantém o contrato *SFX > música* é o ducking (`MUSIC_DUCK_FACTOR = 0.35`), que sob um
+   mantém o contrato _SFX > música_ é o ducking (`MUSIC_DUCK_FACTOR = 0.35`), que sob um
    telegrafo devolve a música a −30 LUFS — exatamente o nível em que ela tocava o tempo
    todo antes desta virada. Trocou-se margem no silêncio, que ninguém usava, por margem no
    instante em que ela importa. O slider "Música" **multiplica** o teto, nunca vira ganho

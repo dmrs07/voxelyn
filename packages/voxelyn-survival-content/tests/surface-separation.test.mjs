@@ -26,6 +26,7 @@ describe('contrato visual das materias organicas e volateis', () => {
       'ice-fractured',
       'ice-critical',
       'deep-water',
+      'aquifer-deep-water',
     ]);
   });
 
@@ -86,6 +87,40 @@ describe('contrato visual das materias organicas e volateis', () => {
       expect(rim.length, `v${variant}`).toBeGreaterThan(0);
       // A borda e o ANEL, nao o miolo: no maximo um quinto das colunas.
       expect(rim.length / deep.length, `v${variant}`).toBeLessThan(0.2);
+    }
+  });
+
+  /**
+   * A agua profunda NATIVA do Aquifero nao veio de placa nenhuma: nada de
+   * gelo, nada de moldura, nada de leito — e continua se separando da rasa
+   * por profundidade, forma e movimento, nunca so por cor.
+   */
+  it('a agua profunda do Aquifero nao tem lasca de gelo nem leito, e nao e moldurada', () => {
+    for (let variant = 0; variant < VARIANTS; variant++) {
+      const deep = surfaceModel('aquifer-deep-water', variant, 0);
+      const shallow = surfaceModel('water', variant, 0);
+      expect(
+        deep.every((b) => b.mat !== 'ice'),
+        `v${variant}: gelo no Aquifero`,
+      ).toBe(true);
+      expect(
+        deep.every((b) => b.mat !== 'rock'),
+        `v${variant}: leito na agua profunda`,
+      ).toBe(true);
+      // A rasa mostra o leito; a profunda e mais ESCURA que ela por materia.
+      const dark = (m) => m.filter((b) => b.mat === 'scorch' || b.mat === 'floor').length;
+      expect(dark(deep)).toBeGreaterThan(dark(shallow));
+      // Sem moldura: a borda do tile nao e diferente do miolo — nenhuma coluna
+      // do anel externo tem altura cheia acima da laje.
+      const half = 4;
+      const rimTall = deep.filter(
+        (b) => b.z >= 1 && b.h >= 1 && (Math.abs(b.x) >= half - 0.5 || Math.abs(b.y) >= half - 0.5),
+      );
+      expect(rimTall, `v${variant}`).toHaveLength(0);
+      // E se MOVE: dois quadros vizinhos nao sao iguais.
+      const a = JSON.stringify(surfaceModel('aquifer-deep-water', variant, 0));
+      const b = JSON.stringify(surfaceModel('aquifer-deep-water', variant, 1));
+      expect(a).not.toBe(b);
     }
   });
 

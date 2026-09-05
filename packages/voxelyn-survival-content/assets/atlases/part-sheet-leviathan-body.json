@@ -1,0 +1,69 @@
+{
+  "id": "part-sheet-leviathan-body",
+  "version": 1,
+  "atlas": "part-sheet-leviathan-body.png",
+  "normalAtlas": "part-sheet-leviathan-body.normal.png",
+  "normalScale": 2,
+  "frameWidth": 160,
+  "frameHeight": 114,
+  "columns": 16,
+  "anchorX": 80,
+  "anchorY": 76,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.7,
+    "h": 1.2
+  },
+  "footprint": {
+    "w": 1.6,
+    "h": 1.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 8,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0
+    },
+    "dl": {
+      "idle": 8
+    },
+    "ur": {
+      "idle": 16
+    },
+    "ul": {
+      "idle": 24
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan body, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

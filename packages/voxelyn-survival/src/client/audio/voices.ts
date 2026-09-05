@@ -192,7 +192,16 @@ export type VoiceId =
   // Leviata do Lencol: baleia abissal, agua, eletricidade abafada. O canto
   // anuncia intencao; o estalo eletrico anuncia perigo.
   | 'leviathanCall'
-  | 'leviathanBreach'
+  | 'leviathanProbeCall'
+  | 'leviathanProbeMark'
+  | 'leviathanProbeRelease'
+  | 'leviathanDiveWarn'
+  | 'leviathanDive'
+  | 'leviathanGulp'
+  | 'leviathanBubbling'
+  | 'leviathanEmerge'
+  | 'leviathanBreath'
+  | 'aquiferPlunge'
   | 'leviathanDelugeRise'
   | 'leviathanShockCharge'
   | 'leviathanShockRelease'
@@ -540,9 +549,29 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // seguro" do jogador local; a trava de 500 ms da a elas o ritmo de um
   // coracao ouvido de dentro. O Diluvio muda o mapa: global tambem.
   leviathanCall: { priority: 6, gain: 0.42, minIntervalMs: 900, spatial: true },
-  leviathanBreach: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  // A primeira fase: o canto da Sondagem e telegrafo (10) mas GRAVE e curto —
+  // nenhum agudo eletrico prolongado, isso e da descarga. A marca no ponto e a
+  // resposta abafada (9); a liberacao e o golpe hidraulico (9). O aviso do
+  // mergulho e telegrafo (10): quem esta de pe sobre o corpo tem de sair. A
+  // descida, o gulp, o borbulhar e a respiracao sao presenca (7-8), e por
+  // isso ficam ABAIXO de todo windup.
+  leviathanProbeCall: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
+  leviathanProbeMark: { priority: 9, gain: 0.42, minIntervalMs: 90, spatial: true },
+  leviathanProbeRelease: { priority: 9, gain: 0.62, minIntervalMs: 60, spatial: true },
+  leviathanDiveWarn: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  leviathanDive: { priority: 8, gain: 0.5, minIntervalMs: 200, spatial: true },
+  leviathanGulp: { priority: 8, gain: 0.55, minIntervalMs: 200, spatial: true },
+  leviathanBubbling: { priority: 8, gain: 0.45, minIntervalMs: 250, spatial: true },
+  leviathanEmerge: { priority: 9, gain: 0.6, minIntervalMs: 200, spatial: true },
+  leviathanBreath: { priority: 7, gain: 0.44, minIntervalMs: 300, spatial: true },
+  // A queda no Aquifero: prioridade maxima como a do gelo — e a morte.
+  aquiferPlunge: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
   leviathanDelugeRise: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
-  leviathanShockCharge: { priority: 10, gain: 0.7, minIntervalMs: 0, spatial: false },
+  // A CARGA da descarga ficou mais leve no mix (0,7 -> 0,45): continua sendo
+  // o aviso fatal (prioridade 10, nunca roubada por som comum), mas deixou de
+  // ser uma parede de saw e ruido — e pressao grave, vocalizacao crescente e
+  // estalos que aceleram, perceptualmente ABAIXO da propria descarga (0,9).
+  leviathanShockCharge: { priority: 10, gain: 0.45, minIntervalMs: 0, spatial: false },
   leviathanShockRelease: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
   leviathanBubbleSafe: { priority: 8, gain: 0.36, minIntervalMs: 500, spatial: false },
   leviathanShockRecover: { priority: 9, gain: 0.5, minIntervalMs: 0, spatial: true },

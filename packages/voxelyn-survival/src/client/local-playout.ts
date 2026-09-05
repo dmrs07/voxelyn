@@ -1,4 +1,5 @@
 import type {
+  BossRuntime,
   Entity,
   LeylineCircuit,
   LeylineNode,
@@ -97,6 +98,15 @@ type Pose = {
   stratumSubverted: boolean;
   salvageSites: SalvageSite[];
   wellOffers: WellOffer[];
+  /**
+   * O ESTADO DO ENCONTRO deste tick. Por valor, e por retrato: as bolhas
+   * protetoras, os relogios da descarga, a marca da Sondagem e a viagem do
+   * Leviata sao lidos pelo desenho no MESMO tick em que os corpos estao —
+   * servidos do estado vivo, uma bolha nasceria um tick antes de o corpo do
+   * chefe chegar onde a carregou, e a promessa "se voce viu que estava dentro,
+   * a simulacao nao cobra" quebraria por um quadro.
+   */
+  bossRuntime: BossRuntime;
 };
 
 /**
@@ -155,6 +165,15 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     stratumSubverted: state.stratumSubverted,
     salvageSites: state.salvageSites.map((s) => ({ ...s })),
     wellOffers: state.wellOffers.map((o) => ({ ...o })),
+    // Raso por campo e fundo nas listas que a simulacao reescreve (bolhas,
+    // bacias, marcas); `path` e derivado e continua compartilhado.
+    bossRuntime: {
+      ...state.bossRuntime,
+      protectiveBubbles: state.bossRuntime.protectiveBubbles.map((b) => ({ ...b })),
+      leviathanPools: [...state.bossRuntime.leviathanPools],
+      blastCells: [...state.bossRuntime.blastCells],
+      collapseCells: state.bossRuntime.collapseCells.map((c) => ({ ...c })),
+    },
   };
 };
 
@@ -238,9 +257,7 @@ export class LocalPlayout {
     // Projeteis viajam a 13 tiles/s — quase dois tercos de tile por tick. Sem
     // interpolar eles saltam enquanto tudo em volta desliza, e o tiro chega ao
     // alvo antes da criatura que ele vai acertar.
-    const projectileTargets = targets
-      ? new Map(to.projectiles.map((p) => [p.id, p]))
-      : null;
+    const projectileTargets = targets ? new Map(to.projectiles.map((p) => [p.id, p])) : null;
 
     return {
       ...state,
@@ -264,6 +281,7 @@ export class LocalPlayout {
       stratumSubverted: from.stratumSubverted,
       salvageSites: from.salvageSites,
       wellOffers: from.wellOffers,
+      bossRuntime: from.bossRuntime,
       players,
       playerExtras: from.playerExtras,
       player: players[from.playerIndex] ?? players[0] ?? state.player,

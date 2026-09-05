@@ -48,6 +48,7 @@ import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
 import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
+import leviathanBodyManifest from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.json';
 import lungMatrixManifest from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.json';
 import furnaceHeartManifest from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.json';
 import frostQueenManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.json';
@@ -115,6 +116,7 @@ import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white
 import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
 import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
 import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
+import leviathanBodyUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.png?url';
 import lungMatrixUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.png?url';
 import furnaceHeartUrl from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.png?url';
 import frostQueenUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.png?url';
@@ -152,6 +154,7 @@ import enemyMudLampreyNormalUrl from '@voxelyn/survival-content/assets/atlases/e
 import enemyResonantNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-resonant.normal.png?url';
 import enemyScoriacNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.normal.png?url';
 import enemySheetLeviathanNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.normal.png?url';
+import partSheetLeviathanBodyNormalUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.normal.png?url';
 import enemySpitterNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.normal.png?url';
 import enemySporeBomberNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.normal.png?url';
 import enemyStalkerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.normal.png?url';
@@ -192,6 +195,7 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-resonant.normal.png': enemyResonantNormalUrl,
   'enemy-scoriac.normal.png': enemyScoriacNormalUrl,
   'enemy-sheet-leviathan.normal.png': enemySheetLeviathanNormalUrl,
+  'part-sheet-leviathan-body.normal.png': partSheetLeviathanBodyNormalUrl,
   'enemy-spitter.normal.png': enemySpitterNormalUrl,
   'enemy-spore-bomber.normal.png': enemySporeBomberNormalUrl,
   'enemy-stalker.normal.png': enemyStalkerNormalUrl,
@@ -293,7 +297,7 @@ export const fanFrameFor = (barrelPhase: number): number =>
   MINIGUN_FAN_FRAMES;
 
 export const weaponComposition = (
-  mounted: readonly string[] = []
+  mounted: readonly string[] = [],
 ): { weapon: string | null; attachments: readonly string[] } => {
   const weapon = mounted.includes('minigun') ? 'minigun' : null;
   return {
@@ -392,7 +396,7 @@ export const glowAlpha = (inherited: number): number => inherited * GLOW_ALPHA;
  */
 export const keepEmissivePixels = (
   rgba: Uint8ClampedArray,
-  emissive: readonly string[]
+  emissive: readonly string[],
 ): number => {
   const wanted = new Set(emissive.map((hex) => parseInt(hex.slice(1), 16)));
   let kept = 0;
@@ -429,7 +433,7 @@ export const emissiveMask = (
   source: CanvasImageSource,
   width: number,
   height: number,
-  emissive: readonly string[]
+  emissive: readonly string[],
 ): HTMLCanvasElement | null => {
   if (width <= 0 || height <= 0) return null;
   const full = document.createElement('canvas');
@@ -524,13 +528,34 @@ export const REQUIRED_ATLAS_IDS: readonly string[] = [
  * exatamente o que ele tinha antes de o modulo existir.
  */
 const MODULE_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
-  'layer-module-piercing': { manifest: modulePiercingManifest as unknown as SpriteManifestEntry, url: modulePiercingUrl },
-  'layer-module-explosive': { manifest: moduleExplosiveManifest as unknown as SpriteManifestEntry, url: moduleExplosiveUrl },
-  'layer-module-conductive': { manifest: moduleConductiveManifest as unknown as SpriteManifestEntry, url: moduleConductiveUrl },
-  'layer-module-return-disc': { manifest: moduleReturnDiscManifest as unknown as SpriteManifestEntry, url: moduleReturnDiscUrl },
-  'layer-module-ricochet': { manifest: moduleRicochetManifest as unknown as SpriteManifestEntry, url: moduleRicochetUrl },
-  'layer-module-siphon': { manifest: moduleSiphonManifest as unknown as SpriteManifestEntry, url: moduleSiphonUrl },
-  'layer-module-minigun': { manifest: moduleMinigunManifest as unknown as SpriteManifestEntry, url: moduleMinigunUrl },
+  'layer-module-piercing': {
+    manifest: modulePiercingManifest as unknown as SpriteManifestEntry,
+    url: modulePiercingUrl,
+  },
+  'layer-module-explosive': {
+    manifest: moduleExplosiveManifest as unknown as SpriteManifestEntry,
+    url: moduleExplosiveUrl,
+  },
+  'layer-module-conductive': {
+    manifest: moduleConductiveManifest as unknown as SpriteManifestEntry,
+    url: moduleConductiveUrl,
+  },
+  'layer-module-return-disc': {
+    manifest: moduleReturnDiscManifest as unknown as SpriteManifestEntry,
+    url: moduleReturnDiscUrl,
+  },
+  'layer-module-ricochet': {
+    manifest: moduleRicochetManifest as unknown as SpriteManifestEntry,
+    url: moduleRicochetUrl,
+  },
+  'layer-module-siphon': {
+    manifest: moduleSiphonManifest as unknown as SpriteManifestEntry,
+    url: moduleSiphonUrl,
+  },
+  'layer-module-minigun': {
+    manifest: moduleMinigunManifest as unknown as SpriteManifestEntry,
+    url: moduleMinigunUrl,
+  },
 };
 
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
@@ -559,6 +584,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: broodManifest as unknown as SpriteManifestEntry, url: broodUrl },
   { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
   { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
+  { manifest: leviathanBodyManifest as unknown as SpriteManifestEntry, url: leviathanBodyUrl },
   { manifest: lungMatrixManifest as unknown as SpriteManifestEntry, url: lungMatrixUrl },
   { manifest: furnaceHeartManifest as unknown as SpriteManifestEntry, url: furnaceHeartUrl },
   { manifest: frostQueenManifest as unknown as SpriteManifestEntry, url: frostQueenUrl },
@@ -644,7 +670,10 @@ export class TerrainBank {
   private settlement = newSettlement();
 
   load(): void {
-    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
+    this.image.onload = () => {
+      this.ready = true;
+      settle(this.settlement, true);
+    };
     this.image.onerror = () => {
       console.warn('[terrain] atlas failed to load; using flat blocks');
       settle(this.settlement, false);
@@ -653,7 +682,9 @@ export class TerrainBank {
   }
 
   /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
-  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+  whenSettled(): Promise<boolean> {
+    return this.settlement.promise;
+  }
 
   /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
   retryFailed(): void {
@@ -662,8 +693,12 @@ export class TerrainBank {
     this.load();
   }
 
-  get kinds(): string[] { return this.manifest.kinds; }
-  get variants(): number { return this.manifest.variants; }
+  get kinds(): string[] {
+    return this.manifest.kinds;
+  }
+  get variants(): number {
+    return this.manifest.variants;
+  }
 
   /**
    * Desenha um bloco com o centro do tile em (sx, sy) no plano do chao.
@@ -679,11 +714,16 @@ export class TerrainBank {
     brightness: number,
     screenX: number,
     screenY: number,
-    zoom: number
+    zoom: number,
   ): boolean {
     if (!this.ready) return false;
     const m = this.manifest;
-    const rect = resolveBlock(m, kindIndex, variantAt(x, y, m.variants), lightLevelFor(m, brightness));
+    const rect = resolveBlock(
+      m,
+      kindIndex,
+      variantAt(x, y, m.variants),
+      lightLevelFor(m, brightness),
+    );
     // O atlas esta na grade fina: pixels de atlas viram tela por `s`, nao por
     // `zoom`. A origem do modelo cai meio voxel AUTORADO adiante do centro do
     // tile nos dois eixos — na projecao 2:1 isso e 1px logico para baixo, que
@@ -692,8 +732,17 @@ export class TerrainBank {
     const dx = screenX - m.originX * s;
     const dy = screenY + ATLAS_SCALE * s - m.originY * s;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * s, m.frameHeight * s);
+    ctx.drawImage(
+      this.image,
+      rect.sx,
+      rect.sy,
+      rect.sw,
+      rect.sh,
+      dx,
+      dy,
+      m.frameWidth * s,
+      m.frameHeight * s,
+    );
     return true;
   }
 }
@@ -716,7 +765,10 @@ export class SurfaceBank {
   private settlement = newSettlement();
 
   load(): void {
-    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
+    this.image.onload = () => {
+      this.ready = true;
+      settle(this.settlement, true);
+    };
     this.image.onerror = () => {
       console.warn('[surfaces] atlas failed to load; using flat floor');
       settle(this.settlement, false);
@@ -725,7 +777,9 @@ export class SurfaceBank {
   }
 
   /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
-  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+  whenSettled(): Promise<boolean> {
+    return this.settlement.promise;
+  }
 
   /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
   retryFailed(): void {
@@ -734,7 +788,9 @@ export class SurfaceBank {
     this.load();
   }
 
-  get kinds(): string[] { return this.manifest.kinds.map((k) => k.name); }
+  get kinds(): string[] {
+    return this.manifest.kinds.map((k) => k.name);
+  }
 
   /**
    * Desenha a crosta de uma celula com o centro do tile em (sx, sy).
@@ -754,7 +810,7 @@ export class SurfaceBank {
     nowMs: number,
     screenX: number,
     screenY: number,
-    zoom: number
+    zoom: number,
   ): boolean {
     if (!this.ready) return false;
     const m = this.manifest;
@@ -764,15 +820,24 @@ export class SurfaceBank {
       kindIndex,
       variantAt(x, y, m.variants),
       surfaceFrameAt(m, kindIndex, x, y, nowMs),
-      lightLevelFor(m, brightness)
+      lightLevelFor(m, brightness),
     );
     // Mesma conversao de grade fina do bloco: a ancora e identica de proposito.
     const s = zoom / ATLAS_SCALE;
     const dx = screenX - m.originX * s;
     const dy = screenY + ATLAS_SCALE * s - m.originY * s;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * s, m.frameHeight * s);
+    ctx.drawImage(
+      this.image,
+      rect.sx,
+      rect.sy,
+      rect.sw,
+      rect.sh,
+      dx,
+      dy,
+      m.frameWidth * s,
+      m.frameHeight * s,
+    );
     return true;
   }
 }
@@ -796,7 +861,10 @@ export class PropBank {
   private normalState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 
   load(): void {
-    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
+    this.image.onload = () => {
+      this.ready = true;
+      settle(this.settlement, true);
+    };
     this.image.onerror = () => {
       console.warn('[props] atlas failed to load; using flat markers');
       settle(this.settlement, false);
@@ -805,7 +873,9 @@ export class PropBank {
   }
 
   /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
-  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+  whenSettled(): Promise<boolean> {
+    return this.settlement.promise;
+  }
 
   /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
   retryFailed(): void {
@@ -867,7 +937,7 @@ export class PropBank {
      * A luz do mundo nas tres faces desta peca. Ausente = a peca e desenhada
      * como sempre foi, sem luz somada.
      */
-    faces?: FaceLighting
+    faces?: FaceLighting,
   ): boolean {
     if (!this.ready) return false;
     const kindIndex = this.indexOf(name);
@@ -934,9 +1004,9 @@ const WALK_HIP_BOB = [0, -2, -2, 0, 0, -2];
  * chama no chao, e nao a um efeito de interface.
  */
 const HEAT_RAMP: readonly (readonly [number, readonly [number, number, number]])[] = [
-  [0.00, [0xd9, 0x3b, 0x4c]], // blood: o primeiro rubor
+  [0.0, [0xd9, 0x3b, 0x4c]], // blood: o primeiro rubor
   [0.55, [0xff, 0x7a, 0x2f]], // fire
-  [1.00, [0xff, 0xd1, 0x66]], // loot
+  [1.0, [0xff, 0xd1, 0x66]], // loot
 ];
 /** Branco-quente: so o superaquecimento chega aqui. */
 const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
@@ -1008,7 +1078,7 @@ export const recoilScreenOffset = (
   facingX: number,
   facingY: number,
   recoil: number,
-  zoom: number
+  zoom: number,
 ): { x: number; y: number } => {
   const worldLength = Math.hypot(facingX, facingY) || 1;
   const screenX = (facingX - facingY) / worldLength;
@@ -1136,7 +1206,7 @@ export class SpriteBank {
    */
   retryFailed(): void {
     const again = [...SOURCES, ...Object.values(MODULE_SOURCES)].filter(
-      (source) => this.byId.get(source.manifest.id)?.failed
+      (source) => this.byId.get(source.manifest.id)?.failed,
     );
     for (const { manifest } of again) {
       this.settlements.set(manifest.id, newSettlement());
@@ -1215,7 +1285,7 @@ export class SpriteBank {
 
   manifestForArchetype(archetype: string): SpriteManifestEntry | null {
     const id = ARCHETYPE_SPRITE[archetype];
-    return id ? this.byId.get(id)?.manifest ?? null : null;
+    return id ? (this.byId.get(id)?.manifest ?? null) : null;
   }
 
   spriteForArchetype(archetype: string): Loaded | null {
@@ -1237,10 +1307,11 @@ export class SpriteBank {
     /** A luz do mundo caindo neste corpo, por silhueta. Ver `drawLit`. */
     light?: Tint,
     /** A mesma luz resolvida POR FACE: [topo, esquerda, direita]. */
-    faces?: FaceLighting
+    faces?: FaceLighting,
   ): boolean {
     if (typeof animation !== 'string' && archetype === 'prospector') {
-      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint, light, faces)) return true;
+      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint, light, faces))
+        return true;
       // Os atlas de camada ainda podem estar carregando. O atlas completo mantém
       // o personagem visível e usa a ação do tronco como fallback temporário.
       facingX = animation.upper.facingX;
@@ -1252,7 +1323,20 @@ export class SpriteBank {
     if (typeof animation !== 'string') animation = animation.upper.animation;
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
-    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint, light, faces);
+    this.drawLoadedFrame(
+      ctx,
+      loaded,
+      animation,
+      facingX,
+      facingY,
+      elapsedMs,
+      footX,
+      footY,
+      zoom,
+      tint,
+      light,
+      faces,
+    );
     return true;
   }
 
@@ -1281,11 +1365,25 @@ export class SpriteBank {
     zoom: number,
     tint?: Tint,
     light?: Tint,
-    faces?: FaceLighting
+    faces?: FaceLighting,
   ): boolean {
     const loaded = this.get(id);
     if (!loaded) return false;
-    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, 0, footX, footY, zoom, tint, light, faces, frame);
+    this.drawLoadedFrame(
+      ctx,
+      loaded,
+      animation,
+      facingX,
+      facingY,
+      0,
+      footX,
+      footY,
+      zoom,
+      tint,
+      light,
+      faces,
+      frame,
+    );
     return true;
   }
 
@@ -1309,7 +1407,7 @@ export class SpriteBank {
     x: number,
     y: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
   ): boolean {
     const loaded = this.get(id);
     if (!loaded || !loaded.ready) return false;
@@ -1325,7 +1423,7 @@ export class SpriteBank {
     zoom: number,
     tint?: Tint,
     light?: Tint,
-    faces?: FaceLighting
+    faces?: FaceLighting,
   ): boolean {
     const lower = this.get(PLAYER_LOWER_ID);
     const upper = this.get(PLAYER_UPPER_ID);
@@ -1350,9 +1448,7 @@ export class SpriteBank {
     const mounted = animation.modules ?? [];
     for (const id of mounted) this.requestModule(moduleLayerSpriteId(id));
     const composition = weaponComposition(mounted);
-    const minigun = composition.weapon
-      ? this.get(moduleLayerSpriteId(composition.weapon))
-      : null;
+    const minigun = composition.weapon ? this.get(moduleLayerSpriteId(composition.weapon)) : null;
     // O atlas da Minigun ainda pode estar viajando. Ate ele chegar o Prospector
     // segue com o Cravador — nunca desarmado, que e o unico desfecho que a
     // composicao nao pode entregar.
@@ -1379,7 +1475,8 @@ export class SpriteBank {
     const firing = animation.upper.animation === 'attack';
     const muzzleLit =
       firing &&
-      frameAtTime(weapon.manifest, 'attack', animation.upper.elapsedMs) === PROSPECTOR_MUZZLE_FLASH_FRAME;
+      frameAtTime(weapon.manifest, 'attack', animation.upper.elapsedMs) ===
+        PROSPECTOR_MUZZLE_FLASH_FRAME;
     // Enquanto acende, a luz manda no corpo: ela e mais forte que o tint frio que
     // separa um parceiro do outro, e dura um quadro.
     const bodyTint = muzzleLit ? MUZZLE_LIGHT : tint;
@@ -1396,18 +1493,23 @@ export class SpriteBank {
       zoom,
       bodyTint,
       light,
-      faces
+      faces,
     );
 
-    const lowerFrame = frameAtTime(lower.manifest, animation.lower.animation, animation.lower.elapsedMs);
-    const hipBob = animation.lower.animation === 'walk'
-      ? WALK_HIP_BOB[lowerFrame % WALK_HIP_BOB.length] * zoom
-      : 0;
+    const lowerFrame = frameAtTime(
+      lower.manifest,
+      animation.lower.animation,
+      animation.lower.elapsedMs,
+    );
+    const hipBob =
+      animation.lower.animation === 'walk'
+        ? WALK_HIP_BOB[lowerFrame % WALK_HIP_BOB.length] * zoom
+        : 0;
     const recoil = recoilScreenOffset(
       animation.upper.facingX,
       animation.upper.facingY,
       animation.recoil,
-      zoom
+      zoom,
     );
 
     const upperX = footX + recoil.x;
@@ -1425,7 +1527,7 @@ export class SpriteBank {
         zoom,
         bodyTint,
         light,
-        faces
+        faces,
       );
     };
 
@@ -1466,7 +1568,7 @@ export class SpriteBank {
           heatTint,
           light,
           faces,
-          layer === minigun ? fanFrame : undefined
+          layer === minigun ? fanFrame : undefined,
         );
       }
     };
@@ -1507,12 +1609,14 @@ export class SpriteBank {
      * decorrido significaria reinicia-la a cada `action_start`, e a Minigun
      * republica um a cada quatro ticks.
      */
-    frameOverride?: number
+    frameOverride?: number,
   ): void {
     const { manifest, image } = loaded;
-    const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
+    const fallbackAnimation =
+      animation === 'special' && !manifest.animations.special ? 'attack' : animation;
     const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
-    const direction = manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
+    const direction =
+      manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
     const count = manifest.animations[useAnimation].frames;
     const frame =
       frameOverride === undefined
@@ -1668,7 +1772,7 @@ export class SpriteBank {
     dy: number,
     dw: number,
     dh: number,
-    zoom: number
+    zoom: number,
   ): void {
     const glow = loaded.glow;
     if (!this.bloom || !glow) return;
@@ -1683,14 +1787,26 @@ export class SpriteBank {
     ctx.globalAlpha = glowAlpha(inherited) * GLOW_WIDE_ALPHA;
     ctx.drawImage(
       glow,
-      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
-      dx - wide, dy - wide, dw + wide * 2, dh + wide * 2
+      rect.sx / GLOW_SCALE,
+      rect.sy / GLOW_SCALE,
+      rect.sw / GLOW_SCALE,
+      rect.sh / GLOW_SCALE,
+      dx - wide,
+      dy - wide,
+      dw + wide * 2,
+      dh + wide * 2,
     );
     ctx.globalAlpha = glowAlpha(inherited);
     ctx.drawImage(
       glow,
-      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
-      dx - grow, dy - grow, dw + grow * 2, dh + grow * 2
+      rect.sx / GLOW_SCALE,
+      rect.sy / GLOW_SCALE,
+      rect.sw / GLOW_SCALE,
+      rect.sh / GLOW_SCALE,
+      dx - grow,
+      dy - grow,
+      dw + grow * 2,
+      dh + grow * 2,
     );
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = inherited;
@@ -1702,7 +1818,7 @@ export class SpriteBank {
     rect: { sx: number; sy: number; sw: number; sh: number },
     width: number,
     height: number,
-    tint: Tint
+    tint: Tint,
   ): HTMLCanvasElement {
     if (!this.tintBuffer) this.tintBuffer = document.createElement('canvas');
     const buffer = this.tintBuffer;
@@ -1753,7 +1869,7 @@ export const deriveAnim = (
   y: number,
   hp: number,
   alive: boolean,
-  nowMs: number
+  nowMs: number,
 ): EntityAnimState => {
   const state: EntityAnimState = previous ?? {
     anim: 'idle',

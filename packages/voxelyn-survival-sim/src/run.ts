@@ -116,11 +116,13 @@ import {
   explodeAt,
   igniteCell,
   isConductiveSurface,
+  isIceHole,
   isGlacialStabilised,
   markDirty,
   setSurface,
   stepCells,
 } from './cells.js';
+import { leviathanCovers } from './leviathan.js';
 import {
   explosiveArmedByDistance,
   impactSolid,
@@ -1618,9 +1620,26 @@ const plungeIntoDeepWater = (
   extra.downed = false;
   extra.bleedoutAt = 0;
   extra.lastDamage = { cause: { kind: 'deep_water' }, tick: state.tick };
-  events.push({ t: 'ice_fall', x: player.x, y: player.y, slot });
+  // De que agua: o buraco de uma placa (registrado em `iceHoles`) ou a agua
+  // profunda nativa do Aquifero. A mesma morte, duas apresentacoes.
+  events.push({
+    t: 'ice_fall',
+    x: player.x,
+    y: player.y,
+    slot,
+    medium: isIceHole(state, cellIdx) ? 'ice' : 'water',
+  });
   killPlayer(state, slot, events);
 };
+
+/**
+ * Esta celula AFOGA quem pisa nela agora? Agua profunda, e nao tampada pelo
+ * corpo aberto do Leviata (ver `leviathanCovers`): enquanto ele esta ancorado
+ * — e durante o mergulho, ate a cauda sumir — as celulas profundas debaixo da
+ * manta sao chao. No tick em que a cauda some, a poca volta a ser fatal.
+ */
+const drownsAt = (state: SurvivalState, cellIdx: number): boolean =>
+  state.surface[cellIdx] === SURF_DEEP_WATER && !leviathanCovers(state, cellIdx);
 
 /**
  * A CARGA DESTE PROSPECTOR SOBRE O GELO, ao longo do que ele acabou de andar.
@@ -1651,7 +1670,7 @@ const applyIceLoad = (
     // O buraco que JA estava aberto mata na entrada, antes de qualquer outra
     // leitura: atravessar um vao de agua profunda no embalo nao e uma travessia
     // bem-sucedida, e o segmento acaba ali.
-    if (state.surface[i] === SURF_DEEP_WATER) {
+    if (drownsAt(state, i)) {
       plungeIntoDeepWater(state, slot, i, events);
       return;
     }
@@ -3348,7 +3367,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
     const p = state.players[slot];
     if (!state.playerExtras[slot].joined || !p.alive) continue;
     const i = cellIndexAt(state, p.x, p.y);
-    if (state.surface[i] === SURF_DEEP_WATER) plungeIntoDeepWater(state, slot, i, events);
+    if (drownsAt(state, i)) plungeIntoDeepWater(state, slot, i, events);
   }
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
@@ -3667,6 +3686,18 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(bubble.y * 1000));
     mix(Math.round(bubble.radius * 1000));
   }
+  // A PRIMEIRA FASE do Leviata: onde a Sondagem vai romper (e se afunda),
+  // quantas ja sairam, para onde ele viaja e quando emerge, e as bacias que
+  // ele abriu. Cada um decide chao, posicao ou tampa — duas simulacoes que
+  // discordem de um deles divergem no proximo impacto ou na proxima queda.
+  mix(state.bossRuntime.leviathanProbeCell);
+  mix(state.bossRuntime.leviathanProbeDeepen ? 1 : 0);
+  mix(state.bossRuntime.leviathanProbeSeq);
+  mix(state.bossRuntime.leviathanAnchorProbes);
+  mix(state.bossRuntime.leviathanDest);
+  mix(state.bossRuntime.leviathanSurfaceAt);
+  mix(state.bossRuntime.leviathanPools.length);
+  for (const pool of state.bossRuntime.leviathanPools) mix(pool);
   // O CORO CARDINAL. Tres campos que decidem a POSICAO de quatro corpos que
   // interceptam tiro: quem ocupa cada assento, quantos quartos de volta a
   // formacao ja deu e quando ela gira de novo. Duas simulacoes que discordem de

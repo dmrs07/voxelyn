@@ -27,6 +27,9 @@ import {
   SURF_RAIL_V,
   SURF_SCORCHED,
   SURF_WATER,
+  SURF_DEEP_WATER,
+  LEVIATHAN_POOL_CORE_RADIUS,
+  LEVIATHAN_POOL_RIM_RADIUS,
   WORLD_W,
 } from './constants.js';
 import type { LeylineNode, Vec2 } from './types.js';
@@ -432,6 +435,190 @@ export const floodOpen = (
     }
   }
   return seen;
+};
+
+/**
+ * O chao CAMINHAVEL a partir de (sx, sy): aberto E nao profundo, em quatro
+ * vizinhos.
+ *
+ * E o modelo honesto do Prospector. O raio dele (0,34) e menor que meia
+ * celula, entao um corredor 4-conexo de celulas abertas e sempre transitavel
+ * — e o afogamento le a celula sob o CENTRO do corpo, entao andar com o centro
+ * numa celula vizinha a agua profunda e permitido. Um BFS sobre solidos
+ * apenas (`floodOpen`) contaria agua profunda como chao, e e exatamente a
+ * mentira que este mapa nao pode contar: uma rota obrigatoria que atravessa
+ * um nucleo profundo nao e rota, e uma queda.
+ */
+export const floodWalkable = (
+  solid: Uint8Array,
+  surface: Uint8Array,
+  w: number,
+  h: number,
+  sx: number,
+  sy: number,
+): Set<number> => {
+  const seen = new Set<number>();
+  const start = idx(w, sx, sy);
+  if (solid[start] !== SOLID_NONE || surface[start] === SURF_DEEP_WATER) return seen;
+  const stack = [start];
+  seen.add(start);
+  while (stack.length > 0) {
+    const cur = stack.pop() as number;
+    const cx = cur % w;
+    const cy = (cur - cx) / w;
+    for (let k = 0; k < 4; k++) {
+      const x = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
+      const y = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const n = idx(w, x, y);
+      if (seen.has(n) || solid[n] !== SOLID_NONE || surface[n] === SURF_DEEP_WATER) continue;
+      seen.add(n);
+      stack.push(n);
+    }
+  }
+  return seen;
+};
+
+/** Menos que isto e uma poca, nao uma bacia: nao ganha nucleo profundo. */
+export const BASIN_MIN_CELLS = 14;
+/** A partir daqui a massa e erodida DUAS vezes: a margem rasa fica mais larga. */
+export const BASIN_DOUBLE_ERODE_CELLS = 46;
+/**
+ * E TRES vezes nas cisternas grandes: a cupula calcaria tem quase duzentas
+ * celulas, e com duas erosoes o abismo dela passava de cem — um terco de toda
+ * agua profunda do setor num lago so, e um lago que engole rota de mais.
+ */
+export const BASIN_TRIPLE_ERODE_CELLS = 120;
+/** Um nucleo de uma ou duas celulas e ruido "sal e pimenta"; nao existe. */
+export const DEEP_CORE_MIN_CELLS = 3;
+
+/**
+ * AS BACIAS PROFUNDAS DO AQUIFERO: toda massa de agua rasa grande o bastante
+ * ganha um nucleo de agua profunda, com margem rasa em volta.
+ *
+ * O algoritmo e o pedido pela spec, sobre as massas que a gramatica karst e
+ * os `waterBlobs` ja pintaram: (1) a mascara externa e a propria massa de
+ * agua rasa, irregular por construcao; (2) ela e ERODIDA por uma celula (duas
+ * nas massas grandes) em vizinhanca de oito — o que sobra sao celulas cujos
+ * oito vizinhos sao agua ou rocha, ou seja, celulas que nunca encostam em piso
+ * seco; (3) o miolo vira agua profunda. A margem rasa e uma consequencia da
+ * erosao, e nao uma segunda passada que poderia esquecer uma borda.
+ *
+ * O que fica de fora: massas pequenas (`BASIN_MIN_CELLS`), nucleos de uma ou
+ * duas celulas (`DEEP_CORE_MIN_CELLS`), as celulas PROTEGIDAS (entrada,
+ * pedestal do poco, ponto do chefe) e massas que JA tem agua profunda — as
+ * pocas autoradas da arena, cujo nucleo e do tamanho da manta do Leviata e nao
+ * pode crescer.
+ *
+ * E a PROVA: cada nucleo e pintado e conferido — se ele corta a rota
+ * caminhavel da entrada ate qualquer `target` (o pedestal, o chefe), volta a
+ * ser raso. Componente por componente, em ordem de indice, para as duas pontas
+ * chegarem ao mesmo mapa. Devolve quantas celulas ficaram profundas.
+ */
+export const stampDeepBasins = (
+  solid: Uint8Array,
+  surface: Uint8Array,
+  w: number,
+  h: number,
+  entry: Vec2,
+  targets: readonly Vec2[],
+  isProtected: (cell: number) => boolean,
+): number => {
+  const isWet = (i: number): boolean =>
+    solid[i] === SOLID_NONE && (surface[i] === SURF_WATER || surface[i] === SURF_DEEP_WATER);
+  const wallOrWet = (x: number, y: number, inCore: Set<number> | null): boolean => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return true;
+    const i = idx(w, x, y);
+    if (solid[i] !== SOLID_NONE) return true;
+    return inCore ? inCore.has(i) : isWet(i);
+  };
+  const erode = (cells: Set<number>, from: Set<number> | null): Set<number> => {
+    const out = new Set<number>();
+    for (const i of cells) {
+      const x = i % w;
+      const y = (i - x) / w;
+      let keep = true;
+      for (let dy = -1; dy <= 1 && keep; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          if (!wallOrWet(x + dx, y + dy, from)) {
+            keep = false;
+            break;
+          }
+        }
+      }
+      if (keep) out.add(i);
+    }
+    return out;
+  };
+  const components = (cells: Set<number>): number[][] => {
+    const seen = new Set<number>();
+    const out: number[][] = [];
+    for (const start of [...cells].sort((a, b) => a - b)) {
+      if (seen.has(start)) continue;
+      seen.add(start);
+      const comp = [start];
+      for (let head = 0; head < comp.length; head++) {
+        const c = comp[head];
+        const cx = c % w;
+        const cy = (c - cx) / w;
+        for (let k = 0; k < 4; k++) {
+          const x = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
+          const y = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const n = idx(w, x, y);
+          if (seen.has(n) || !cells.has(n)) continue;
+          seen.add(n);
+          comp.push(n);
+        }
+      }
+      out.push(comp);
+    }
+    return out;
+  };
+
+  const shallow = new Set<number>();
+  for (let i = 0; i < surface.length; i++) {
+    if (solid[i] === SOLID_NONE && surface[i] === SURF_WATER) shallow.add(i);
+  }
+  const reachable = (): boolean => {
+    const walk = floodWalkable(solid, surface, w, h, entry.x, entry.y);
+    return targets.every((t) => walk.has(idx(w, t.x, t.y)));
+  };
+  let deepened = 0;
+  for (const mass of components(shallow)) {
+    if (mass.length < BASIN_MIN_CELLS) continue;
+    // Massa AUTORADA (ja tem nucleo): a arena decidiu o tamanho dela.
+    let authored = false;
+    for (const i of mass) {
+      const x = i % w;
+      const y = (i - x) / w;
+      for (let k = 0; k < 4 && !authored; k++) {
+        const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0);
+        const ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        if (surface[idx(w, nx, ny)] === SURF_DEEP_WATER) authored = true;
+      }
+      if (authored) break;
+    }
+    if (authored) continue;
+    const massSet = new Set(mass);
+    let core = erode(massSet, null);
+    if (mass.length >= BASIN_DOUBLE_ERODE_CELLS) core = erode(core, core);
+    if (mass.length >= BASIN_TRIPLE_ERODE_CELLS) core = erode(core, core);
+    for (const i of [...core]) if (isProtected(i)) core.delete(i);
+    for (const piece of components(core)) {
+      if (piece.length < DEEP_CORE_MIN_CELLS) continue;
+      for (const i of piece) surface[i] = SURF_DEEP_WATER;
+      if (reachable()) {
+        deepened += piece.length;
+        continue;
+      }
+      // Cortou uma rota obrigatoria: este nucleo volta a ser lamina rasa.
+      for (const i of piece) surface[i] = SURF_WATER;
+    }
+  }
+  return deepened;
 };
 
 const bfsFarthest = (
@@ -933,6 +1120,81 @@ const stampCorePedestal = (
  * parede, invisivel e inalcancavel. Foi exatamente o que aconteceu na primeira
  * versao (seed 205, setor 3: um cuspidor emparedado num pilar de cristal).
  */
+/**
+ * Onde as pocas da arena do Aquifero nascem, em offsets a partir do chefe.
+ *
+ * Cinco, e nao oito: com a margem rasa de raio 2,6 cada poca ocupa ~21
+ * celulas, e oito delas alagariam a camara inteira — a primeira fase precisa
+ * de chao seco ENTRE as pocas, porque e por ele que o Prospector foge da
+ * Sondagem e e nele que a Sondagem abre pocas novas. As distancias entre
+ * vizinhas (8,5 a 12 tiles) cabem no salto do Leviata
+ * (`LEVIATHAN_HOP_MIN_TILES`..`LEVIATHAN_HOP_MAX_TILES`).
+ */
+export const AQUIFER_ARENA_POOLS: ReadonlyArray<readonly [number, number]> = [
+  [6, 0],
+  [-6, 0],
+  [0, 6],
+  [0, -6],
+  [5, -5],
+];
+
+/**
+ * Uma POCA da arena: margem rasa num disco, nucleo profundo no miolo.
+ *
+ * O nucleo so recebe celulas cujos quatro vizinhos JA sao agua: a margem rasa
+ * e uma garantia, nao uma esperanca — agua profunda nunca encosta em piso
+ * seco (ela pode encostar em rocha). Perto do pedestal e do proprio chefe
+ * (`cheb <= 2`) nada e escrito, pelo mesmo contrato do resto da moldura.
+ */
+const stampArenaPool = (
+  draft: TerrainDraft,
+  w: number,
+  h: number,
+  boss: Vec2,
+  core: Vec2,
+  dx: number,
+  dy: number,
+): void => {
+  const { solid, surface } = draft;
+  const cx = boss.x + dx;
+  const cy = boss.y + dy;
+  const cheb = (ax: number, ay: number): number => Math.max(Math.abs(ax), Math.abs(ay));
+  const allowed = (x: number, y: number): boolean =>
+    x > 1 &&
+    y > 1 &&
+    x < w - 2 &&
+    y < h - 2 &&
+    cheb(x - boss.x, y - boss.y) > 2 &&
+    cheb(x - core.x, y - core.y) > 2;
+  const rim = Math.ceil(LEVIATHAN_POOL_RIM_RADIUS);
+  for (let y = cy - rim; y <= cy + rim; y++) {
+    for (let x = cx - rim; x <= cx + rim; x++) {
+      if (!allowed(x, y)) continue;
+      if (Math.hypot(x - cx, y - cy) > LEVIATHAN_POOL_RIM_RADIUS) continue;
+      const i = idx(w, x, y);
+      if (solid[i] === SOLID_ROCK || solid[i] === SOLID_FRAGILE) draft.setSolid(i, SOLID_NONE);
+      if (solid[i] === SOLID_NONE) surface[i] = SURF_WATER;
+    }
+  }
+  const coreR = Math.ceil(LEVIATHAN_POOL_CORE_RADIUS);
+  const coreCells: number[] = [];
+  for (let y = cy - coreR; y <= cy + coreR; y++) {
+    for (let x = cx - coreR; x <= cx + coreR; x++) {
+      if (!allowed(x, y)) continue;
+      if (Math.hypot(x - cx, y - cy) > LEVIATHAN_POOL_CORE_RADIUS) continue;
+      const i = idx(w, x, y);
+      if (solid[i] !== SOLID_NONE || surface[i] !== SURF_WATER) continue;
+      const rimmed = [i - 1, i + 1, i - w, i + w].every(
+        (n) => solid[n] === SOLID_NONE && surface[n] === SURF_WATER,
+      );
+      if (rimmed) coreCells.push(i);
+    }
+  }
+  // Um nucleo de uma ou duas celulas (a poca caiu meio dentro da moldura)
+  // nao e nucleo: e ruido, e nao tampa nada. Ou a plus inteira, ou nada.
+  if (coreCells.length >= 3) for (const i of coreCells) surface[i] = SURF_DEEP_WATER;
+};
+
 export const stampBossArena = (
   draft: TerrainDraft,
   w: number,
@@ -1050,9 +1312,23 @@ export const stampBossArena = (
       crystals++;
     }
   } else if (halls === 'karst') {
-    // Aquifero: a orla e agua. Numa arena fechada, agua e o chao que CONDUZ —
-    // a descarga que o jogador solta volta para ele se ele estiver na lamina.
-    for (const [dx, dy] of ORLA) paint(dx, dy, SURF_WATER);
+    // AS POCAS DA ARENA DO AQUIFERO — a rede de destinos do Leviata.
+    //
+    // A orla de agua rasa que existia aqui virou cinco POCAS: bacias com
+    // margem rasa e um nucleo profundo pequeno (uma plus de cinco celulas),
+    // espalhadas em volta do chefe com chao seco caminhavel entre elas. E a
+    // geografia da primeira fase inteira: ele nasce sobre uma delas, tampa o
+    // nucleo com o corpo aberto, e viaja POR BAIXO ate a proxima; a Sondagem
+    // Abissal abre outras conforme a luta anda. Cada nucleo cabe debaixo da
+    // manta (`LEVIATHAN_POOL_CORE_RADIUS` < `LEVIATHAN_LID_RADIUS`), que e o
+    // que faz o corpo estacionario realmente tampar a poca em vez de deixar
+    // uma borda fatal escondida debaixo de uma asa.
+    //
+    // ESCAVA onde precisa: uma poca meio dentro da rocha nao e uma poca, e o
+    // carimbo roda antes das provas de alcancabilidade, que cobram o resto.
+    // Agua rasa continua conduzindo — a descarga do jogador volta para ele se
+    // ele estiver na lamina, como sempre.
+    for (const [dx, dy] of AQUIFER_ARENA_POOLS) stampArenaPool(draft, w, h, boss, core, dx, dy);
   } else if (halls === 'lungs') {
     // Fenda: paredes porosas nos eixos. A arena abre com um tiro, e o que era
     // cobertura vira passagem — nos dois sentidos.
@@ -1521,6 +1797,34 @@ const generateAttempt = (
     }
   }
 
+  // 5a) AS BACIAS PROFUNDAS. Depois de toda agua rasa existir (a gramatica
+  // dos saloes, os `waterBlobs`, as pocas da arena) e antes de qualquer ponto
+  // de interesse ser escolhido: terminais, caches, respiradouros e spawns
+  // nascem sobre chao CAMINHAVEL, e caminhavel agora exclui o nucleo. Com
+  // `waterBlobs.count` zero e sem karst nao ha massa nenhuma e nada roda — o
+  // basalto historico continua byte a byte.
+  //
+  // Protegidos: a entrada e o pedestal (raio 3 — o fosso raso do pedestal do
+  // Aquifero continua raso, e e funcional) e o ponto do chefe (raio 2).
+  const basinProtected = (cell: number): boolean => {
+    const x = cell % w;
+    const y = Math.floor(cell / w);
+    return (
+      Math.hypot(x - entry.x, y - entry.y) <= 3 ||
+      Math.hypot(x - corePos.x, y - corePos.y) <= 3 ||
+      Math.max(Math.abs(x - guardianSpawn.x), Math.abs(y - guardianSpawn.y)) <= 2
+    );
+  };
+  if (profile.waterBlobs.count > 0 || profile.halls === 'karst') {
+    stampDeepBasins(solid, surface, w, h, entry, [corePos, guardianSpawn], basinProtected);
+  }
+  // O chao caminhavel de verdade: aberto e NAO profundo, alcancavel da
+  // entrada. E sobre ele — e nao sobre `openCells` — que todo ponto de
+  // interesse e sorteado daqui em diante. Sem agua profunda no mapa as duas
+  // listas sao identicas, e o sorteio dos outros estratos nao muda.
+  const walkable = floodWalkable(solid, surface, w, h, entry.x, entry.y);
+  const walkArr = openArr.filter((cell) => walkable.has(cell));
+
   // 5b) TRILHOS da operacao: tramos retos sobre chao nu, longe da entrada e
   // do poco. So marcam superficie (SURF_RAIL) — a topologia nao muda, e com
   // count 0 nenhuma tirada de RNG acontece (todo estrato intocado).
@@ -1555,7 +1859,7 @@ const generateAttempt = (
   // 6) pontos de interesse sobre celulas abertas e distantes da entrada
   const pickOpenFar = (minDist: number, minGap: number, taken: Vec2[]): Vec2 | null => {
     for (let attempts = 0; attempts < 400; attempts++) {
-      const cell = openArr[rng.nextInt(openArr.length)];
+      const cell = walkArr[rng.nextInt(walkArr.length)];
       const x = cell % w;
       const y = Math.floor(cell / w);
       if (distFromEntry[cell] < minDist) continue;
@@ -1583,7 +1887,7 @@ const generateAttempt = (
   ];
 
   const chooseBandCell = (minRatio: number, maxRatio: number, taken: Vec2[]): Vec2 | null => {
-    const candidates = openArr.filter((cell) => {
+    const candidates = walkArr.filter((cell) => {
       const d = distFromEntry[cell];
       if (d < Math.ceil(maxPath * minRatio) || d > Math.floor(maxPath * maxRatio)) return false;
       const x = cell % w;
@@ -1599,7 +1903,7 @@ const generateAttempt = (
 
   const chooseCacheForTerminal = (terminal: Vec2, taken: Vec2[]): Vec2 | null => {
     const terminalDist = distFromEntry[idx(w, terminal.x, terminal.y)];
-    const candidates = openArr.filter((cell) => {
+    const candidates = walkArr.filter((cell) => {
       const x = cell % w;
       const y = Math.floor(cell / w);
       const path = distFromEntry[cell];

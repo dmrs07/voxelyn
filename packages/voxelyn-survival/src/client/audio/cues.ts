@@ -97,6 +97,11 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   // soou um instante antes. Um segundo bipe aqui ensinaria que ha o que
   // esquivar no meio do voo, e nao ha: o arco nao machuca por baixo.
   leap: null,
+  // As tres acoes do Leviata sao SO dele, e um chefe nunca fala pelo
+  // generico: o `boss_windup` do mesmo tick e quem fala por elas.
+  probe: null,
+  dive: null,
+  emerge: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -130,8 +135,13 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
   },
   white_devourer: { erupt: 'devourerEmergeWarning' },
   archcantor: { song: 'archcantorPhrase' },
+  // O Leviata: o canto grave da Sondagem sai do CORPO (a marca no chao e
+  // outro evento, `probe_marker`); o aviso do mergulho e a agua sendo puxada
+  // para baixo; o halo da emergencia e o borbulhar crescendo no destino.
   sheet_leviathan: {
-    breach: 'leviathanBreach',
+    probe: 'leviathanProbeCall',
+    dive: 'leviathanDiveWarn',
+    emerge: 'leviathanBubbling',
     deluge: 'leviathanDelugeRise',
     massive_shock: 'leviathanShockCharge',
   },
@@ -158,7 +168,9 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   erupt: 'telegraphCharge',
   maw: null,
   song: 'telegraphPulse',
-  breach: 'telegraphCharge',
+  probe: 'telegraphRanged',
+  dive: null,
+  emerge: null,
   deluge: null,
   massive_shock: 'telegraphPulse',
   wave: null,
@@ -178,7 +190,14 @@ const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
   },
   white_devourer: { erupt: 'devourerEmerge' },
   // O canto e decidido por intensidade (acorde ou tritono) — ver abaixo.
-  sheet_leviathan: { massive_shock: 'leviathanShockRelease' },
+  // O Leviata: o golpe hidraulico da Sondagem, a descida (a agua puxada por
+  // cima do corpo, camada a camada) e a ruptura pesada da lamina ao emergir.
+  sheet_leviathan: {
+    probe: 'leviathanProbeRelease',
+    dive: 'leviathanDive',
+    emerge: 'leviathanEmerge',
+    massive_shock: 'leviathanShockRelease',
+  },
   furnace_heart: { wave: 'furnaceWave' },
   frost_queen: { freeze: 'frostQueenFreeze' },
   magnetarch: { crush: 'magnetarchCrush', tether: 'magnetarchArc' },
@@ -191,7 +210,17 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
     maw_open: 'devourerMawOpen',
     maw_close: 'devourerMawClose',
   },
-  sheet_leviathan: { call: 'leviathanCall', recover: 'leviathanShockRecover' },
+  sheet_leviathan: {
+    call: 'leviathanCall',
+    // O ultimo "gulp": a cauda sumiu, a poca voltou a ser fatal.
+    submerged: 'leviathanGulp',
+    // O borbulhar comecando no destino — identifica a poca sem depender de
+    // visao, junto com o `boss_windup: emerge` que cresce ali.
+    surfacing: 'leviathanBubbling',
+    // A respiracao funda quando o corpo termina de cobrir a poca.
+    emerged: 'leviathanBreath',
+    recover: 'leviathanShockRecover',
+  },
   // A inspiracao em si e o leito (lung-breath-bus); o que a virada para
   // inspirar TOCA e a valvula fechando.
   lung_matrix: { hold: 'lungHold', exhale: 'lungExhale', inhale: 'lungClose', wound: 'lungWound' },
@@ -563,7 +592,23 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     // dois stings no mesmo tick soariam como falha de mixagem, e o que conta o
     // que houve e o afundamento. Prioridade maxima no banco (ver VOICE_SPECS).
     case 'ice_fall':
-      return [{ voice: 'icePlunge', x: ev.x, y: ev.y, scale: 1 }];
+      // A mesma morte, duas aguas: o buraco no gelo (gelo cedendo e a queda)
+      // ou a agua profunda nativa do Aquifero (um golpe grave, abafado e
+      // aquatico — nada de gelo).
+      return [
+        {
+          voice: ev.medium === 'water' ? 'aquiferPlunge' : 'icePlunge',
+          x: ev.x,
+          y: ev.y,
+          scale: 1,
+        },
+      ];
+
+    // A MARCA DA SONDAGEM: a resposta abafada surgindo NO PONTO marcado —
+    // bolhas e pedra cedendo, a dez tiles do corpo que cantou. A que afunda a
+    // poca soa mais pesada, porque o que ela deixa e permanente e fatal.
+    case 'probe_marker':
+      return [{ voice: 'leviathanProbeMark', x: ev.x, y: ev.y, scale: ev.deepen ? 1.35 : 1 }];
 
     case 'ice_mend':
       return [{ voice: 'iceMend', x: ev.x, y: ev.y, scale: 1 }];

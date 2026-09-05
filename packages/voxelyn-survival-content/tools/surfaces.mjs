@@ -93,6 +93,12 @@ export const SURFACE_KINDS = [
   // Agua profunda: o vazio frio. Quatro quadros como a agua rasa, mas mais
   // lentos — o que se move la dentro nao e onda, e massa.
   { name: 'deep-water', frames: 4, frameMs: 520 },
+  // AGUA PROFUNDA NATIVA DO AQUIFERO (o mesmo SURF_DEEP_WATER = 18, escolhido
+  // pelo cliente por (superficie, estrato)). Nao e um buraco no gelo: e o
+  // nucleo de uma bacia — sem lasca de gelo nenhuma, sem moldura, e sem borda
+  // brilhante por tile, para uma poca de varias celulas ler como UMA massa
+  // continua sem grade interna. Tres quadros, lentos: massa gira, nao ondula.
+  { name: 'aquifer-deep-water', frames: 3, frameMs: 640 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -305,7 +311,7 @@ const gasHaze = (variant, frame, put) => {
         candidates.find(
           (c) =>
             !chosen.includes(c) &&
-            chosen.some((s) => Math.abs(c.dx - s.dx) + Math.abs(c.dy - s.dy) === 1)
+            chosen.some((s) => Math.abs(c.dx - s.dx) + Math.abs(c.dy - s.dy) === 1),
         ) ?? candidates.find((c) => !chosen.includes(c));
       if (!next) break;
       chosen.push(next);
@@ -376,7 +382,11 @@ const gasPlume = (variant, frame, put) => {
         [0, 1],
         [0, -1],
       ]
-        .map(([dx, dy], k) => ({ dx, dy, rank: hash3d(cx + dx, cy + dy, cz, seed + i * 31 + k) % 1000 }))
+        .map(([dx, dy], k) => ({
+          dx,
+          dy,
+          rank: hash3d(cx + dx, cy + dy, cz, seed + i * 31 + k) % 1000,
+        }))
         .sort((a, b) => a.rank - b.rank || a.dx - b.dx || a.dy - b.dy);
       for (let k = 0; k < Math.min(mass, around.length); k++) {
         put(cx + around[k].dx, cy + around[k].dy, cz);
@@ -420,7 +430,8 @@ const gasModel = (variant, frame) => {
     for (let sx = 0; sx < F; sx++) {
       for (let sy = 0; sy < F; sy++) {
         for (let sz = 0; sz < F; sz++) {
-          const eaten = hash3d(wrap(cx) * F + sx, wrap(cy) * F + sy, z * F + sz, variant + 101) % 5 === 0;
+          const eaten =
+            hash3d(wrap(cx) * F + sx, wrap(cy) * F + sy, z * F + sz, variant + 101) % 5 === 0;
           if (eaten) continue;
           boxes.push(box(bx + sx / F, by + sy / F, z + sz / F, 1 / F, 1 / F, 1 / F, 'sulfur'));
         }
@@ -452,7 +463,8 @@ export const surfaceModel = (kind, variant, frame) => {
       if (h % 8 === 0) return; // falhas no tapete: o chao aparece por baixo
       boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, 'fungusDeep'));
       // Pontos vivos pulsam devagar; a massa continua baixa, um tapete umido.
-      if ((h >>> 4) % 9 === (frame % 2) * 3) boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'fungus'));
+      if ((h >>> 4) % 9 === (frame % 2) * 3)
+        boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'fungus'));
     });
     return boxes;
   }
@@ -725,6 +737,44 @@ export const surfaceModel = (kind, variant, frame) => {
     return boxes;
   }
 
+  if (kind === 'aquifer-deep-water') {
+    // O NUCLEO DA BACIA: quase preto, um plano rebaixado, correntes largas e
+    // lentas, bolhas esparsas — e NENHUMA borda. A transicao para a agua rasa
+    // e feita pela propria rasa (que mostra o leito, mineral, o filme claro);
+    // aqui nao ha leito, e a ausencia e a informacao.
+    //
+    // O que separa isto da agua rasa sem depender de cor lida lado a lado:
+    // profundidade (a lamina afunda meio voxel abaixo da crosta vizinha e
+    // nao ha ilha nem fundo), forma (a massa nao tem grade — nenhuma coluna
+    // clara em anel, nenhum tile com moldura) e movimento (duas correntes
+    // largas em periodos primos, girando devagar, contra a ondulacao rapida e
+    // fina da rasa). O que separa isto do BURACO da Cripta: nenhuma lasca de
+    // gelo — a agua profunda daqui nao veio de placa nenhuma.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 83, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'scorch'));
+        // Duas correntes LARGAS (tres colunas de espessura), lentas, em
+        // sentidos opostos e com periodos primos: a massa gira sem piscar.
+        const flowA = (fx * 2 + fy + frame * 2) % 17;
+        const flowB = (fx - fy * 2 + FINE_COLS * 4 - frame * 3) % 19;
+        const current = flowA < 3 || (flowB < 2 && (h & 1) === 0);
+        // Bolhas esparsas subindo: uma coluna fina em cem, deslocada por quadro.
+        const bubble = (h + frame * 37) % 101 === 0;
+        // Silhuetas indefinidas em algumas variantes: uma sombra mais escura
+        // que a propria agua, so no variante 2, no meio da massa.
+        const shade = variant === 2 && (h >>> 5) % 23 === 0;
+        const mat = bubble ? 'glass' : current ? 'water' : shade ? 'scorch' : 'floor';
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, mat));
+      }
+    }
+    return boxes;
+  }
+
   if (kind === 'silt') {
     // Areia solta: cobertura quase total sobre a laje, com ONDULACAO. A duna em
     // miniatura e o que faz a silica nao ler como "chao claro" — sem as cristas
@@ -886,10 +936,11 @@ export const buildSurfaceFrames = (frameW, frameH, anchorX, anchorY) => {
           frameW,
           frameH,
           anchorX,
-          anchorY
+          anchorY,
         );
         // Chao e parede escurecem na mesma escala para nao abrir costura visual.
-        for (let level = 0; level < LIGHT_LEVELS; level++) frames.push(dim(lit, lightFactor(level)));
+        for (let level = 0; level < LIGHT_LEVELS; level++)
+          frames.push(dim(lit, lightFactor(level)));
       }
     }
   }

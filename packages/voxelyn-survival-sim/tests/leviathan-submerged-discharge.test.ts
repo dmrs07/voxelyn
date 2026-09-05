@@ -3,7 +3,7 @@ import { createRun, emptyCommand, stepRun } from '../src/run';
 import { damageEntity, spawnEnemy } from '../src/entities';
 import { delugeDepth } from '../src/cells';
 import { emptyBossRuntime } from '../src/bosses';
-import { DEVOURER_SURFACED } from '../src/types';
+import { BOSS_PHASE_DELUGE, LEVIATHAN_HUNTING } from '../src/types';
 import {
   DELUGE_MAX_DEPTH,
   LEVIATHAN_SHOCK_DAMAGE,
@@ -24,6 +24,10 @@ const floodedDuel = (seed = 9001) => {
   }
   state.enemies = [];
   const boss = spawnEnemy(state, 'sheet_leviathan', px + 6, py, false);
+  // A segunda fase: o Diluvio ja passou e ele esta CACANDO. As bolhas e a
+  // descarga massiva pertencem a este estado, e so a ele.
+  boss.mood = LEVIATHAN_HUNTING;
+  state.bossRuntime.phasesFired |= BOSS_PHASE_DELUGE;
   state.bossRuntime.awake = true;
   state.tick = 1000;
   state.bossRuntime.delugeAt = 0;
@@ -105,7 +109,7 @@ describe('Leviata do Lencol — combate realmente submerso', () => {
     state.bossRuntime.leviathanShockRecoverAt = -1;
     boss.action = undefined;
     beginShock(state);
-    boss.mood = DEVOURER_SURFACED;
+    boss.mood = LEVIATHAN_HUNTING;
     damageEntity(state, boss, boss.hp, [], { kind: 'player_shot' });
     stepRun(state, [emptyCommand()]);
     expect(state.bossRuntime.protectiveBubbles).toHaveLength(0);

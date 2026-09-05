@@ -69,7 +69,23 @@ import {
   isPipe,
   FURNACE_OVERHEATING,
   WELL_OFFER_REACH,
+  LEVIATHAN_LID_RADIUS,
+  LEVIATHAN_PROBE_DEEPEN_WINDUP_TICKS,
+  LEVIATHAN_PROBE_WINDUP_TICKS,
+  LEVIATHAN_SHOCK_WINDUP_TICKS,
+  bubbleShellRadius,
+  insideAnyBubble,
+  leviathanPosture,
+  leviathanTargetable,
 } from '@voxelyn/survival-sim';
+import {
+  LEVIATHAN_BODY_ATLAS,
+  LEVIATHAN_SINK_PX,
+  LeviathanBodies,
+  leviathanSubmersions,
+  type LeviathanBodyHead,
+  type LeviathanBodyNode,
+} from './leviathan-body';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type {
   AbilityId,
@@ -334,6 +350,22 @@ export const SURFACE_KIND_INDEX: Record<number, number> = {
 };
 
 /**
+ * A AGUA PROFUNDA NATIVA DO AQUIFERO no atlas de crostas: o mesmo id de
+ * superficie (`SURF_DEEP_WATER`), outro tile. Escolhido por (superficie,
+ * estrato) e nao por id, porque a simulacao nao distingue as duas aguas — e
+ * nao deve: afogam igual, conduzem igual. O que muda e de onde vieram, e isso
+ * o estrato diz: na Cripta todo nucleo profundo e um buraco de placa (a borda
+ * de gelo quebrado diz de onde veio); no Aquifero e o miolo de uma bacia, sem
+ * gelo nenhum, mais negro e sem moldura por tile.
+ */
+export const AQUIFER_DEEP_WATER_KIND = 19;
+
+export const surfaceKindIndex = (surf: number, stratum: string): number | undefined =>
+  surf === SURF_DEEP_WATER && stratum === 'aquifer'
+    ? AQUIFER_DEEP_WATER_KIND
+    : SURFACE_KIND_INDEX[surf];
+
+/**
  * Cor de recuo por superficie, para quando o atlas ainda nao carregou ou falhou.
  *
  * Nao e a arte: e o minimo para o jogador nao pisar num gas invisivel enquanto a
@@ -379,6 +411,14 @@ export const SURFACE_FALLBACK: Record<number, string> = {
   // unico chao do jogo em que entrar mata sem golpe nenhum.
   [SURF_DEEP_WATER]: '#141b28',
 };
+
+/** A cor de recuo da agua profunda do AQUIFERO: mais negra que a da Cripta. */
+export const AQUIFER_DEEP_WATER_FALLBACK = '#0b1119';
+
+export const surfaceFallbackColor = (surf: number, stratum: string): string | undefined =>
+  surf === SURF_DEEP_WATER && stratum === 'aquifer'
+    ? AQUIFER_DEEP_WATER_FALLBACK
+    : SURFACE_FALLBACK[surf];
 
 /**
  * Nomes dos estratos e ocupacoes, por chave de catalogo.
@@ -943,6 +983,154 @@ const drawStunIndicator = (
  * Fase e geometria saem do id e do relogio, nunca de sorteio: as duas maquinas
  * de uma sala de co-op desenham a mesma perturbacao no mesmo lugar.
  */
+/** Raio da marca da Sondagem no chao, em tiles: o raio de dano. */
+const PROBE_MARK_RADIUS = 1.7;
+
+/**
+ * A LINHA D'AGUA de um sprite do Leviata: onde recortar e quanto descer.
+ *
+ * A linha e um pouco ACIMA do pe da ancora (o corpo boia com o ventre na
+ * agua, nao de pe sobre ela), e a descida completa e a altura util do quadro:
+ * a 100% nao sobra um pixel acima da linha. `null` fora da agua.
+ */
+const leviathanWaterDip = (
+  submersion: number,
+  sy: number,
+  spriteZoom: number,
+): { line: number; drop: number } | null => {
+  if (submersion <= 0) return null;
+  return {
+    line: sy + 6 * spriteZoom,
+    drop: Math.min(1, submersion) * LEVIATHAN_SINK_PX * spriteZoom,
+  };
+};
+
+/**
+ * A ONDULACAO onde um corpo corta a superficie: dois aneis rasos defasados e
+ * um traco claro na linha. Mais forte no meio da travessia, nula nas pontas.
+ */
+const drawWaterlineRipple = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  lineY: number,
+  width: number,
+  z: number,
+  nowMs: number,
+  submersion: number,
+): void => {
+  const strength = Math.sin(Math.max(0, Math.min(1, submersion)) * Math.PI);
+  if (strength <= 0.02) return;
+  ctx.save();
+  for (const offset of [0, 0.5]) {
+    const phase = (((nowMs / 700 + offset) % 1) + 1) % 1;
+    const r = width * (0.6 + phase * 0.8);
+    ctx.strokeStyle = `rgba(150,200,240,${(0.35 * strength * (1 - phase)).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, z);
+    ctx.beginPath();
+    ctx.ellipse(sx, lineY, r, r * 0.42, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = `rgba(210,235,255,${(0.28 * strength).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(sx, lineY, width * 0.7, Math.max(1, 1.2 * z), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+};
+
+/**
+ * A MARCA DA SONDAGEM ABISSAL: aneis escuros que se contraem para o centro,
+ * o miolo escurecendo (o chao encharcando) e, na que afunda a poca, um anel
+ * tracejado por fora. Le sem cor: e a UNICA marca do jogo em que os aneis
+ * fecham para dentro.
+ */
+const drawProbeMark = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  radius: number,
+  progress: number,
+  z: number,
+  nowMs: number,
+  deepen: boolean,
+): void => {
+  const ISO = Math.SQRT2;
+  const rx = radius * TILE_W * 0.5 * ISO * z;
+  const ry = radius * TILE_H * 0.5 * ISO * z;
+  ctx.save();
+  // O chao encharcando: o miolo escurece com o progresso.
+  ctx.fillStyle = `rgba(12,22,38,${(0.15 + progress * 0.45).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tres aneis contraindo, defasados: sempre ha um fechando.
+  for (let k = 0; k < 3; k++) {
+    const phase = (((nowMs / (900 - progress * 450) + k / 3) % 1) + 1) % 1;
+    const scale = 1.7 - phase * 0.9;
+    ctx.strokeStyle = `rgba(8,16,30,${(0.35 + phase * 0.5).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, (deepen ? 2.4 : 1.4) * z);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, rx * scale, ry * scale, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(200,225,245,${(0.12 + phase * 0.25).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, z * 0.6);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, rx * scale * 0.96, ry * scale * 0.96, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // O anel do raio real, fixo: ate onde a coluna cobra.
+  ctx.strokeStyle = `rgba(230,240,255,${(0.35 + progress * 0.4).toFixed(3)})`;
+  ctx.lineWidth = Math.max(1, z);
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  if (deepen) {
+    ctx.setLineDash([5 * z, 4 * z]);
+    ctx.lineDashOffset = nowMs / 25;
+    ctx.strokeStyle = `rgba(230,240,255,${(0.4 + progress * 0.4).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1.5, 1.6 * z);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, rx * 1.25, ry * 1.25, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+/**
+ * A POCA EM EBULICAO: o borbulhar crescente no destino do Leviata — aneis
+ * expandindo cada vez mais depressa e um clarao baixo no centro, na
+ * intensidade que a chegada dele impoe.
+ */
+const drawPoolBoil = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  intensity: number,
+  z: number,
+  nowMs: number,
+): void => {
+  const ISO = Math.SQRT2;
+  const base = (1.2 + intensity * 1.2) * TILE_W * 0.5 * ISO * z;
+  ctx.save();
+  const rings = 2 + Math.round(intensity * 3);
+  for (let k = 0; k < rings; k++) {
+    const phase = (((nowMs / (800 - intensity * 450) + k / rings) % 1) + 1) % 1;
+    const r = base * (0.3 + phase);
+    ctx.strokeStyle = `rgba(170,215,245,${(0.5 * intensity * (1 - phase)).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, (1 + intensity) * z);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const glow = ctx.createRadialGradient(sx, sy, 1, sx, sy, base * 0.6);
+  glow.addColorStop(0, `rgba(120,190,240,${(0.25 * intensity).toFixed(3)})`);
+  glow.addColorStop(1, 'rgba(120,190,240,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, base * 0.6, base * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+};
+
 const drawLurkerDisturbance = (
   ctx: CanvasRenderingContext2D,
   sx: number,
@@ -1366,7 +1554,9 @@ export type GroundMarker = {
   y: number;
   radius: number;
   fireTick: number;
-  kind: 'blast' | 'stalactite';
+  kind: 'blast' | 'stalactite' | 'probe';
+  /** Sondagem que AFUNDA a poca: o aviso mais pesado. */
+  deepen?: boolean;
 };
 
 export const pendingGroundMarkers = (state: {
@@ -1374,11 +1564,30 @@ export const pendingGroundMarkers = (state: {
   bossRuntime: {
     collapseCells: readonly { idx: number; at: number }[];
     blastCells: readonly number[];
+    leviathanProbeCell?: number;
+    leviathanProbeDeepen?: boolean;
   };
   enemies: readonly { alive: boolean; action?: { kind: string; releaseAt: number } }[];
 }): GroundMarker[] => {
   const w = state.config.width;
   const out: GroundMarker[] = [];
+  // A SONDAGEM ABISSAL do Leviata: a celula viaja no `bossRuntime` e o relogio
+  // na acao dele — o mesmo contrato da Salva. Quem reconecta no meio do aviso
+  // le a marca daqui, sem ter recebido o `probe_marker`.
+  const probeCell = state.bossRuntime.leviathanProbeCell ?? -1;
+  if (probeCell >= 0) {
+    const at = state.enemies.find((e) => e.alive && e.action?.kind === 'probe')?.action?.releaseAt;
+    if (at !== undefined) {
+      out.push({
+        x: (probeCell % w) + 0.5,
+        y: Math.floor(probeCell / w) + 0.5,
+        radius: PROBE_MARK_RADIUS,
+        fireTick: at,
+        kind: 'probe',
+        deepen: state.bossRuntime.leviathanProbeDeepen ?? false,
+      });
+    }
+  }
   for (const cell of state.bossRuntime.collapseCells) {
     out.push({
       x: (cell.idx % w) + 0.5,
@@ -1553,6 +1762,8 @@ export class SurvivalRenderer {
    * quadros anteriores sabe. Ver devourer-spine.ts.
    */
   private readonly devourerSpines = new DevourerSpines();
+  /** Os corpos dos Leviatas em cena (ver leviathan-body.ts). */
+  private readonly leviathanBodies = new LeviathanBodies();
   /**
    * Se o Devorador estava NO AR no ultimo quadro, por id.
    *
@@ -1822,6 +2033,7 @@ export class SurvivalRenderer {
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
     this.devourerSpines.reset();
+    this.leviathanBodies.reset();
     this.devourerAloft.clear();
     this.devourerLandedAt.clear();
     this.bossModuleMarks.clear();
@@ -1938,8 +2150,15 @@ export class SurvivalRenderer {
           }
           break;
         case 'leviathan_discharge':
-          this.addFlash(ev.x, ev.y, 18, 1.8, nowMs, 430, PAL.electric);
-          this.shake = { power: 9, until: nowMs + 420 };
+          // Sem strobe de tela inteira: um clarao largo mas curto no corpo, e
+          // um clarao FRIO e menor em cada casca — os arcos contornam o abrigo
+          // em vez de atravessa-lo, e o jogador la dentro ve a luz passar por
+          // fora.
+          this.addFlash(ev.x, ev.y, 14, 1.4, nowMs, 380, PAL.electric);
+          for (const bubble of ev.bubbles) {
+            this.addFlash(bubble.x, bubble.y, bubble.radius * 1.6, 0.5, nowMs, 300, PAL.mist);
+          }
+          this.shake = { power: 8, until: nowMs + 380 };
           break;
         case 'hit':
           // Respingo na materia do alvo. Descritivo: diz o que foi atingido,
@@ -2012,9 +2231,16 @@ export class SurvivalRenderer {
         case 'ice_fall':
           // A QUEDA. O corpo afundando e desenhado pela camada de apresentacao
           // (ver `IcePlunge`); aqui fica so o que ela nao entrega — o baque na
-          // camera e a marca de que este `death` ja tem dono.
+          // camera e a marca de que este `death` ja tem dono. No Aquifero a
+          // agua negra engole sem estilhaco: um clarao frio e curto no lugar,
+          // e nenhum tremor de gelo quebrando.
           this.plungedThisTick.add(ev.slot + 1);
-          this.shake = { power: 7, until: nowMs + 300 };
+          if (ev.medium === 'water') {
+            this.addFlash(ev.x, ev.y, 1.8, 0.35, nowMs, 320, PAL.mist);
+            this.shake = { power: 4, until: nowMs + 220 };
+          } else {
+            this.shake = { power: 7, until: nowMs + 300 };
+          }
           break;
         case 'ice_mend':
           // A ARENA RECOMPOSTA. Um clarao frio proporcional ao que voltou: a
@@ -2846,12 +3072,16 @@ export class SurvivalRenderer {
         // invisivel, que e o pior defeito possivel num jogo em que o chao e a
         // mecanica: a silica solta do Devorador e o aviso de por onde ele anda,
         // e o vidro e a prova de que aquele pedaco esta negado a ele.
-        const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
+        const surfKind = surf === SURF_GAS ? 0 : surfaceKindIndex(surf, state.stratum);
         if (
           surfKind === undefined ||
           !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)
         ) {
-          diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
+          diamond(
+            sx,
+            sy,
+            shade(surfaceFallbackColor(surf, state.stratum) ?? PAL.rockShadow, 0.35 + b * 0.75),
+          );
         }
 
         // A COR da luz que chega neste chao, por cima do tile ja escolhido.
@@ -3060,9 +3290,37 @@ export class SurvivalRenderer {
     {
       for (const mark of pendingGroundMarkers(state)) {
         const remaining = mark.fireTick - state.tick;
-        const lead = mark.kind === 'stalactite' ? STALACTITE_LEAD_TICKS : BLAST_LEAD_TICKS;
+        const lead =
+          mark.kind === 'stalactite'
+            ? STALACTITE_LEAD_TICKS
+            : mark.kind === 'probe'
+              ? mark.deepen
+                ? LEVIATHAN_PROBE_DEEPEN_WINDUP_TICKS
+                : LEVIATHAN_PROBE_WINDUP_TICKS
+              : BLAST_LEAD_TICKS;
         const progress = Math.max(0, Math.min(1, 1 - remaining / lead));
         const [msx, msy] = toScreen(mark.x, mark.y);
+        if (mark.kind === 'probe') {
+          // A MARCA DA SONDAGEM: circulos ESCUROS se contraindo para o centro,
+          // o chao encharcando progressivamente e bolhas subindo. A leitura
+          // nao depende de cor: sao aneis concentricos que FECHAM, e o chao
+          // fica cada vez mais escuro no miolo — o oposto exato do anel de
+          // demolicao (vermelho, e o interno abre). A que AFUNDA a poca tem
+          // aneis mais grossos e um anel tracejado a mais: e permanente.
+          drawProbeMark(ctx, msx, msy, mark.radius, progress, z, nowMs, mark.deepen === true);
+          this.particles.emitMovementBubbles(
+            -11,
+            mark.x + Math.sin(nowMs / 90) * 0.4,
+            mark.y + Math.cos(nowMs / 70) * 0.4,
+            0.6 + progress,
+            0.6 + progress,
+            0.5 + progress * 0.6,
+            0.9 + progress,
+            nowMs,
+            false,
+          );
+          continue;
+        }
         const rx = mark.radius * TILE_W * 0.5 * z;
         const ry = mark.radius * TILE_H * 0.5 * z;
         ctx.save();
@@ -3682,6 +3940,7 @@ export class SurvivalRenderer {
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
       this.devourerSpines.reset();
+      this.leviathanBodies.reset();
       this.devourerAloft.clear();
       this.devourerLandedAt.clear();
       this.bossModuleMarks.clear();
@@ -3750,6 +4009,7 @@ export class SurvivalRenderer {
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
     const trailUpdated = new Set<number>();
+    const leviathansDrawn = new Set<number>();
     /** Quais Devoradores tiveram corpo montado neste quadro. Ver `keepOnly`. */
     const wormsDrawn = new Set<number>();
     for (const enemy of state.enemies) {
@@ -3929,6 +4189,55 @@ export class SurvivalRenderer {
           });
         }
       }
+      // O CORPO SEGMENTADO DO LEVIATA.
+      //
+      // Oito cortes transversais atras da cabeca (leviathan-body.ts). A razao
+      // de ele ser em pecas nao e comprimento, e a SUBMERSAO: cabeca, asas,
+      // tronco e cauda atravessam a lamina em momentos diferentes, e cada
+      // peca e recortada pela superficie da agua na propria fracao. Ancorado
+      // ele nao tem rastro (a pose e autorada em volta do corpo parado);
+      // cacando, na segunda fase, o corpo segue as curvas da cabeca pelo
+      // mesmo rastro por comprimento de arco do Devorador.
+      //
+      // ESCONDIDO nao desenha NADA — nem corpo, nem sombra, nem barra: a
+      // posicao autoritativa ja e a da poca de destino, e o unico sinal que
+      // ele da e o borbulhar la (desenhado com as marcas de chao).
+      let leviathanHead: LeviathanBodyHead | null = null;
+      if (enemy.archetype === 'sheet_leviathan') {
+        if (leviathanPosture(enemy) === 'hidden') continue;
+        const subs = leviathanSubmersions(enemy, state.tick);
+        leviathanHead = {
+          x: enemy.x,
+          y: enemy.y,
+          dirX: presented.facingX,
+          dirY: presented.facingY,
+          submersion: subs.head,
+        };
+        const nodes = this.leviathanBodies.nodes(enemy, state.tick, leviathanHead, nowMs);
+        leviathansDrawn.add(enemy.id);
+        for (const node of nodes) {
+          if (node.submersion >= 1) continue;
+          const nb = brightness(node.x, node.y);
+          if (nb <= 0.05) continue;
+          const [nsx, nsy] = toScreen(node.x, node.y);
+          if (nsx < -120 || nsx > vw + 120 || nsy < -120 || nsy > vh + 120) continue;
+          items.push({
+            depth: node.x + node.y,
+            draw: () =>
+              this.drawLeviathanPiece(
+                ctx,
+                node,
+                nsx,
+                nsy,
+                z,
+                spriteZoom,
+                bodyLight(node.x, node.y, CREATURE_RESPONSE),
+                bodyFaceLight(node.x, node.y, CREATURE_RESPONSE),
+                nowMs,
+              ),
+          });
+        }
+      }
       // Montado o corpo (e preservado o rastro), a cabeca no escuro para aqui.
       if (headDark) continue;
 
@@ -4042,6 +4351,19 @@ export class SurvivalRenderer {
             ctx.rect(0, 0, ctx.canvas.width, sand);
             ctx.clip();
           }
+          // A CABECA DO LEVIATA atravessando a lamina: desce e e recortada na
+          // linha d'agua, como cada peca do corpo (ver `drawLeviathanPiece`).
+          const dip = leviathanHead
+            ? leviathanWaterDip(leviathanHead.submersion, sy, spriteZoom)
+            : null;
+          if (dip) {
+            if (dip.line <= 0) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, ctx.canvas.width, dip.line);
+            ctx.clip();
+          }
+          const drawY = bodyY + (dip?.drop ?? 0);
           const drew = this.sprites.drawEntity(
             ctx,
             enemy.archetype,
@@ -4050,7 +4372,7 @@ export class SurvivalRenderer {
             presented.facingY,
             presented.elapsedMs,
             sx,
-            bodyY,
+            drawY,
             spriteZoom,
             // Um sheet de frames fixos nao sabe o humor da entidade, e o
             // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
@@ -4080,7 +4402,7 @@ export class SurvivalRenderer {
           if (!drew) {
             drawVoxelEntity(ctx, {
               sx,
-              sy: bodyY,
+              sy: drawY,
               z,
               radius: enemy.radius,
               brightness: b,
@@ -4103,6 +4425,18 @@ export class SurvivalRenderer {
                 (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED),
             });
           }
+          if (dip) {
+            ctx.restore();
+            drawWaterlineRipple(
+              ctx,
+              sx,
+              dip.line,
+              size * 1.6,
+              z,
+              nowMs,
+              leviathanHead?.submersion ?? 0,
+            );
+          }
           if (sand !== null) ctx.restore();
           if (enemy.stunnedUntil > state.tick) {
             drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
@@ -4117,7 +4451,12 @@ export class SurvivalRenderer {
             ctx.ellipse(sx, sy, size * 1.05, size * 0.55, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
-          drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+          // A barra do Leviata so existe enquanto ele E alvo: uma barra sobre
+          // agua lisa entregaria a posicao de um corpo que ninguem ve — e
+          // prometeria dano onde o funil nao cobra.
+          if (!leviathanHead || leviathanTargetable(enemy, state.tick)) {
+            drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+          }
         },
       });
     }
@@ -4133,6 +4472,7 @@ export class SurvivalRenderer {
     // no primeiro quadro depois que a boca fecha — que e a pose de quem acabou
     // de se enfiar na areia.
     this.devourerSpines.keepOnly(wormsDrawn);
+    this.leviathanBodies.keepOnly(leviathansDrawn);
 
     // Rastros orfaos (o bicho emergiu, morreu ou apagou): desbotam ate o fim
     // e a entrada some — a lamina esquece no proprio ritmo, nunca de supetao.
@@ -4818,30 +5158,75 @@ export class SurvivalRenderer {
     // por baixo de particulas, numeros de dano e HUD.
     drawBiomeVeil(ctx, state.stratum, vw, vh);
 
-    // Bolsao de AR: volume real vem do runtime; aqui a elipse isometrica e a
-    // borda dupla o separam inequivocamente das particulas pequenas.
+    // AS BOLHAS PROTETORAS, em duas camadas com dois raios distintos.
+    //
+    // 1. O ANEL NO CHAO, no RAIO SEGURO (`bubble.radius`): a projecao correta
+    //    de um circulo de raio R no mundo — semi-eixos `R * TILE_W/2 * raiz2`
+    //    e `R * TILE_H/2 * raiz2` — e nao `R * TILE_W`, que era o defeito: o
+    //    domo desenhado media muito mais que a area que a simulacao protegia,
+    //    e o jogador morria DENTRO do desenho. O ponto de contato do
+    //    Prospector dentro deste anel significa "seguro", pelo MESMO predicado
+    //    que a simulacao usa para nao cobrar (`insideAnyBubble`).
+    // 2. O DOMO atmosferico, decorativo, no raio da CASCA (`bubbleShellRadius`):
+    //    maior que a area segura, e nunca a promessa.
+    //
+    // Quando o jogador local esta dentro, o anel interno se ESTABILIZA (para
+    // de pulsar), engrossa e ganha um segundo traco: a confirmacao nao depende
+    // de cor. O som (`leviathanBubbleSafe`) faz a mesma pergunta.
+    const ISO_RING = Math.SQRT2;
     for (const bubble of state.bossRuntime.protectiveBubbles) {
       const [bx, by] = toScreen(bubble.x, bubble.y);
-      const rx = bubble.radius * TILE_W * z;
-      const ry = bubble.radius * TILE_H * z;
-      const pulse = 0.78 + 0.12 * Math.sin(nowMs / 115 + bubble.x);
+      const safeRx = bubble.radius * TILE_W * 0.5 * ISO_RING * z;
+      const safeRy = bubble.radius * TILE_H * 0.5 * ISO_RING * z;
+      const shell = bubbleShellRadius(bubble);
+      const shellRx = shell * TILE_W * 0.5 * ISO_RING * z;
+      const shellRy = shell * TILE_H * 0.5 * ISO_RING * z;
+      const here = state.player.alive && insideAnyBubble(state.player.x, state.player.y, [bubble]);
+      const pulse = here ? 0.95 : 0.7 + 0.18 * Math.sin(nowMs / 115 + bubble.x);
       ctx.save();
-      const fill = ctx.createRadialGradient(bx - rx * 0.25, by - ry * 0.5, 1, bx, by, rx);
-      fill.addColorStop(0, 'rgba(232,247,255,0.28)');
-      fill.addColorStop(0.7, 'rgba(110,190,225,0.10)');
-      fill.addColorStop(1, 'rgba(70,135,170,0.03)');
+      // O domo: uma casca translucida SOBRE o anel, mais alta que larga.
+      const fill = ctx.createRadialGradient(
+        bx - shellRx * 0.25,
+        by - shellRy * 0.9,
+        1,
+        bx,
+        by - shellRy * 0.4,
+        shellRx,
+      );
+      fill.addColorStop(0, 'rgba(232,247,255,0.22)');
+      fill.addColorStop(0.7, 'rgba(110,190,225,0.08)');
+      fill.addColorStop(1, 'rgba(70,135,170,0.02)');
       ctx.fillStyle = fill;
-      ctx.strokeStyle = `rgba(220,248,255,${pulse.toFixed(3)})`;
-      ctx.lineWidth = Math.max(2, 2.2 * z);
-      ctx.beginPath();
-      ctx.ellipse(bx, by - ry * 0.55, rx, ry * 1.55, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(125,210,240,0.55)';
+      ctx.strokeStyle = 'rgba(160,215,240,0.35)';
       ctx.lineWidth = Math.max(1, z);
       ctx.beginPath();
-      ctx.ellipse(bx, by - ry * 0.55, rx * 0.82, ry * 1.32, 0, 0, Math.PI * 2);
+      ctx.ellipse(bx, by - shellRy * 0.9, shellRx, shellRy * 2.1, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
+      // O ANEL SEGURO no chao: e ele que promete.
+      ctx.strokeStyle = `rgba(220,248,255,${pulse.toFixed(3)})`;
+      ctx.lineWidth = Math.max(2, (here ? 3 : 2.2) * z);
+      ctx.beginPath();
+      ctx.ellipse(bx, by, safeRx, safeRy, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      if (here) {
+        // Confirmado: um segundo traco por dentro e o miolo mais claro.
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = Math.max(1, z);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, safeRx * 0.86, safeRy * 0.86, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(200,240,255,0.14)';
+        ctx.beginPath();
+        ctx.ellipse(bx, by, safeRx, safeRy, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(125,210,240,0.45)';
+        ctx.lineWidth = Math.max(1, z);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, safeRx * 0.86, safeRy * 0.86, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
     const chargingLeviathan = state.enemies.find(
@@ -4851,27 +5236,132 @@ export class SurvivalRenderer {
         enemy.action?.kind === 'massive_shock',
     );
     if (chargingLeviathan?.action) {
+      // O TELEGRAFO DA DESCARGA usa o corpo inteiro (as linhas condutivas
+      // acendem pelo atlas, `special`) e a agua em volta: ondas CONVERGINDO
+      // para o corpo, riscos eletricos na lamina FORA das bolhas (o interior
+      // fica calmo), e no ultimo meio segundo tres contracoes claras. Nada
+      // de strobe de tela inteira; tudo abaixo do orcamento de efeitos.
       const [lx, ly] = toScreen(chargingLeviathan.x, chargingLeviathan.y);
-      const span = Math.max(
-        1,
-        chargingLeviathan.action.releaseAt - chargingLeviathan.action.startedAt,
-      );
+      const span = Math.max(1, LEVIATHAN_SHOCK_WINDUP_TICKS);
       const charge = Math.max(
         0,
         Math.min(1, (state.tick - chargingLeviathan.action.startedAt) / span),
       );
+      const remaining = chargingLeviathan.action.releaseAt - state.tick;
+      const contraction =
+        remaining <= 10 && remaining >= 0
+          ? Math.max(0, Math.sin((remaining / 10) * Math.PI * 3))
+          : 0;
+      const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      ctx.strokeStyle = `rgba(150,220,255,${(0.28 + charge * 0.7).toFixed(3)})`;
-      ctx.lineWidth = Math.max(1.5, (1 + charge * 3) * z);
-      const arcs = 2 + Math.floor(charge * 5);
-      for (let i = 0; i < arcs; i++) {
-        const radius = (24 + i * 7 + Math.sin(nowMs / 55 + i) * 4) * z;
+      // Ondas convergindo: aneis que ENCOLHEM em direcao ao corpo.
+      for (let i = 0; i < 3; i++) {
+        const phase = (((nowMs / 700 + i / 3) % 1) + 1) % 1;
+        const r = (1 - phase) * 6 * z * TILE_W * 0.5 * ISO_RING * 0.5 + 6 * z;
+        ctx.strokeStyle = `rgba(150,220,255,${(0.1 + charge * 0.25 * phase).toFixed(3)})`;
+        ctx.lineWidth = Math.max(1, z);
         ctx.beginPath();
-        ctx.arc(lx, ly - 18 * z, radius, i * 0.9 + nowMs / 420, i * 0.9 + nowMs / 420 + 1.5);
+        ctx.ellipse(lx, ly, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Riscos eletricos na lamina, FORA das bolhas. Semeados pelo tick: as
+      // duas maquinas do co-op veem os mesmos riscos.
+      const streaks = Math.floor((4 + charge * 14) * fxScale);
+      for (let i = 0; i < streaks; i++) {
+        const seed =
+          ((Math.imul(i + 1, 2654435761) ^ Math.imul(state.tick >> 1, 40503)) >>> 0) % 10000;
+        const angle = (seed / 10000) * Math.PI * 2;
+        const dist = 2 + (((seed >> 3) % 100) / 100) * 9;
+        const wx = chargingLeviathan.x + Math.cos(angle) * dist;
+        const wy = chargingLeviathan.y + Math.sin(angle) * dist;
+        if (insideAnyBubble(wx, wy, state.bossRuntime.protectiveBubbles)) continue;
+        const [sx0, sy0] = toScreen(wx, wy);
+        ctx.strokeStyle = `rgba(190,235,255,${(0.25 + charge * 0.45).toFixed(3)})`;
+        ctx.lineWidth = Math.max(1, z * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(sx0, sy0);
+        ctx.lineTo(sx0 + (seed % 7) * z - 3 * z, sy0 - 2 * z - (seed % 5) * z);
+        ctx.lineTo(sx0 + (seed % 11) * z - 5 * z, sy0 - 5 * z);
+        ctx.stroke();
+      }
+      // Os arcos junto ao corpo, e as tres contracoes finais.
+      ctx.strokeStyle = `rgba(150,220,255,${(0.2 + charge * 0.5 + contraction * 0.3).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, (1 + charge * 2 + contraction * 2) * z);
+      const arcs = 2 + Math.floor(charge * 4);
+      for (let i = 0; i < arcs; i++) {
+        const radius = (20 + i * 7 + Math.sin(nowMs / 55 + i) * 4) * z * (1 - contraction * 0.25);
+        ctx.beginPath();
+        ctx.arc(lx, ly - 14 * z, radius, i * 0.9 + nowMs / 420, i * 0.9 + nowMs / 420 + 1.5);
         ctx.stroke();
       }
       ctx.restore();
+    }
+    // A VIAGEM ESCONDIDA: a poca de destino borbulha cada vez mais forte ate
+    // ele emergir; e o AVISO DO MERGULHO na poca ocupada: um anel escuro
+    // pulsando no raio da tampa — quem esta de pe sobre o corpo tem de sair
+    // antes de a cauda sumir. Os dois sao identificaveis sem cor: um cresce,
+    // o outro pulsa.
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || enemy.archetype !== 'sheet_leviathan') continue;
+      const posture = leviathanPosture(enemy);
+      if (posture === 'hidden' && state.bossRuntime.leviathanDest >= 0) {
+        const w = state.config.width;
+        const dest = state.bossRuntime.leviathanDest;
+        const dx = (dest % w) + 0.5;
+        const dy = Math.floor(dest / w) + 0.5;
+        const surfaceAt = state.bossRuntime.leviathanSurfaceAt;
+        const intensity =
+          surfaceAt >= 0 ? Math.max(0.15, Math.min(1, 1 - (surfaceAt - state.tick) / 50)) : 0.5;
+        const [bx, by] = toScreen(dx, dy);
+        drawPoolBoil(ctx, bx, by, intensity, z, nowMs);
+        this.particles.emitMovementBubbles(
+          -12,
+          dx + Math.sin(nowMs / 130) * 0.5 * intensity,
+          dy + Math.cos(nowMs / 110) * 0.5 * intensity,
+          1 + intensity * 2,
+          1 + intensity * 2,
+          0.8 + intensity,
+          1.5,
+          nowMs,
+          true,
+        );
+      }
+      if (
+        posture === 'diving' &&
+        enemy.action?.kind === 'dive' &&
+        enemy.action.phase === 'windup'
+      ) {
+        const [bx, by] = toScreen(enemy.x, enemy.y);
+        const remaining = enemy.action.releaseAt - state.tick;
+        const progress =
+          1 -
+          Math.max(
+            0,
+            Math.min(1, remaining / Math.max(1, enemy.action.releaseAt - enemy.action.startedAt)),
+          );
+        const beat = 0.5 + 0.5 * Math.sin(nowMs / (160 - progress * 90));
+        ctx.save();
+        ctx.strokeStyle = `rgba(20,30,50,${(0.5 + beat * 0.4).toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, (2 + beat * 2) * z);
+        ctx.beginPath();
+        ctx.ellipse(
+          bx,
+          by,
+          LEVIATHAN_LID_RADIUS * TILE_W * 0.5 * ISO_RING * z,
+          LEVIATHAN_LID_RADIUS * TILE_H * 0.5 * ISO_RING * z,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(220,240,255,${(0.35 + beat * 0.4).toFixed(3)})`;
+        ctx.lineWidth = Math.max(1, z);
+        ctx.setLineDash([4 * z, 4 * z]);
+        ctx.lineDashOffset = -nowMs / 30;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // O TELEGRAFO DO CARRINHO: a linha inteira do tramo pulsa em laranja de
@@ -5617,6 +6107,67 @@ export class SurvivalRenderer {
    */
   private devourerSandLine(sy: number, spriteZoom: number): number {
     return sy + DEVOURER_BELOW_ANCHOR_PX * spriteZoom;
+  }
+
+  /**
+   * UMA PECA do corpo do Leviata: o quadro do posto, no rumo da peca, descendo
+   * e recortada pela LINHA D'AGUA na fracao de submersao dela — e, se esta
+   * atravessando a lamina, a ondulacao onde o corpo corta a superficie.
+   *
+   * Apenas deslocar o sprite para baixo nao bastaria: sem o recorte a peca
+   * apareceria inteira, desenhada por baixo da poca, boiando. O recorte e o
+   * que transforma "mais para baixo" em "debaixo d'agua".
+   */
+  private drawLeviathanPiece(
+    ctx: CanvasRenderingContext2D,
+    node: LeviathanBodyNode,
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    light: Tint | undefined,
+    faces: FaceLighting | undefined,
+    nowMs: number,
+  ): void {
+    const loaded = this.sprites.get(LEVIATHAN_BODY_ATLAS);
+    // Sem atlas nao ha corpo, e nao ha recuo: a cabeca sozinha e um chefe
+    // legivel; oito losangos de recuo em fila seriam pior que a ausencia.
+    if (!loaded) return;
+    const dip = leviathanWaterDip(node.submersion, sy, spriteZoom);
+    const bodyY = sy - node.bobPx * z + (dip?.drop ?? 0);
+    if (dip) {
+      if (dip.line <= 0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, ctx.canvas.width, dip.line);
+      ctx.clip();
+    }
+    this.sprites.drawPiece(
+      ctx,
+      LEVIATHAN_BODY_ATLAS,
+      'idle',
+      node.rank,
+      node.dirX,
+      node.dirY,
+      sx,
+      bodyY,
+      spriteZoom,
+      undefined,
+      light,
+      faces,
+    );
+    if (dip) {
+      ctx.restore();
+      drawWaterlineRipple(
+        ctx,
+        sx,
+        dip.line,
+        TILE_W * 0.45 * z * (1.3 - node.rank * 0.1),
+        z,
+        nowMs,
+        node.submersion,
+      );
+    }
   }
 
   private drawDevourerRing(

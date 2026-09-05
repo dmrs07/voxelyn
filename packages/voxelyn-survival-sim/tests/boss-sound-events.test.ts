@@ -31,7 +31,12 @@ import {
   SURF_NONE,
   SURF_WATER,
 } from '../src/constants';
-import { BOSS_PHASE_REACTOR, BOSS_PHASE_SUMMON, type EnemyArchetype } from '../src/types';
+import {
+  BOSS_PHASE_REACTOR,
+  BOSS_PHASE_SUMMON,
+  LEVIATHAN_HIDDEN,
+  type EnemyArchetype,
+} from '../src/types';
 import type { SemanticEvent, SurvivalState } from '../src/types';
 
 /** Arena limpa no meio do mapa, com o chefe a `gap` tiles a leste. */
@@ -155,23 +160,20 @@ describe('preparacao e execucao de chefe sao eventos proprios', () => {
     expect(ofType(events, 'boss_state').some((e) => e.state === 'idle_note')).toBe(true);
   });
 
-  it('a decolagem do Devorador e a rompida do Leviata sao a MESMA acao com habilidades diferentes', () => {
+  it('a decolagem do Devorador e a Sondagem do Leviata sao habilidades proprias, nunca o telegrafo generico', () => {
     const devourer = duel(33, 'white_devourer', 6);
     const devEvents = advanceCollecting(devourer.state, 200);
     const erupt = ofType(devEvents, 'boss_windup').find((e) => e.archetype === 'white_devourer');
     expect(erupt?.ability).toBe('erupt');
 
     const leviathan = duel(34, 'sheet_leviathan', 6);
-    paint(
-      leviathan.state,
-      Math.floor(leviathan.state.player.x),
-      Math.floor(leviathan.state.player.y),
-      12,
-      SURF_WATER,
-    );
-    const levEvents = advanceCollecting(leviathan.state, 200);
-    const breach = ofType(levEvents, 'boss_windup').find((e) => e.archetype === 'sheet_leviathan');
-    expect(breach?.ability).toBe('breach');
+    const levEvents = advanceCollecting(leviathan.state, 300);
+    const probe = ofType(levEvents, 'boss_windup').find((e) => e.archetype === 'sheet_leviathan');
+    expect(probe?.ability).toBe('probe');
+    // A marca no chao sai junto com o canto no corpo: dois lugares, dois eventos.
+    const marker = ofType(levEvents, 'probe_marker')[0];
+    expect(marker).toBeDefined();
+    expect(marker.releaseTick).toBe(probe?.releaseTick);
   });
 });
 
@@ -220,9 +222,12 @@ describe('presenca e relogio da luta', () => {
     expect(attacks.some((e) => e.ability === 'crush')).toBe(true);
   });
 
-  it('o Leviata submerso chama, espacado, enquanto nao esta carregando', () => {
-    const { state } = duel(38, 'sheet_leviathan', 6);
-    paint(state, Math.floor(state.player.x), Math.floor(state.player.y), 12, SURF_WATER);
+  it('o Leviata escondido chama, espacado, enquanto nao esta carregando', () => {
+    const { state, boss } = duel(38, 'sheet_leviathan', 6);
+    // Viajando por baixo: a posicao ja e a do destino e nada dele se ve. O
+    // chamado e a unica presenca que ele tem nesse intervalo.
+    boss.mood = LEVIATHAN_HIDDEN;
+    state.bossRuntime.leviathanSurfaceAt = state.tick + LEVIATHAN_CALL_INTERVAL_TICKS * 4;
     const events = advanceCollecting(state, LEVIATHAN_CALL_INTERVAL_TICKS * 3);
     const calls = ofType(events, 'boss_state').filter((e) => e.state === 'call');
     expect(calls.length).toBeGreaterThanOrEqual(1);
