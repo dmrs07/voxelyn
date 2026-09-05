@@ -2973,7 +2973,6 @@ const broodStep = (
     }
   }
 
-  const w = state.config.width;
   const len = Math.hypot(mx, my);
   if (len >= 0.0001) {
     const step = ARCHETYPES.devourer_brood.speed * dt;

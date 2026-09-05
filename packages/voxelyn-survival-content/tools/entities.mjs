@@ -3483,13 +3483,6 @@ const base = (
  */
 const eightWay = (spec) => ({ ...spec, directions: 8, authoredDirs: DIRS8 });
 
-/** Os modelos do Leviata, expostos para o script de medida de quadro. */
-export const LEVIATHAN_PARTS_FOR_MEASURE = {
-  bodyModel: (rank) => leviathanBodyModel(rank),
-  headModel: (anim, f) => leviathanModel(anim, f),
-  quarterTurn,
-};
-
 export const ENTITY_SPECS = [
   base(
     'player-prospector',
