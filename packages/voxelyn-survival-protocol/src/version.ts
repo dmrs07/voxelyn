@@ -911,7 +911,11 @@ export const PROTOCOL_VERSION = 32;
 //     mudou (raio seguro para o CENTRO, sem subtrair o raio do corpo). Leviata
 //     e Lampreia atravessam agua profunda; `sealIceHole` so fecha buracos
 //     REGISTRADOS. Seis campos novos do `bossRuntime` entram no hash.
-export const SIMULATION_VERSION = 59;
+// 60: A VIDA DO LEVIATA sobe de 800 para 4000. Com 800 o parafuso basico o
+//     matava em 19 s e o Diluvio saia aos 13 — antes do primeiro mergulho —,
+//     entao a primeira fase nunca acontecia. `hp`/`maxHp` viajam no snapshot
+//     e no hash: um replay de 59 nao bate.
+export const SIMULATION_VERSION = 60;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -506,6 +506,14 @@ por baixo da lâmina, uma **massa** escura sem borda desenhada sob cada peça, s
 água, que persiste enquanto ele afunda: o corpo parece maior do que o que rompe a
 superfície.
 
+**A vida** (`LEVIATHAN_HP`, `SIMULATION_VERSION` 60) é 4000 — cinco vezes a de antes.
+Medido sem cliente, com o parafuso básico atirando sempre que ele é alvo: com 800 ele
+morria em 19 s e o Dilúvio saía aos 13, antes do primeiro mergulho — a primeira fase
+nunca acontecia. Com 4000, no mesmo tiro perfeito, o Dilúvio sai aos 61 s depois de
+quatro mergulhos e ele morre aos 105 s; um jogador de verdade fica em dois ou três
+minutos com a arma básica. É o chefe do último estrato e passa boa parte do tempo fora
+de alcance: a vida alta é o preço de ter janelas de dano de verdade.
+
 As posturas são explícitas (`LEVIATHAN_ANCHORED/DIVING/HIDDEN/EMERGING/HUNTING`;
 `charging` é derivada). O Aquífero ganhou **bacias** geradas por erosão (margem rasa
 garantida por construção, núcleo `SURF_DEEP_WATER` permanente que nunca entra em

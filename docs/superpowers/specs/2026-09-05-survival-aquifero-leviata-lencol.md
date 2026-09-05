@@ -1,6 +1,6 @@
 # Voxelyn Survival — o Aquífero Negro e o Leviatã do Lençol em duas fases
 
-**Versões**: `SIMULATION_VERSION` 59 · `PROTOCOL_VERSION` 32 · `CONTENT_VERSION` 34
+**Versões**: `SIMULATION_VERSION` 59 (60 com a vida em 4000, ver §5) · `PROTOCOL_VERSION` 32 · `CONTENT_VERSION` 34
 (atlas `enemy-sheet-leviathan` v3, atlas novos `part-sheet-leviathan-wings` e `part-sheet-leviathan-tail` v1,
 `surface-tiles` v9).
 
@@ -109,6 +109,12 @@ apresentação precisa (marca, afunda, destino, tick de emersão) também nas
 `WorldFlags` para quem reconecta.
 
 ## 5. A primeira fase
+
+**Vida**: `LEVIATHAN_HP` = 4000 (`SIMULATION_VERSION` 60; era 800). Medido sem cliente
+com o parafuso básico e tiro perfeito: com 800 ele morria em 19 s e o Dilúvio saía aos
+13 — antes do primeiro mergulho, a primeira fase nunca acontecia. Com 4000 o Dilúvio sai
+aos 61 s depois de quatro mergulhos e ele morre aos 105 s; na prática, dois ou três
+minutos com a arma básica.
 
 1. Ancorado: `vx`/`vy` zerados todo tick; gira a `LEVIATHAN_TURN_RATE` rad/s sem
    translação.
