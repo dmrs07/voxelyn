@@ -375,6 +375,7 @@ finger on a phone. It is a completely different game and I regret nothing.
 
 ![A live run in the Basalt Galleries](media/run-basalt-galleries.png)
 
+It runs in the browser at [danitools.itch.io/voxelyn-survival](https://danitools.itch.io/voxelyn-survival).
 If you are coming back after the last zip, here is the order I would go in:
 
 1. **Put headphones on.** Genuinely. The sound tells you things the screen has not shown you yet,
@@ -399,6 +400,8 @@ singing, one minigun, and a scoreboard that finally measures the right thing.
 
 The number I am least sure about is fourteen seconds. The only way to settle it is to watch somebody
 who is not me get caught on the far side of the lake when the Queen decides to repair it.
+
+[Play it in the browser.](https://danitools.itch.io/voxelyn-survival)
 
 Music by **Clevo ([@clevoclevoclevo](https://instagram.com/clevoclevoclevo))**. Game by **DaniTools
 ([@dani.tools](https://instagram.com/dani.tools))**. Go break some ice.
