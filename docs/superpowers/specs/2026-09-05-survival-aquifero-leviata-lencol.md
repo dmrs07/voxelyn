@@ -1,6 +1,6 @@
 # Voxelyn Survival — o Aquífero Negro e o Leviatã do Lençol em duas fases
 
-**Versões**: `SIMULATION_VERSION` 59 · `PROTOCOL_VERSION` 32 · `CONTENT_VERSION` 34
+**Versões**: `SIMULATION_VERSION` 59 (60 com a vida em 4000, ver §5) · `PROTOCOL_VERSION` 32 · `CONTENT_VERSION` 34
 (atlas `enemy-sheet-leviathan` v3, atlas novos `part-sheet-leviathan-wings` e `part-sheet-leviathan-tail` v1,
 `surface-tiles` v9).
 
@@ -109,6 +109,12 @@ apresentação precisa (marca, afunda, destino, tick de emersão) também nas
 `WorldFlags` para quem reconecta.
 
 ## 5. A primeira fase
+
+**Vida**: `LEVIATHAN_HP` = 4000 (`SIMULATION_VERSION` 60; era 800). Medido sem cliente
+com o parafuso básico e tiro perfeito: com 800 ele morria em 19 s e o Dilúvio saía aos
+13 — antes do primeiro mergulho, a primeira fase nunca acontecia. Com 4000 o Dilúvio sai
+aos 61 s depois de quatro mergulhos e ele morre aos 105 s; na prática, dois ou três
+minutos com a arma básica.
 
 1. Ancorado: `vx`/`vy` zerados todo tick; gira a `LEVIATHAN_TURN_RATE` rad/s sem
    translação.
@@ -234,6 +240,16 @@ devolve com os corpos daquele tick; `NetClient` retém o último `WorldFlags` nu
   estrato) em `surfaceKindIndex`: quase preto, plano rebaixado, correntes largas e
   lentas, bolhas esparsas, sem moldura por tile e sem gelo. O `deep-water` da
   Cripta continua com a borda de gelo quebrado.
+- **O nível da água é legível**: todo corpo que não nada (Prospector, parceiro,
+  inimigos) é **cortado na linha d'água** do Dilúvio (`drawCutByWaterline`): acima
+  dela como é, abaixo dela azul e apagado, com a ondulação na linha — é nele que se
+  lê "na cintura" ou "acima da cabeça". Na caçada o Leviatã **nada na superfície**
+  (cabeça e peças sobem a altura da coluna; a massa fica no chão) e, emergindo sob
+  o Dilúvio, sobe do fundo com a própria emergência. Os **núcleos profundos** do
+  Aquífero ganham o contorno do núcleo (só as arestas que encostam em chão não
+  profundo — o tile continua sem moldura) e, alagados, uma mancha escura no plano
+  da superfície: a água é mais funda onde o chão caiu, e cair num buraco que a tela
+  não mostra não é dificuldade.
 - **Marcas**: `probe` em `pendingGroundMarkers` (reconexão lê do `bossRuntime`);
   poça de destino em ebulição (`drawPoolBoil`, intensidade por
   `leviathanSurfaceAt`); aviso do mergulho como anel escuro pulsando no raio da

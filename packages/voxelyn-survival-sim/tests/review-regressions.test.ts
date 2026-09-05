@@ -206,7 +206,10 @@ describe('mineradores — uma celula, um corpo', () => {
         }
       }
     }
-  });
+    // Timeout proprio, como as outras varreduras de mundos: 280 setores
+    // gerados chegam aos 5 s padrao do vitest desde que o Aquifero ganhou
+    // as bacias, e o runner do CI cruzava a linha num dia sim, noutro nao.
+  }, 60_000);
 
   it('continua respeitando o teto global de inimigos', () => {
     for (let seed = 1; seed <= 20; seed++) {

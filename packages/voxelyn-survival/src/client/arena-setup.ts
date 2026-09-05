@@ -105,7 +105,7 @@ export const arenaIceCensus = (state: SurvivalState): ArenaIceCensus => {
 
 /** Faixa de HP que a tela de setup oferece. Fora disso nao ha teste util: */
 export const ARENA_MIN_HP = 20;
-export const ARENA_MAX_HP = 500;
+export const ARENA_MAX_HP = 6000;
 
 export const clampArenaHp = (hp: number): number =>
   Math.round(

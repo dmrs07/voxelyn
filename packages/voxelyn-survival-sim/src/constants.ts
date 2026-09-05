@@ -2350,7 +2350,22 @@ export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
  * As posturas sao explicitas (ver `LEVIATHAN_ANCHORED` e irmas em types.ts):
  * nada aqui e inferido do humor compartilhado com o Devorador.
  */
-export const LEVIATHAN_HP = 800;
+/**
+ * A VIDA e o que faz o encontro durar o ciclo que ele conta.
+ *
+ * Medido sem cliente, com o Prospector parado a sete tiles atirando o
+ * parafuso basico (14 de dano a cada 5 ticks) sempre que ele e alvo: com 800
+ * ele morria em 19 s e cruzava o limiar do Diluvio aos 13 — antes do primeiro
+ * mergulho. A primeira fase inteira (ancorar, sondar, mergulhar, reaparecer)
+ * nunca aparecia, e a segunda durava seis segundos. Com 4000, na mesma
+ * medida (tiro perfeito, sem errar um parafuso, o atirador sempre a seis
+ * tiles), o Diluvio sai aos 61 s depois de quatro mergulhos e ele morre aos
+ * 105 s; um jogador de verdade erra, desvia e recua, e o encontro com a arma
+ * basica fica em dois ou tres minutos — com missil, Minigun e modulos, bem
+ * menos. E o chefe do ultimo estrato, e passa boa parte do tempo fora de
+ * alcance: a vida alta e o preco de ter janelas de dano de verdade.
+ */
+export const LEVIATHAN_HP = 4000;
 /** Velocidade de PERSEGUICAO, na segunda fase. Ele nada; nao ha chao seco. */
 export const LEVIATHAN_SWIM_SPEED = 5;
 /**

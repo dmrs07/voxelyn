@@ -29,6 +29,7 @@ import {
   SURF_ICE_FRACTURED,
   SURF_ICE_CRITICAL,
   SURF_DEEP_WATER,
+  BOSS_PHASE_DELUGE,
   SURF_GLASS,
   SURF_RAIL,
   SURF_SILT,
@@ -92,6 +93,7 @@ import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './in
 import type {
   AbilityId,
   ActiveModule,
+  Entity,
   ModuleId,
   OccupationId,
   RunSummary,
@@ -110,7 +112,6 @@ import {
 } from './sprites';
 import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
 import {
-  DEVOURER_SUBMERGED_PX,
   DevourerSpines,
   DEVOURER_BELOW_ANCHOR_PX,
   DEVOURER_HIDDEN_PX,
@@ -194,12 +195,7 @@ import {
   salvageTerminalLayout,
 } from './salvage-choice-presentation';
 import { abilityPresentation } from './ability-presentation';
-import {
-  moduleChoiceLayout,
-  rewardFlightPosition,
-  type Rect,
-  type SafeInsets,
-} from './module-layout';
+import { rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
 import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
@@ -1038,6 +1034,52 @@ const drawLeviathanMass = (
   ctx.arc(0, 0, rx, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+};
+
+/** O veu de quem esta debaixo da lamina do Diluvio: azul, apagado, sem detalhe. */
+const UNDERWATER_TINT: Tint = { color: 'rgba(38,92,132,0.55)', alpha: 0.55 };
+
+/**
+ * Um corpo CORTADO pela lamina do Diluvio: acima da linha d'agua ele e
+ * desenhado como e; abaixo dela, azul e apagado; e a linha ganha a ondulacao.
+ *
+ * E o que faz o NIVEL da agua existir na tela. A lamina e um veu translucido
+ * sobre o chao, e um veu nao tem altura: o jogador via o Prospector nitido
+ * numa sala que a simulacao dizia estar tres tiles debaixo d'agua, e nao
+ * tinha como saber ate onde a agua chegava — nem que o chao sob ela tinha
+ * buracos. Com todo corpo cortado na mesma altura, a linha d'agua vira uma
+ * referencia que atravessa a cena: e ela que diz "a agua esta na cintura" ou
+ * "passou da cabeca".
+ *
+ * `draw` recebe o tint a usar (o de baixo substitui o do corpo: a agua vence
+ * a marcacao de elite ou de geada) e devolve se o sprite existia.
+ */
+const drawCutByWaterline = (
+  ctx: CanvasRenderingContext2D,
+  lineY: number,
+  sx: number,
+  rippleWidth: number,
+  z: number,
+  nowMs: number,
+  draw: (tint: Tint | undefined) => boolean,
+): boolean => {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, Math.max(0, lineY));
+  ctx.clip();
+  const drew = draw(undefined);
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, lineY, w, Math.max(0, h - lineY));
+  ctx.clip();
+  ctx.globalAlpha *= 0.78;
+  draw(UNDERWATER_TINT);
+  ctx.restore();
+  drawWaterlineRipple(ctx, sx, lineY, rippleWidth, z, nowMs, 0.5);
+  return drew;
 };
 
 /**
@@ -3180,6 +3222,53 @@ export class SurvivalRenderer {
             diamond(sx, surfaceY, `rgba(190,225,245,${(crest * 0.48).toFixed(3)})`);
           }
         }
+        // A BORDA DO NUCLEO PROFUNDO, sempre — e, debaixo do Diluvio, o buraco
+        // na propria superficie.
+        //
+        // A agua profunda nativa e fatal, e o Diluvio a cobria: a lamina
+        // subia por cima do tile escuro e o jogador nao tinha como distinguir
+        // o chao raso do poco a dois passos dele. Cair num buraco que a tela
+        // nao mostra nao e dificuldade, e injustica. O tile continua sem
+        // moldura (o nucleo e um so, nao uma grade de ladrilhos): o que se
+        // desenha e o CONTORNO do nucleo — so as arestas que encostam em chao
+        // que nao e profundo — e, alagado, uma mancha mais escura no plano da
+        // superficie, onde a agua e mais funda porque o chao caiu.
+        if (surf === SURF_DEEP_WATER && state.stratum === 'aquifer') {
+          const hw = (TILE_W / 2) * z;
+          const hh = (TILE_H / 2) * z;
+          const flooded = delugeR >= 0 && isDeluged(state, i);
+          const planeY = flooded ? sy - delugeDepth(state, i) * TILE_H * z : sy;
+          if (flooded) diamond(sx, planeY, `rgba(2,6,14,${(0.34 + b * 0.2).toFixed(3)})`);
+          const rimOf = (nx: number, ny: number): boolean => {
+            if (nx < 0 || ny < 0 || nx >= w || ny >= state.config.height) return false;
+            const n = ny * w + nx;
+            return state.solid[n] === SOLID_NONE && state.surface[n] !== SURF_DEEP_WATER;
+          };
+          ctx.save();
+          ctx.strokeStyle = flooded
+            ? `rgba(176,214,238,${(0.35 + b * 0.35).toFixed(3)})`
+            : `rgba(150,196,226,${(0.18 + b * 0.3).toFixed(3)})`;
+          ctx.lineWidth = Math.max(1, z * 0.75);
+          ctx.beginPath();
+          if (rimOf(x + 1, y)) {
+            ctx.moveTo(sx + hw, planeY);
+            ctx.lineTo(sx, planeY + hh);
+          }
+          if (rimOf(x - 1, y)) {
+            ctx.moveTo(sx - hw, planeY);
+            ctx.lineTo(sx, planeY - hh);
+          }
+          if (rimOf(x, y + 1)) {
+            ctx.moveTo(sx, planeY + hh);
+            ctx.lineTo(sx - hw, planeY);
+          }
+          if (rimOf(x, y - 1)) {
+            ctx.moveTo(sx, planeY - hh);
+            ctx.lineTo(sx + hw, planeY);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
         const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;
         if (surf === SURF_GAS) {
           // Gas sulfurico: sopros amarelos que abrem enquanto sobem.
@@ -4237,6 +4326,25 @@ export class SurvivalRenderer {
       // ESCONDIDO nao desenha NADA — nem corpo, nem sombra, nem barra: a
       // posicao autoritativa ja e a da poca de destino, e o unico sinal que
       // ele da e o borbulhar la (desenhado com as marcas de chao).
+      // Quanto o Leviata SOBE para nadar na superficie do Diluvio, em pixels:
+      // a altura da coluna d'agua na celula, so na cacada (ancorado, a poca e
+      // dele e a lamina ainda nao subiu).
+      //
+      // Emergindo debaixo do Diluvio ele SOBE do fundo ate a superficie com a
+      // propria emergencia (`exposed` e a fracao fora d'agua daquela peca):
+      // sem isso ele emergia no piso e saltava um tile inteiro para cima no
+      // primeiro quadro da cacada.
+      const swimLiftAt = (ent: Entity, x: number, y: number, exposed = 1): number => {
+        if (ent.archetype !== 'sheet_leviathan') return 0;
+        const posture = leviathanPosture(ent);
+        const rising =
+          posture === 'emerging' && (state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE) !== 0;
+        if (posture !== 'hunting' && posture !== 'charging' && !rising) return 0;
+        const ci = Math.floor(y) * state.config.width + Math.floor(x);
+        return (
+          delugeDepth(state, ci) * TILE_H * z * (rising ? Math.max(0, Math.min(1, exposed)) : 1)
+        );
+      };
       let leviathanHead: LeviathanBodyHead | null = null;
       if (enemy.archetype === 'sheet_leviathan') {
         if (leviathanPosture(enemy) === 'hidden') continue;
@@ -4278,6 +4386,7 @@ export class SurvivalRenderer {
           if (nb <= 0.05) continue;
           const [nsx, nsy] = toScreen(node.x, node.y);
           if (nsx < -120 || nsx > vw + 120 || nsy < -120 || nsy > vh + 120) continue;
+          const pieceLift = swimLiftAt(enemy, node.x, node.y, 1 - node.submersion);
           items.push({
             depth: node.x + node.y,
             draw: () =>
@@ -4285,7 +4394,7 @@ export class SurvivalRenderer {
                 ctx,
                 node,
                 nsx,
-                nsy,
+                nsy - pieceLift,
                 z,
                 spriteZoom,
                 bodyLight(node.x, node.y, CREATURE_RESPONSE),
@@ -4420,42 +4529,63 @@ export class SurvivalRenderer {
             ctx.rect(0, 0, ctx.canvas.width, dip.line);
             ctx.clip();
           }
-          const drawY = bodyY + (dip?.drop ?? 0);
-          const drew = this.sprites.drawEntity(
-            ctx,
-            enemy.archetype,
-            presented.anim,
-            presented.facingX,
-            presented.facingY,
-            presented.elapsedMs,
-            sx,
-            drawY,
-            spriteZoom,
-            // Um sheet de frames fixos nao sabe o humor da entidade, e o
-            // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
-            // gancho de tint que ja existia para o elite serve exatamente para
-            // isso — e vermelho contra o laranja do elite mantem as duas
-            // marcacoes distinguiveis.
-            enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED
-              ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
-              : // O COLAPSO no corpo do chefe: a pedra dele esquenta ate ficar
-                // vermelha, e a instabilidade a leva ao branco. E a leitura
-                // que diz, sem numero na tela, que a luta esta acabando — e
-                // ela pulsa no MESMO ritmo do tremor, porque e o mesmo
-                // coracao batendo.
-                enemy.archetype === 'furnace_heart'
-                ? furnaceBodyTint(livePhases, nowMs)
-                : enemy.elite
-                  ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
-                  : undefined,
-            // A LUZ DO MUNDO sobre a casca do bicho. Separada do tint acima de
-            // proposito: aquele conta um ESTADO da criatura (elite, enfurecida,
-            // colapsando) e este conta o que esta acontecendo AO REDOR dela. Se
-            // dividissem o mesmo canal, uma explosao apagaria a marcacao de
-            // elite justamente no instante de maior confusao na tela.
-            bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
-            bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+          // NA CACADA ele nada NA SUPERFICIE do Diluvio: a cabeca sobe a
+          // altura da coluna d'agua (a massa fica no chao). Desenhado no piso,
+          // tres tiles debaixo da lamina, ele lia como um bicho no fundo de um
+          // aquario — e a agua, como um filtro.
+          const swimLift = swimLiftAt(
+            enemy,
+            enemy.x,
+            enemy.y,
+            1 - (leviathanHead?.submersion ?? 0),
           );
+          const cell = Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x);
+          const waterDepth = leviathanHead ? 0 : delugeDepth(state, cell);
+          const waterLine = waterDepth > 0 ? sy - waterDepth * TILE_H * z : null;
+          const drawY = bodyY + (dip?.drop ?? 0) - swimLift;
+          const paint = (override: Tint | undefined): boolean =>
+            this.sprites.drawEntity(
+              ctx,
+              enemy.archetype,
+              presented.anim,
+              presented.facingX,
+              presented.facingY,
+              presented.elapsedMs,
+              sx,
+              drawY,
+              spriteZoom,
+              // Um sheet de frames fixos nao sabe o humor da entidade, e o
+              // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
+              // gancho de tint que ja existia para o elite serve exatamente para
+              // isso — e vermelho contra o laranja do elite mantem as duas
+              // marcacoes distinguiveis.
+              override ??
+                (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED
+                  ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
+                  : // O COLAPSO no corpo do chefe: a pedra dele esquenta ate ficar
+                    // vermelha, e a instabilidade a leva ao branco. E a leitura
+                    // que diz, sem numero na tela, que a luta esta acabando — e
+                    // ela pulsa no MESMO ritmo do tremor, porque e o mesmo
+                    // coracao batendo.
+                    enemy.archetype === 'furnace_heart'
+                    ? furnaceBodyTint(livePhases, nowMs)
+                    : enemy.elite
+                      ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                      : undefined),
+              // A LUZ DO MUNDO sobre a casca do bicho. Separada do tint acima de
+              // proposito: aquele conta um ESTADO da criatura (elite, enfurecida,
+              // colapsando) e este conta o que esta acontecendo AO REDOR dela. Se
+              // dividissem o mesmo canal, uma explosao apagaria a marcacao de
+              // elite justamente no instante de maior confusao na tela.
+              bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+              bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+            );
+          // Todo corpo que nao nada e CORTADO pela lamina: e a linha d'agua
+          // que o jogador le para saber quanto a sala ja encheu.
+          const drew =
+            waterLine !== null
+              ? drawCutByWaterline(ctx, waterLine, sx, enemy.radius * TILE_W * z, z, nowMs, paint)
+              : paint(undefined);
           if (!drew) {
             drawVoxelEntity(ctx, {
               sx,
@@ -4679,29 +4809,48 @@ export class SurvivalRenderer {
               ctx.translate(-psx, -psy);
             }
             if (!flick) {
-              const drew = this.sprites.drawEntity(
-                ctx,
-                'prospector',
-                presented.anim,
-                presented.facingX,
-                presented.facingY,
-                presented.elapsedMs,
-                psx,
-                psy,
-                spriteZoom,
-                // O veu da geada vence o tint do parceiro: o frio e informacao,
-                // a cor de aliado e convencao — e o visor ja diz quem e quem.
-                frostTint(frostFrac, frozen) ??
-                  // parceiro (nao-local) recebe leve tint frio para diferenciar
-                  (isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }),
-                // O CHASSI E LATAO USINADO: o unico corpo polido que anda pela
-                // tela, e por isso o unico que devolve um realce concentrado em
-                // vez de um veu. E ele que faz o proprio tiro do jogador acender
-                // a armadura ao sair — a arma esta montada no ombro direito, e o
-                // estilhaco nasce a um palmo dela.
-                bodyLight(pl.x, pl.y, CHASSIS_RESPONSE),
-                bodyFaceLight(pl.x, pl.y, CHASSIS_RESPONSE),
-              );
+              const paintProspector = (override: Tint | undefined): boolean =>
+                this.sprites.drawEntity(
+                  ctx,
+                  'prospector',
+                  presented.anim,
+                  presented.facingX,
+                  presented.facingY,
+                  presented.elapsedMs,
+                  psx,
+                  psy,
+                  spriteZoom,
+                  // A agua vence tudo; depois, o veu da geada vence o tint do
+                  // parceiro: o frio e informacao, a cor de aliado e convencao
+                  // — e o visor ja diz quem e quem.
+                  override ??
+                    frostTint(frostFrac, frozen) ??
+                    // parceiro (nao-local) recebe leve tint frio para diferenciar
+                    (isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }),
+                  // O CHASSI E LATAO USINADO: o unico corpo polido que anda pela
+                  // tela, e por isso o unico que devolve um realce concentrado em
+                  // vez de um veu. E ele que faz o proprio tiro do jogador acender
+                  // a armadura ao sair — a arma esta montada no ombro direito, e o
+                  // estilhaco nasce a um palmo dela.
+                  bodyLight(pl.x, pl.y, CHASSIS_RESPONSE),
+                  bodyFaceLight(pl.x, pl.y, CHASSIS_RESPONSE),
+                );
+              // O Prospector CORTADO pela lamina do Diluvio: e nele que o
+              // jogador le o nivel — cintura, peito, cabeca.
+              const playerCell = Math.floor(pl.y) * state.config.width + Math.floor(pl.x);
+              const playerDepth = delugeDepth(state, playerCell);
+              const drew =
+                playerDepth > 0
+                  ? drawCutByWaterline(
+                      ctx,
+                      psy - playerDepth * TILE_H * z,
+                      psx,
+                      pl.radius * TILE_W * z,
+                      z,
+                      nowMs,
+                      paintProspector,
+                    )
+                  : paintProspector(undefined);
               if (!drew) {
                 drawVoxelEntity(ctx, {
                   sx: psx,

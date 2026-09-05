@@ -506,11 +506,25 @@ por baixo da lâmina, uma **massa** escura sem borda desenhada sob cada peça, s
 água, que persiste enquanto ele afunda: o corpo parece maior do que o que rompe a
 superfície.
 
+**A vida** (`LEVIATHAN_HP`, `SIMULATION_VERSION` 60) é 4000 — cinco vezes a de antes.
+Medido sem cliente, com o parafuso básico atirando sempre que ele é alvo: com 800 ele
+morria em 19 s e o Dilúvio saía aos 13, antes do primeiro mergulho — a primeira fase
+nunca acontecia. Com 4000, no mesmo tiro perfeito, o Dilúvio sai aos 61 s depois de
+quatro mergulhos e ele morre aos 105 s; um jogador de verdade fica em dois ou três
+minutos com a arma básica. É o chefe do último estrato e passa boa parte do tempo fora
+de alcance: a vida alta é o preço de ter janelas de dano de verdade.
+
 As posturas são explícitas (`LEVIATHAN_ANCHORED/DIVING/HIDDEN/EMERGING/HUNTING`;
 `charging` é derivada). O Aquífero ganhou **bacias** geradas por erosão (margem rasa
 garantida por construção, núcleo `SURF_DEEP_WATER` permanente que nunca entra em
 `iceHoles`), e a arena karst escava cinco poças ocupáveis. Leviatã e Lampreia
 atravessam água profunda; terrestres continuam barrados.
+
+**A água tem nível na tela.** Todo corpo que não nada é cortado na linha d'água do
+Dilúvio (acima como é, abaixo azul e apagado, ondulação na linha); o Leviatã nada na
+superfície na caçada; e os núcleos profundos do Aquífero têm contorno sempre e, sob o
+Dilúvio, uma mancha escura no plano da superfície — o jogador vê o buraco antes de
+cair nele.
 
 **As bolhas** têm um contrato de raio único: `bubble.radius` é o raio seguro para o
 **centro** do Prospector e `playerProtectedByBubble` é o único predicado — dano,
