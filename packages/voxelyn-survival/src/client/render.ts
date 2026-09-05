@@ -112,7 +112,6 @@ import {
 } from './sprites';
 import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
 import {
-  DEVOURER_SUBMERGED_PX,
   DevourerSpines,
   DEVOURER_BELOW_ANCHOR_PX,
   DEVOURER_HIDDEN_PX,
@@ -197,7 +196,6 @@ import {
 } from './salvage-choice-presentation';
 import { abilityPresentation } from './ability-presentation';
 import {
-  moduleChoiceLayout,
   rewardFlightPosition,
   type Rect,
   type SafeInsets,
