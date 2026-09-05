@@ -5022,18 +5022,24 @@ const probeTargetCell = (
   const w = state.config.width;
   const h = state.config.height;
   const runtime = state.bossRuntime;
+  const capped = runtime.leviathanPools.length >= LEVIATHAN_MAX_NEW_POOLS;
   const valid = (x: number, y: number): boolean => {
     if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) return false;
     const i = y * w + x;
     if (state.solid[i] !== SOLID_NONE) return false;
+    // Com o teto de bacias novas atingido, so AGUA que ja existe recebe o
+    // golpe: piso seco viraria uma poca a mais, registrada ou nao.
+    if (capped && state.surface[i] !== SURF_WATER) return false;
     if (Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y) < LEVIATHAN_PROBE_MIN_RANGE) return false;
     return !probeCellForbidden(state, i);
   };
   const cx = Math.floor(aimX);
   const cy = Math.floor(aimY);
   // Teto de bacias novas atingido: se ha uma poca dele perto da mirada, e ela
-  // que recebe o golpe — ampliada ou afundada, nunca uma bacia a mais.
-  if (runtime.leviathanPools.length >= LEVIATHAN_MAX_NEW_POOLS) {
+  // que recebe o golpe — ampliada ou afundada, nunca uma bacia a mais. Longe
+  // de todas, a varredura abaixo so aceita agua rasa; sem agua ao alcance,
+  // nao ha Sondagem (o chamador tenta o salto).
+  if (capped) {
     let best = -1;
     let bestD = LEVIATHAN_PROBE_SEARCH + 3;
     for (const pool of runtime.leviathanPools) {
@@ -5558,7 +5564,15 @@ const leviathanStep = (
   // O DILUVIO e a primeira coisa que ele consulta, e nao um ramo do ciclo:
   // uma carta que muda o mapa nao pode ficar esperando a fase certa para
   // sair. Cruzou o limiar com o encontro em curso, ela sai.
-  if (runtime.awake) leviathanDeluge(state, enemy, events);
+  if (runtime.awake) {
+    leviathanDeluge(state, enemy, events);
+    // A virada pode ter COMECADO um mergulho agora mesmo: a acao esta no
+    // telegrafo, a tampa ainda vale, e os ramos abaixo so leem posturas cuja
+    // acao JA VENCEU. Sem esta saida o mergulho recem-aberto era tratado como
+    // acabado no mesmo tick — a tampa sumia debaixo do jogador sem o aviso
+    // de 26 ticks, e o corpo nunca afundava por segmentos.
+    if (enemy.action) return;
+  }
   const delugeFired = (runtime.phasesFired & BOSS_PHASE_DELUGE) !== 0;
 
   // O mergulho ACABOU (a acao venceu neste tick): a cauda sumiu.

@@ -37,7 +37,9 @@ import {
 } from '../src/types';
 import {
   DELUGE_HP_FRACTION,
+  LEVIATHAN_DIVE_TELEGRAPH_TICKS,
   LEVIATHAN_LID_RADIUS,
+  LEVIATHAN_MAX_NEW_POOLS,
   LEVIATHAN_PROBE_DAMAGE,
   LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
   LEVIATHAN_PROTECTIVE_BUBBLE_SHELL_RADIUS,
@@ -693,5 +695,127 @@ describe('Aquifero — a semantica da agua profunda', () => {
     expect(fall?.t === 'ice_fall' ? fall.medium : null).toBe('water');
     expect(state.player.alive).toBe(false);
     expect(state.playerExtra.lastDamage?.cause.kind).toBe('deep_water');
+  });
+});
+
+describe('Leviata do Lencol — as arestas que a revisao apontou', () => {
+  it('a virada com o chefe ancorado e livre ABRE um mergulho, nao fecha um', () => {
+    // Ancorado, sem acao em curso, o Prospector de pe sobre a tampa. Cruzar o
+    // limiar tem de comecar um mergulho com telegrafo — a tampa vale ate a
+    // cauda sumir — e nao tratar o mergulho recem-aberto como acabado no
+    // mesmo tick, que era tirar a poca de baixo do jogador sem aviso.
+    const { state, boss, px, py } = lencol();
+    advance(state, 40, stand(state, px, py));
+    until(state, () => boss.mood === LEVIATHAN_ANCHORED && !boss.action, 600, stand(state, px, py));
+    expect(boss.mood).toBe(LEVIATHAN_ANCHORED);
+    expect(boss.action).toBeUndefined();
+    boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
+    const onLid = (): void => {
+      state.player.x = boss.x;
+      state.player.y = boss.y;
+    };
+    onLid();
+    const first = advance(state, 1, onLid);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE).not.toBe(0);
+    expect(starts(first, boss.id, 'dive')).toHaveLength(1);
+    expect(boss.mood).toBe(LEVIATHAN_DIVING);
+    expect(boss.action?.kind).toBe('dive');
+    expect(boss.action?.phase).toBe('windup');
+    expect(state.player.alive).toBe(true);
+    // O telegrafo inteiro com a tampa valendo: o jogador sobre o corpo vive.
+    advance(state, LEVIATHAN_DIVE_TELEGRAPH_TICKS - 2, onLid);
+    expect(boss.mood).toBe(LEVIATHAN_DIVING);
+    expect(state.player.alive).toBe(true);
+    // Passada a acao, o mergulho ACABA de verdade: escondido, esperando o lencol.
+    until(state, () => boss.mood !== LEVIATHAN_DIVING, 200);
+    expect(boss.mood).toBe(LEVIATHAN_HIDDEN);
+  });
+
+  it('com o teto de bacias novas atingido, nenhuma Sondagem abre poca em piso seco', () => {
+    const { state, boss, px, py, w } = lencol();
+    // Quatro pocas "dele" registradas LONGE da mirada: nenhuma perto do
+    // jogador, entao a busca generica e a unica saida — e ela nao pode cair
+    // em piso seco.
+    const far = [
+      (py - 16) * w + (px - 16),
+      (py - 16) * w + (px + 16),
+      (py + 16) * w + (px - 16),
+      (py + 16) * w + (px + 16),
+    ];
+    for (const cell of far) state.surface[cell] = SURF_WATER;
+    state.bossRuntime.leviathanPools = far.slice(0, LEVIATHAN_MAX_NEW_POOLS);
+    // As massas de agua (rasa ou profunda) em vizinhanca de oito: uma Sondagem
+    // sobre agua que ja existe pode AMPLIAR a poca (a orla irregular pinta
+    // celulas secas encostadas nela) — o que ela nao pode e abrir uma massa
+    // NOVA, separada, em piso seco.
+    const waterBodies = (): number => {
+      const seen = new Uint8Array(state.surface.length);
+      let bodies = 0;
+      for (let start = 0; start < state.surface.length; start++) {
+        if (seen[start]) continue;
+        const wet = (i: number): boolean =>
+          state.surface[i] === SURF_WATER || state.surface[i] === SURF_DEEP_WATER;
+        if (!wet(start)) continue;
+        bodies++;
+        const stack = [start];
+        seen[start] = 1;
+        while (stack.length > 0) {
+          const i = stack.pop()!;
+          const x = i % w;
+          const y = (i - x) / w;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= w || ny >= state.config.height) continue;
+              const n = ny * w + nx;
+              if (seen[n] || !wet(n)) continue;
+              seen[n] = 1;
+              stack.push(n);
+            }
+          }
+        }
+      }
+      return bodies;
+    };
+    const bodiesBefore = waterBodies();
+    const events = advance(state, 900, stand(state, px, py));
+    // Ele continuou agindo (Sondagens sobre agua ou saltos), e nenhuma massa
+    // de agua nova apareceu — as que existem podem ter crescido ou se unido.
+    expect(
+      starts(events, boss.id, 'probe').length + starts(events, boss.id, 'dive').length,
+    ).toBeGreaterThan(0);
+    expect(waterBodies()).toBeLessThanOrEqual(bodiesBefore);
+    expect(state.bossRuntime.leviathanPools.length).toBeLessThanOrEqual(LEVIATHAN_MAX_NEW_POOLS);
+  });
+
+  it('um tiro que cruza a posicao do Leviata escondido nao acerta nada', () => {
+    const { state, boss } = lencol();
+    boss.action = undefined;
+    boss.mood = LEVIATHAN_HIDDEN;
+    state.bossRuntime.leviathanSurfaceAt = state.tick + 500;
+    expect(leviathanTargetable(boss, state.tick)).toBe(false);
+    const hp = boss.hp;
+    state.projectiles.push({
+      kind: 'bolt',
+      id: 4242,
+      owner: state.player.id,
+      x: boss.x - 0.6,
+      y: boss.y,
+      vx: 12,
+      vy: 0,
+      damage: 9,
+      distanceTravelled: 0,
+      hostile: false,
+      leavesBiofluid: false,
+      ttl: 20,
+    });
+    const events = advance(state, 2);
+    expect(boss.hp).toBe(hp);
+    expect(events.some((e) => e.t === 'hit' && e.entity === boss.id)).toBe(false);
+    // O tiro continua vivo, para alem da posicao dele.
+    const proj = state.projectiles.find((p) => p.id === 4242);
+    expect(proj).toBeDefined();
+    expect(proj!.x).toBeGreaterThan(boss.x + 0.2);
   });
 });

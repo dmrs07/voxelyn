@@ -122,7 +122,7 @@ import {
   setSurface,
   stepCells,
 } from './cells.js';
-import { leviathanCovers } from './leviathan.js';
+import { leviathanCovers, leviathanTargetable } from './leviathan.js';
 import {
   explosiveArmedByDistance,
   impactSolid,
@@ -2591,6 +2591,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       let bestDistance = Number.POSITIVE_INFINITY;
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
+        // Um missil nao persegue o que nao se ve.
+        if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+          continue;
+        }
         const d = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
         if (d < bestDistance) {
           target = enemy;
@@ -2907,6 +2911,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         if (proj.kind === 'cart') {
           for (const enemy of state.enemies) {
             if (!enemy.alive) continue;
+            if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+              continue;
+            }
             if (proj.hits?.includes(enemy.id)) continue;
             if (
               Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >=
@@ -2925,6 +2932,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       } else {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
+          // O Leviata FORA DE VISTA nao tem corpo para acertar: o tiro passa
+          // pela posicao dele sem gastar carga, atordoar, curar nem morrer.
+          // `damageEntity` ja o recusava, mas so depois de tudo isso ter sido
+          // cobrado — um tiro que some no lugar de um bicho invisivel.
+          if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+            continue;
+          }
           const discHits = proj.disc
             ? proj.disc.phase === 'outbound'
               ? proj.disc.outboundHits
