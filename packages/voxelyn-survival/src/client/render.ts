@@ -195,11 +195,7 @@ import {
   salvageTerminalLayout,
 } from './salvage-choice-presentation';
 import { abilityPresentation } from './ability-presentation';
-import {
-  rewardFlightPosition,
-  type Rect,
-  type SafeInsets,
-} from './module-layout';
+import { rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
 import { CasingField } from './casings';
 import { MinigunViews } from './minigun-view';
 import { ModulePropField, type PropOrigin } from './module-props';
