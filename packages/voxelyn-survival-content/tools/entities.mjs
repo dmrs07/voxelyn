@@ -2640,21 +2640,24 @@ const leviathanModel = (anim, f) => {
     { x: 5.5, w: 2, d: 5.2, h: 2 },
   ];
   for (const sl of slabs) {
-    // Ventre cinza embaixo, dorso azul por cima: o ventre so aparece quando
-    // ele inclina ou emerge — e e exatamente quando o jogador o ve de baixo.
+    // Ventre palido embaixo, dorso QUASE PRETO por cima. O bicho e uma coisa
+    // do fundo: contra a agua escura o que se le dele e a orla clara do
+    // ventre, os olhos, os poros e as duas linhas — a massa em si e sombra.
+    // O ventre so aparece quando ele inclina ou emerge, que e exatamente
+    // quando o jogador o ve de baixo.
     b.push(box(sl.x, -sl.d / 2, z, sl.w, sl.d, sl.h * 0.35, 'rock'));
-    b.push(box(sl.x, -sl.d / 2, z + sl.h * 0.35, sl.w, sl.d, sl.h * 0.65, 'water'));
+    b.push(box(sl.x, -sl.d / 2, z + sl.h * 0.35, sl.w, sl.d, sl.h * 0.65, 'rockDeep'));
   }
-  // Manchas quase pretas no dorso: ardósia molhada.
+  // Brilhos de pele molhada no dorso: o unico azul da cabeca.
   for (let k = 0; k < 5; k++) {
     const h = levHash(3, k, 5);
     const x = -3 + ((h % 1000) / 1000) * 7;
     const y = ((((h >>> 10) % 1000) / 1000) * 2 - 1) * 3.6;
-    b.push(box(x, y, top - 0.5, 1.4, 1.1, 0.5, 'rockDeep'));
+    b.push(box(x, y, top - 0.5, 1.4, 1.1, 0.5, 'water'));
   }
   // OS LOBOS CEFALICOS: dois dedos para a frente, flanqueando a boca.
   for (const s of [-1, 1]) {
-    b.push(box(6.2, s > 0 ? 2.4 : -4.2, z + 0.2, 2.4 + probe * 0.4, 1.8, 1.6, 'water'));
+    b.push(box(6.2, s > 0 ? 2.4 : -4.2, z + 0.2, 2.4 + probe * 0.4, 1.8, 1.6, 'rockDeep'));
   }
   // A BOCA: uma fenda larga e escura sob o focinho.
   b.push(box(6.6, -2.2, z + 0.2, 0.9, 4.4, 0.8 + probe * 0.6, 'floor'));
@@ -2701,52 +2704,58 @@ const leviathanModel = (anim, f) => {
  */
 const leviathanBodyModel = (rank) => {
   const L = 7;
-  const trunkD = [9, 8.2, 7, 6, 4.6, 3.2, 2, 1.3][rank];
-  const trunkH = [3.2, 3, 2.7, 2.4, 2, 1.6, 1.2, 0.9][rank];
-  const wingSpan = [10, 12, 8.5, 4.5, 0, 0, 0, 0][rank];
+  const trunkD = [9.2, 8.6, 7.6, 6.4, 5, 3.4, 2.2, 1.4][rank];
+  const trunkH = [3.4, 3.2, 2.9, 2.5, 2.1, 1.6, 1.2, 0.9][rank];
+  // O VAO: 17 unidades para cada lado no meio das asas — 34 de ponta a ponta,
+  // pouco mais de quatro tiles. Era 24 (tres tiles): uma raia de tres tiles
+  // com a cabeca de dois lia como um peixe grande; com quatro e um pedaco do
+  // fundo que se levantou.
+  const wingSpan = [15, 17, 13.5, 8.5, 3.2, 0, 0, 0][rank];
   const b = [];
   const z = 0.4;
   const top = z + trunkH;
-  // Tronco: ventre cinza por baixo, dorso azul por cima.
+  // Tronco: ventre palido por baixo, dorso quase preto por cima; a unica
+  // linha azul e a crista molhada do lombo, para a coluna ler como uma so
+  // linha de peca em peca.
   b.push(box(-L / 2, -trunkD / 2, z, L, trunkD, trunkH * 0.35, 'rock'));
-  b.push(box(-L / 2, -trunkD / 2, z + trunkH * 0.35, L, trunkD, trunkH * 0.65, 'water'));
-  // O lombo: uma crista baixa correndo o comprimento, para a coluna ler como
-  // uma so linha de peca em peca.
-  b.push(box(-L / 2, -trunkD * 0.12, top, L, trunkD * 0.24, 0.3, 'rockDeep'));
-  // AS ASAS: tiras em crescente que nascem no lombo e DESCEM ate a borda, com
-  // a corda encolhendo para tras — a membrana e triangular e a borda traseira
-  // sai irregular, levemente serrilhada.
+  b.push(box(-L / 2, -trunkD / 2, z + trunkH * 0.35, L, trunkD, trunkH * 0.65, 'rockDeep'));
+  b.push(box(-L / 2, -trunkD * 0.1, top, L, trunkD * 0.2, 0.3, 'water'));
+  // AS ASAS: doze tiras que se SOBREPOEM (passo menor que a profundidade),
+  // descendo do lombo ate a ponta numa curva que acelera — a asa de uma
+  // raia e quase plana perto do corpo e cai na ponta. A corda encolhe em
+  // crescente e a borda traseira sai serrilhada. O dorso da asa e sombra; o
+  // que a desenha contra a agua e o brilho molhado da borda de ataque, em
+  // tiras alternadas, e a orla palida do ventre nas ultimas tiras.
   if (wingSpan > 0) {
-    // Dez tiras que se SOBREPOEM (passo menor que a profundidade de cada
-    // uma): a asa e uma superficie continua descendo em degraus de meio
-    // voxel, e nao seis lajes soltas em escada — era a escada que fazia o
-    // corpo ler como pilha de placas.
-    const strips = 10;
+    const strips = 12;
     const reach = wingSpan - trunkD / 2;
-    const stripDepth = Math.max(1, (reach / strips) * 1.6);
+    const stripDepth = Math.max(1, (reach / strips) * 1.7);
     for (const s of [-1, 1]) {
       for (let k = 0; k < strips; k++) {
         const t = (k + 1) / strips;
-        // A borda EXTERNA da tira e que caminha ate o vao: o passo e menor
-        // que a profundidade, entao a tira de fora cobre a de dentro.
         const y = trunkD / 2 + t * reach - stripDepth;
-        const chord = L - t * 2.4 - (levHash(rank, k, 3) % 2) * 0.5;
-        const lift = top - 0.9 - t * 2.2;
+        const chord = Math.max(2.4, L - t * t * 3.2 - (levHash(rank, k, 3) % 2) * 0.5);
+        const lift = Math.max(z + 0.4, top - 0.8 - t * t * 2.8);
         // Centrada em x com um leve recuo para tras (a membrana e mais longa
         // atras do que na frente), pequeno o bastante para a caixa envolvente
         // de cada posto continuar centrada — ver `barnaclesAndScars`.
         const x0 = -chord / 2 - (L - chord) * 0.12;
         const yy = s > 0 ? y : -y - stripDepth;
-        b.push(box(x0, yy, lift, chord, stripDepth, 0.9, 'water'));
-        // O ventre da asa aparece quando ela dobra para baixo.
+        b.push(box(x0, yy, lift, chord, stripDepth, 0.9, 'rockDeep'));
         b.push(box(x0, yy, lift - 0.4, chord, stripDepth, 0.4, 'rock'));
+        if (k % 2 === 1) {
+          b.push(box(x0 + chord - 0.7, yy, lift + 0.9, 0.7, stripDepth, 0.25, 'water'));
+        }
+        if (k >= strips - 3) {
+          b.push(box(x0, yy, lift + 0.9, 0.5, stripDepth, 0.25, 'rock'));
+        }
       }
     }
   }
   // Restos de nadadeira no tronco: duas quilhas curtas.
   if (rank === 3 || rank === 4) {
     for (const s of [-1, 1]) {
-      b.push(box(-1.5, s > 0 ? trunkD / 2 : -trunkD / 2 - 0.8, z + 0.6, 3, 0.8, 0.9, 'water'));
+      b.push(box(-1.5, s > 0 ? trunkD / 2 : -trunkD / 2 - 0.8, z + 0.6, 3, 0.8, 0.9, 'rockDeep'));
     }
   }
   // O ORGAO ELETRICO da ponta: um espinho curto, discreto.
@@ -2755,9 +2764,19 @@ const leviathanBodyModel = (rank) => {
   }
   // As linhas condutivas, na mesma cota relativa ao topo em toda peca.
   conductiveLines(b, -L / 2, L, Math.max(0.5, trunkD / 2 - 0.4), top, 1);
-  barnaclesAndScars(b, 20 + rank, -L / 2, L, trunkD / 2, top, rank < 4 ? 3 : 1);
+  barnaclesAndScars(b, 20 + rank, -L / 2, L, trunkD / 2, top, rank < 4 ? 4 : 1);
   return b;
 };
+
+/**
+ * As pecas do corpo vivem em DOIS atlas: as asas (postos 0..3) e a cauda
+ * (postos 4..7). Um atlas so tem um tamanho de quadro, e a raiz das asas
+ * precisa de um quadro de 200 e tantos pixels que a ponta da cauda, de
+ * cinquenta, pagaria em branco trinta e duas vezes no orcamento de boot.
+ */
+export const LEVIATHAN_WING_RANKS = 4;
+/** Os modelos do Leviata por posto, para o teste que mede o quadro. */
+export const leviathanBodyPiece = (rank) => quarterTurn(leviathanBodyModel(rank));
 
 // ---------------------------------------------------------------------------
 // enemy-lung-matrix — o Pulmao-Matriz da Fenda Sulfurosa.
@@ -3240,8 +3259,10 @@ const archcantorFrame = (dir, anim, f) =>
 // largura e 20 de altura em branco, em cem quadros, no orcamento de boot.
 const leviathanFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 112, 68, 56, 41);
-const leviathanBodyFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(leviathanBodyModel(f)), DIR_INDEX[dir], 152, 84, 76, 45);
+const leviathanWingsFrame = (dir, anim, f) =>
+  renderVoxels(leviathanBodyPiece(f), DIR_INDEX[dir], 208, 112, 104, 61);
+const leviathanTailFrame = (dir, anim, f) =>
+  renderVoxels(leviathanBodyPiece(LEVIATHAN_WING_RANKS + f), DIR_INDEX[dir], 64, 44, 32, 30);
 const lungMatrixFrame = (dir, anim, f) =>
   renderVoxels(lungMatrixModel(anim, f), DIR_INDEX[dir], 116, 112, 56, 88);
 const furnaceHeartFrame = (dir, anim, f) =>
@@ -3870,24 +3891,41 @@ export const ENTITY_SPECS = [
   // OITO RUMOS, e nao quatro: a peca e escolhida pela tangente do caminho, e
   // um corpo nadando na horizontal ou na vertical da tela (as diagonais do
   // mundo) ficava a 45 graus de qualquer quadro autorado — oito quadros `dr`
-  // empilhados na vertical leem como escada. O quadro e o menor que enquadra
-  // as oito rotacoes com 2px de margem (a raiz das asas em `d`/`u` e a mais
-  // larga, 144px; a peca vista de frente em `r`/`l` e a mais alta, 78px).
+  // empilhados na vertical leem como escada. Dois atlas (asas e cauda) pelo
+  // tamanho do quadro, ver `LEVIATHAN_WING_RANKS`; os quadros sao os menores
+  // que enquadram as oito rotacoes de cada metade com 2px de margem.
   eightWay(
     base(
-      'part-sheet-leviathan-body',
-      152,
-      84,
-      76,
-      45,
+      'part-sheet-leviathan-wings',
+      208,
+      112,
+      104,
+      61,
       { w: 1.7, h: 1.2 },
       { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
       {
-        idle: { frames: LEVIATHAN_BODY_RANKS, fps: 1, loop: true },
+        idle: { frames: LEVIATHAN_WING_RANKS, fps: 1, loop: true },
       },
-      leviathanBodyFrame,
-      'voxel-isometric cross-sections of an abyssal ray-leviathan body in eight facings, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars',
-      2,
+      leviathanWingsFrame,
+      'voxel-isometric cross-sections of an abyssal ray-leviathan wing region in eight facings, four ranks from broad crescent wing roots through the widest span of over four tiles to narrowing membranes with serrated pale trailing edges and wet leading-edge sheen, near-black dorsum, pale belly, two continuous conductive lines along the dorsum, barnacles and pale scars',
+      1,
+    ),
+  ),
+  eightWay(
+    base(
+      'part-sheet-leviathan-tail',
+      64,
+      44,
+      32,
+      30,
+      { w: 1.7, h: 1.2 },
+      { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+      {
+        idle: { frames: LEVIATHAN_BODY_RANKS - LEVIATHAN_WING_RANKS, fps: 1, loop: true },
+      },
+      leviathanTailFrame,
+      'voxel-isometric cross-sections of an abyssal ray-leviathan tail in eight facings, four ranks from a tapering trunk with fin remnants through a thin peduncle to a whip tail tipped with a discreet electric organ, near-black dorsum with a wet crest, two continuous conductive lines',
+      1,
     ),
   ),
   // Pulmao e Coracao sao FIXOS na simulacao (speed 0) e por isso nao tem

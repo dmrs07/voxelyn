@@ -492,11 +492,19 @@ O corpo é **uma raia, não uma cobra**: o rastro por comprimento de arco ganhou
 coeficiente de rigidez (`TrailConfig.stiffness`, 0,72 no Leviatã, 0 no Devorador,
 que não mudou). A cabeça é o vetor, a raiz das asas herda o rumo dela e cada elo só
 desvia do anterior até 12° — o corpo vira do tronco para trás, sem serpentear. As
-peças do corpo têm **oito rumos** (`part-sheet-leviathan-body`, `dirFromFacing8`):
-os quatro eixos do mundo e as quatro diagonais, que na tela são a horizontal e a
-vertical — um corpo nadando na vertical com peças só nos eixos empilhava oito quadros
-`dr` e lia como escada. Os rumos intermediários são o mesmo modelo voxel girado meio
-passo e re-rasterizado (`rotatedVoxels`).
+peças do corpo têm **oito rumos** (`part-sheet-leviathan-wings` e
+`part-sheet-leviathan-tail`, `dirFromFacing8`): os quatro eixos do mundo e as quatro
+diagonais, que na tela são a horizontal e a vertical — um corpo nadando na vertical
+com peças só nos eixos empilhava oito quadros `dr` e lia como escada. Os rumos
+intermediários são o mesmo modelo voxel girado meio passo e re-rasterizado
+(`rotatedVoxels`).
+
+E ele é **largo e do fundo**: pouco mais de quatro tiles de vão, dorso quase preto e
+ventre pálido — contra a água escura o que se lê é a orla clara das pontas das asas,
+o brilho molhado da borda de ataque, os olhos, os poros e as linhas condutivas — e,
+por baixo da lâmina, uma **massa** escura sem borda desenhada sob cada peça, só sobre
+água, que persiste enquanto ele afunda: o corpo parece maior do que o que rompe a
+superfície.
 
 As posturas são explícitas (`LEVIATHAN_ANCHORED/DIVING/HIDDEN/EMERGING/HUNTING`;
 `charging` é derivada). O Aquífero ganhou **bacias** geradas por erosão (margem rasa

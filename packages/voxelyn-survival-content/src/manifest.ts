@@ -174,8 +174,11 @@ export const CHARACTER_SPRITE_IDS = [
   // membranas, tronco, pedunculo, cauda). `part-` pela mesma razao do anel do
   // Devorador: nao e um bicho, e uma peca que o cliente pendura atras da
   // cabeca — numa pose autorada quando ele esta ancorado, no rastro da cabeca
-  // quando caca. Os quadros sao POSTOS, do mais largo ao mais fino.
-  'part-sheet-leviathan-body',
+  // quando caca. Os quadros sao POSTOS, do mais largo ao mais fino, em oito
+  // rumos, e em DOIS atlas — as asas e a cauda — porque um atlas tem um
+  // tamanho de quadro so e a cauda nao pode pagar o quadro das asas.
+  'part-sheet-leviathan-wings',
+  'part-sheet-leviathan-tail',
   'enemy-lung-matrix',
   'enemy-furnace-heart',
   'enemy-frost-queen',

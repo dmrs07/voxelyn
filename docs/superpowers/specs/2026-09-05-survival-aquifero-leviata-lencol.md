@@ -1,7 +1,7 @@
 # Voxelyn Survival — o Aquífero Negro e o Leviatã do Lençol em duas fases
 
 **Versões**: `SIMULATION_VERSION` 59 · `PROTOCOL_VERSION` 32 · `CONTENT_VERSION` 34
-(atlas `enemy-sheet-leviathan` v2, atlas novo `part-sheet-leviathan-body` v1,
+(atlas `enemy-sheet-leviathan` v3, atlas novos `part-sheet-leviathan-wings` e `part-sheet-leviathan-tail` v1,
 `surface-tiles` v9).
 
 Rework completo e integrado do estrato e do encontro: água profunda nativa gerada
@@ -203,21 +203,33 @@ devolve com os corpos daquele tick; `NetClient` retém o último `WorldFlags` nu
   rigidez não muda a forma (`spine-trail.test.ts`).
 - **Atlas**: `enemy-sheet-leviathan` v3 é só a cabeça (disco cefálico, lobos,
   boca, olhos no topo, fendas branquiais, eletroporos, início das linhas; hitbox
-  1,7 × 1,2; quadro 112 × 68, o menor que enquadra as quatro rotações);
-  `part-sheet-leviathan-body` v2 são oito cortes (raiz das asas, meio — o maior
-  vão —, borda serrilhada, tronco ×2, pedúnculo, cauda, ponta com o órgão
-  elétrico) em **oito rumos** (152 × 84, 64 quadros): os quatro eixos do mundo e
-  as quatro diagonais (`r`, `d`, `l`, `u`), escolhidos por `dirFromFacing8` em
-  setores de 45° no plano da tela. Um corpo nadando na vertical da tela com
-  peças só nos eixos empilhava oito quadros `dr` e lia como escada. Os rumos
-  intermediários são o mesmo modelo girado meio passo e **re-rasterizado** na
-  grade fina (`rotatedVoxels`: malha 2×2 por voxel, pivô (0,5, 0,5) — o mesmo
-  das rotações inteiras — interior maciço, borda serrilhada em um voxel). As
-  asas são dez tiras sobrepostas descendo em meio voxel, não seis lajes; linhas
-  condutivas **sobre** o dorso em toda peça, cracas e cicatrizes em pares
-  espelhados (caixa envolvente centrada por posto). A cabeça continua em quatro
-  rumos (bicho vivo: validador e histerese de `facing.ts`); oito rumos nela
-  custariam ~3 MiB no orçamento de boot, que fechou em 166,3 de 167,8 MB.
+  1,7 × 1,2; quadro 112 × 68, o menor que enquadra as quatro rotações). O corpo
+  são oito cortes em **dois atlas** de **oito rumos**: `part-sheet-leviathan-wings`
+  (postos 0–3: raiz das asas, o maior vão, borda serrilhada, tronco com quilhas;
+  208 × 112) e `part-sheet-leviathan-tail` (postos 4–7: tronco, pedúnculo, cauda,
+  ponta com o órgão elétrico; 64 × 44) — um atlas tem um só tamanho de quadro, e a
+  cauda não pode pagar o quadro das asas trinta e duas vezes. Os rumos são os
+  quatro eixos do mundo e as quatro diagonais (`r`, `d`, `l`, `u`), escolhidos por
+  `dirFromFacing8` em setores de 45° no plano da tela; os intermediários são o
+  mesmo modelo girado meio passo e **re-rasterizado** na grade fina
+  (`rotatedVoxels`: malha 2×2 por voxel, pivô (0,5, 0,5) — o mesmo das rotações
+  inteiras — interior maciço, borda serrilhada em um voxel).
+- **Direção de arte — largo e talassofóbico**: o vão do meio das asas é 34
+  unidades, pouco mais de **quatro tiles** (era três); as asas são doze tiras
+  sobrepostas numa curva que acelera para a ponta, corda em crescente, borda
+  traseira serrilhada. O dorso é **quase preto** (`rockDeep`), o ventre pálido
+  (`rock`): contra a água escura o que se lê dele é a orla clara do ventre nas
+  pontas das asas, o brilho molhado da borda de ataque em tiras alternadas, os
+  olhos, os poros e as duas linhas condutivas — a massa em si é sombra. A cabeça
+  segue a mesma regra (dorso escuro, brilhos azuis de pele molhada). E por baixo
+  da lâmina o renderer desenha a **massa** (`drawLeviathanMass`,
+  `LEVIATHAN_MASS_RADIUS` por posto, 2,9 tiles no meio das asas, 2,0 na cabeça):
+  uma elipse escura sem borda no plano do chão, só sobre água, que persiste
+  enquanto o corpo afunda e some com ele — o corpo parece maior do que o que
+  rompe a superfície. A cabeça continua em quatro rumos (bicho vivo: validador e
+  histerese de `facing.ts`); oito rumos nela custariam ~3 MiB no orçamento de
+  boot. `leviathan-frames.test.ts` mede que as oito rotações de cada peça cabem
+  no quadro com 2px de margem e que o vão passa de quatro tiles.
 - **Chão**: `aquifer-deep-water` (surface-tiles v9), escolhido por (superfície,
   estrato) em `surfaceKindIndex`: quase preto, plano rebaixado, correntes largas e
   lentas, bolhas esparsas, sem moldura por tile e sem gelo. O `deep-water` da
@@ -259,5 +271,5 @@ células tampadas, marca, destino, descarga e o predicado da bolha com a margem.
   `aquifero-bacias.test.ts`, os testes antigos do Leviatã reescritos.
 - content: `surface-separation.test.mjs` (a água profunda do Aquífero sem gelo,
   sem leito, sem moldura, e se move), validação de atlas (bounds, anchors,
-  jitter, paleta, normais, sem quadro vazio, oito rumos, orçamento de boot: 166,67 MB de
+  jitter, paleta, normais, sem quadro vazio, oito rumos, quadros das peças, orçamento de boot: 166,75 MB de
   167,77).

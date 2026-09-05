@@ -79,7 +79,9 @@ import {
   leviathanTargetable,
 } from '@voxelyn/survival-sim';
 import {
-  LEVIATHAN_BODY_ATLAS,
+  LEVIATHAN_HEAD_MASS_RADIUS,
+  LEVIATHAN_MASS_RADIUS,
+  leviathanPieceFrame,
   LEVIATHAN_SINK_PX,
   LeviathanBodies,
   leviathanSubmersions,
@@ -1003,6 +1005,39 @@ const leviathanWaterDip = (
     line: sy + 6 * spriteZoom,
     drop: Math.min(1, submersion) * LEVIATHAN_SINK_PX * spriteZoom,
   };
+};
+
+/**
+ * A MASSA de um posto do Leviata por baixo da lamina: uma elipse escura sem
+ * borda, no plano do chao, na projecao isometrica de um disco de `radius`
+ * tiles (a mesma conta do anel das bolhas). O centro e quase opaco e a orla
+ * some no nada — uma sombra com contorno seria um objeto; sem contorno e
+ * profundidade.
+ */
+const drawLeviathanMass = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  radius: number,
+  z: number,
+  alpha: number,
+): void => {
+  if (alpha <= 0.01) return;
+  const rx = radius * TILE_W * 0.5 * Math.SQRT2 * z;
+  const ry = radius * TILE_H * 0.5 * Math.SQRT2 * z;
+  if (rx < 1 || ry < 1) return;
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(1, ry / rx);
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+  grad.addColorStop(0, `rgba(1,3,9,${alpha})`);
+  grad.addColorStop(0.5, `rgba(1,3,9,${alpha * 0.7})`);
+  grad.addColorStop(1, 'rgba(1,3,9,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, rx, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 };
 
 /**
@@ -4215,6 +4250,28 @@ export class SurvivalRenderer {
         };
         const nodes = this.leviathanBodies.nodes(enemy, state.tick, leviathanHead, nowMs);
         leviathansDrawn.add(enemy.id);
+        // A MASSA por baixo da lamina: uma sombra larga e sem borda sob a
+        // cabeca e sob cada peca, so sobre agua. O dorso e o que se ve; a
+        // sombra e o que diz que ha muito mais dele ali embaixo. Ela fica
+        // enquanto o corpo afunda (a coisa continua la) e some com ele.
+        const massAt = (x: number, y: number, radius: number, submersion: number): void => {
+          const ci = Math.floor(y) * state.config.width + Math.floor(x);
+          if (ci < 0 || ci >= state.surface.length) return;
+          const surf = state.surface[ci];
+          const wet = surf === SURF_WATER || surf === SURF_DEEP_WATER || delugeDepth(state, ci) > 0;
+          if (!wet) return;
+          if (brightness(x, y) <= 0.05) return;
+          const [msx, msy] = toScreen(x, y);
+          items.push({
+            depth: x + y - 0.75,
+            draw: () => drawLeviathanMass(ctx, msx, msy, radius, z, 0.5 * (1 - 0.45 * submersion)),
+          });
+        };
+        massAt(enemy.x, enemy.y, LEVIATHAN_HEAD_MASS_RADIUS, subs.head);
+        for (const node of nodes) {
+          if (node.submersion >= 1) continue;
+          massAt(node.x, node.y, LEVIATHAN_MASS_RADIUS[node.rank] ?? 0.5, node.submersion);
+        }
         for (const node of nodes) {
           if (node.submersion >= 1) continue;
           const nb = brightness(node.x, node.y);
@@ -6129,7 +6186,8 @@ export class SurvivalRenderer {
     faces: FaceLighting | undefined,
     nowMs: number,
   ): void {
-    const loaded = this.sprites.get(LEVIATHAN_BODY_ATLAS);
+    const piece = leviathanPieceFrame(node.rank);
+    const loaded = this.sprites.get(piece.atlas);
     // Sem atlas nao ha corpo, e nao ha recuo: a cabeca sozinha e um chefe
     // legivel; oito losangos de recuo em fila seriam pior que a ausencia.
     if (!loaded) return;
@@ -6144,9 +6202,9 @@ export class SurvivalRenderer {
     }
     this.sprites.drawPiece(
       ctx,
-      LEVIATHAN_BODY_ATLAS,
+      piece.atlas,
       'idle',
-      node.rank,
+      piece.frame,
       node.dirX,
       node.dirY,
       sx,

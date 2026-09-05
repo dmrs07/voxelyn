@@ -36,8 +36,33 @@ import {
 } from '@voxelyn/survival-sim';
 import { SpineTrail, type TrailNode } from './spine-trail';
 
-/** O atlas das pecas do corpo. Os quadros sao POSTOS, nao instantes. */
-export const LEVIATHAN_BODY_ATLAS = 'part-sheet-leviathan-body';
+/**
+ * Os atlas das pecas do corpo: as asas (postos 0..3) e a cauda (postos 4..7).
+ * Os quadros sao POSTOS, nao instantes. Dois atlas porque um atlas tem um
+ * tamanho de quadro so, e a raiz das asas (quatro tiles de vao) num quadro
+ * de 208 px faria a ponta da cauda, de cinquenta, pagar o mesmo em branco.
+ */
+export const LEVIATHAN_WINGS_ATLAS = 'part-sheet-leviathan-wings';
+export const LEVIATHAN_TAIL_ATLAS = 'part-sheet-leviathan-tail';
+export const LEVIATHAN_WING_RANKS = 4;
+
+/** Em que atlas e em que quadro vive a peca de um posto. */
+export const leviathanPieceFrame = (rank: number): { atlas: string; frame: number } =>
+  rank < LEVIATHAN_WING_RANKS
+    ? { atlas: LEVIATHAN_WINGS_ATLAS, frame: rank }
+    : { atlas: LEVIATHAN_TAIL_ATLAS, frame: rank - LEVIATHAN_WING_RANKS };
+
+/**
+ * O raio da MASSA que cada posto arrasta por baixo da lamina, em tiles.
+ *
+ * O que se ve dele e o dorso; o que o jogador tem de sentir e o resto — a
+ * sombra larga e sem borda que uma coisa grande demais faz na agua escura.
+ * Desenhada no chao sob cada peca (e sob a cabeca), so sobre agua, e ela
+ * que faz o corpo parecer maior do que o que rompe a superficie. Os postos
+ * das asas sao os mais largos; a cauda quase nao faz sombra.
+ */
+export const LEVIATHAN_MASS_RADIUS: readonly number[] = [2.6, 2.9, 2.5, 1.8, 1.3, 0.9, 0.7, 0.5];
+export const LEVIATHAN_HEAD_MASS_RADIUS = 2.0;
 
 /**
  * Passo entre pecas, em tiles.
@@ -74,10 +99,10 @@ export const LEVIATHAN_TELEPORT_TILES = 3;
 
 /**
  * Quanto uma peca DESCE, em pixels de atlas, quando esta 100% submersa.
- * A altura do quadro do corpo (84px, o maior dos dois): descendo tudo, o
+ * A altura do quadro das asas (112px, o maior dos tres): descendo tudo, o
  * recorte na lamina nao deixa um pixel, nem da cabeca nem de peca alguma.
  */
-export const LEVIATHAN_SINK_PX = 84;
+export const LEVIATHAN_SINK_PX = 112;
 
 /** Uma peca do corpo resolvida para este quadro. */
 export type LeviathanBodyNode = TrailNode & {

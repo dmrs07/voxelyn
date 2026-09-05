@@ -1,14 +1,14 @@
 {
-  "id": "part-sheet-leviathan-body",
-  "version": 2,
-  "atlas": "part-sheet-leviathan-body.png",
-  "normalAtlas": "part-sheet-leviathan-body.normal.png",
+  "id": "part-sheet-leviathan-wings",
+  "version": 1,
+  "atlas": "part-sheet-leviathan-wings.png",
+  "normalAtlas": "part-sheet-leviathan-wings.normal.png",
   "normalScale": 2,
-  "frameWidth": 152,
-  "frameHeight": 84,
-  "columns": 22,
-  "anchorX": 76,
-  "anchorY": 45,
+  "frameWidth": 208,
+  "frameHeight": 112,
+  "columns": 16,
+  "anchorX": 104,
+  "anchorY": 61,
   "directions": 8,
   "authoredDirs": [
     "dr",
@@ -46,7 +46,7 @@
   ],
   "animations": {
     "idle": {
-      "frames": 8,
+      "frames": 4,
       "fps": 1,
       "loop": true
     }
@@ -56,30 +56,30 @@
       "idle": 0
     },
     "dl": {
-      "idle": 8
+      "idle": 4
     },
     "ur": {
-      "idle": 16
+      "idle": 8
     },
     "ul": {
-      "idle": 24
+      "idle": 12
     },
     "r": {
-      "idle": 32
+      "idle": 16
     },
     "d": {
-      "idle": 40
+      "idle": 20
     },
     "l": {
-      "idle": 48
+      "idle": 24
     },
     "u": {
-      "idle": 56
+      "idle": 28
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan body in eight facings, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars",
+    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan wing region in eight facings, four ranks from broad crescent wing roots through the widest span of over four tiles to narrowing membranes with serrated pale trailing edges and wet leading-edge sheen, near-black dorsum, pale belly, two continuous conductive lines along the dorsum, barnacles and pale scars",
     "seedOrRef": "deterministic-code-v2"
   }
 }

@@ -49,7 +49,8 @@ import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
 import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
-import leviathanBodyManifest from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.json';
+import leviathanWingsManifest from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-wings.json';
+import leviathanTailManifest from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-tail.json';
 import lungMatrixManifest from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.json';
 import furnaceHeartManifest from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.json';
 import frostQueenManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.json';
@@ -117,7 +118,8 @@ import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white
 import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
 import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
 import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
-import leviathanBodyUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.png?url';
+import leviathanWingsUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-wings.png?url';
+import leviathanTailUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-tail.png?url';
 import lungMatrixUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.png?url';
 import furnaceHeartUrl from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.png?url';
 import frostQueenUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.png?url';
@@ -155,7 +157,8 @@ import enemyMudLampreyNormalUrl from '@voxelyn/survival-content/assets/atlases/e
 import enemyResonantNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-resonant.normal.png?url';
 import enemyScoriacNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.normal.png?url';
 import enemySheetLeviathanNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.normal.png?url';
-import partSheetLeviathanBodyNormalUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-body.normal.png?url';
+import partSheetLeviathanWingsNormalUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-wings.normal.png?url';
+import partSheetLeviathanTailNormalUrl from '@voxelyn/survival-content/assets/atlases/part-sheet-leviathan-tail.normal.png?url';
 import enemySpitterNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.normal.png?url';
 import enemySporeBomberNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.normal.png?url';
 import enemyStalkerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.normal.png?url';
@@ -196,7 +199,8 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-resonant.normal.png': enemyResonantNormalUrl,
   'enemy-scoriac.normal.png': enemyScoriacNormalUrl,
   'enemy-sheet-leviathan.normal.png': enemySheetLeviathanNormalUrl,
-  'part-sheet-leviathan-body.normal.png': partSheetLeviathanBodyNormalUrl,
+  'part-sheet-leviathan-wings.normal.png': partSheetLeviathanWingsNormalUrl,
+  'part-sheet-leviathan-tail.normal.png': partSheetLeviathanTailNormalUrl,
   'enemy-spitter.normal.png': enemySpitterNormalUrl,
   'enemy-spore-bomber.normal.png': enemySporeBomberNormalUrl,
   'enemy-stalker.normal.png': enemyStalkerNormalUrl,
@@ -585,7 +589,8 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: broodManifest as unknown as SpriteManifestEntry, url: broodUrl },
   { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
   { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
-  { manifest: leviathanBodyManifest as unknown as SpriteManifestEntry, url: leviathanBodyUrl },
+  { manifest: leviathanWingsManifest as unknown as SpriteManifestEntry, url: leviathanWingsUrl },
+  { manifest: leviathanTailManifest as unknown as SpriteManifestEntry, url: leviathanTailUrl },
   { manifest: lungMatrixManifest as unknown as SpriteManifestEntry, url: lungMatrixUrl },
   { manifest: furnaceHeartManifest as unknown as SpriteManifestEntry, url: furnaceHeartUrl },
   { manifest: frostQueenManifest as unknown as SpriteManifestEntry, url: frostQueenUrl },
