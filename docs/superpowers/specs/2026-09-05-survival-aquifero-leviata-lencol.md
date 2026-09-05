@@ -240,6 +240,16 @@ devolve com os corpos daquele tick; `NetClient` retém o último `WorldFlags` nu
   estrato) em `surfaceKindIndex`: quase preto, plano rebaixado, correntes largas e
   lentas, bolhas esparsas, sem moldura por tile e sem gelo. O `deep-water` da
   Cripta continua com a borda de gelo quebrado.
+- **O nível da água é legível**: todo corpo que não nada (Prospector, parceiro,
+  inimigos) é **cortado na linha d'água** do Dilúvio (`drawCutByWaterline`): acima
+  dela como é, abaixo dela azul e apagado, com a ondulação na linha — é nele que se
+  lê "na cintura" ou "acima da cabeça". Na caçada o Leviatã **nada na superfície**
+  (cabeça e peças sobem a altura da coluna; a massa fica no chão) e, emergindo sob
+  o Dilúvio, sobe do fundo com a própria emergência. Os **núcleos profundos** do
+  Aquífero ganham o contorno do núcleo (só as arestas que encostam em chão não
+  profundo — o tile continua sem moldura) e, alagados, uma mancha escura no plano
+  da superfície: a água é mais funda onde o chão caiu, e cair num buraco que a tela
+  não mostra não é dificuldade.
 - **Marcas**: `probe` em `pendingGroundMarkers` (reconexão lê do `bossRuntime`);
   poça de destino em ebulição (`drawPoolBoil`, intensidade por
   `leviathanSurfaceAt`); aviso do mergulho como anel escuro pulsando no raio da
