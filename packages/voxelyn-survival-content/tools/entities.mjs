@@ -30,6 +30,7 @@ export const ANIM_ORDER = [
   'burst',
 ];
 const DIRS = ['dr', 'dl', 'ur', 'ul'];
+const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
 
 // ---------------------------------------------------------------------------
 // player-prospector — SHEET COMPLETO do bot PX
@@ -46,7 +47,7 @@ const DIRS = ['dr', 'dl', 'ur', 'ul'];
 // `hit`, `die`, `downed` e `revive` —, e por ser o caminho de recuo enquanto os
 // tres atlas de camada nao carregaram.
 // ---------------------------------------------------------------------------
-const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
+const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3, r: 4, d: 5, l: 6, u: 7 };
 
 /**
  * Progresso da morte, de 0 (corpo ainda inteiro, no frame do golpe) a 1 (so
@@ -2716,20 +2717,29 @@ const leviathanBodyModel = (rank) => {
   // a corda encolhendo para tras — a membrana e triangular e a borda traseira
   // sai irregular, levemente serrilhada.
   if (wingSpan > 0) {
-    const strips = 6;
+    // Dez tiras que se SOBREPOEM (passo menor que a profundidade de cada
+    // uma): a asa e uma superficie continua descendo em degraus de meio
+    // voxel, e nao seis lajes soltas em escada — era a escada que fazia o
+    // corpo ler como pilha de placas.
+    const strips = 10;
+    const reach = wingSpan - trunkD / 2;
+    const stripDepth = Math.max(1, (reach / strips) * 1.6);
     for (const s of [-1, 1]) {
       for (let k = 0; k < strips; k++) {
         const t = (k + 1) / strips;
-        const y = trunkD / 2 + (t - 1 / strips) * (wingSpan - trunkD / 2);
-        const chord = L - t * 2.4 - (levHash(rank, k, 3) % 2) * 0.6;
+        // A borda EXTERNA da tira e que caminha ate o vao: o passo e menor
+        // que a profundidade, entao a tira de fora cobre a de dentro.
+        const y = trunkD / 2 + t * reach - stripDepth;
+        const chord = L - t * 2.4 - (levHash(rank, k, 3) % 2) * 0.5;
         const lift = top - 0.9 - t * 2.2;
         // Centrada em x com um leve recuo para tras (a membrana e mais longa
         // atras do que na frente), pequeno o bastante para a caixa envolvente
         // de cada posto continuar centrada — ver `barnaclesAndScars`.
         const x0 = -chord / 2 - (L - chord) * 0.12;
-        b.push(box(x0, s > 0 ? y : -y - 1, lift, chord, 1.1, 0.9, 'water'));
+        const yy = s > 0 ? y : -y - stripDepth;
+        b.push(box(x0, yy, lift, chord, stripDepth, 0.9, 'water'));
         // O ventre da asa aparece quando ela dobra para baixo.
-        b.push(box(x0, s > 0 ? y : -y - 1, lift - 0.4, chord, 1.1, 0.4, 'rock'));
+        b.push(box(x0, yy, lift - 0.4, chord, stripDepth, 0.4, 'rock'));
       }
     }
   }
@@ -3225,10 +3235,13 @@ const devourerFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 152, 76, 104);
 const archcantorFrame = (dir, anim, f) =>
   renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
+// O quadro da cabeca e o menor que enquadra as quatro rotacoes com 2px de
+// margem (104x63 de conteudo): o canvas de 132x88 de antes pagava 28px de
+// largura e 20 de altura em branco, em cem quadros, no orcamento de boot.
 const leviathanFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 132, 88, 66, 58);
+  renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 112, 68, 56, 41);
 const leviathanBodyFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(leviathanBodyModel(f)), DIR_INDEX[dir], 160, 114, 80, 76);
+  renderVoxels(quarterTurn(leviathanBodyModel(f)), DIR_INDEX[dir], 152, 84, 76, 45);
 const lungMatrixFrame = (dir, anim, f) =>
   renderVoxels(lungMatrixModel(anim, f), DIR_INDEX[dir], 116, 112, 56, 88);
 const furnaceHeartFrame = (dir, anim, f) =>
@@ -3458,6 +3471,24 @@ const base = (
   draw,
   prompt,
 });
+
+/**
+ * Uma PECA em oito rumos: os quatro eixos do mundo e as quatro diagonais.
+ *
+ * So para `part-`: um bicho vivo continua em quatro (o validador exige, e o
+ * rumo dele passa pela histerese de `facing.ts`). Uma peca de corpo comprido
+ * e escolhida pela tangente do caminho, que aponta para qualquer lado, e em
+ * quatro rumos metade das tangentes cai a 45 graus do quadro mais proximo —
+ * um corpo nadando na vertical da tela virava uma escada de quadros `dr`.
+ */
+const eightWay = (spec) => ({ ...spec, directions: 8, authoredDirs: DIRS8 });
+
+/** Os modelos do Leviata, expostos para o script de medida de quadro. */
+export const LEVIATHAN_PARTS_FOR_MEASURE = {
+  bodyModel: (rank) => leviathanBodyModel(rank),
+  headModel: (anim, f) => leviathanModel(anim, f),
+  quarterTurn,
+};
 
 export const ENTITY_SPECS = [
   base(
@@ -3825,10 +3856,10 @@ export const ENTITY_SPECS = [
   // da descarga (as linhas acendem); `attack` e a Sondagem (guelras vibram).
   base(
     'enemy-sheet-leviathan',
-    132,
-    88,
-    66,
-    58,
+    112,
+    68,
+    56,
+    41,
     { w: 1.7, h: 1.2 },
     { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
     {
@@ -3837,25 +3868,34 @@ export const ENTITY_SPECS = [
     },
     leviathanFrame,
     'voxel-isometric black aquifer ray-leviathan boss head: flattened muscular cephalic disc, forward cephalic lobes around a wide slit mouth, small top-mounted cyan eyes, deep gill slits, cyan electrosensory pores, two conductive lateral lines starting at the nape, near-black navy and wet slate dorsum, blue-grey belly',
-    2,
+    3,
   ),
   // O CORPO do Leviata, um corte transversal por quadro: raiz das asas,
   // membranas, tronco, pedunculo e cauda. `part-` pela mesma razao do anel do
   // Devorador — nao e um bicho, e uma peca; os quadros sao POSTOS.
-  base(
-    'part-sheet-leviathan-body',
-    160,
-    114,
-    80,
-    76,
-    { w: 1.7, h: 1.2 },
-    { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
-    {
-      idle: { frames: LEVIATHAN_BODY_RANKS, fps: 1, loop: true },
-    },
-    leviathanBodyFrame,
-    'voxel-isometric cross-sections of an abyssal ray-leviathan body, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars',
-    1,
+  //
+  // OITO RUMOS, e nao quatro: a peca e escolhida pela tangente do caminho, e
+  // um corpo nadando na horizontal ou na vertical da tela (as diagonais do
+  // mundo) ficava a 45 graus de qualquer quadro autorado — oito quadros `dr`
+  // empilhados na vertical leem como escada. O quadro e o menor que enquadra
+  // as oito rotacoes com 2px de margem (a raiz das asas em `d`/`u` e a mais
+  // larga, 144px; a peca vista de frente em `r`/`l` e a mais alta, 78px).
+  eightWay(
+    base(
+      'part-sheet-leviathan-body',
+      152,
+      84,
+      76,
+      45,
+      { w: 1.7, h: 1.2 },
+      { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+      {
+        idle: { frames: LEVIATHAN_BODY_RANKS, fps: 1, loop: true },
+      },
+      leviathanBodyFrame,
+      'voxel-isometric cross-sections of an abyssal ray-leviathan body in eight facings, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars',
+      2,
+    ),
   ),
   // Pulmao e Coracao sao FIXOS na simulacao (speed 0) e por isso nao tem
   // `walk`: um atlas com marcha para quem nunca sai do lugar seria 24 quadros

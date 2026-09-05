@@ -53,9 +53,18 @@ export const LEVIATHAN_HEAD_OFFSET = 0.7;
 /** Resolucao do rastro na cacada, em tiles. */
 export const LEVIATHAN_TRAIL_STEP = 0.12;
 /** A ondulacao lateral na cacada: um corpo pesado, uma onda longa, devagar. */
-export const LEVIATHAN_SWAY = 0.16;
-export const LEVIATHAN_SWAY_WAVES = 1.1;
+export const LEVIATHAN_SWAY = 0.1;
+export const LEVIATHAN_SWAY_WAVES = 0.8;
 export const LEVIATHAN_SWAY_HZ = 0.45;
+/**
+ * A RIGIDEZ do corpo na cacada (`TrailConfig.stiffness`): uma raia, nao uma
+ * cobra. A cabeca e o vetor, a raiz das asas herda o rumo dela quase inteiro
+ * e o corpo so dobra de verdade do tronco para tras — e cada peca desvia da
+ * anterior no maximo `LEVIATHAN_MAX_BEND` (12 graus), o que da a cauda uma
+ * curva de 84 graus no total, para o corpo VIRAR sem serpentear.
+ */
+export const LEVIATHAN_STIFFNESS = 0.72;
+export const LEVIATHAN_MAX_BEND = (12 * Math.PI) / 180;
 /**
  * Salto de posicao acima do qual o rastro e descartado. O menor salto entre
  * pocas e de 5 tiles (`LEVIATHAN_HOP_MIN_TILES`); a cabeca nada no maximo
@@ -65,10 +74,10 @@ export const LEVIATHAN_TELEPORT_TILES = 3;
 
 /**
  * Quanto uma peca DESCE, em pixels de atlas, quando esta 100% submersa.
- * A altura util do quadro (acima da ancora mais abaixo dela): descendo tudo,
- * o recorte na lamina nao deixa um pixel.
+ * A altura do quadro do corpo (84px, o maior dos dois): descendo tudo, o
+ * recorte na lamina nao deixa um pixel, nem da cabeca nem de peca alguma.
  */
-export const LEVIATHAN_SINK_PX = 76;
+export const LEVIATHAN_SINK_PX = 84;
 
 /** Uma peca do corpo resolvida para este quadro. */
 export type LeviathanBodyNode = TrailNode & {
@@ -182,6 +191,8 @@ export class LeviathanBodies {
     sway: LEVIATHAN_SWAY,
     swayWaves: LEVIATHAN_SWAY_WAVES,
     swayHz: LEVIATHAN_SWAY_HZ,
+    stiffness: LEVIATHAN_STIFFNESS,
+    maxBend: LEVIATHAN_MAX_BEND,
     teleportTiles: LEVIATHAN_TELEPORT_TILES,
   });
 

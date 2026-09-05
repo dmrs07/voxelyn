@@ -207,6 +207,7 @@ const LEVIATHAN_SCENARIO_LABELS: Record<LeviathanScenario, string> = {
   probeDry: 'Sondagem (piso seco)',
   probeDeepen: 'Sondagem (aprofundar)',
   standOnLid: 'jogador sobre a tampa',
+  stepOff: 'jogador ao lado, em piso seco',
   dive: 'mergulho',
   hidden: 'viagem escondida',
   emerge: 'emergência',

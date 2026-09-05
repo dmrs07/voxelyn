@@ -193,12 +193,31 @@ devolve com os corpos daquele tick; `NetClient` retém o último `WorldFlags` nu
   de 0,25 tile), descarte em qualquer salto > 3 tiles; cada peça desce
   `LEVIATHAN_SINK_PX` × submersão e é **recortada** na linha d'água com ondulação
   (`drawLeviathanPiece`, `leviathanWaterDip`). Escondido não desenha nada.
-- **Atlas**: `enemy-sheet-leviathan` v2 é só a cabeça (disco cefálico, lobos,
+- **Rigidez** (`TrailConfig.stiffness`, `maxBend`): uma raia, não uma cobra. Com
+  rigidez 0 o corpo senta sobre o caminho da cabeça (o Devorador, inalterado).
+  O Leviatã usa 0,72 com dobra máxima de 12° por elo: a **cabeça é o vetor**, o
+  primeiro elo herda o rumo dela, cada elo seguinte mistura a tangente do caminho
+  com a direção do anterior e é segurado pelo limite; a posição passa a ser o fim
+  do elo (sempre a `gap` do anterior — sem fresta nem amontoado). A cauda soma
+  no máximo 84° de curva: o corpo **vira** em vez de serpentear. Andando reto,
+  rigidez não muda a forma (`spine-trail.test.ts`).
+- **Atlas**: `enemy-sheet-leviathan` v3 é só a cabeça (disco cefálico, lobos,
   boca, olhos no topo, fendas branquiais, eletroporos, início das linhas; hitbox
-  1,7 × 1,2); `part-sheet-leviathan-body` são oito cortes (raiz das asas, meio —
-  o maior vão —, borda serrilhada, tronco ×2, pedúnculo, cauda, ponta com o órgão
-  elétrico), linhas condutivas **sobre** o dorso em toda peça, cracas e
-  cicatrizes em pares espelhados (caixa envolvente centrada por posto).
+  1,7 × 1,2; quadro 112 × 68, o menor que enquadra as quatro rotações);
+  `part-sheet-leviathan-body` v2 são oito cortes (raiz das asas, meio — o maior
+  vão —, borda serrilhada, tronco ×2, pedúnculo, cauda, ponta com o órgão
+  elétrico) em **oito rumos** (152 × 84, 64 quadros): os quatro eixos do mundo e
+  as quatro diagonais (`r`, `d`, `l`, `u`), escolhidos por `dirFromFacing8` em
+  setores de 45° no plano da tela. Um corpo nadando na vertical da tela com
+  peças só nos eixos empilhava oito quadros `dr` e lia como escada. Os rumos
+  intermediários são o mesmo modelo girado meio passo e **re-rasterizado** na
+  grade fina (`rotatedVoxels`: malha 2×2 por voxel, pivô (0,5, 0,5) — o mesmo
+  das rotações inteiras — interior maciço, borda serrilhada em um voxel). As
+  asas são dez tiras sobrepostas descendo em meio voxel, não seis lajes; linhas
+  condutivas **sobre** o dorso em toda peça, cracas e cicatrizes em pares
+  espelhados (caixa envolvente centrada por posto). A cabeça continua em quatro
+  rumos (bicho vivo: validador e histerese de `facing.ts`); oito rumos nela
+  custariam ~3 MiB no orçamento de boot, que fechou em 166,3 de 167,8 MB.
 - **Chão**: `aquifer-deep-water` (surface-tiles v9), escolhido por (superfície,
   estrato) em `surfaceKindIndex`: quase preto, plano rebaixado, correntes largas e
   lentas, bolhas esparsas, sem moldura por tile e sem gelo. O `deep-water` da
@@ -222,7 +241,7 @@ devolve com os corpos daquele tick; `NetClient` retém o último `WorldFlags` nu
 Seed 112 medida de novo: ~540 células de chão num raio de 14, ~200 de água rasa,
 14 profundas em três poças ocupáveis, chão seco entre elas, três dutos. O painel
 do Leviatã (`arena-leviathan-debug.ts`) põe o encontro em cada postura — ancorar,
-quatro rumos, Sondagem em piso seco e aprofundamento, jogador sobre a tampa,
+quatro rumos, Sondagem em piso seco e aprofundamento, jogador sobre a tampa e em piso seco,
 mergulho, viagem escondida, emergência, Dilúvio, perseguição, carga — e o jogador
 dentro, na borda e fora da bolha, com a leitura exata: postura, exposição,
 células tampadas, marca, destino, descarga e o predicado da bolha com a margem.

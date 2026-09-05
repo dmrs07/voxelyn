@@ -42,6 +42,7 @@ export type LeviathanScenario =
   | 'probeDry'
   | 'probeDeepen'
   | 'standOnLid'
+  | 'stepOff'
   | 'dive'
   | 'hidden'
   | 'emerge'
@@ -62,6 +63,7 @@ export const LEVIATHAN_SCENARIOS: readonly LeviathanScenario[] = [
   'probeDry',
   'probeDeepen',
   'standOnLid',
+  'stepOff',
   'dive',
   'hidden',
   'emerge',
@@ -116,6 +118,44 @@ const puddleUnderPlayer = (state: SurvivalState): void => {
   }
 };
 
+/**
+ * Poe o Prospector em piso seco AO LADO do chefe: a celula seca e andavel
+ * mais proxima dele a pelo menos `minDist` tiles. Serve a duas coisas. Um
+ * cenario que mergulha o chefe com o jogador de pe na tampa termina a run —
+ * a tampa vai embora com a cauda — e um painel que mata o jogador nao
+ * demonstra nada. E o chefe so e desenhado onde ha luz: ancorado numa poca
+ * a dez tiles da lanterna, ele e escuridao — o jogador tem de chegar perto
+ * para ver o que o painel diz que esta acontecendo.
+ */
+const stepOff = (state: SurvivalState, boss: Entity, minDist = 3): void => {
+  const w = state.config.width;
+  const px = Math.floor(boss.x);
+  const py = Math.floor(boss.y);
+  for (let r = 1; r <= 16; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = px + dx;
+        const y = py + dy;
+        const i = y * w + x;
+        if (i < 0 || i >= state.surface.length) continue;
+        if (state.solid[i] !== SOLID_NONE || state.surface[i] === SURF_DEEP_WATER) continue;
+        if (Math.hypot(x + 0.5 - boss.x, y + 0.5 - boss.y) < minDist) continue;
+        state.player.x = x + 0.5;
+        state.player.y = y + 0.5;
+        state.player.vx = 0;
+        state.player.vy = 0;
+        return;
+      }
+    }
+  }
+};
+
+const playerOnDeep = (state: SurvivalState): boolean => {
+  const i = Math.floor(state.player.y) * state.config.width + Math.floor(state.player.x);
+  return i >= 0 && i < state.surface.length && state.surface[i] === SURF_DEEP_WATER;
+};
+
 /** Alaga a sala INTEIRA no passado: a segunda fase, pronta. */
 const flood = (state: SurvivalState, boss: Entity): void => {
   state.bossRuntime.phasesFired |= BOSS_PHASE_DELUGE;
@@ -165,9 +205,14 @@ export const applyLeviathanScenario = (state: SurvivalState, scenario: Leviathan
       state.player.x = boss.x;
       state.player.y = boss.y;
       break;
+    case 'stepOff':
+      stepOff(state, boss);
+      break;
     case 'dive': {
       // O mergulho com um destino valido: o proximo tick telegrafa e afunda.
+      // Um jogador ainda sobre a tampa sai antes — a tampa some com a cauda.
       anchor(state, boss);
+      if (playerOnDeep(state)) stepOff(state, boss);
       state.bossRuntime.leviathanAnchorProbes = 99;
       break;
     }
@@ -218,6 +263,7 @@ export const applyLeviathanScenario = (state: SurvivalState, scenario: Leviathan
       // Cruza o limiar: a simulacao cancela a Sondagem, mergulha, sobe o
       // lencol e emerge inteira — o ciclo todo, de verdade.
       anchor(state, boss);
+      if (playerOnDeep(state)) stepOff(state, boss);
       boss.hp = Math.floor(boss.maxHp * (DELUGE_HP_FRACTION - 0.05));
       break;
     case 'hunting':

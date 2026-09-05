@@ -1,5 +1,6 @@
 import {
   dirFromFacing,
+  dirFromFacing8,
   gunBehindUpper,
   PROSPECTOR_MUZZLE_FLASH_FRAME,
   frameAtTime,
@@ -1616,7 +1617,11 @@ export class SpriteBank {
       animation === 'special' && !manifest.animations.special ? 'attack' : animation;
     const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
     const direction =
-      manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
+      manifest.directions === 8
+        ? dirFromFacing8(facingX, facingY)
+        : manifest.directions > 1
+          ? dirFromFacing(facingX, facingY)
+          : manifest.authoredDirs[0];
     const count = manifest.animations[useAnimation].frames;
     const frame =
       frameOverride === undefined

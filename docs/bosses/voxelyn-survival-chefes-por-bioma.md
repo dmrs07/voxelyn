@@ -488,6 +488,16 @@ teleporta. A **segunda fase** é a arraia inteira nadando direto no Prospector, 
 corpo seguindo as curvas da cabeça; a descarga massiva e as duas bolhas protetoras
 pertencem a ela.
 
+O corpo é **uma raia, não uma cobra**: o rastro por comprimento de arco ganhou um
+coeficiente de rigidez (`TrailConfig.stiffness`, 0,72 no Leviatã, 0 no Devorador,
+que não mudou). A cabeça é o vetor, a raiz das asas herda o rumo dela e cada elo só
+desvia do anterior até 12° — o corpo vira do tronco para trás, sem serpentear. As
+peças do corpo têm **oito rumos** (`part-sheet-leviathan-body`, `dirFromFacing8`):
+os quatro eixos do mundo e as quatro diagonais, que na tela são a horizontal e a
+vertical — um corpo nadando na vertical com peças só nos eixos empilhava oito quadros
+`dr` e lia como escada. Os rumos intermediários são o mesmo modelo voxel girado meio
+passo e re-rasterizado (`rotatedVoxels`).
+
 As posturas são explícitas (`LEVIATHAN_ANCHORED/DIVING/HIDDEN/EMERGING/HUNTING`;
 `charging` é derivada). O Aquífero ganhou **bacias** geradas por erosão (margem rasa
 garantida por construção, núcleo `SURF_DEEP_WATER` permanente que nunca entra em

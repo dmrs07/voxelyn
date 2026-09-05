@@ -1,20 +1,24 @@
 {
   "id": "part-sheet-leviathan-body",
-  "version": 1,
+  "version": 2,
   "atlas": "part-sheet-leviathan-body.png",
   "normalAtlas": "part-sheet-leviathan-body.normal.png",
   "normalScale": 2,
-  "frameWidth": 160,
-  "frameHeight": 114,
-  "columns": 16,
-  "anchorX": 80,
-  "anchorY": 76,
-  "directions": 4,
+  "frameWidth": 152,
+  "frameHeight": 84,
+  "columns": 22,
+  "anchorX": 76,
+  "anchorY": 45,
+  "directions": 8,
   "authoredDirs": [
     "dr",
     "dl",
     "ur",
-    "ul"
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
   ],
   "flipPairs": {},
   "hitbox": {
@@ -59,11 +63,23 @@
     },
     "ul": {
       "idle": 24
+    },
+    "r": {
+      "idle": 32
+    },
+    "d": {
+      "idle": 40
+    },
+    "l": {
+      "idle": 48
+    },
+    "u": {
+      "idle": 56
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan body, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars",
+    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan body in eight facings, eight ranks from broad crescent wing roots with the widest span near the head through narrowing membranes with serrated trailing edges, a tapering trunk, a thin peduncle and a whip tail tipped with a discreet electric organ, two continuous conductive lines along the dorsum, barnacles and pale scars",
     "seedOrRef": "deterministic-code-v2"
   }
 }

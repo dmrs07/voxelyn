@@ -54,6 +54,22 @@ export type TrailConfig = {
   swayWaves: number;
   swayHz: number;
   /**
+   * RIGIDEZ do corpo, 0..1 — o coeficiente de dobra.
+   *
+   * Em 0 cada segmento senta exatamente sobre o caminho da cabeca: e a
+   * cobra, o Devorador. Acima disso o corpo vira uma corrente de elos rigidos
+   * pendurada na cabeca, e a direcao de cada elo e uma mistura entre a
+   * tangente do caminho (o que o rastro pede) e a direcao do elo anterior (o
+   * que um corpo duro pede), pesada por este numero. A CABECA e o vetor: o
+   * primeiro elo herda o rumo dela, e cada elo seguinte so pode desviar do
+   * anterior ate `maxBend`. Uma raia dobra pouco e dobra do meio para tras —
+   * as asas sao uma peca so com a cabeca — e e isso que a leitura pede: um
+   * corpo largo que VIRA, e nao uma fila de quadros que serpenteia.
+   */
+  stiffness?: number;
+  /** Desvio maximo entre um elo e o anterior, em radianos. So vale com rigidez. */
+  maxBend?: number;
+  /**
    * Salto de posicao acima do qual o rastro e jogado fora, em tiles.
    *
    * Um snapshot perdido, um `respawn`, a troca de sala — ou o Leviata
@@ -68,6 +84,25 @@ export type TrailConfig = {
 const norm = (x: number, y: number): { x: number; y: number } => {
   const m = Math.hypot(x, y);
   return m > 1e-6 ? { x: x / m, y: y / m } : { x: 0, y: 1 };
+};
+
+/**
+ * `want` girado em direcao a `toward`, mas nunca mais que `maxBend` radianos
+ * a partir de `from`. E o elo que tenta seguir o caminho e e segurado pelo
+ * elo anterior.
+ */
+export const bendToward = (
+  from: { x: number; y: number },
+  want: { x: number; y: number },
+  maxBend: number,
+): { x: number; y: number } => {
+  const a0 = Math.atan2(from.y, from.x);
+  const a1 = Math.atan2(want.y, want.x);
+  let delta = a1 - a0;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const clamped = Math.max(-maxBend, Math.min(maxBend, delta));
+  return { x: Math.cos(a0 + clamped), y: Math.sin(a0 + clamped) };
 };
 
 /**
@@ -185,7 +220,13 @@ export class SpineTrail {
 
   private read(trail: TrailSample[], head: TrailHead, nowMs: number): TrailNode[] {
     const { segments, gap, headOffset, sway, swayWaves, swayHz } = this.config;
+    const stiffness = Math.max(0, Math.min(1, this.config.stiffness ?? 0));
+    const maxBend = this.config.maxBend ?? Math.PI;
     const nodes: TrailNode[] = [];
+    // O elo anterior da corrente rigida: comeca na cabeca, que e o vetor.
+    let prevDir = norm(head.dirX, head.dirY);
+    let prevX = head.x;
+    let prevY = head.y;
     for (let k = 0; k < segments; k++) {
       const want = headOffset + k * gap;
       const at = sampleTrailAt(trail, head, want);
@@ -195,13 +236,33 @@ export class SpineTrail {
       // pisca a cada quadro.
       const ahead = sampleTrailAt(trail, head, Math.max(0, want - gap * 0.5));
       const behind = sampleTrailAt(trail, head, want + gap * 0.5);
-      const dir = norm(ahead.x - behind.x, ahead.y - behind.y);
+      const pathDir = norm(ahead.x - behind.x, ahead.y - behind.y);
+      let dir = pathDir;
+      let x = at.x;
+      let y = at.y;
+      if (stiffness > 0) {
+        // O elo quer a tangente do caminho e e segurado pelo anterior: a
+        // mistura pesada pela rigidez, depois o limite de dobra. A posicao
+        // deixa de ser a amostra do rastro e passa a ser o fim do elo — os
+        // elos ficam sempre a `gap` um do outro, sem fresta nem amontoado.
+        const blended = norm(
+          pathDir.x * (1 - stiffness) + prevDir.x * stiffness,
+          pathDir.y * (1 - stiffness) + prevDir.y * stiffness,
+        );
+        dir = bendToward(prevDir, blended, maxBend);
+        const reach = k === 0 ? headOffset : gap;
+        x = prevX - dir.x * reach;
+        y = prevY - dir.y * reach;
+      }
+      prevDir = dir;
+      prevX = x;
+      prevY = y;
       const phase = want * swayWaves * Math.PI * 2 - (nowMs / 1000) * swayHz * Math.PI * 2;
       const grow = segments > 1 ? k / (segments - 1) : 0;
       const wobble = Math.sin(phase) * sway * grow;
       nodes.push({
-        x: at.x - dir.y * wobble,
-        y: at.y + dir.x * wobble,
+        x: x - dir.y * wobble,
+        y: y + dir.x * wobble,
         liftPx: at.liftPx,
         dirX: dir.x,
         dirY: dir.y,
