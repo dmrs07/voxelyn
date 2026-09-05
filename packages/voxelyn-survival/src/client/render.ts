@@ -111,6 +111,9 @@ import {
   PropBank,
 } from './sprites';
 import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
+import { PAL } from './palette';
+import { BossHealthBarPresentation, drawBossHealthBar, usesMonumentalBar } from './boss-health-bar';
+import { bossHealthBarLayout } from './boss-health-bar-layout';
 import {
   DevourerSpines,
   DEVOURER_BELOW_ANCHOR_PX,
@@ -590,8 +593,17 @@ const STAR_EMPTY = '☆';
  * menos informacao. Lido a cada consulta, e nao uma vez na carga: o jogador
  * pode ligar a preferencia no sistema com o jogo aberto.
  */
+let reducedMotionOverride: boolean | null = null;
+/**
+ * Forca (ou solta) a preferencia de menos movimento. So a Arena usa, para
+ * inspecionar a versao sem montagem da barra de chefe sem mexer no sistema.
+ */
+export const setReducedMotionOverride = (value: boolean | null): void => {
+  reducedMotionOverride = value;
+};
 const prefersReducedMotion = (): boolean =>
-  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  reducedMotionOverride ??
+  (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 export type ModuleHudMetrics = { size: number; gap: number };
 
@@ -641,26 +653,7 @@ export const simMessageTone = (key: string): HudMessageTone => {
 const VOICE_CAPTION_COLOR = '#4fd6c9';
 
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md)
-const PAL = {
-  dark: '#0b0e14',
-  rockShadow: '#1d2430',
-  rock: '#2e3a4d',
-  rockLight: '#46566e',
-  /** O cinza-azulado palido da paleta mestra: gelo, e a espuma que ele levanta. */
-  mist: '#7b8ba3',
-  rust: '#6e4a33',
-  bone: '#b8a98f',
-  fungusDark: '#1f3d33',
-  fungus: '#2f6b4f',
-  fungusLight: '#66c28a',
-  biolum: '#59f2c2',
-  acid: '#a8e63c',
-  fire: '#ff7a2f',
-  blood: '#d93b4c',
-  electric: '#7ab8ff',
-  loot: '#ffd166',
-  player: '#e8f1ff',
-};
+// A paleta mestra vive em `palette.ts` (a barra de chefe a le sem o renderer).
 
 /**
  * O `spark` que existia aqui saiu junto com a descarga: eram duas linhas
@@ -1890,6 +1883,12 @@ export class SurvivalRenderer {
    * a marca em vez de acrescentar mais uma. Ver applyBossModuleMark.
    */
   private readonly bossModuleMarks = new Map<number, BossModuleMark>();
+  /**
+   * A BARRA MONUMENTAL do chefe de setor (boss-health-bar.ts). Alimentada pelo
+   * estado do quadro apresentado e pelos eventos daquele tick; desenhada por
+   * ultimo, sobre a HUD, no rodape.
+   */
+  readonly bossHealthBar = new BossHealthBarPresentation();
   private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;
   private rewardFlight: {
@@ -2114,6 +2113,7 @@ export class SurvivalRenderer {
     this.devourerAloft.clear();
     this.devourerLandedAt.clear();
     this.bossModuleMarks.clear();
+    this.bossHealthBar.reset();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
     // `trackSector` compara NUMEROS e sairia cedo, deixando o beacon de SV-01
@@ -2178,6 +2178,7 @@ export class SurvivalRenderer {
   }
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
+    this.bossHealthBar.ingestEvents(events, nowMs);
     this.presentation.ingest(events, nowMs);
     this.plungedThisTick.clear();
     // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
@@ -4641,7 +4642,15 @@ export class SurvivalRenderer {
           // A barra do Leviata so existe enquanto ele E alvo: uma barra sobre
           // agua lisa entregaria a posicao de um corpo que ninguem ve — e
           // prometeria dano onde o funil nao cobra.
-          if (!leviathanHead || leviathanTargetable(enemy, state.tick)) {
+          //
+          // O DONO DO SETOR nao tem barra local: a vida dele e a barra monumental
+          // do rodape (boss-health-bar.ts), e duas barras de HP para o mesmo
+          // corpo contariam a mesma coisa duas vezes — a pequena em cima dele
+          // perderia justamente a gravidade que a grande veio dar.
+          if (
+            !usesMonumentalBar(state, enemy) &&
+            (!leviathanHead || leviathanTargetable(enemy, state.tick))
+          ) {
             drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
           }
         },
@@ -5721,6 +5730,37 @@ export class SurvivalRenderer {
     this.trackSector(state, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
+    this.renderBossHealthBar(state, input, nowMs, vw, vh);
+  }
+
+  /**
+   * A barra monumental do chefe de setor, por ultimo e no rodape.
+   *
+   * Sincroniza com o MESMO estado que acabou de posicionar os corpos — no
+   * online, o tick alcancado pelo playout; no solo e no replay, a amostra do
+   * `LocalPlayout` — e desenha nos numeros do layout puro, que ja resolveu
+   * viewport, area segura, controles de toque e a barra de comandos.
+   */
+  private renderBossHealthBar(
+    state: SurvivalState,
+    input: InputState,
+    nowMs: number,
+    vw: number,
+    vh: number,
+  ): void {
+    const bar = this.bossHealthBar;
+    bar.sync(state, nowMs);
+    const reduced = prefersReducedMotion();
+    const view = bar.view(nowMs, reduced);
+    if (!view) return;
+    const layout = bossHealthBarLayout({
+      viewportWidth: vw,
+      viewportHeight: vh,
+      safe: this.safeArea,
+      touchMode: input.usingTouch,
+      hudPanel: this.hudPanelRect,
+    });
+    drawBossHealthBar(this.ctx, layout, view, { reducedMotion: reduced });
   }
 
   /**

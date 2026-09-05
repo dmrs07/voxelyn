@@ -308,6 +308,18 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.undertaker': 'Undertaker',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
+  // The material accent of each boss health bar (boss-health-bar-palette.ts).
+  'bossBar.material.neutral': 'bone and slate',
+  'bossBar.material.guardian': 'basalt and bone',
+  'bossBar.material.bishop': 'fungus and biofluid',
+  'bossBar.material.diamandis': 'Aurix metal and energy',
+  'bossBar.material.white_devourer': 'ivory silica',
+  'bossBar.material.archcantor': 'prismatic crystal',
+  'bossBar.material.sheet_leviathan': 'abyssal water and electric cyan',
+  'bossBar.material.lung_matrix': 'sulfur and bone',
+  'bossBar.material.furnace_heart': 'coal and ember',
+  'bossBar.material.frost_queen': 'white ice and cyan',
+  'bossBar.material.magnetarch': 'iron, rust and magnetism',
 
   'bestiary.code.stalker': 'SPECIMEN QUIT-04',
   'bestiary.note.stalker':

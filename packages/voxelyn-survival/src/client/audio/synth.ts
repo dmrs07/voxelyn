@@ -315,6 +315,24 @@ const FREEZE_CHIMES: ReadonlyArray<readonly [number, number, number]> = [
   [5710, 1.05, 1.0],
 ];
 
+/**
+ * O CORPO comum do som da barra de chefe: o impacto abafado da peca pousando
+ * e o encaixe travando. As caudas por material entram por cima, nas vozes.
+ */
+const bossBarBody = (ctx: AudioContext, out: AudioNode, t0: number, noise: AudioBuffer): void => {
+  tone(ctx, out, t0, { type: 'sine', from: 72, to: 48, peak: 0.55, decay: 0.42, attack: 0.012 });
+  burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.2, type: 'lowpass', from: 240, to: 80 });
+  // O encaixe: um clique curto e seco, 160 ms depois — quando a moldura fecha.
+  burst(ctx, out, t0 + 0.16, noise, {
+    peak: 0.42,
+    decay: 0.03,
+    type: 'bandpass',
+    from: 900,
+    q: 1.5,
+  });
+  tone(ctx, out, t0 + 0.16, { type: 'square', from: 180, to: 120, peak: 0.16, decay: 0.06 });
+};
+
 export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // --- telegrafos ---------------------------------------------------------
   // Dois toques subindo: "vem na sua direcao".
@@ -1119,6 +1137,95 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       from: 400,
       to: 90,
       attack: 0.2,
+    });
+  },
+  // A BARRA DE CHEFE SE MONTANDO. Tres camadas, sempre: um impacto grave e
+  // ABAFADO (o rugido do despertar ja tem o subgrave — este e so o peso da
+  // peca pousando), um ENCAIXE curto (o estalo de pedra ou metal travando) e
+  // a pequena CAUDA do material. Nada aqui ultrapassa 0,9 s: a interface
+  // termina de montar em 0,8 e o som nao pode continuar depois dela.
+  bossBarMineral: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Pedra: um estalo seco e um granulado curto e baixo.
+    burst(ctx, out, t0 + 0.16, noise, {
+      peak: 0.5,
+      decay: 0.05,
+      type: 'bandpass',
+      from: 1800,
+      q: 2,
+    });
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.25,
+      decay: 0.45,
+      type: 'lowpass',
+      from: 500,
+      to: 120,
+    });
+  },
+  bossBarMetal: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Metal: o encaixe TOCA — um parcial inarmonico curto e um segundo mais alto.
+    tone(ctx, out, t0 + 0.16, { type: 'triangle', from: 1240, to: 1180, peak: 0.28, decay: 0.32 });
+    tone(ctx, out, t0 + 0.17, { type: 'sine', from: 3110, to: 3000, peak: 0.12, decay: 0.22 });
+  },
+  bossBarCrystal: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Cristal: duas notas limpas em quinta, curtas, com um sopro de vidro.
+    tone(ctx, out, t0 + 0.16, { type: 'sine', from: 1568, peak: 0.2, decay: 0.4, attack: 0.01 });
+    tone(ctx, out, t0 + 0.22, { type: 'sine', from: 2349, peak: 0.14, decay: 0.36, attack: 0.01 });
+    burst(ctx, out, t0 + 0.16, noise, { peak: 0.12, decay: 0.3, type: 'highpass', from: 5000 });
+  },
+  bossBarFluid: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Agua abissal / biofluido: um borbulhar baixo, filtrado, que se fecha.
+    burst(ctx, out, t0 + 0.16, noise, {
+      peak: 0.3,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 260,
+      to: 90,
+      q: 3,
+      rate: 0.6,
+    });
+    tone(ctx, out, t0 + 0.18, {
+      type: 'sine',
+      from: 140,
+      to: 70,
+      peak: 0.16,
+      decay: 0.45,
+      attack: 0.03,
+    });
+  },
+  bossBarEmber: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Carvao e brasa: um crepitar curto e um sopro quente que apaga.
+    burst(ctx, out, t0 + 0.16, noise, {
+      peak: 0.24,
+      decay: 0.12,
+      type: 'highpass',
+      from: 2400,
+      rate: 1.4,
+    });
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'lowpass',
+      from: 900,
+      to: 200,
+      attack: 0.05,
+    });
+  },
+  bossBarIce: (ctx, out, t0, noise) => {
+    bossBarBody(ctx, out, t0, noise);
+    // Gelo: um estalo fino e uma nota alta e fria, quase sem cauda.
+    burst(ctx, out, t0 + 0.16, noise, { peak: 0.3, decay: 0.04, type: 'highpass', from: 3200 });
+    tone(ctx, out, t0 + 0.17, {
+      type: 'sine',
+      from: 2637,
+      to: 2600,
+      peak: 0.16,
+      decay: 0.3,
+      attack: 0.005,
     });
   },
   playerDown: (ctx, out, t0, noise) => {

@@ -282,6 +282,119 @@
           bottom: calc(96px + var(--safe-area-inset-bottom));
         }
       }
+      /* O PAINEL DA BARRA DE CHEFE: cenarios que agem sobre a luta corrente pelo
+         funil da simulacao, a leitura exata do que a barra le e a porta da
+         galeria. Canto direito, abaixo da nota; a barra em si vive no rodape,
+         entao o painel nunca disputa com ela. Aparece em TODOS os chefes. */
+      #bossbar-panel {
+        position: fixed;
+        right: calc(10px + var(--safe-area-inset-right));
+        top: calc(36px + var(--safe-area-inset-top));
+        width: 272px;
+        z-index: 6;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #c9c2b4;
+        background: rgba(10, 12, 18, 0.9);
+        border: 1px solid #2a2d38;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+      #bossbar-panel b {
+        color: #e2d9c8;
+        font-weight: 600;
+      }
+      #bossbar-panel .blood {
+        color: #d93b4c;
+      }
+      #bossbar-readout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 8px;
+        margin-bottom: 6px;
+      }
+      #bossbar-buttons,
+      #bossbar-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+      #bossbar-panel button,
+      #gallery-controls button {
+        font: inherit;
+        font-size: 10px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid #2a2d38;
+        background: #141821;
+        color: #d8cfc0;
+        cursor: pointer;
+      }
+      #bossbar-panel button:hover,
+      #gallery-controls button:hover {
+        background: #1f2532;
+      }
+      #bossbar-panel select,
+      #gallery-controls select {
+        font: inherit;
+        font-size: 10px;
+        background: #141821;
+        color: #d8cfc0;
+        border: 1px solid #2a2d38;
+        border-radius: 4px;
+        padding: 2px 4px;
+      }
+      #bossbar-panel label,
+      #gallery-controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      @media (max-width: 640px) {
+        #bossbar-panel {
+          width: 220px;
+          top: calc(8px + var(--safe-area-inset-top));
+        }
+      }
+      /* A GALERIA: todos os chefes, mesma estrutura, cada um com o seu acento,
+         numa viewport escolhida. Cobre a tela — e inspecao, nao gameplay. */
+      #bossbar-gallery {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background: #06070a;
+        display: flex;
+        flex-direction: column;
+      }
+      #gallery-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        font-size: 11px;
+        color: #c9c2b4;
+        border-bottom: 1px solid #2a2d38;
+        background: #0c0e14;
+      }
+      #gallery-stage {
+        flex: 1;
+        overflow: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #gallery-canvas {
+        image-rendering: pixelated;
+        background: #0b0e14;
+        outline: 1px solid #2a2d38;
+      }
+      #gallery-stage.fit #gallery-canvas {
+        max-width: 100%;
+        max-height: 100%;
+      }
+
       /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo, e a
          nota sobreposta ao HP era o primeiro pixel que o playtest via. */
       #hud-note {
@@ -369,6 +482,53 @@
     <div id="leviathan-panel" class="hidden">
       <div id="leviathan-readout"></div>
       <div id="leviathan-buttons"></div>
+    </div>
+    <!-- O PAINEL DA BARRA DE CHEFE (arena-bossbar-debug.ts): cenarios sobre a
+         luta corrente, a leitura exata do que a barra le, os alternadores de
+         movimento reduzido e de lingua, e a porta da galeria comparativa. -->
+    <div id="bossbar-panel" class="hidden">
+      <div id="bossbar-readout"></div>
+      <div id="bossbar-buttons"></div>
+      <div id="bossbar-tools">
+        <button
+          type="button"
+          id="bossbar-reconnect"
+          title="Esquece a apresentação e reentra no HP atual, como um reconnect"
+        >
+          reconnect simulado
+        </button>
+        <label><input type="checkbox" id="bossbar-reduced" /> menos movimento</label>
+        <label>
+          língua
+          <select id="bossbar-locale"></select>
+        </label>
+        <button type="button" id="bossbar-gallery-open">galeria de chefes</button>
+      </div>
+    </div>
+    <div id="bossbar-gallery" class="hidden">
+      <div id="gallery-controls">
+        <b>GALERIA — barras de chefe</b>
+        <label>
+          cenário
+          <select id="gallery-scenario"></select>
+        </label>
+        <label>
+          viewport
+          <select id="gallery-viewport"></select>
+        </label>
+        <label>
+          chefe
+          <select id="gallery-single"></select>
+        </label>
+        <label><input type="checkbox" id="gallery-reduced" /> menos movimento</label>
+        <label><input type="checkbox" id="gallery-fit" checked /> ajustar à janela</label>
+        <label>
+          língua
+          <select id="gallery-locale"></select>
+        </label>
+        <button type="button" id="gallery-close">fechar</button>
+      </div>
+      <div id="gallery-stage" class="fit"><canvas id="gallery-canvas"></canvas></div>
     </div>
 
     <div id="setup">

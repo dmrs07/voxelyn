@@ -325,6 +325,20 @@ export const PT_BR = {
   'bestiary.name.magnetarch': 'Magnetarca',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
+  // O ACENTO MATERIAL da barra de vida de cada chefe (boss-health-bar-palette.ts):
+  // o par de materiais que a moldura e o nome carregam. E o rotulo que a galeria
+  // da arena mostra ao lado do nome.
+  'bossBar.material.neutral': 'osso e ardósia',
+  'bossBar.material.guardian': 'basalto e osso',
+  'bossBar.material.bishop': 'fungo e biofluido',
+  'bossBar.material.diamandis': 'metal Aurix e energia',
+  'bossBar.material.white_devourer': 'sílica marfim',
+  'bossBar.material.archcantor': 'cristal prismático',
+  'bossBar.material.sheet_leviathan': 'água abissal e ciano elétrico',
+  'bossBar.material.lung_matrix': 'enxofre e osso',
+  'bossBar.material.furnace_heart': 'carvão e brasa',
+  'bossBar.material.frost_queen': 'gelo branco e ciano',
+  'bossBar.material.magnetarch': 'ferro, ferrugem e magnetismo',
 
   'bestiary.code.stalker': 'ESPÉCIME QUIT-04',
   'bestiary.note.stalker':

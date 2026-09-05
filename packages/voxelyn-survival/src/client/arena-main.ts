@@ -49,6 +49,21 @@ import {
   leviathanReadout,
   type LeviathanScenario,
 } from './arena-leviathan-debug';
+import {
+  BOSS_BAR_SCENARIOS,
+  BossBarGallery,
+  BossBarScenarioDriver,
+  GALLERY_SCENARIOS,
+  GALLERY_VIEWPORTS,
+  bossBarReadout,
+  type BossBarScenario,
+  type GalleryScenario,
+  type GalleryViewport,
+} from './arena-bossbar-debug';
+import { setReducedMotionOverride } from './render';
+import { LOCALES, LOCALE_LABELS, getLocale, setLocale, t } from './i18n';
+import { BOSS_ARCHETYPES } from '@voxelyn/survival-sim';
+import { bossBarAccent } from './boss-health-bar-palette';
 
 const FROST_SCENARIO_LABELS: Record<FrostScenario, string> = {
   clear: 'Medidor vazio',
@@ -104,6 +119,23 @@ const frostFastDecay = document.getElementById('frost-fast-decay') as HTMLInputE
 const leviathanPanel = document.getElementById('leviathan-panel') as HTMLDivElement;
 const leviathanReadoutEl = document.getElementById('leviathan-readout') as HTMLDivElement;
 const leviathanButtons = document.getElementById('leviathan-buttons') as HTMLDivElement;
+const bossBarPanel = document.getElementById('bossbar-panel') as HTMLDivElement;
+const bossBarReadoutEl = document.getElementById('bossbar-readout') as HTMLDivElement;
+const bossBarButtons = document.getElementById('bossbar-buttons') as HTMLDivElement;
+const bossBarReconnect = document.getElementById('bossbar-reconnect') as HTMLButtonElement;
+const bossBarReduced = document.getElementById('bossbar-reduced') as HTMLInputElement;
+const bossBarLocale = document.getElementById('bossbar-locale') as HTMLSelectElement;
+const bossBarGalleryOpen = document.getElementById('bossbar-gallery-open') as HTMLButtonElement;
+const galleryEl = document.getElementById('bossbar-gallery') as HTMLDivElement;
+const galleryScenario = document.getElementById('gallery-scenario') as HTMLSelectElement;
+const galleryViewport = document.getElementById('gallery-viewport') as HTMLSelectElement;
+const gallerySingle = document.getElementById('gallery-single') as HTMLSelectElement;
+const galleryReduced = document.getElementById('gallery-reduced') as HTMLInputElement;
+const galleryFit = document.getElementById('gallery-fit') as HTMLInputElement;
+const galleryLocale = document.getElementById('gallery-locale') as HTMLSelectElement;
+const galleryClose = document.getElementById('gallery-close') as HTMLButtonElement;
+const galleryStage = document.getElementById('gallery-stage') as HTMLDivElement;
+const galleryCanvas = document.getElementById('gallery-canvas') as HTMLCanvasElement;
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
@@ -253,6 +285,170 @@ const updateLeviathanPanel = (state: SurvivalState, nowMs: number): void => {
   ];
   leviathanReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
 };
+// ---------------------------------------------------------------------------
+// O painel da barra de chefe (arena-bossbar-debug.ts): cenarios sobre a luta
+// corrente, pelo funil da simulacao; leitura exata; alternadores; galeria.
+// ---------------------------------------------------------------------------
+const BOSS_BAR_SCENARIO_LABELS: Record<BossBarScenario, string> = {
+  sleep: 'dormir',
+  awaken: 'despertar',
+  full: 'vida cheia',
+  hitSmall: 'dano pequeno (3%)',
+  hitBig: 'dano grande (18%)',
+  burst: 'rajada (4 golpes)',
+  heal: 'cura (+12%)',
+  phase: 'transição de fase',
+  hide: 'ocultar / submergir',
+  offscreen: 'fora da câmera',
+  kill: 'morte',
+};
+const bossBarDriver = new BossBarScenarioDriver();
+for (const scenario of BOSS_BAR_SCENARIOS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = BOSS_BAR_SCENARIO_LABELS[scenario];
+  button.dataset.scenario = scenario;
+  button.addEventListener('click', () => {
+    if (!activeFrostState) return;
+    const events = bossBarDriver.apply(activeFrostState, scenario);
+    // Pelo mesmo funil dos eventos de verdade: a barra, o som e o clarao sao o
+    // que se esta testando.
+    if (events.length > 0) activeFrostEvents?.(events);
+  });
+  bossBarButtons.appendChild(button);
+}
+bossBarReconnect.addEventListener('click', () => {
+  // Um reconnect: a apresentacao esquece tudo e reentra no HP atual — sem o
+  // ritual, porque ninguem viu o chefe dormir e nenhum `boss_awake` chegou.
+  renderer.bossHealthBar.reset();
+});
+bossBarReduced.addEventListener('change', () => {
+  setReducedMotionOverride(bossBarReduced.checked ? true : null);
+});
+const fillLocaleSelect = (select: HTMLSelectElement): void => {
+  for (const locale of LOCALES) {
+    const option = document.createElement('option');
+    option.value = locale;
+    option.textContent = LOCALE_LABELS[locale];
+    select.appendChild(option);
+  }
+  select.value = getLocale();
+  select.addEventListener('change', () => {
+    setLocale(select.value as (typeof LOCALES)[number]);
+    bossBarLocale.value = select.value;
+    galleryLocale.value = select.value;
+    gallery.restart();
+  });
+};
+const BOSS_BAR_READOUT_INTERVAL_MS = 100;
+let bossBarReadoutAt = -1;
+const updateBossBarPanel = (state: SurvivalState, nowMs: number): void => {
+  if (bossBarReadoutAt >= 0 && nowMs - bossBarReadoutAt < BOSS_BAR_READOUT_INTERVAL_MS) return;
+  bossBarReadoutAt = nowMs;
+  const r = bossBarReadout(state);
+  const shown = renderer.bossHealthBar.archetype;
+  const rows: string[] = [
+    `dono <b>${r.archetype ?? '—'}</b>`,
+    `entityId <b>${r.entityIdNull ? 'null' : 'id'}</b>`,
+    `acordado <b>${r.awake ? 'sim' : 'não'}</b>`,
+    `derrotado <b>${r.defeated ? 'sim' : 'não'}</b>`,
+    `HP <b class="blood">${r.hp ?? '—'}</b> / <b>${r.maxHp ?? '—'}</b>`,
+    `fases <b>${r.phases.toString(2).padStart(6, '0')}</b>`,
+    `barra <b>${shown ?? 'oculta'}</b>`,
+    `acento <b>${r.material}</b>`,
+  ];
+  bossBarReadoutEl.innerHTML = rows.map((row) => `<span>${row}</span>`).join('');
+};
+
+// A GALERIA: um laco proprio de quadros enquanto estiver aberta.
+const gallery = new BossBarGallery(galleryCanvas);
+const GALLERY_SCENARIO_LABELS: Record<GalleryScenario, string> = {
+  entry: 'entrada (ritual)',
+  full: 'vida cheia',
+  hit: 'dano (pequeno, rajada, grande)',
+  heal: 'cura',
+  phase: 'transição de fase',
+  veiled: 'oculto / submerso',
+  death: 'morte',
+};
+for (const scenario of GALLERY_SCENARIOS) {
+  const option = document.createElement('option');
+  option.value = scenario;
+  option.textContent = GALLERY_SCENARIO_LABELS[scenario];
+  galleryScenario.appendChild(option);
+}
+const GALLERY_VIEWPORT_LABELS: Record<GalleryViewport, string> = {
+  desktop: 'Desktop 1366×768',
+  desktopHd: 'Desktop 1920×1080',
+  ultrawide: 'Ultrawide 2560×1080',
+  landscape: 'Móvel paisagem 568×320',
+  portrait: 'Móvel retrato 320×568',
+};
+for (const id of Object.keys(GALLERY_VIEWPORTS) as GalleryViewport[]) {
+  const option = document.createElement('option');
+  option.value = id;
+  option.textContent = GALLERY_VIEWPORT_LABELS[id];
+  galleryViewport.appendChild(option);
+}
+{
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = 'todos (comparativo)';
+  gallerySingle.appendChild(all);
+  for (const archetype of BOSS_ARCHETYPES) {
+    const option = document.createElement('option');
+    option.value = archetype;
+    option.textContent = `${archetype} — ${t(bossBarAccent(archetype).materialKey)}`;
+    gallerySingle.appendChild(option);
+  }
+}
+fillLocaleSelect(bossBarLocale);
+fillLocaleSelect(galleryLocale);
+let galleryRunning = false;
+const galleryFrame = (now: number): void => {
+  if (!galleryRunning) return;
+  gallery.render(now);
+  requestAnimationFrame(galleryFrame);
+};
+const applyGalleryControls = (): void => {
+  gallery.scenario = galleryScenario.value as GalleryScenario;
+  gallery.viewport = galleryViewport.value as GalleryViewport;
+  gallery.single = gallerySingle.value || null;
+  gallery.reducedMotion = galleryReduced.checked;
+  galleryStage.classList.toggle('fit', galleryFit.checked);
+  gallery.restart();
+};
+for (const el of [galleryScenario, galleryViewport, gallerySingle, galleryReduced, galleryFit]) {
+  el.addEventListener('change', applyGalleryControls);
+}
+bossBarGalleryOpen.addEventListener('click', () => {
+  applyGalleryControls();
+  galleryEl.classList.remove('hidden');
+  galleryRunning = true;
+  requestAnimationFrame(galleryFrame);
+});
+galleryClose.addEventListener('click', () => {
+  galleryRunning = false;
+  galleryEl.classList.add('hidden');
+});
+// `?gallery=1` abre a galeria direto, sem entrar numa luta — e o caminho das
+// capturas de tela automatizadas.
+if (new URLSearchParams(location.search).get('gallery') === '1') {
+  const params = new URLSearchParams(location.search);
+  if (params.get('scenario')) galleryScenario.value = params.get('scenario')!;
+  if (params.get('viewport')) galleryViewport.value = params.get('viewport')!;
+  if (params.get('single') !== null) gallerySingle.value = params.get('single')!;
+  if (params.get('locale')) {
+    setLocale(params.get('locale') as (typeof LOCALES)[number]);
+    galleryLocale.value = getLocale();
+  }
+  galleryFit.checked = params.get('fit') !== '0';
+  applyGalleryControls();
+  galleryEl.classList.remove('hidden');
+  galleryRunning = true;
+  requestAnimationFrame(galleryFrame);
+}
+
 const FROST_READOUT_INTERVAL_MS = 100;
 let frostReadoutAt = -1;
 const updateFrostPanel = (state: SurvivalState, nowMs: number): void => {
@@ -402,6 +598,9 @@ const runArena = (conditions: ArenaConditions): void => {
   icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   frostPanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   leviathanPanel.classList.toggle('hidden', conditions.boss !== 'sheet_leviathan');
+  bossBarPanel.classList.remove('hidden');
+  bossBarDriver.reset();
+  bossBarReadoutAt = -1;
   icePanelAt = -1;
   frostReadoutAt = -1;
   leviathanReadoutAt = -1;
@@ -493,6 +692,9 @@ const runArena = (conditions: ArenaConditions): void => {
       // O parceiro de apresentacao nao recebe comando: fica onde nasceu.
       const result = stepRun(state, conditions.coop ? [raw, emptyCommand()] : [raw]);
       if (frostFastDecay.checked && conditions.boss === 'frost_queen') applyFastDecay(state);
+      // A rajada da barra de chefe: um golpe por tick, pelo funil de dano, com
+      // os eventos na MESMA leva do tick — a barra os ve no tick apresentado.
+      result.events.push(...bossBarDriver.tick(state));
       playout.capture(state);
       eventQueue.push(state.tick, result.events);
       accumulator -= TICK_MS;
@@ -513,6 +715,7 @@ const runArena = (conditions: ArenaConditions): void => {
       updateFrostPanel(state, now);
     }
     if (conditions.boss === 'sheet_leviathan') updateLeviathanPanel(state, now);
+    updateBossBarPanel(state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
@@ -564,6 +767,8 @@ btnReconfigure.addEventListener('click', () => {
   hudNote.classList.add('hidden');
   icePanel.classList.add('hidden');
   frostPanel.classList.add('hidden');
+  leviathanPanel.classList.add('hidden');
+  bossBarPanel.classList.add('hidden');
   activeFrostState = null;
   activeFrostEvents = null;
   endOverlay.classList.add('hidden');
