@@ -115,7 +115,7 @@ describe('desktop', () => {
 describe('toque em paisagem (568x320)', () => {
   const W = 568;
   const H = 320;
-  it('usa a faixa livre entre os controles, sem cobrir nenhum', () => {
+  it('usa a faixa livre entre os controles, discreta e encostada embaixo, sem cobrir nenhum', () => {
     const layout = bossHealthBarLayout({
       viewportWidth: W,
       viewportHeight: H,
@@ -125,16 +125,41 @@ describe('toque em paisagem (568x320)', () => {
     expect(layout.visible).toBe(true);
     integers(layout);
     expect(layout.orientation).toBe('landscape');
+    expect(layout.quiet).toBe(true);
+    expect(layout.ornament).toBe('none');
+    expect(layout.endCap).toBe(0);
     const piece = { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
     for (const control of touchRects(W, H)) expect(rectsOverlap(piece, control)).toBe(false);
-    // A vida entre 8 e 11 px, o nome entre 12 e 15.
-    expect(layout.bed.height).toBeGreaterThanOrEqual(8);
-    expect(layout.bed.height).toBeLessThanOrEqual(11);
-    expect(layout.name.fontPx).toBeGreaterThanOrEqual(12);
-    expect(layout.name.fontPx).toBeLessThanOrEqual(15);
-    // Na linha dos manches.
+    // Menor que as outras posturas: vida de 6 a 8 px, nome de 10 a 12, ate
+    // metade da largura.
+    expect(layout.bed.height).toBeGreaterThanOrEqual(6);
+    expect(layout.bed.height).toBeLessThanOrEqual(8);
+    expect(layout.name.fontPx).toBeGreaterThanOrEqual(10);
+    expect(layout.name.fontPx).toBeLessThanOrEqual(12);
+    expect(layout.width).toBeLessThanOrEqual(W * 0.5);
+    // Na linha de BAIXO dos manches, nao no centro deles: fora da luta.
     const g = touchControlGeometry(W, H);
-    expect(Math.abs(layout.frame.y + layout.frame.height / 2 - g.aimY)).toBeLessThanOrEqual(2);
+    expect(layout.frame.y).toBeGreaterThan(g.moveY);
+    expect(layout.frame.y + layout.frame.height).toBeLessThanOrEqual(
+      g.moveY + MOVE_JOYSTICK_RADIUS,
+    );
+    // As posturas grandes nao sao discretas.
+    expect(
+      bossHealthBarLayout({
+        viewportWidth: 1366,
+        viewportHeight: 768,
+        safe: NO_SAFE,
+        touchMode: false,
+      }).quiet,
+    ).toBe(false);
+    expect(
+      bossHealthBarLayout({
+        viewportWidth: 320,
+        viewportHeight: 568,
+        safe: NO_SAFE,
+        touchMode: true,
+      }).quiet,
+    ).toBe(false);
   });
 
   it('a mesma geometria que os botoes reais usam', () => {
@@ -155,7 +180,7 @@ describe('toque em paisagem (568x320)', () => {
       touchMode: true,
     });
     expect(layout.ornament).not.toBe('full');
-    expect(layout.bed.height).toBeGreaterThanOrEqual(8);
+    expect(layout.bed.height).toBeGreaterThanOrEqual(6);
   });
 });
 

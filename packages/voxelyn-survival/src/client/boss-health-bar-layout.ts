@@ -14,9 +14,10 @@
 //                 comandos. E a postura monumental: a moldura inteira, as
 //                 terminacoes em degraus, o nome em 18 px.
 //   PAISAGEM    — na FAIXA LIVRE entre o manche de movimento e o grupo de
-//   (toque)       botoes da direita, na linha dos manches. E mais estreita do
-//                 que a direcao pede, porque a faixa e o que ha: os ornamentos
-//                 encolhem antes da vida.
+//   (toque)       botoes da direita, encostada na linha de BAIXO dos manches.
+//                 E a postura DISCRETA: menor, sem terminacoes, atenuada. Num
+//                 celular deitado a tela inteira e a luta, e a barra informa
+//                 sem disputar o olhar com ela.
 //   RETRATO     — quase a largura inteira, ACIMA da faixa dos controles.
 //   (toque)
 //
@@ -26,7 +27,7 @@
 import { hudScale } from './hud-layout';
 import type { HudRect } from './hud-layout';
 import type { SafeInsets } from './module-layout';
-import { touchControlGeometry } from './input';
+import { MOVE_JOYSTICK_RADIUS, touchControlGeometry } from './input';
 import { DESKTOP_CONTROL_BAR_RESERVE } from './desktop-controls';
 
 export type BossHealthBarOrnament = 'full' | 'reduced' | 'none';
@@ -51,6 +52,12 @@ export type BossHealthBarLayout = {
   scale: number;
   orientation: 'landscape' | 'portrait';
   ornament: BossHealthBarOrnament;
+  /**
+   * A postura DISCRETA (paisagem de toque): a peca e menor, sem terminacoes,
+   * encostada na borda de baixo, e o desenho a atenua — num celular deitado a
+   * tela inteira e a luta, e a barra nao pode disputar com ela.
+   */
+  quiet: boolean;
   /** O retangulo INTEIRO da peca — nome, moldura e terminacoes. */
   x: number;
   y: number;
@@ -87,6 +94,7 @@ const hidden = (scale: number, orientation: 'landscape' | 'portrait'): BossHealt
   scale,
   orientation,
   ornament: 'none',
+  quiet: false,
   x: 0,
   y: 0,
   width: 0,
@@ -113,7 +121,9 @@ const rhythmFor = (
   if (posture === 'desktop') {
     return { lifeH: scale < 1 ? 10 : 13, fontPx: scale < 1 ? 16 : 18, ornament };
   }
-  if (posture === 'landscape') return { lifeH: 9, fontPx: 13, ornament };
+  // Paisagem de toque: a menor das tres. Vida de 7 px e nome de 11 px — legivel
+  // num celular deitado, e nada alem disso.
+  if (posture === 'landscape') return { lifeH: 7, fontPx: 11, ornament: 'none' };
   return { lifeH: 10, fontPx: 14, ornament };
 };
 
@@ -134,6 +144,7 @@ const assemble = (
   rhythm: Rhythm,
   scale: number,
   orientation: 'landscape' | 'portrait',
+  quiet = false,
 ): BossHealthBarLayout => {
   const pad = ORNAMENT_PAD[rhythm.ornament];
   const width = round(totalWidth);
@@ -166,6 +177,7 @@ const assemble = (
     scale,
     orientation,
     ornament: rhythm.ornament,
+    quiet,
     x,
     y,
     width,
@@ -242,19 +254,28 @@ export const bossHealthBarLayout = (input: BossHealthBarLayoutInput): BossHealth
     );
   }
 
-  // PAISAGEM: a faixa livre entre os controles, na linha dos manches.
+  // PAISAGEM: a faixa livre entre os controles, ENCOSTADA na borda de baixo.
+  //
+  // Discreta de proposito. Num celular deitado a tela inteira e a luta: a
+  // peca fica pequena (vida de 7 px, nome de 11 px, sem terminacoes), nao
+  // passa de 46% da largura, e pousa na linha de baixo dos manches — o lugar
+  // da tela em que o olho menos esta — em vez de no centro deles.
   const laneLeft = Math.max(usableLeft, g.laneLeft + 6);
   const laneRight = Math.min(usableRight, g.laneRight - 6);
   const laneWidth = laneRight - laneLeft;
-  if (laneWidth >= 140) {
-    const ornament: BossHealthBarOrnament = laneWidth >= 260 ? 'full' : 'reduced';
-    const rhythm = rhythmFor(ornament, 'landscape', scale);
-    const width = Math.min(laneWidth, round(vw * 0.68));
-    // A moldura CENTRADA na altura dos manches: a barra e mais uma peca da
-    // fileira do rodape, nao um painel flutuando sobre eles.
-    const frameH = rhythm.lifeH + ORNAMENT_PAD[ornament].y * 2;
-    const frameBottom = round(g.aimY + frameH / 2);
-    return assemble((laneLeft + laneRight) / 2, frameBottom, width, rhythm, scale, orientation);
+  if (laneWidth >= 120) {
+    const rhythm = rhythmFor('none', 'landscape', scale);
+    const width = Math.min(laneWidth, round(vw * 0.46));
+    const frameBottom = round(g.moveY + MOVE_JOYSTICK_RADIUS - 4);
+    return assemble(
+      (laneLeft + laneRight) / 2,
+      frameBottom,
+      width,
+      rhythm,
+      scale,
+      orientation,
+      true,
+    );
   }
   // Faixa estreita demais (tela minuscula): sobe para cima dos controles, sem
   // terminacoes, e ainda assim inteira e legivel.
@@ -265,10 +286,11 @@ export const bossHealthBarLayout = (input: BossHealthBarLayoutInput): BossHealth
       assemble(
         (left + usableRight) / 2,
         frameBottom,
-        Math.min(usableRight - left, round(vw * 0.68)),
+        Math.min(usableRight - left, round(vw * 0.5)),
         rhythm,
         scale,
         orientation,
+        true,
       ),
     usableLeft,
     input.hudPanel,

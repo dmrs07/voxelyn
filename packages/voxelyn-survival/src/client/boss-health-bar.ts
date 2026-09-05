@@ -588,7 +588,9 @@ export const drawBossHealthBar = (
   const ritual = view.entry.ritual && entryP < 1;
 
   // O alfa GLOBAL da peca: o fade da entrada sem ritual e o afundar da morte.
-  let alpha = view.entry.ritual ? 1 : entryP;
+  // Na postura discreta (paisagem de toque) a peca inteira e atenuada: ela
+  // informa sem pedir o olhar.
+  let alpha = (view.entry.ritual ? 1 : entryP) * (layout.quiet ? 0.8 : 1);
   if (death) alpha *= 1 - easeInCubic(death.exit);
   if (alpha <= 0) return;
 
@@ -730,10 +732,13 @@ export const drawBossHealthBar = (
       ctx.fillStyle = BOSS_BAR_LIFE_DARK;
       ctx.fillRect(bedX, bedY + bedH - facet, lifeW, facet);
       // Facetas: uma coluna escura a cada 8 px, a grade que da o voxel sem
-      // quebrar o comprimento em quadradinhos.
-      ctx.fillStyle = hexAlpha(BOSS_BAR_LIFE_DARK, 0.45);
-      for (let x = bedX + 8; x < bedX + lifeW - 1; x += 8)
-        ctx.fillRect(x, bedY + facet, 1, bedH - facet * 2);
+      // quebrar o comprimento em quadradinhos. A postura discreta as dispensa:
+      // numa vida de 7 px elas virariam textura.
+      if (!layout.quiet) {
+        ctx.fillStyle = hexAlpha(BOSS_BAR_LIFE_DARK, 0.45);
+        for (let x = bedX + 8; x < bedX + lifeW - 1; x += 8)
+          ctx.fillRect(x, bedY + facet, 1, bedH - facet * 2);
+      }
       // A ponta: um pixel mais claro onde a vida termina.
       ctx.fillStyle = BOSS_BAR_LIFE_LIGHT;
       ctx.fillRect(bedX + lifeW - 1, bedY, 1, bedH);
@@ -810,7 +815,8 @@ export const drawBossHealthBar = (
     const nameFade = death ? 1 - easeInCubic(clamp01(death.exit / 0.5)) : 1;
     ctx.globalAlpha = alpha * nameAlpha * nameFade;
     const intensify = view.phase !== null ? Math.sin(clamp01(view.phase) * Math.PI) : 0;
-    const color = intensify > 0 ? mixHex(NAME_COLOR, acc.glow, intensify * 0.6) : NAME_COLOR;
+    const base = layout.quiet ? mixHex(NAME_COLOR, PAL.bone, 0.6) : NAME_COLOR;
+    const color = intensify > 0 ? mixHex(base, acc.glow, intensify * 0.6) : base;
     drawSpacedName(ctx, view.name, layout, font, color);
 
     // O ACENTO MATERIAL sob o nome: apaga na morte, acende no pulso.

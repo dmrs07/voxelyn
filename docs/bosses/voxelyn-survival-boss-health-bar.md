@@ -148,11 +148,11 @@ amarrotada lo-fi dos chefes: é interface). Reconexão não toca nada.
 
 `bossHealthBarLayout` resolve três posturas:
 
-| Postura        | Largura                          | Vida  | Nome  | Onde                                            |
-| -------------- | -------------------------------- | ----- | ----- | ----------------------------------------------- |
-| Desktop        | 66 % da tela, teto 860 px        | 13 px | 18 px | centrada, acima da barra de comandos (`+16 px`) |
-| Móvel paisagem | a faixa livre entre os controles | 9 px  | 13 px | na linha dos manches; ornamento reduzido        |
-| Móvel retrato  | 94 % da tela, margens de 12 px   | 10 px | 14 px | acima da borda mais alta dos controles          |
+| Postura        | Largura                                            | Vida  | Nome  | Onde                                                                                                          |
+| -------------- | -------------------------------------------------- | ----- | ----- | ------------------------------------------------------------------------------------------------------------- |
+| Desktop        | 66 % da tela, teto 860 px                          | 13 px | 18 px | centrada, acima da barra de comandos (`+16 px`)                                                               |
+| Móvel paisagem | a faixa livre entre os controles, até 46 % da tela | 7 px  | 11 px | encostada na linha de baixo dos manches; sem terminações; peça atenuada (a postura DISCRETA: a tela é a luta) |
+| Móvel retrato  | 94 % da tela, margens de 12 px                     | 10 px | 14 px | acima da borda mais alta dos controles                                                                        |
 
 Sempre dentro da área segura; se a peça tocar o painel de status (tela muito
 baixa), ela recua para a direita dele; se nem assim couber, não é desenhada.
