@@ -259,5 +259,5 @@ células tampadas, marca, destino, descarga e o predicado da bolha com a margem.
   `aquifero-bacias.test.ts`, os testes antigos do Leviatã reescritos.
 - content: `surface-separation.test.mjs` (a água profunda do Aquífero sem gelo,
   sem leito, sem moldura, e se move), validação de atlas (bounds, anchors,
-  jitter, paleta, normais, sem quadro vazio, orçamento de boot: 167,17 MiB de
+  jitter, paleta, normais, sem quadro vazio, oito rumos, orçamento de boot: 166,67 MB de
   167,77).
