@@ -33,6 +33,20 @@ import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '..
 import { lineageOf, sectorProfile } from '../src/strata';
 import type { SurvivalState } from '../src/types';
 
+/**
+ * Devolve o laco de eventos ao vitest no meio de uma varredura longa.
+ *
+ * O worker fala com o processo principal por RPC com 60 s de prazo, e a
+ * resposta chega como macrotarefa. Um arquivo de testes sincronos que gera
+ * centenas de mundos em sequencia (este passa de um minuto no runner do CI)
+ * nunca deixa essa resposta entrar — entre um `it` e o outro so ha
+ * microtarefas — e o prazo estoura como "Timeout calling onTaskUpdate", com
+ * todos os testes verdes e o processo saindo com erro. Um `setImmediate` a
+ * cada punhado de seeds e o unico intervalo que a varredura precisa.
+ */
+const breathe = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+const BREATHE_EVERY = 8;
+
 const seedWithLineage = (lineage: string): number => {
   for (let seed = 1; seed < 4096; seed++) if (lineageOf(seed) === lineage) return seed;
   throw new Error(`nenhuma seed pequena com linhagem ${lineage}`);
@@ -180,7 +194,7 @@ describe('arena do chefe por estrato', () => {
     }
   });
 
-  it('ninguem nasce DENTRO da moldura', () => {
+  it('ninguem nasce DENTRO da moldura', async () => {
     // O defeito que este arquivo quase deixou passar. `openCells` e montado
     // no comeco da geracao e o carimbo roda depois — mas nenhum consumidor
     // daquela lista reconfere `solid`. Sem podar a lista, uma celula virada
@@ -197,6 +211,7 @@ describe('arena do chefe por estrato', () => {
     // rocha e conteudo, nao defeito. Corpo DENTRO da parede e que e impossivel.
     let checked = 0;
     for (let seed = 1; seed <= 250; seed++) {
+      if (seed % BREATHE_EVERY === 0) await breathe();
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
@@ -311,7 +326,7 @@ describe('arena do chefe por estrato', () => {
     ).toBe(true);
   });
 
-  it('a decoracao de parede NAO re-sorteia o material da moldura', () => {
+  it('a decoracao de parede NAO re-sorteia o material da moldura', async () => {
     // O passo 4 da geracao converte rocha adjacente a chao aberto em fragil,
     // minerio ou cristal — e um pilar isolado e parede FINA nos dois eixos, o
     // caso de MAIOR chance de virar fragil. Na Fornalha da seed 7 os quatro
@@ -341,6 +356,7 @@ describe('arena do chefe por estrato', () => {
     // por isso a protecao no codigo e uniforme e a amostra aqui e larga.
     let conferidos = 0;
     for (let seed = 1; seed <= 200; seed++) {
+      if (seed % BREATHE_EVERY === 0) await breathe();
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const profile = sectorProfile(seed, sector);
         const alvo = esperado[profile.halls];
@@ -373,7 +389,7 @@ describe('arena do chefe por estrato', () => {
     // deixar o teste depender da maquina.
   }, 60_000);
 
-  it('o mundo que a moldura deixa e o mundo que a geracao MEDE', () => {
+  it('o mundo que a moldura deixa e o mundo que a geracao MEDE', async () => {
     // O pedestal do poco e carimbado ANTES do re-flood e do BFS, entao toda
     // estrutura derivada ja o enxerga. A moldura da arena nao tem essa sorte —
     // depende do ponto do chefe, que depende do terreno — e por isso refaz as
@@ -388,6 +404,7 @@ describe('arena do chefe por estrato', () => {
     //     de 82% do maximo final pedia 136 — escolhido com a distancia de um
     //     mundo que deixou de existir.
     for (let seed = 1; seed <= 220; seed++) {
+      if (seed % BREATHE_EVERY === 0) await breathe();
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const profile = sectorProfile(seed, sector);
         const world = generateWorld(
