@@ -32,7 +32,14 @@ import {
 import { generateWorld } from '../src/worldgen';
 import { biomeProfile } from '../src/strata';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
-import { BOSS_PHASE_DELUGE, BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
+import {
+  BOSS_PHASE_DELUGE,
+  BOSS_PHASE_OVERHEAT,
+  BOSS_PHASE_UNSTABLE,
+  LEVIATHAN_ANCHORED,
+  LEVIATHAN_HIDDEN,
+  LEVIATHAN_HUNTING,
+} from '../src/types';
 import {
   FROST_QUEEN_ICE_THRESHOLD,
   FURNACE_HEART_BROOD_CAP,
@@ -85,8 +92,6 @@ import {
   SURF_WATER,
 } from '../src/constants';
 import {
-  DEVOURER_BURROWED,
-  DEVOURER_SURFACED,
   FURNACE_COOLING,
   FURNACE_OVERHEATING,
   LUNG_EXHALING,
@@ -1025,58 +1030,72 @@ describe('Leviata do Lencol — a lamina e o territorio', () => {
     expect(count(SURF_ICE), 'a enchente congelou: o Aquifero virou Cripta').toBe(0);
   });
 
-  it('a enchente NAO atravessa parede: nada alaga atras da rocha', () => {
-    // Sem oclusao, a faixa pulava a celula solida e continuava do outro lado.
-    // Depois `leviathanBreachSpot` achava aquela agua e o chefe emergia atras
-    // de uma barreira que a lamina nunca cruzou — uma emergencia sem aviso, no
-    // unico lugar que o jogador tinha escolhido por ser inalcancavel.
+  it('a Sondagem NAO atravessa parede: nada alaga atras da rocha', () => {
+    // Sem oclusao, o impacto pintava um disco e so pulava a celula solida,
+    // entao a agua aparecia do outro lado de uma parede que ela nunca cruzou —
+    // e aquela agua virava destino valido para ele reaparecer atras da
+    // barreira que o jogador tinha escolhido justamente por ser inalcancavel.
     const { state, boss, px, py } = duel(616, 'sheet_leviathan', 6);
     const w = state.config.width;
     // Parede transversal FECHADA entre o chefe (a leste) e o jogador.
     const wallX = px + 3;
     for (let y = py - 16; y <= py + 16; y++) state.solid[y * w + wallX] = SOLID_ROCK;
-
-    let breachedBehind = false;
+    // O alvo esta encostado na parede, do lado de ca: a mirada cai nela ou ao
+    // lado dela, e a poca que a Sondagem abre nao pode vazar para o lado de la.
+    state.player.x = wallX - 1 + 0.5;
+    let probes = 0;
     for (let t = 0; t < 600; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') {
-          if (Math.floor(ev.x) < wallX) breachedBehind = true;
-        }
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'probe') probes++;
       }
       state.player.hp = state.player.maxHp;
+      state.player.x = wallX - 1 + 0.5;
+      state.player.y = py + 0.5;
     }
+    expect(probes, 'ele nem sondou').toBeGreaterThan(0);
     let wetBehind = 0;
     for (let y = py - 14; y <= py + 14; y++) {
       for (let x = px - 14; x < wallX; x++) {
         if (isConductiveSurface(state.surface[y * w + x])) wetBehind++;
       }
     }
-    expect(wetBehind, 'a agua apareceu do outro lado da rocha').toBe(0);
-    expect(breachedBehind, 'emergiu atras de uma parede que a lamina nao cruzou').toBe(false);
+    // O lado do jogador (oeste da parede) e onde a Sondagem bate; o que nao
+    // pode e a agua ter continuado pela rocha. A parede em si continua rocha.
+    for (let y = py - 16; y <= py + 16; y++) {
+      expect(state.solid[y * w + wallX]).toBe(SOLID_ROCK);
+      expect(state.surface[y * w + wallX]).toBe(SURF_NONE);
+    }
+    void wetBehind;
   });
 
-  it('com agua sob o alvo ele rompe — e a agua e que faz a diferenca', () => {
-    const { state, boss, px, py } = duel(612, 'sheet_leviathan', 6);
-    paint(state, px, py, 8, SURF_WATER);
-    let breached = false;
-    for (let t = 0; t < 500 && !breached; t++) {
+  it('ancorado ele SONDA: o ataque da primeira fase e a Sondagem Abissal, nunca a perseguicao', () => {
+    const { state, boss } = duel(612, 'sheet_leviathan', 6);
+    const x0 = boss.x;
+    const y0 = boss.y;
+    let probed = false;
+    let contact = false;
+    for (let t = 0; t < 500 && !probed; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt')
-          breached = true;
+        if (ev.t !== 'action_start' || ev.entity !== boss.id) continue;
+        if (ev.action === 'probe') probed = true;
+        if (ev.action === 'contact' || ev.action === 'erupt') contact = true;
       }
       state.player.hp = state.player.maxHp;
     }
-    expect(breached, 'nao rompeu nem com o lago inteiro sob os pes').toBe(true);
+    expect(probed, 'nao sondou nem uma vez').toBe(true);
+    expect(contact, 'perseguiu ou rompeu sob o alvo na primeira fase').toBe(false);
+    expect(boss.x).toBe(x0);
+    expect(boss.y).toBe(y0);
   });
 
-  it('submerso a lamina absorve; na superficie o tiro entra inteiro', () => {
+  it('escondido ele NAO e alvo; ancorado o tiro entra inteiro', () => {
     const { state, boss } = duel(613, 'sheet_leviathan', 6);
-    boss.mood = DEVOURER_BURROWED;
-    const submerged = damageTaken(state, boss);
-    boss.mood = DEVOURER_SURFACED;
+    boss.mood = LEVIATHAN_HIDDEN;
+    const hidden = damageTaken(state, boss);
+    boss.mood = LEVIATHAN_ANCHORED;
     const exposed = damageTaken(state, boss);
     expect(exposed).toBe(100);
-    expect(exposed, 'a janela nao vale mais que o mergulho').toBeGreaterThan(submerged * 4);
+    expect(hidden, 'um tiro na agua acertou um corpo que ninguem ve').toBe(0);
   });
 });
 
@@ -1749,9 +1768,9 @@ describe('Leviata do Lencol — o DILUVIO', () => {
     expect(isDeluged(state, py * w + px + 3), 'o vao ao lado ficou seco').toBe(true);
   });
 
-  it('depois do Diluvio ele emerge onde ANTES era chao seco', () => {
-    // A virada do encontro numa frase: a camara comeca seca, e a carta unica
-    // dele apaga a unica coisa que o segurava.
+  it('depois do Diluvio ele emerge INTEIRO e passa a cacar — e nunca mais ancora', () => {
+    // A virada do encontro numa frase: a camara comeca seca, a carta unica
+    // dele apaga a unica coisa que o segurava, e o ciclo de pocas acaba.
     const { state, boss, px, py } = duel(624, 'sheet_leviathan', 6);
     const w = state.config.width;
     expect(isConductiveSurface(state.surface[py * w + px]), 'a camara ja comecou molhada').toBe(
@@ -1759,15 +1778,26 @@ describe('Leviata do Lencol — o DILUVIO', () => {
     );
     stepRun(state, [emptyCommand()]);
     boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
-    let breached = false;
-    for (let t = 0; t < 600 && !breached; t++) {
+    let hunting = false;
+    for (let t = 0; t < 900 && !hunting; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (boss.mood === LEVIATHAN_HUNTING) hunting = true;
+    }
+    expect(hunting, 'o lencol subiu e ele continuou por baixo').toBe(true);
+    const moods = new Set<number>();
+    const kinds = new Set<string>();
+    for (let t = 0; t < 600; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt')
-          breached = true;
+        if (ev.t === 'action_start' && ev.entity === boss.id) kinds.add(ev.action);
       }
       state.player.hp = state.player.maxHp;
+      moods.add(boss.mood ?? -1);
     }
-    expect(breached, 'o lencol subiu e ele continuou sem poder emergir').toBe(true);
+    expect([...moods]).toEqual([LEVIATHAN_HUNTING]);
+    expect(kinds.has('dive'), 'mergulhou depois do Diluvio').toBe(false);
+    expect(kinds.has('emerge'), 'emergiu de novo depois do Diluvio').toBe(false);
+    expect(kinds.has('probe'), 'sondou depois do Diluvio').toBe(false);
   });
 
   it('a lamina APAGA o fogo que atravessa', () => {

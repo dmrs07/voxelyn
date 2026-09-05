@@ -20,6 +20,8 @@ import {
   mawIntensity,
   normalizedDepth,
   runSectorCount,
+  insideAnyBubble,
+  LEVIATHAN_SHOCK_WINDUP_TICKS,
 } from '@voxelyn/survival-sim';
 import type { Entity, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
@@ -98,6 +100,15 @@ export class AudioDirector {
    * inteira da feature.
    */
   private sfxBus: GainNode | null = null;
+  /** Os nos da carga da descarga em curso, para o abrigo abafa-la. */
+  private chargeDuck: {
+    gain: GainNode;
+    lowpass: BiquadFilterNode;
+    baseGain: number;
+    cutoffHz: number;
+  } | null = null;
+  /** A ultima carga (por `leviathanShockSeq`) que este cliente ja ouviu. */
+  private chargeSeqHeard = -1;
   /**
    * A AMARROTADA dos chefes (ver `lofi.ts`): entrada de uma cadeia de
    * saturacao, quantizacao a 8 bits e passa-baixa que desagua no barramento
@@ -674,13 +685,40 @@ export class AudioDirector {
    * mixer como qualquer cue, para respeitar orcamento e travas.
    */
   private updateBubbleSafety(state: SurvivalState, nowMs: number): void {
-    if (state.bossRuntime.leviathanShockAt < 0) return;
+    const runtime = state.bossRuntime;
+    if (runtime.leviathanShockAt < 0) {
+      this.chargeDuck = null;
+      this.chargeSeqHeard = -1;
+      return;
+    }
+    // RECONEXAO NO MEIO DA CARGA: o `boss_windup` que a anunciou ficou no
+    // passado, mas o relogio dela viaja no `WorldFlags`. A carga toca com o
+    // tempo RESTANTE — o renderer e agendado no passado pelo que ja passou, e
+    // o WebAudio o entrega a partir de agora — em vez de ficar em silencio ate
+    // uma descarga que ninguem avisou.
+    if (this.chargeSeqHeard !== runtime.leviathanShockSeq) {
+      this.chargeSeqHeard = runtime.leviathanShockSeq;
+      if (!this.chargeDuck) {
+        const elapsedTicks = state.tick - (runtime.leviathanShockAt - LEVIATHAN_SHOCK_WINDUP_TICKS);
+        if (elapsedTicks > 1 && elapsedTicks < LEVIATHAN_SHOCK_WINDUP_TICKS) {
+          const spec = voiceSpec('leviathanShockCharge');
+          this.play('leviathanShockCharge', spec.gain, 0, NEAR_CUTOFF_HZ, elapsedTicks / TICK_HZ);
+        }
+      }
+    }
     const local = state.players.find((p) => p.id === this.localPlayerId);
     if (!local || !local.alive) return;
-    const inside = state.bossRuntime.protectiveBubbles.some(
-      (bubble) =>
-        Math.hypot(local.x - bubble.x, local.y - bubble.y) + local.radius <= bubble.radius,
-    );
+    // O MESMO predicado da simulacao: se ela nao cobra, o som confirma.
+    const inside = insideAnyBubble(local.x, local.y, runtime.protectiveBubbles);
+    // Dentro do abrigo a carga fica ABAFADA (low-pass e menos ganho): o que se
+    // ouve la dentro e o proprio coracao, nao a sirene. Fora, ela volta.
+    const duck = this.chargeDuck;
+    if (duck) {
+      const ctx = this.ctx;
+      const at = ctx ? ctx.currentTime : 0;
+      duck.lowpass.frequency.setTargetAtTime(inside ? 700 : duck.cutoffHz, at, 0.08);
+      duck.gain.gain.setTargetAtTime(inside ? duck.baseGain * 0.5 : duck.baseGain, at, 0.08);
+    }
     if (!inside) return;
     const cue = { voice: 'leviathanBubbleSafe' as const, x: 0, y: 0, scale: 1 };
     for (const planned of this.mixer.plan([cue], { x: local.x, y: local.y }, nowMs)) {
@@ -741,7 +779,14 @@ export class AudioDirector {
     return { x: ent.x, y: ent.y };
   }
 
-  private play(voice: VoiceId, gain: number, pan: number, cutoffHz: number): void {
+  private play(
+    voice: VoiceId,
+    gain: number,
+    pan: number,
+    cutoffHz: number,
+    /** Quanto desta voz JA PASSOU, em segundos (reconexao no meio dela). */
+    elapsedSeconds = 0,
+  ): void {
     const ctx = this.ctx;
     // A saida das vozes e o barramento de EFEITOS, nunca o mestre direto: e o
     // que faz o slider de efeitos valer para todo som do mundo sem que cada
@@ -764,7 +809,7 @@ export class AudioDirector {
       this.bossTrackBus?.duck();
     }
 
-    const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD;
+    const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD - elapsedSeconds;
 
     const voiceGain = ctx.createGain();
     voiceGain.gain.value = gain;
@@ -772,6 +817,11 @@ export class AudioDirector {
     const lowpass = ctx.createBiquadFilter();
     lowpass.type = 'lowpass';
     lowpass.frequency.value = cutoffHz;
+    // A carga da descarga guarda os proprios nos: e a unica voz que o jogador
+    // pode ABAFAR no meio — entrando numa bolha (ver `updateBubbleSafety`).
+    if (voice === 'leviathanShockCharge') {
+      this.chargeDuck = { gain: voiceGain, lowpass, baseGain: gain, cutoffHz };
+    }
 
     let tail: AudioNode = voiceGain;
     voiceGain.connect(lowpass);

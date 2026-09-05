@@ -210,6 +210,53 @@
         gap: 0 8px;
         margin-bottom: 6px;
       }
+      #leviathan-panel {
+        position: fixed;
+        left: calc(10px + var(--safe-area-inset-left));
+        bottom: calc(150px + var(--safe-area-inset-bottom));
+        width: 300px;
+        background: rgba(10, 12, 18, 0.9);
+        border: 1px solid #2a2d38;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 11px;
+        color: #c9c2b4;
+        z-index: 6;
+      }
+      #leviathan-panel b {
+        color: #9fd8ff;
+        font-weight: 600;
+      }
+      #leviathan-panel .safe {
+        color: #8ff0c8;
+      }
+      #leviathan-panel .danger {
+        color: #ff9a7a;
+      }
+      #leviathan-readout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 8px;
+        margin-bottom: 6px;
+      }
+      #leviathan-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      #leviathan-buttons button {
+        font: inherit;
+        font-size: 10px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid #2a2d38;
+        background: #141821;
+        color: #d8cfc0;
+        cursor: pointer;
+      }
+      #leviathan-buttons button:hover {
+        background: #1f2532;
+      }
       #frost-buttons {
         display: flex;
         flex-wrap: wrap;
@@ -314,6 +361,14 @@
       <div id="frost-readout"></div>
       <div id="frost-buttons"></div>
       <label><input type="checkbox" id="frost-fast-decay" /> decaimento ×10 (debug)</label>
+    </div>
+    <!-- O PAINEL DO LEVIATA: cada postura do ciclo (ancorado, Sondagem rasa e
+         funda, tampa, mergulho, viagem, emergencia, Diluvio, cacada, carga) e
+         o jogador fora, na borda e dentro da bolha — com a leitura exata do
+         que a simulacao decide. So aparece na arena do Leviata. -->
+    <div id="leviathan-panel" class="hidden">
+      <div id="leviathan-readout"></div>
+      <div id="leviathan-buttons"></div>
     </div>
 
     <div id="setup">

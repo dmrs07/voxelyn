@@ -48,6 +48,7 @@ import {
   type PlayerTuning,
   type SurvivalState,
   type Vec2,
+  leviathanTargetable,
 } from '@voxelyn/survival-sim';
 import { DEVOURER_HEAD_GONE_AT, devourerSubmergence } from './devourer-spine';
 import { leapProgress } from './leap-arc';
@@ -116,6 +117,11 @@ const hasVisibleBody = (enemy: Entity, tick: number): boolean => {
   ) {
     return false;
   }
+  // O LEVIATA fora de vista nao e alvo — e a mesma pergunta que o funil de
+  // dano faz (`leviathanTargetable`): escondido, ou com a cabeca ainda por
+  // baixo da lamina, a mira solta. Estado autoritativo dos dois lados, entao
+  // as duas maquinas de uma sala respondem igual.
+  if (enemy.archetype === 'sheet_leviathan') return leviathanTargetable(enemy, tick);
   if (enemy.archetype === 'white_devourer') {
     // A MESMA rampa que decide a altura dele decide a mira, contra o limiar em
     // que a cabeca some do recorte. A primeira versao perguntava so pelo tipo
@@ -134,9 +140,7 @@ const hasVisibleBody = (enemy: Entity, tick: number): boolean => {
     // manual continua funcionando, e o erro contrario — assistente colado num
     // bicho que ninguem ve — e o que este mergulho existe para nao fazer.
     const erupting = enemy.action?.kind === 'erupt' ? enemy.action : null;
-    const progress = erupting
-      ? leapProgress(tick, erupting.startedAt, erupting.releaseAt)
-      : null;
+    const progress = erupting ? leapProgress(tick, erupting.startedAt, erupting.releaseAt) : null;
     return devourerSubmergence(enemy.mood, null, progress) < DEVOURER_HEAD_GONE_AT;
   }
   return true;

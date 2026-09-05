@@ -29,6 +29,28 @@ export type NetStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'off
 type FrameEntities = {
   entities: Map<number, EntitySnapshot>;
   projectiles: ProjectileSnapshot[];
+  /**
+   * O ENCONTRO no instante deste quadro: as bolhas protetoras, os relogios da
+   * descarga e a primeira fase do Leviata (a marca da Sondagem, a viagem).
+   * Capturado do ultimo `WorldFlags` aplicado no momento em que o quadro
+   * chega, e devolvido ao estado desenhado junto com as posicoes DESTE quadro
+   * — e nao do mais novo. Sem isto `applyWorld` escrevia as bolhas no estado
+   * vivo no tick em que chegavam, enquanto os corpos ficavam um a tres ticks
+   * atras: o jogador via a bolha antes de o chefe carregar, e "estou dentro"
+   * era decidido contra uma posicao de outro tick.
+   */
+  boss: BossFrame;
+};
+
+type BossFrame = {
+  protectiveBubbles: Array<{ x: number; y: number; radius: number }>;
+  leviathanShockAt: number;
+  leviathanShockRecoverAt: number;
+  leviathanShockSeq: number;
+  leviathanProbeCell: number;
+  leviathanProbeDeepen: boolean;
+  leviathanDest: number;
+  leviathanSurfaceAt: number;
 };
 
 /**
@@ -36,8 +58,32 @@ type FrameEntities = {
  * renderavel a partir da geracao local (mesma seed) + diffs de chunk + snapshots,
  * com interpolacao de entidades. Testavel em Node contra o SurvivalServer.
  */
+const EMPTY_BOSS_FRAME: BossFrame = {
+  protectiveBubbles: [],
+  leviathanShockAt: -1,
+  leviathanShockRecoverAt: -1,
+  leviathanShockSeq: 0,
+  leviathanProbeCell: -1,
+  leviathanProbeDeepen: false,
+  leviathanDest: -1,
+  leviathanSurfaceAt: -1,
+};
+
+const applyBossFrame = (state: SurvivalState, boss: BossFrame): void => {
+  state.bossRuntime.protectiveBubbles = boss.protectiveBubbles.map((b) => ({ ...b }));
+  state.bossRuntime.leviathanShockAt = boss.leviathanShockAt;
+  state.bossRuntime.leviathanShockRecoverAt = boss.leviathanShockRecoverAt;
+  state.bossRuntime.leviathanShockSeq = boss.leviathanShockSeq;
+  state.bossRuntime.leviathanProbeCell = boss.leviathanProbeCell;
+  state.bossRuntime.leviathanProbeDeepen = boss.leviathanProbeDeepen;
+  state.bossRuntime.leviathanDest = boss.leviathanDest;
+  state.bossRuntime.leviathanSurfaceAt = boss.leviathanSurfaceAt;
+};
+
 export class NetClient {
   status: NetStatus = 'idle';
+  /** O ultimo encontro recebido (ver `BossFrame`). */
+  private latestBoss: BossFrame = EMPTY_BOSS_FRAME;
   resumeToken: string | null = null;
   slot = 0;
   readonly events: SemanticEvent[] = [];
@@ -445,12 +491,21 @@ export class NetClient {
     state.bossRuntime.mawOpenedAt = world.mawOpenedAt ?? -1;
     state.bossRuntime.delugeX = world.delugeX ?? 0;
     state.bossRuntime.delugeY = world.delugeY ?? 0;
-    state.bossRuntime.leviathanShockAt = world.leviathanShockAt ?? -1;
-    state.bossRuntime.leviathanShockRecoverAt = world.leviathanShockRecoverAt ?? -1;
-    state.bossRuntime.leviathanShockSeq = world.leviathanShockSeq ?? 0;
-    state.bossRuntime.protectiveBubbles = (world.protectiveBubbles ?? []).map((bubble) => ({
-      ...bubble,
-    }));
+    // O ENCONTRO fica RETIDO no ultimo `WorldFlags`, e nao escrito no estado
+    // vivo: quem o entrega ao desenho e `sampleRenderState`, pelo quadro que
+    // esta sendo desenhado (ver `BossFrame`). Servidor antigo: sem Sondagem
+    // marcada e sem viagem — o chefe e desenhado pelo humor do snapshot.
+    this.latestBoss = {
+      protectiveBubbles: (world.protectiveBubbles ?? []).map((bubble) => ({ ...bubble })),
+      leviathanShockAt: world.leviathanShockAt ?? -1,
+      leviathanShockRecoverAt: world.leviathanShockRecoverAt ?? -1,
+      leviathanShockSeq: world.leviathanShockSeq ?? 0,
+      leviathanProbeCell: world.leviathanProbeCell ?? -1,
+      leviathanProbeDeepen: world.leviathanProbeDeepen ?? false,
+      leviathanDest: world.leviathanDest ?? -1,
+      leviathanSurfaceAt: world.leviathanSurfaceAt ?? -1,
+    };
+    applyBossFrame(state, this.latestBoss);
     // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao
     // reimplementa a regra de quem guarda o que, ele desenha o que a sala
     // decidiu. `entityId` fica nulo — o espelho nunca precisa dele.
@@ -545,7 +600,9 @@ export class NetClient {
     const map = new Map<number, EntitySnapshot>();
     for (const e of entities) map.set(e.id, e);
     // Linha do tempo reiniciada (sala nova): a narracao guardada e daquele mundo.
-    if (this.playout.ingest(tick, nowMs, { entities: map, projectiles })) this.eventQueue.clear();
+    if (this.playout.ingest(tick, nowMs, { entities: map, projectiles, boss: this.latestBoss })) {
+      this.eventQueue.clear();
+    }
   }
 
   /**
@@ -575,6 +632,8 @@ export class NetClient {
     // acenderia antes do tick que o disparou. O que ja aconteceu na linha de
     // render e o que `from` conta; o resto ainda nao aconteceu.
     state.tick = sample.tick;
+    // O encontro do quadro ALCANCADO, junto com os corpos dele.
+    applyBossFrame(state, from.boss);
     const interpolated = from !== to && alpha > 0;
     const lerpPos = (id: number, cx: number, cy: number): { x: number; y: number } => {
       const target = interpolated ? to.entities.get(id) : undefined;

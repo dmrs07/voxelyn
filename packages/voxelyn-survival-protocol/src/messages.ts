@@ -349,7 +349,25 @@ export type WorldFlags = {
   leviathanShockAt?: number;
   leviathanShockRecoverAt?: number;
   leviathanShockSeq?: number;
+  /**
+   * As bolhas protetoras. `radius` e o RAIO SEGURO para o centro do
+   * Prospector: o cliente desenha o anel do chao com ele e decide "estou
+   * dentro" pelo mesmo predicado da simulacao (`playerProtectedByBubble`).
+   */
   protectiveBubbles?: Array<{ x: number; y: number; radius: number }>;
+  /**
+   * A PRIMEIRA FASE do Leviata, o que o cliente precisa para desenhar o
+   * aviso sem ter recebido o evento: a celula sob a qual a Sondagem em curso
+   * vai romper (-1 = nenhuma) e se ela afunda a poca (telegrafo mais pesado);
+   * a celula da poca de destino da viagem escondida (-1 = nenhuma) e o tick em
+   * que ele comeca a emergir la (-1 = nao esta viajando) — e dele que sai a
+   * rampa do borbulhar no destino. Quem RECONECTA no meio de uma Sondagem ou
+   * de uma viagem le tudo daqui. Ausentes em servidores anteriores: -1/false.
+   */
+  leviathanProbeCell?: number;
+  leviathanProbeDeepen?: boolean;
+  leviathanDest?: number;
+  leviathanSurfaceAt?: number;
   /**
    * A BOCA do Devorador: o tick em que ela abriu (-1 = fechada).
    *

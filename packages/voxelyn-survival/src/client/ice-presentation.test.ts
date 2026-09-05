@@ -35,7 +35,7 @@ const ctx = { worldWidth: 96, localPlayerId: 1 };
 
 const crack = (stage: number): SemanticEvent => ({ t: 'ice_crack', x: 4, y: 4, stage });
 const collapse: SemanticEvent = { t: 'ice_collapse', x: 4, y: 4 };
-const fall: SemanticEvent = { t: 'ice_fall', x: 4, y: 4, slot: 0 };
+const fall: SemanticEvent = { t: 'ice_fall', x: 4, y: 4, slot: 0, medium: 'ice' };
 const mend: SemanticEvent = { t: 'ice_mend', x: 4, y: 4, radius: 6, mended: 3, sealed: 1 };
 const death = (entity: number): SemanticEvent => ({
   t: 'death',

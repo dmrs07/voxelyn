@@ -159,7 +159,9 @@ const buildEntity = (spec) => {
       for (let f = 0; f < def.frames; f++) {
         const rawFrame = spec.draw(dir, anim, f);
         if (rawFrame.w !== spec.frameWidth || rawFrame.h !== spec.frameHeight) {
-          throw new Error(`${spec.id} ${dir}/${anim}/${f}: ${rawFrame.w}x${rawFrame.h} != ${spec.frameWidth}x${spec.frameHeight}`);
+          throw new Error(
+            `${spec.id} ${dir}/${anim}/${f}: ${rawFrame.w}x${rawFrame.h} != ${spec.frameWidth}x${spec.frameHeight}`,
+          );
         }
         if (isEmpty(rawFrame)) throw new Error(`${spec.id} ${dir}/${anim}/${f}: frame vazio`);
         raw.push(rawFrame);
@@ -225,7 +227,9 @@ const buildEntity = (spec) => {
       columns * Math.ceil(spec.frameWidth / NORMAL_SCALE),
       rows * Math.ceil(spec.frameHeight / NORMAL_SCALE),
     );
-    half.forEach((frame, i) => blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)));
+    half.forEach((frame, i) =>
+      blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)),
+    );
     const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
     normalPng.data = Buffer.from(normalAtlas.buf);
     const bytes = PNG.sync.write(normalPng, PNG_WRITE);
@@ -241,9 +245,7 @@ const buildEntity = (spec) => {
      * O mapa de faces deste sprite, quando ha um. Ausente = o cliente cai na
      * iluminacao por silhueta, que continua correta, so menos informativa.
      */
-    ...(normalBytes > 0
-      ? { normalAtlas: `${spec.id}.normal.png`, normalScale: NORMAL_SCALE }
-      : {}),
+    ...(normalBytes > 0 ? { normalAtlas: `${spec.id}.normal.png`, normalScale: NORMAL_SCALE } : {}),
     frameWidth: spec.frameWidth,
     frameHeight: spec.frameHeight,
     columns,
@@ -322,10 +324,19 @@ const buildTerrain = () => {
     variants: VARIANTS,
     lightLevels: LIGHT_LEVELS,
     paletteColors: [...palette].sort(),
-    generation: { tool: 'procedural voxel raster (tools/terrain.mjs)', seedOrRef: 'deterministic-code-v1' },
+    generation: {
+      tool: 'procedural voxel raster (tools/terrain.mjs)',
+      seedOrRef: 'deterministic-code-v1',
+    },
   };
   writeFileSync(resolve(OUT, 'terrain-blocks.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { id: 'terrain-blocks', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+  return {
+    id: 'terrain-blocks',
+    cols: frames.length,
+    width: atlas.w,
+    height: atlas.h,
+    bytes: pngBytes.byteLength,
+  };
 };
 
 /**
@@ -365,7 +376,10 @@ const buildSurfaces = () => {
     // 8: o CICLO DE RACHADURAS da Cripta (SURF_ICE_CRACKED 15,
     // SURF_ICE_FRACTURED 16, SURF_ICE_CRITICAL 17) e o BURACO de agua profunda
     // (SURF_DEEP_WATER 18) — os quatro no fim da lista, como sempre.
-    version: 8,
+    // 9: a AGUA PROFUNDA NATIVA DO AQUIFERO (`aquifer-deep-water`), o mesmo
+    // id de superficie desenhado por (superficie, estrato): o nucleo das
+    // bacias, sem lasca de gelo. No fim da lista.
+    version: 9,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
@@ -376,10 +390,19 @@ const buildSurfaces = () => {
     variants: VARIANTS,
     lightLevels: LIGHT_LEVELS,
     paletteColors: [...palette].sort(),
-    generation: { tool: 'procedural voxel raster (tools/surfaces.mjs)', seedOrRef: 'deterministic-code-v1' },
+    generation: {
+      tool: 'procedural voxel raster (tools/surfaces.mjs)',
+      seedOrRef: 'deterministic-code-v1',
+    },
   };
   writeFileSync(resolve(OUT, 'surface-tiles.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { id: 'surface-tiles', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+  return {
+    id: 'surface-tiles',
+    cols: frames.length,
+    width: atlas.w,
+    height: atlas.h,
+    bytes: pngBytes.byteLength,
+  };
 };
 
 const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS, ...MODULE_LAYER_SPECS].map(buildEntity);
@@ -433,10 +456,7 @@ const buildProps = () => {
   );
   const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
   normalPng.data = Buffer.from(normalAtlas.buf);
-  writeFileSync(
-    resolve(OUT, 'world-props.normal.png'),
-    PNG.sync.write(normalPng, PNG_WRITE),
-  );
+  writeFileSync(resolve(OUT, 'world-props.normal.png'), PNG.sync.write(normalPng, PNG_WRITE));
 
   const manifest = {
     id: 'world-props',
@@ -461,10 +481,19 @@ const buildProps = () => {
     originY: -bounds.minY + 2,
     kinds: PROP_KINDS,
     paletteColors: [...palette].sort(),
-    generation: { tool: 'procedural voxel raster (tools/props.mjs)', seedOrRef: 'deterministic-code-v1' },
+    generation: {
+      tool: 'procedural voxel raster (tools/props.mjs)',
+      seedOrRef: 'deterministic-code-v1',
+    },
   };
   writeFileSync(resolve(OUT, 'world-props.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { id: 'world-props', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+  return {
+    id: 'world-props',
+    cols: frames.length,
+    width: atlas.w,
+    height: atlas.h,
+    bytes: pngBytes.byteLength,
+  };
 };
 
 const surfaceResult = buildSurfaces();
@@ -476,4 +505,5 @@ const index = {
 };
 writeFileSync(resolve(OUT, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 console.log('atlases gerados:');
-for (const r of [...results, terrainResult, surfaceResult, propResult]) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
+for (const r of [...results, terrainResult, surfaceResult, propResult])
+  console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);

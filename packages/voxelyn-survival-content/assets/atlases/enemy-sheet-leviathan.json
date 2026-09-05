@@ -1,14 +1,14 @@
 {
   "id": "enemy-sheet-leviathan",
-  "version": 1,
+  "version": 3,
   "atlas": "enemy-sheet-leviathan.png",
   "normalAtlas": "enemy-sheet-leviathan.normal.png",
   "normalScale": 2,
-  "frameWidth": 124,
-  "frameHeight": 80,
-  "columns": 25,
-  "anchorX": 60,
-  "anchorY": 51,
+  "frameWidth": 112,
+  "frameHeight": 68,
+  "columns": 34,
+  "anchorX": 56,
+  "anchorY": 41,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -18,12 +18,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 2.2,
-    "h": 1.4
+    "w": 1.7,
+    "h": 1.2
   },
   "footprint": {
-    "w": 2,
-    "h": 1.8,
+    "w": 1.6,
+    "h": 1.6,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -38,7 +38,8 @@
     "#7b8ba3",
     "#8a7154",
     "#b8a98f",
-    "#d5cdba"
+    "#d5cdba",
+    "#e8f1ff"
   ],
   "animations": {
     "idle": {
@@ -108,7 +109,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric black aquifer ray-leviathan boss, broad flat wing sheets, whip tail, conductive electric lateral lines running nose to tail, flattened wedge head with gill slits and a slit mouth, top-mounted eyes",
+    "prompt": "voxel-isometric black aquifer ray-leviathan boss head: flattened muscular cephalic disc, forward cephalic lobes around a wide slit mouth, small top-mounted cyan eyes, deep gill slits, cyan electrosensory pores, two conductive lateral lines starting at the nape, near-black navy and wet slate dorsum, blue-grey belly",
     "seedOrRef": "deterministic-code-v2"
   }
 }

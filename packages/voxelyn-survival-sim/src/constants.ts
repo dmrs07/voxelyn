@@ -2333,75 +2333,145 @@ export const ARCHCANTOR_SOLOIST_COOLDOWN_TICKS = 48;
 export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
 
 /**
- * LEVIATA DO LENCOL (Aquifero Negro) — o corpo que se move sob a agua.
+ * LEVIATA DO LENCOL (Aquifero Negro) — o corpo que atravessa a lamina.
  *
- * Mesma gramatica do Devorador Branco, outro elemento e outro contra-jogo: ele
- * so anda e so emerge por superficie CONDUTIVA, e o que o detem nao e negar o
- * chao — e eletrificar a agua. A descarga o atordoa pela regra generica que ja
- * existe, e eletrifica a regiao inteira junto: o preco de para-lo e o mesmo
- * meio ficar mortal para quem o parou.
+ * Duas lutas em uma. Na PRIMEIRA FASE ele nao persegue ninguem: e uma criatura
+ * ESTACIONARIA que ocupa uma poca profunda, ataca a distancia pelo lencol
+ * freatico (a Sondagem Abissal), cria e aprofunda pocas novas com esse ataque,
+ * e viaja entre elas POR BAIXO — cabeca, asas, tronco e cauda entram na agua em
+ * sequencia, a posicao so muda quando nada dele esta visivel, e ele emerge por
+ * segmentos na poca de destino. Enquanto esta aberto sobre uma poca, o corpo e
+ * uma TAMPA VIVA: o Prospector nao cai nas celulas profundas que ele cobre.
+ *
+ * Na SEGUNDA FASE (depois do Diluvio) ele emerge por completo e passa a NADAR
+ * direto na direcao do Prospector, com o corpo inteiro seguindo a trajetoria
+ * da cabeca; a descarga massiva e as duas bolhas protetoras pertencem a ela.
+ *
+ * As posturas sao explicitas (ver `LEVIATHAN_ANCHORED` e irmas em types.ts):
+ * nada aqui e inferido do humor compartilhado com o Devorador.
  */
 export const LEVIATHAN_HP = 800;
+/** Velocidade de PERSEGUICAO, na segunda fase. Ele nada; nao ha chao seco. */
 export const LEVIATHAN_SWIM_SPEED = 5;
+/**
+ * A velocidade de tabela do arquetipo. Na primeira fase ele nao anda (a
+ * ancoragem zera `vx`/`vy`), e na segunda usa `LEVIATHAN_SWIM_SPEED`; este
+ * numero existe porque a ficha de arquetipo exige um, e nenhum passo o le.
+ */
 export const LEVIATHAN_SURFACE_SPEED = 1.8;
 export const LEVIATHAN_RADIUS = 0.85;
-export const LEVIATHAN_SUBMERGED_ARMOR = 0.15;
-export const LEVIATHAN_SURFACE_TICKS = 100;
-export const LEVIATHAN_DIVE_MIN_TICKS = 60;
-export const LEVIATHAN_BREACH_WINDUP_TICKS = 26;
-export const LEVIATHAN_BREACH_RADIUS = 3;
-export const LEVIATHAN_BREACH_DAMAGE = 28;
-export const LEVIATHAN_BREACH_SEARCH = 7;
-export const LEVIATHAN_LEAD_SECONDS = 0.8;
 /**
- * De quanto em quanto tempo o Leviata submerso CHAMA (`boss_state: call`).
+ * Quao rapido ele GIRA ancorado, em radianos por segundo. Sem translacao: a
+ * unica coisa que o corpo faz enquanto esta aberto sobre a poca e acompanhar
+ * o Prospector com a cabeca — devagar, porque e uma criatura de toneladas e
+ * porque a direcao da cabeca e o telegrafo de para onde a Sondagem vai.
+ */
+export const LEVIATHAN_TURN_RATE = 1.6;
+/**
+ * A TAMPA VIVA: ate que distancia do centro da poca ocupada o corpo aberto
+ * cobre celulas de agua profunda. E a silhueta principal estacionaria (o
+ * disco cefalico mais as raizes das asas), e nao o circulo do hitbox — o
+ * hitbox mede 0,85 e a manta aberta mede quase o dobro. As pocas ocupaveis sao
+ * autoradas pequenas o bastante (`LEVIATHAN_POOL_CORE_RADIUS`) para o corpo
+ * realmente tampa-las: um nucleo maior que a manta deixaria uma borda fatal
+ * escondida debaixo de uma asa.
+ */
+export const LEVIATHAN_LID_RADIUS = 1.9;
+/** Raio do nucleo profundo de uma poca OCUPAVEL (as da arena e as aprofundadas). */
+export const LEVIATHAN_POOL_CORE_RADIUS = 1.2;
+/** Raio da margem rasa em volta de um nucleo ocupavel. */
+export const LEVIATHAN_POOL_RIM_RADIUS = 2.6;
+/**
+ * Quanto ele espera depois de terminar de emergir antes da primeira Sondagem,
+ * e o vao entre duas Sondagens do mesmo ancoradouro. O primeiro e o "respirar"
+ * (o corpo acabou de ocupar a poca); o segundo e o ritmo da fase inteira.
+ */
+export const LEVIATHAN_ANCHOR_SETTLE_TICKS = 24;
+export const LEVIATHAN_PROBE_INTERVAL_TICKS = 44;
+/** De duas a tres Sondagens por ancoradouro, alternando de forma determinista. */
+export const LEVIATHAN_PROBES_MIN = 2;
+export const LEVIATHAN_PROBES_MAX = 3;
+/**
+ * A SONDAGEM ABISSAL: o canto grave atravessa o lencol e a pressao reaparece
+ * sob a posicao prevista do Prospector.
+ *
+ * 22 ticks (1,1 s) e o tempo de abandonar o centro: a 4,6 tiles/s da para sair
+ * dos 1,7 tiles do raio com folga, mas nao para ignorar o aviso. O
+ * APROFUNDAMENTO — a segunda Sondagem sobre uma poca que a primeira criou —
+ * avisa por mais tempo (32 ticks), porque o que ele deixa no chao e permanente
+ * e fatal, e nunca pode acontecer em silencio debaixo de alguem.
+ */
+export const LEVIATHAN_PROBE_WINDUP_TICKS = 22;
+export const LEVIATHAN_PROBE_DEEPEN_WINDUP_TICKS = 32;
+export const LEVIATHAN_PROBE_RECOVERY_TICKS = 10;
+/** Quanto a frente do movimento do Prospector a Sondagem mira. */
+export const LEVIATHAN_PROBE_LEAD_SECONDS = 0.7;
+export const LEVIATHAN_PROBE_RADIUS = 1.7;
+export const LEVIATHAN_PROBE_DAMAGE = 22;
+/** Ate onde a coluna EMPURRA quem estava no centro, em tiles. */
+export const LEVIATHAN_PROBE_PUSH_TILES = 1.4;
+/** Ate onde a busca deterministica procura outra celula valida perto da mirada. */
+export const LEVIATHAN_PROBE_SEARCH = 5;
+/** Raio da poca RASA irregular que o primeiro impacto deixa em piso seco. */
+export const LEVIATHAN_PROBE_POOL_RADIUS = 2;
+/**
+ * Quantas bacias NOVAS a primeira fase pode abrir. Depois disto a Sondagem
+ * prefere ampliar ou aprofundar as que existem: a fase nao pode destruir todas
+ * as rotas caminhaveis antes do Diluvio — o Diluvio e que apaga o chao, e ele
+ * apaga por cima, sem tirar rota de ninguem.
+ */
+export const LEVIATHAN_MAX_NEW_POOLS = 4;
+/** A Sondagem nunca mira a propria poca: perto demais nao e "a distancia". */
+export const LEVIATHAN_PROBE_MIN_RANGE = 3.5;
+/**
+ * O MERGULHO. O telegrafo (26 ticks, 1,3 s) e o tempo que quem esta de pe
+ * sobre o corpo tem para sair da poca ANTES de a cobertura acabar — e a
+ * descida (40 ticks) e a animacao de cabeca, asas, tronco e cauda entrando na
+ * agua em sequencia. A tampa dura ate a cauda sumir; depois disto a poca
+ * volta a ser fatal no mesmo tick.
+ */
+export const LEVIATHAN_DIVE_TELEGRAPH_TICKS = 26;
+export const LEVIATHAN_DIVE_TICKS = 40;
+/**
+ * A VIAGEM escondida: um fixo mais um tanto por tile de distancia entre as
+ * duas pocas. E o intervalo em que a posicao autoritativa ja mudou, nada dele
+ * e visivel e a poca de destino borbulha cada vez mais.
+ */
+export const LEVIATHAN_TRAVEL_TICKS_BASE = 18;
+export const LEVIATHAN_TRAVEL_TICKS_PER_TILE = 3;
+/**
+ * A EMERGENCIA: um halo de pressao marca o ponto (12 ticks) e depois a cabeca
+ * rompe a lamina, as asas se desdobram, o tronco sobe e a cauda sai por ultimo
+ * (44 ticks). A janela de dano so abre quando a regiao vulneravel — o disco
+ * cefalico — esta de fato fora da agua: ver `LEVIATHAN_HEAD_FRACTION`.
+ */
+export const LEVIATHAN_EMERGE_HALO_TICKS = 12;
+export const LEVIATHAN_EMERGE_TICKS = 44;
+/**
+ * A fracao do mergulho em que a CABECA termina de entrar (e a fracao da
+ * emergencia em que ela termina de sair). E o limiar da janela de dano: antes
+ * disso no mergulho ele ainda e alvo; depois disso na emergencia ele volta a
+ * ser. Os segmentos do corpo repartem o resto do intervalo por posto.
+ */
+export const LEVIATHAN_HEAD_FRACTION = 0.3;
+/** Distancia minima e maxima entre a poca ocupada e o proximo destino. */
+export const LEVIATHAN_HOP_MIN_TILES = 5;
+export const LEVIATHAN_HOP_MAX_TILES = 20;
+/** Ele nao emerge debaixo do Prospector: a emergencia nao e um golpe. */
+export const LEVIATHAN_HOP_MIN_PLAYER_DIST = 3;
+/**
+ * A emergencia DEPOIS do Diluvio, na poca central: mais longa que a normal,
+ * porque o corpo inteiro sai de uma vez e o que se ve e a virada da luta.
+ */
+export const LEVIATHAN_DELUGE_EMERGE_TICKS = 50;
+/**
+ * De quanto em quanto tempo o Leviata ESCONDIDO chama (`boss_state: call`).
  *
  * Quatro segundos: espacado o bastante para ler como um animal enorme
  * navegando fora da camera, e nao como um alarme. O chamado cala durante a
  * carga da descarga — o silencio subito e parte do aviso.
  */
 export const LEVIATHAN_CALL_INTERVAL_TICKS = 80;
-/**
- * A ENCHENTE: o lencol sobe atras de quem subiu na margem.
- *
- * O defeito que ela corrige foi medido em playtest e era terminal: chao seco
- * nao atrasava o Leviata, ELIMINAVA o Leviata. Ele so anda por superficie
- * condutiva e so emerge nela, entao um jogador de pe em rocha seca a doze tiles
- * da agua nao tinha o que esquivar — ficava atirando num chefe de 800 de vida
- * que nao tinha uma unica resposta a dar. "Saber onde ele NAO alcanca" era para
- * ser meia travessia do setor; virou a luta inteira.
- *
- * A resposta nao e um golpe novo: e o proprio estrato. Negada a emergencia, ele
- * EMPURRA a lamina na direcao do alvo — a agua avanca uma faixa por vez, e o
- * chao que era refugio passa a ser dominio dele. Nada aqui e mecanica
- * inventada: e o Aquifero Negro fazendo o que um aquifero faz.
- *
- * E o preco continua simetrico, que e o que a mantem justa: a agua que ele traz
- * e condutiva nos DOIS sentidos. Quem deixa a enchente chegar ganha um chao em
- * que a descarga do proprio Prospector o atordoa — a enchente e a ameaca e a
- * ferramenta, e escolher o instante de virar uma na outra e o encontro.
- */
-export const LEVIATHAN_SURGE_COOLDOWN_TICKS = 60;
-/** Ate onde a lamina avanca por investida, em tiles. */
-export const LEVIATHAN_SURGE_LENGTH = 11;
-/** Meia-largura da faixa que sobe. Larga: uma enchente nao e um risco. */
-export const LEVIATHAN_SURGE_WIDTH = 2;
-/**
- * A enchente nao tem relogio, e a ausencia dele e deliberada.
- *
- * A primeira versao gravava a faixa com timer, e estava errada de um jeito que
- * so apareceria setenta segundos depois: agua COM timer, no motor, e agua
- * derretida de gelo, e `stepCells` a devolve como `SURF_ICE` quando a contagem
- * acaba. A enchente teria virado gelo permanente no Aquifero — e gelo nao e
- * condutivo, ou seja, a correcao que existe para o Leviata deixar de ser
- * kitavel teria acabado desligando o Leviata de novo, longe da causa.
- *
- * A lamina que sobe e a mesma materia de que os lagos do estrato sao feitos, e
- * lago nao expira. O que limita a enchente e a condicao que a dispara, e nao um
- * cronometro: ela so sai quando a emergencia foi NEGADA, e para no instante em
- * que a agua alcanca o alvo — ela avanca ate resolver o problema dela e nao um
- * metro alem.
- */
 // ---------------------------------------------------------------------------
 // O DILUVIO — a carta unica do Leviata do Lencol
 // ---------------------------------------------------------------------------
@@ -2507,7 +2577,31 @@ export const LEVIATHAN_SHOCK_WINDUP_TICKS = 72;
 export const LEVIATHAN_SHOCK_RECOVERY_TICKS = 24;
 export const LEVIATHAN_SHOCK_COOLDOWN_TICKS = 190;
 export const LEVIATHAN_SHOCK_DAMAGE = 78;
+/**
+ * AS BOLHAS PROTETORAS — o contrato dos dois raios.
+ *
+ * `LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS` e o RAIO SEGURO: a distancia maxima do
+ * CENTRO (o pivo) do Prospector ao centro da bolha para a descarga nao cobrar.
+ * E o unico numero que decide dano, e todo mundo — simulacao, HUD, audio,
+ * renderer, debug e testes — pergunta pelo mesmo predicado
+ * (`playerProtectedByBubble`). O defeito que isto conserta era geometrico:
+ * a regra antiga subtraia o raio do corpo (`dist + player.radius <= raio`), o
+ * que encolhia a area segura para 1,01 tile, enquanto o domo desenhado media
+ * o raio inteiro numa elipse errada — o jogador morria DENTRO do desenho.
+ *
+ * `LEVIATHAN_PROTECTIVE_BUBBLE_SHELL_RADIUS` e o raio da CASCA visual: o domo
+ * atmosferico pode ser maior que a area segura, mas o anel no chao que diz
+ * "aqui e seguro" e sempre o primeiro.
+ */
 export const LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS = 1.35;
+export const LEVIATHAN_PROTECTIVE_BUBBLE_SHELL_RADIUS = 1.75;
+/**
+ * Ate que distancia GEODESICA (andando pelos vaos, sem atravessar agua
+ * profunda) de um jogador vivo uma bolha pode nascer. 72 ticks de carga a
+ * 4,6 tiles/s na lamina lenta (x0,72) sao ~11,9 tiles em linha reta; onze
+ * tiles de caminho deixam folga para a curva.
+ */
+export const LEVIATHAN_BUBBLE_REACH_TILES = 11;
 /**
  * Quantos dutos a Cripta... nao: o AQUIFERO recebe. Zero em todo o resto.
  *

@@ -36,9 +36,14 @@ const worldFor = (seed: number, sector: number) =>
     sectorProfile(seed, sector),
   );
 
+/** Devolve o laco de eventos ao vitest no meio da varredura — ver arena-chefe.test.ts. */
+const breathe = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+const BREATHE_EVERY = 8;
+
 describe('o terreno derivado nunca esta vencido', () => {
-  it('`openCells` bate com um flood refeito sobre o terreno FINAL', () => {
+  it('`openCells` bate com um flood refeito sobre o terreno FINAL', async () => {
     for (let seed = 1; seed <= 120; seed++) {
+      if (seed % BREATHE_EVERY === 0) await breathe();
       for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const world = worldFor(seed, sector);
         const fresh = floodOpen(world.solid, WORLD_W, WORLD_H, world.entry.x, world.entry.y);
@@ -58,10 +63,11 @@ describe('o terreno derivado nunca esta vencido', () => {
     }
   }, 120_000);
 
-  it('toda celula de `openCells` esta mesmo ABERTA', () => {
+  it('toda celula de `openCells` esta mesmo ABERTA', async () => {
     // O sintoma mais grosseiro dos tres: era assim que o cuspidor da seed 205
     // nascia dentro de um pilar de cristal.
     for (let seed = 1; seed <= 120; seed++) {
+      if (seed % BREATHE_EVERY === 0) await breathe();
       for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const world = worldFor(seed, sector);
         for (const cell of world.openCells) {
@@ -135,10 +141,9 @@ describe('a barreira de escrita do draft', () => {
     // invalidacao funcionando (foi assim que a primeira versao deste teste
     // falhou: media a coisa certa no lugar errado).
     draft.setSolid(3 * W + 6, SOLID_NONE);
-    expect(
-      draft.derived(entry).openCells.length,
-      'abrir chao novo nao refez o derivado',
-    ).toBe(antes + 1);
+    expect(draft.derived(entry).openCells.length, 'abrir chao novo nao refez o derivado').toBe(
+      antes + 1,
+    );
   });
 
   it('trocar o buffer inteiro (o automato) tambem invalida', () => {

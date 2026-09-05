@@ -68,6 +68,12 @@ export type FrostClocks = {
 export type IcePlunge = {
   entity: number;
   slot: number;
+  /**
+   * De que agua: `ice` e o buraco de uma placa (estilhacos, gelo se fechando),
+   * `water` e a agua profunda nativa do Aquifero (a lamina negra engole o
+   * chassi, bolhas, nenhum gelo). Vem do evento; a queda e a mesma.
+   */
+  medium: 'ice' | 'water';
   x: number;
   y: number;
   facingX: number;
@@ -116,6 +122,11 @@ export const actionAnimation = (action: EntityActionKind): string => {
   // antes de atravessar a arena, o Devorador rasga o chao antes de sair dele, e
   // a Rainha levanta os bracos antes de o lago congelar. Mostrar a pose de
   // ataque durante esses telegrafos e o erro do Coveiro outra vez.
+  // O LEVIATA: a Sondagem e o `attack` (guelras e eletroporos vibrando); o
+  // mergulho e a emergencia NAO trocam de pose — o corpo em pecas e a
+  // animacao, recortado pela lamina posto a posto — entao ficam no `idle`.
+  if (action === 'probe') return 'attack';
+  if (action === 'dive' || action === 'emerge') return 'idle';
   if (
     action === 'detonate' ||
     action === 'charge' ||
@@ -468,6 +479,7 @@ export class EntityPresentation {
         this.plungesById.set(entity, {
           entity,
           slot: event.slot,
+          medium: event.medium ?? 'ice',
           x: event.x,
           y: event.y,
           // Provisorio: o `death` do mesmo tick traz o rumo autoritativo e o

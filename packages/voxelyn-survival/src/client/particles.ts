@@ -396,6 +396,22 @@ export class VoxelParticles {
     for (const ev of events) {
       switch (ev.t) {
         case 'boss_state':
+          // O LEVIATA atravessando a lamina: o ultimo "gulp" (bolhas grandes
+          // e um anel fechando onde a cauda sumiu), o borbulhar comecando no
+          // destino, e a agua escorrendo quando o corpo termina de ocupar a
+          // poca (bolhas ficam alguns instantes).
+          if (ev.archetype === 'sheet_leviathan') {
+            if (ev.state === 'submerged') {
+              this.burst(ev.x, ev.y, 'bubble', n(12), 0.8, 2.4, 700, 84, 0.05);
+              this.ring(ev.x, ev.y, 'bubble', n(10), 1.6, 480, 85, 0.05);
+            } else if (ev.state === 'surfacing') {
+              this.burst(ev.x, ev.y, 'bubble', n(6), 0.5, 1.6, 700, 86, 0.05);
+            } else if (ev.state === 'emerged') {
+              this.ring(ev.x, ev.y, 'bubble', n(16), 2.4, 700, 87, 0.05);
+              this.burst(ev.x, ev.y, 'bubble', n(10), 1.2, 1.4, 900, 88, 0.4);
+            }
+            break;
+          }
           if (ev.archetype !== 'archcantor') break;
           if (ev.state === 'song_halo') {
             this.ring(ev.x, ev.y, 'crystalShard', Math.max(18, n(32)), 4.8, 720, 81, 0.35);
@@ -629,6 +645,19 @@ export class VoxelParticles {
           this.burst(ev.x, ev.y, 'bubble', n(6), 1.1, 2.1, 520, 53);
           break;
         case 'boss_attack':
+          // O Leviata: a coluna da Sondagem sai NO PONTO (o `pulse` do mesmo
+          // tick, com o raio real, ja desenha a frente); aqui e o corpo — a
+          // descida comecando (agua puxada por cima dele) e a ruptura pesada
+          // da lamina ao emergir.
+          if (ev.archetype === 'sheet_leviathan') {
+            if (ev.ability === 'dive') {
+              this.ring(ev.x, ev.y, 'bubble', n(12), 1.8, 600, 89, 0.05);
+            } else if (ev.ability === 'emerge') {
+              this.burst(ev.x, ev.y, 'bubble', n(24), 1.8, 3.2, 800, 90, 0.2);
+              this.ring(ev.x, ev.y, 'bubble', n(18), 2.8, 560, 91, 0.05);
+            }
+            break;
+          }
           if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
             // O CONGELAMENTO: um saco de cacos despejado no chao. Um leque de
             // lascas saltando alto e caindo para fora (o `burst`, com impulso
@@ -666,10 +695,22 @@ export class VoxelParticles {
         case 'ice_fall':
           // A QUEDA: massa entrando na agua. O respingo sobe alto e volta —
           // `bubble` e a unica rampa de agua do banco, e e a certa: o que se ve
-          // aqui e liquido, nao gelo. Os cacos que sobram sao a borda do buraco
-          // levando o baque.
+          // aqui e liquido, nao gelo. No GELO, os cacos que sobram sao a borda
+          // do buraco levando o baque; no AQUIFERO nao ha gelo nenhum — a agua
+          // negra engole o chassi, uma coluna de bolhas sobe e ondas baixas
+          // fecham a superficie (o anel e de bolhas, rasteiro).
           this.burst(ev.x, ev.y, 'bubble', n(14), 1.5, 3.2, 700, 59);
-          this.ring(ev.x, ev.y, 'iceShard', n(7), 0.7, 420, 61);
+          if (ev.medium === 'water') {
+            this.burst(ev.x, ev.y, 'bubble', n(10), 0.4, 2.6, 900, 63);
+            this.ring(ev.x, ev.y, 'bubble', n(8), 0.9, 520, 65, 0.05);
+          } else {
+            this.ring(ev.x, ev.y, 'iceShard', n(7), 0.7, 420, 61);
+          }
+          break;
+        // A MARCA DA SONDAGEM nasce com bolhas pequenas subindo do ponto: o
+        // chao ja esta cedendo antes de a coluna romper.
+        case 'probe_marker':
+          this.burst(ev.x, ev.y, 'bubble', n(ev.deepen ? 8 : 5), 0.35, 1.2, 600, 66, 0.05);
           break;
         case 'overheat':
           this.burst(ev.x, ev.y, 'ember', n(6), 1.0, 2.0, 380, 37);

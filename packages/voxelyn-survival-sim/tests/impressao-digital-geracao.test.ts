@@ -223,7 +223,22 @@ describe('impressao digital da geracao', () => {
     // cobre a abertura da arena e a rede cristalina acrescentadas neste rework.
     // A margem agora deriva do alcance de 12 tiles introduzido na v54; assim
     // nenhum braco novo termina fora da arena que o worldgen reservou.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2080667893);
+    // 3903803443 (era 2080667893), na SIMULATION_VERSION 59: o AQUIFERO NEGRO
+    // ganhou BACIAS PROFUNDAS e a arena do Leviata ganhou cinco pocas.
+    //
+    // Duas mudancas de proposito, e so o Aquifero (e todo setor com
+    // `waterBlobs`) e tocado: (1) toda massa de agua rasa grande o bastante e
+    // erodida e recebe um nucleo de `SURF_DEEP_WATER` permanente, com margem
+    // rasa garantida por construcao e a prova de rota (entrada -> pedestal e
+    // chefe) celula a celula; (2) a moldura karst da camara do chefe deixou
+    // de pintar uma orla rasa e passou a ESCAVAR cinco pocas ocupaveis em
+    // volta do ponto do chefe — o `solid` muda, e com ele `openCells`.
+    //
+    // E uma terceira, estrutural: todo ponto de interesse (terminais, caches,
+    // respiradouros, spawns) passou a ser sorteado sobre chao CAMINHAVEL
+    // (aberto e nao profundo). Onde nao ha agua profunda a lista e identica a
+    // `openCells`, e o sorteio dos estratos secos nao muda um byte.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3903803443);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {
@@ -231,7 +246,12 @@ describe('impressao digital da geracao', () => {
     // instavel (ordem de iteracao de Set, `Date.now`, RNG global) so apareceria
     // como uma assinatura que muda sozinha entre execucoes — e a primeira
     // reacao seria colar o numero novo, escondendo o defeito de vez.
-    for (const [seed, sector] of [[7, 3], [141, 3], [205, 3], [210, 2]] as const) {
+    for (const [seed, sector] of [
+      [7, 3],
+      [141, 3],
+      [205, 3],
+      [210, 2],
+    ] as const) {
       expect(fingerprint(worldFor(seed, sector))).toBe(fingerprint(worldFor(seed, sector)));
     }
   }, 30_000);

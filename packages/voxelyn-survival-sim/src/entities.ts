@@ -76,21 +76,38 @@ import {
   FURNACE_HEART_WAVE_DAMAGE,
   FURNACE_HEART_WAVE_INTERVAL_TICKS,
   FURNACE_HEART_WAVE_RADIUS,
-  LEVIATHAN_BREACH_DAMAGE,
-  LEVIATHAN_BREACH_RADIUS,
-  LEVIATHAN_BREACH_SEARCH,
-  LEVIATHAN_BREACH_WINDUP_TICKS,
-  LEVIATHAN_DIVE_MIN_TICKS,
   LEVIATHAN_HP,
-  LEVIATHAN_LEAD_SECONDS,
   LEVIATHAN_RADIUS,
-  LEVIATHAN_SUBMERGED_ARMOR,
   LEVIATHAN_SURFACE_SPEED,
-  LEVIATHAN_SURFACE_TICKS,
   LEVIATHAN_SWIM_SPEED,
-  LEVIATHAN_SURGE_COOLDOWN_TICKS,
-  LEVIATHAN_SURGE_LENGTH,
-  LEVIATHAN_SURGE_WIDTH,
+  LEVIATHAN_TURN_RATE,
+  LEVIATHAN_LID_RADIUS,
+  LEVIATHAN_ANCHOR_SETTLE_TICKS,
+  LEVIATHAN_PROBE_INTERVAL_TICKS,
+  LEVIATHAN_PROBES_MIN,
+  LEVIATHAN_PROBES_MAX,
+  LEVIATHAN_PROBE_WINDUP_TICKS,
+  LEVIATHAN_PROBE_DEEPEN_WINDUP_TICKS,
+  LEVIATHAN_PROBE_RECOVERY_TICKS,
+  LEVIATHAN_PROBE_LEAD_SECONDS,
+  LEVIATHAN_PROBE_RADIUS,
+  LEVIATHAN_PROBE_DAMAGE,
+  LEVIATHAN_PROBE_PUSH_TILES,
+  LEVIATHAN_PROBE_SEARCH,
+  LEVIATHAN_PROBE_POOL_RADIUS,
+  LEVIATHAN_MAX_NEW_POOLS,
+  LEVIATHAN_PROBE_MIN_RANGE,
+  LEVIATHAN_DIVE_TELEGRAPH_TICKS,
+  LEVIATHAN_DIVE_TICKS,
+  LEVIATHAN_TRAVEL_TICKS_BASE,
+  LEVIATHAN_TRAVEL_TICKS_PER_TILE,
+  LEVIATHAN_EMERGE_HALO_TICKS,
+  LEVIATHAN_EMERGE_TICKS,
+  LEVIATHAN_HOP_MIN_TILES,
+  LEVIATHAN_HOP_MAX_TILES,
+  LEVIATHAN_HOP_MIN_PLAYER_DIST,
+  LEVIATHAN_DELUGE_EMERGE_TICKS,
+  LEVIATHAN_BUBBLE_REACH_TILES,
   LEVIATHAN_DELUGE_SPEED_SCALE,
   DELUGE_HP_FRACTION,
   DELUGE_WINDUP_TICKS,
@@ -315,7 +332,6 @@ import {
   delugeFront,
   explodeAt,
   igniteCell,
-  isConductiveCell,
   isConductiveSurface,
   meltIce,
   openArena,
@@ -323,6 +339,7 @@ import {
   sealIceHole,
   setSurface,
 } from './cells.js';
+import { insideAnyBubble, isPoolCore, leviathanTargetable } from './leviathan.js';
 import { applyFreezeDose } from './frost.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
@@ -335,7 +352,12 @@ import {
   DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
   DEVOURER_MAW,
-  DEVOURER_SURFACED,
+  LEVIATHAN_ANCHORED,
+  LEVIATHAN_DIVING,
+  LEVIATHAN_HIDDEN,
+  LEVIATHAN_EMERGING,
+  LEVIATHAN_HUNTING,
+  type ProtectiveBubble,
   FURNACE_COOLING,
   FURNACE_OVERHEATING,
   LUNG_EXHALING,
@@ -726,7 +748,15 @@ export const circleBlocked = (state: SurvivalState, x: number, y: number, r: num
  * dono do estrato, e derreter gelo (que ja e o contra-jogo da couraca) viraria
  * tambem um jeito de imobilizar o encontro inteiro.
  */
-const CROSSES_DEEP_WATER: ReadonlySet<string> = new Set(['frost_queen', 'frost_wraith']);
+const CROSSES_DEEP_WATER: ReadonlySet<string> = new Set([
+  'frost_queen',
+  'frost_wraith',
+  // Os aquaticos do Aquifero: o Leviata nada por cima (e por baixo) dela, e a
+  // Lampreia vive na lamina — para os dois, um nucleo profundo e casa, e nao
+  // buraco.
+  'sheet_leviathan',
+  'mud_lamprey',
+]);
 
 /**
  * O buraco barra ESTE corpo?
@@ -910,6 +940,12 @@ export const damageEntity = (
   hazard = false,
 ): void => {
   if (!ent.alive) return;
+  // O Leviata FORA DE VISTA nao e alvo: submerso, ou com a cabeca ainda por
+  // baixo da lamina, nenhum caminho de dano o toca — nem tiro, nem fogo, nem
+  // descarga. Nao e armadura (armadura ensina "guarde a municao e espere");
+  // e a ausencia de um corpo para acertar, e o `hit` nem sai, porque nao
+  // houve acerto. A janela e o disco cefalico VISIVEL (ver leviathan.ts).
+  if (ent.archetype === 'sheet_leviathan' && !leviathanTargetable(ent, state.tick)) return;
   if (ent.kind === 'player') {
     const extra = state.playerExtras[ent.slot ?? 0];
     if (extra.iframesUntil > state.tick || extra.downed) return;
@@ -967,9 +1003,7 @@ export const damageEntity = (
   // o nucleo fechado. Rainha cercada de gelo: a couraça E o estrato, e ela cai
   // quando o lago derrete. Arquicantor SEM rede: o inverso de todas — a sala
   // esvaziada o deixa mais FRAGIL, porque a Catedral era a defesa dele.
-  if (ent.archetype === 'sheet_leviathan' && ent.mood === DEVOURER_BURROWED) {
-    amount *= LEVIATHAN_SUBMERGED_ARMOR;
-  }
+
   if (ent.archetype === 'furnace_heart') {
     if (ent.mood === FURNACE_OVERHEATING) amount *= FURNACE_HEART_HOT_ARMOR;
     // Acertar na janela fria E a leitura do encontro: ele nao esta mais duro,
@@ -1043,6 +1077,10 @@ export const damageEntity = (
   if (ent.archetype === 'sheet_leviathan') {
     state.bossRuntime.protectiveBubbles = [];
     state.bossRuntime.leviathanShockAt = -1;
+    state.bossRuntime.leviathanProbeCell = -1;
+    state.bossRuntime.leviathanProbeDeepen = false;
+    state.bossRuntime.leviathanDest = -1;
+    state.bossRuntime.leviathanSurfaceAt = -1;
     ent.action = undefined;
   }
   // A NINHADA nao entra na contagem de abates. O total alimenta o PLACAR, e
@@ -1232,9 +1270,10 @@ export const spawnEnemy = (
     // O Devorador nasce POR BAIXO: a primeira coisa que o jogador ve dele e o
     // rastro de areia, nunca o corpo.
     ...(archetype === 'white_devourer' ? { mood: DEVOURER_BURROWED } : {}),
-    // O Leviata tambem nasce por baixo: a primeira coisa que se ve dele e a
-    // ondulacao. Os tres de ciclo nascem na fase de abertura do proprio ciclo.
-    ...(archetype === 'sheet_leviathan' ? { mood: DEVOURER_BURROWED } : {}),
+    // O Leviata nasce ANCORADO sobre uma poca (populateSector o poe sobre o
+    // nucleo mais proximo): a primeira coisa que se ve dele e o corpo aberto
+    // tampando a agua, e nao uma ondulacao.
+    ...(archetype === 'sheet_leviathan' ? { mood: LEVIATHAN_ANCHORED } : {}),
     ...(archetype === 'lung_matrix' ? { mood: LUNG_INHALING } : {}),
     ...(archetype === 'furnace_heart' ? { mood: FURNACE_OVERHEATING } : {}),
     ...(archetype === 'magnetarch' ? { mood: MAGNET_ATTRACT } : {}),
@@ -1403,7 +1442,11 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
     case 'massive_shock':
       return action;
     case 'erupt':
-      return archetype === 'sheet_leviathan' ? 'breach' : 'erupt';
+      return 'erupt';
+    case 'probe':
+    case 'dive':
+    case 'emerge':
+      return action;
     default:
       return null;
   }
@@ -1744,10 +1787,18 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     return;
   }
   if (action.kind === 'erupt') {
-    if (enemy.archetype === 'sheet_leviathan') leviathanBreach(state, enemy, events);
-    else devourerErupt(state, enemy, events);
+    devourerErupt(state, enemy, events);
     return;
   }
+  if (action.kind === 'probe') {
+    leviathanProbeRelease(state, enemy, events);
+    return;
+  }
+  // O mergulho e a emergencia nao TEM release: a liberacao e o instante em
+  // que os segmentos comecam a entrar (ou sair) da agua, e o `boss_attack`
+  // que ja saiu acima e o som disso. A transicao de postura acontece no fim
+  // da acao, em `leviathanStep`.
+  if (action.kind === 'dive' || action.kind === 'emerge') return;
   if (action.kind === 'massive_shock') {
     leviathanMassiveDischarge(state, enemy, events);
     return;
@@ -2922,7 +2973,6 @@ const broodStep = (
     }
   }
 
-  const w = state.config.width;
   const len = Math.hypot(mx, my);
   if (len >= 0.0001) {
     const step = ARCHETYPES.devourer_brood.speed * dt;
@@ -4836,186 +4886,667 @@ const resonantSoloistBurst = (
 };
 
 /**
- * LEVIATA DO LENCOL: o Devorador do outro elemento.
+ * LEVIATA DO LENCOL: a criatura que atravessa a lamina.
  *
- * Mesma gramatica — mergulha, preve, emerge — com duas diferencas que sao o
- * encontro: ele so anda e so emerge por superficie CONDUTIVA, e o que o para
- * nao e negar o chao, e eletrificar a agua. O atordoamento sai da regra
- * generica de descarga que ja existe; o preco e o meio ficar mortal para quem
- * o parou.
+ * Duas lutas em uma, e o corpo segmentado existe para a costura entre elas.
+ *
+ * PRIMEIRA FASE — "O Lencol por Baixo". Ele nao persegue ninguem. Esta
+ * ANCORADO sobre uma poca profunda, com o corpo aberto tampando o nucleo (o
+ * Prospector nao cai nas celulas que ele cobre), gira devagar para acompanhar
+ * o alvo e solta duas ou tres SONDAGENS ABISSAIS: um canto grave atravessa o
+ * lencol freatico e a pressao rompe o chao sob a posicao prevista do
+ * Prospector — dano, empurrao e uma poca rasa irregular no lugar. Uma segunda
+ * Sondagem sobre uma poca dele AFUNDA o centro e deixa um nucleo profundo com
+ * margem rasa, que passa a ser candidato a proxima emergencia. Depois disso
+ * ele escolhe uma poca valida, telegrafa o mergulho, afunda por segmentos
+ * (cabeca, asas, tronco, cauda), viaja completamente submerso — a posicao
+ * autoritativa so muda quando a cauda sumiu — e emerge por segmentos no
+ * destino. A poca abandonada volta a ser fatal no tick em que a cauda some.
+ *
+ * SEGUNDA FASE — "A Arraia Inteira". Abaixo de DELUGE_HP_FRACTION ele
+ * mergulha, o lencol sobe pelos dutos e pelas pocas, e quando o nivel passa da
+ * cabeca do Prospector ele emerge por completo e passa a NADAR direto na
+ * direcao do alvo. Nunca mais ancora nem teleporta: a descarga massiva e as
+ * duas bolhas protetoras sao o controle de espaco desta fase.
+ *
+ * As posturas sao explicitas (`LEVIATHAN_*` em types.ts) e as regras puras —
+ * quem e alvo, o que a tampa cobre, quem esta dentro da bolha — moram em
+ * leviathan.ts, compartilhadas com o cliente.
  */
-type ProtectiveBubble = { x: number; y: number; radius: number };
 
-const bubblePositionValid = (
-  state: SurvivalState,
-  boss: Entity,
-  bubble: ProtectiveBubble,
-  placed: readonly ProtectiveBubble[],
-  reachable: ReadonlySet<number>,
-): boolean => {
-  const w = state.config.width;
-  const h = state.config.height;
-  if (bubble.x < 2 || bubble.y < 2 || bubble.x >= w - 2 || bubble.y >= h - 2) return false;
-  if (Math.hypot(bubble.x - boss.x, bubble.y - boss.y) < boss.radius + bubble.radius + 0.65)
-    return false;
-  if (
-    placed.some(
-      (other) =>
-        Math.hypot(bubble.x - other.x, bubble.y - other.y) < bubble.radius + other.radius + 0.5,
-    )
-  )
-    return false;
-  if (!reachable.has(Math.floor(bubble.y) * w + Math.floor(bubble.x))) return false;
-  for (
-    let y = Math.floor(bubble.y - bubble.radius);
-    y <= Math.floor(bubble.y + bubble.radius);
-    y++
-  ) {
-    for (
-      let x = Math.floor(bubble.x - bubble.radius);
-      x <= Math.floor(bubble.x + bubble.radius);
-      x++
-    ) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return false;
-      if (
-        Math.hypot(x + 0.5 - bubble.x, y + 0.5 - bubble.y) <= bubble.radius &&
-        state.solid[y * w + x] !== SOLID_NONE
-      )
-        return false;
-    }
-  }
-  return (
-    delugeDepth(state, Math.floor(bubble.y) * w + Math.floor(bubble.x)) >= PROSPECTOR_HEAD_HEIGHT
-  );
+/** Ordem FIXA de vizinhanca: o que torna toda frente de agua determinista. */
+const NEIGHBORS4: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
+/** Um hash inteiro determinista de (celula, sal): a "irregularidade" das pocas. */
+const cellHash = (cell: number, salt: number): number => {
+  let h = Math.imul(cell + 0x9e37, 374761393) ^ Math.imul(salt + 17, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) >>> 0;
 };
 
 /**
- * Dois abrigos deterministas e deliberadamente assimetricos: o primeiro tende
- * a ficar longe do chefe; o segundo, mais perto dele. A rotacao sai da seed e
- * da sequencia do golpe, sem Math.random e sem quebrar replay/network.
+ * O CHAO CAMINHAVEL pelo Prospector a partir de um conjunto de celulas de
+ * origem: aberto, nao profundo, quatro vizinhos. Devolve a distancia
+ * geodesica por celula (-1 = inalcancavel).
+ *
+ * E o mesmo modelo de `floodWalkable` do worldgen, com distancia: as bolhas
+ * precisam saber se um jogador CHEGA nelas em 72 ticks, e a Sondagem precisa
+ * saber se afundar uma poca corta a rota de alguem ate o pedestal.
  */
-const protectiveBubblePositions = (state: SurvivalState, boss: Entity): ProtectiveBubble[] => {
-  const out: ProtectiveBubble[] = [];
+const walkableDistances = (state: SurvivalState, sources: readonly number[]): Int32Array => {
   const w = state.config.width;
-  const reachable = new Set<number>();
+  const h = state.config.height;
+  const dist = new Int32Array(w * h).fill(-1);
   const queue: number[] = [];
-  for (const player of state.players) {
-    const extra = state.playerExtras[player.slot ?? 0];
-    if (!player.alive || !extra.joined || extra.downed) continue;
-    const cell = Math.floor(player.y) * w + Math.floor(player.x);
-    if (!reachable.has(cell)) {
-      reachable.add(cell);
-      queue.push(cell);
-    }
+  for (const cell of sources) {
+    if (cell < 0 || cell >= dist.length || dist[cell] >= 0) continue;
+    if (state.solid[cell] !== SOLID_NONE || state.surface[cell] === SURF_DEEP_WATER) continue;
+    dist[cell] = 0;
+    queue.push(cell);
   }
   for (let head = 0; head < queue.length; head++) {
     const cell = queue[head];
     const x = cell % w;
-    const y = Math.floor(cell / w);
+    const y = (cell - x) / w;
     for (const [dx, dy] of NEIGHBORS4) {
       const nx = x + dx;
       const ny = y + dy;
-      if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= state.config.height - 1) continue;
+      if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
       const next = ny * w + nx;
-      if (reachable.has(next) || state.solid[next] !== SOLID_NONE) continue;
-      reachable.add(next);
+      if (dist[next] >= 0 || state.solid[next] !== SOLID_NONE) continue;
+      if (state.surface[next] === SURF_DEEP_WATER) continue;
+      dist[next] = dist[cell] + 1;
       queue.push(next);
     }
   }
-  const base =
-    (((state.config.seed ^ (state.bossRuntime.leviathanShockSeq * 0x9e3779b9)) >>> 0) % 6283) /
-    1000;
-  const rings = [6.2, 3.4];
-  for (let slot = 0; slot < 2; slot++) {
-    for (let n = 0; n < 40; n++) {
-      const angle = base + slot * 2.17 + n * 2.399963;
-      const radius = rings[slot] + ((n % 5) - 2) * 0.35;
-      const bubble = {
-        x: Math.floor(boss.x + Math.cos(angle) * radius) + 0.5,
-        y: Math.floor(boss.y + Math.sin(angle) * radius) + 0.5,
-        radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
-      };
-      if (!bubblePositionValid(state, boss, bubble, out, reachable)) continue;
-      out.push(bubble);
-      break;
-    }
-  }
-  // Arenas muito recortadas: busca exaustiva, ainda determinista, garante o par.
-  for (let i = 0; out.length < 2 && i < state.surface.length; i++) {
-    const idx = (i * 97 + state.bossRuntime.leviathanShockSeq * 53) % state.surface.length;
-    const bubble = {
-      x: (idx % w) + 0.5,
-      y: Math.floor(idx / w) + 0.5,
-      radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
-    };
-    if (bubblePositionValid(state, boss, bubble, out, reachable)) out.push(bubble);
-  }
-  return out;
+  return dist;
 };
 
-const playerProtectedByBubble = (player: Entity, bubble: ProtectiveBubble): boolean =>
-  Math.hypot(player.x - bubble.x, player.y - bubble.y) + player.radius <= bubble.radius;
+/** A celula sob o centro de um corpo, ou -1 fora do mapa. */
+const cellOf = (state: SurvivalState, x: number, y: number): number => {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  if (cx < 0 || cy < 0 || cx >= state.config.width || cy >= state.config.height) return -1;
+  return cy * state.config.width + cx;
+};
 
-const leviathanMassiveDischarge = (
+/**
+ * As celulas CRITICAS que a Sondagem nunca molha nem afunda: a entrada, o
+ * poco/pedestal (com o fosso funcional em volta), terminais e caches,
+ * ofertas do poco, as bolhas protetoras e jogadores abatidos. `deep` cobre a
+ * versao mais rigorosa (afundar), que ainda exige a prova de rota abaixo.
+ */
+const probeCellForbidden = (state: SurvivalState, cell: number): boolean => {
+  const w = state.config.width;
+  const x = cell % w;
+  const y = (cell - x) / w;
+  if (Math.max(Math.abs(x - state.entry.x), Math.abs(y - state.entry.y)) <= 2) return true;
+  if (Math.hypot(x - state.corePos.x, y - state.corePos.y) <= 3) return true;
+  for (const site of state.salvageSites) {
+    if (Math.max(Math.abs(x - site.terminal.x), Math.abs(y - site.terminal.y)) <= 1) return true;
+    if (Math.max(Math.abs(x - site.cache.x), Math.abs(y - site.cache.y)) <= 1) return true;
+  }
+  for (const offer of state.wellOffers) {
+    if (Math.hypot(x + 0.5 - offer.x, y + 0.5 - offer.y) <= 1.5) return true;
+  }
+  for (const bubble of state.bossRuntime.protectiveBubbles) {
+    if (Math.hypot(x + 0.5 - bubble.x, y + 0.5 - bubble.y) <= bubble.radius + 1) return true;
+  }
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!extra.joined || !player.alive || !extra.downed) continue;
+    if (Math.max(Math.abs(x - Math.floor(player.x)), Math.abs(y - Math.floor(player.y))) <= 1)
+      return true;
+  }
+  return false;
+};
+
+/**
+ * A celula que a Sondagem vai romper, a partir do ponto previsto do alvo, ou
+ * -1. Varredura em anel FIXA em volta da mirada: aberta, nao critica, longe o
+ * bastante do corpo dele (a Sondagem e um ataque A DISTANCIA — a propria poca
+ * nao e alvo) e, depois do teto de bacias novas, de preferencia sobre uma poca
+ * que ELE abriu, para aprofundar em vez de espalhar.
+ */
+const probeTargetCell = (
+  state: SurvivalState,
+  enemy: Entity,
+  aimX: number,
+  aimY: number,
+): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const runtime = state.bossRuntime;
+  const capped = runtime.leviathanPools.length >= LEVIATHAN_MAX_NEW_POOLS;
+  const valid = (x: number, y: number): boolean => {
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) return false;
+    const i = y * w + x;
+    if (state.solid[i] !== SOLID_NONE) return false;
+    // Com o teto de bacias novas atingido, so AGUA que ja existe recebe o
+    // golpe: piso seco viraria uma poca a mais, registrada ou nao.
+    if (capped && state.surface[i] !== SURF_WATER) return false;
+    if (Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y) < LEVIATHAN_PROBE_MIN_RANGE) return false;
+    return !probeCellForbidden(state, i);
+  };
+  const cx = Math.floor(aimX);
+  const cy = Math.floor(aimY);
+  // Teto de bacias novas atingido: se ha uma poca dele perto da mirada, e ela
+  // que recebe o golpe — ampliada ou afundada, nunca uma bacia a mais. Longe
+  // de todas, a varredura abaixo so aceita agua rasa; sem agua ao alcance,
+  // nao ha Sondagem (o chamador tenta o salto).
+  if (capped) {
+    let best = -1;
+    let bestD = LEVIATHAN_PROBE_SEARCH + 3;
+    for (const pool of runtime.leviathanPools) {
+      const px = pool % w;
+      const py = (pool - px) / w;
+      const d = Math.hypot(px - cx, py - cy);
+      if (d < bestD && valid(px, py)) {
+        bestD = d;
+        best = pool;
+      }
+    }
+    if (best >= 0) return best;
+  }
+  for (let r = 0; r <= LEVIATHAN_PROBE_SEARCH; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (valid(cx + dx, cy + dy)) return (cy + dy) * w + (cx + dx);
+      }
+    }
+  }
+  return -1;
+};
+
+/**
+ * Afundar o centro desta poca CORTA uma rota obrigatoria? A prova e a mesma
+ * do worldgen: de cada jogador vivo (e da entrada) ate o pedestal, andando por
+ * chao aberto e nao profundo. Roda com o nucleo ja pintado — quem chama pinta,
+ * pergunta, e desfaz se a resposta for sim.
+ */
+const deepeningCutsRoute = (state: SurvivalState): boolean => {
+  const w = state.config.width;
+  const sources = [state.entry.y * w + state.entry.x];
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!extra.joined || !player.alive) continue;
+    const cell = cellOf(state, player.x, player.y);
+    if (cell >= 0) sources.push(cell);
+  }
+  const fromEntry = walkableDistances(state, [sources[0]]);
+  const core = state.corePos.y * w + state.corePos.x;
+  if (fromEntry[core] < 0) return true;
+  for (let k = 1; k < sources.length; k++) {
+    // Um jogador de pe sobre o corpo do chefe (celula profunda tampada) nao
+    // e fonte valida para o BFS — ele sai pela margem, que continua rasa.
+    if (state.surface[sources[k]] === SURF_DEEP_WATER) continue;
+    if (fromEntry[sources[k]] < 0) return true;
+  }
+  return false;
+};
+
+/**
+ * O IMPACTO da Sondagem no chao, e o que ele deixa.
+ *
+ * Progressivo, e a progressao e o ensino: piso seco vira poca RASA irregular;
+ * poca rasa vira nucleo PROFUNDO com margem rasa (so as celulas cujos quatro
+ * vizinhos ja sao agua afundam, entao a margem e garantida por construcao);
+ * e agua que ja e profunda so ganha margem. Tudo por CONECTIVIDADE a partir
+ * do centro — nada atravessa parede, e nada pinta solido — e tudo
+ * determinista: a forma irregular sai de um hash da celula com o numero da
+ * Sondagem, igual nas duas pontas.
+ *
+ * Devolve `true` se o chao ficou PROFUNDO em alguma celula.
+ */
+const probeImpact = (state: SurvivalState, cell: number, deepen: boolean): boolean => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const runtime = state.bossRuntime;
+  const cx = cell % w;
+  const cy = (cell - cx) / w;
+  const salt = runtime.leviathanProbeSeq;
+  const paintShallow = (i: number): void => {
+    if (probeCellForbidden(state, i)) return;
+    // Cobre chao nu e cinza; nao apaga fogo do jogador nem desfaz gelo.
+    if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+      setSurface(state, i, SURF_WATER, 0);
+    }
+  };
+  // 1) A margem rasa, por frente conexa a partir do centro, com o contorno
+  //    roido pelo hash: uma poca de Sondagem nao e um disco.
+  const start = cell;
+  const seen = new Set<number>([start]);
+  let frontier = [start];
+  if (state.solid[start] === SOLID_NONE) paintShallow(start);
+  for (let step = 1; step <= LEVIATHAN_PROBE_POOL_RADIUS && frontier.length > 0; step++) {
+    const next: number[] = [];
+    for (const from of frontier) {
+      const fx = from % w;
+      const fy = (from - fx) / w;
+      for (const [dx, dy] of NEIGHBORS4) {
+        const x = fx + dx;
+        const y = fy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (seen.has(i) || state.solid[i] !== SOLID_NONE) continue;
+        const d = Math.hypot(x - cx, y - cy);
+        if (d > LEVIATHAN_PROBE_POOL_RADIUS + 0.5) continue;
+        // A borda e dentada: um terco das celulas do anel externo fica seca.
+        if (d > LEVIATHAN_PROBE_POOL_RADIUS - 0.5 && cellHash(i, salt) % 3 === 0) continue;
+        seen.add(i);
+        next.push(i);
+        paintShallow(i);
+      }
+    }
+    frontier = next;
+  }
+  if (!deepen) return false;
+  // 2) O nucleo: uma plus de cinco celulas no centro, so onde a margem existe.
+  const core: number[] = [];
+  for (const [dx, dy] of [[0, 0], ...NEIGHBORS4] as ReadonlyArray<readonly [number, number]>) {
+    const x = cx + dx;
+    const y = cy + dy;
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+    const i = y * w + x;
+    if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_WATER) continue;
+    if (probeCellForbidden(state, i)) continue;
+    const rimmed = [i - 1, i + 1, i - w, i + w].every(
+      (n) =>
+        state.solid[n] !== SOLID_NONE ||
+        state.surface[n] === SURF_WATER ||
+        state.surface[n] === SURF_DEEP_WATER,
+    );
+    if (rimmed) core.push(i);
+  }
+  if (core.length === 0) return false;
+  for (const i of core) setSurface(state, i, SURF_DEEP_WATER, 0);
+  // 3) A prova: um nucleo que corta a rota de alguem ate o pedestal volta a
+  //    ser raso. A Sondagem pressiona; ela nao emparede.
+  if (deepeningCutsRoute(state)) {
+    for (const i of core) setSurface(state, i, SURF_WATER, 0);
+    return false;
+  }
+  return true;
+};
+
+/**
+ * A LIBERACAO da Sondagem: a coluna rompe o chao sob a celula marcada.
+ *
+ * Dano e empurrao a quem esta no raio, o impacto no chao (ver `probeImpact`)
+ * e a contabilidade do ancoradouro. O empurrao anda por `moveEntity`, em
+ * passos curtos, e PARA antes de agua profunda: uma coluna que jogasse alguem
+ * dentro de um nucleo seria a Sondagem matando sem dano, e a regra dela e
+ * pressionar.
+ */
+const leviathanProbeRelease = (
   state: SurvivalState,
   enemy: Entity,
   events: SemanticEvent[],
 ): void => {
-  const bubbles = state.bossRuntime.protectiveBubbles.map((bubble) => ({ ...bubble }));
+  const runtime = state.bossRuntime;
+  const cell = runtime.leviathanProbeCell;
+  runtime.leviathanProbeCell = -1;
+  runtime.leviathanAnchorProbes += 1;
+  runtime.leviathanProbeSeq += 1;
+  enemy.nextActionAt = state.tick + LEVIATHAN_PROBE_INTERVAL_TICKS;
+  if (cell < 0) return;
+  const w = state.config.width;
+  const px = (cell % w) + 0.5;
+  const py = Math.floor(cell / w) + 0.5;
   for (const player of state.players) {
     const extra = state.playerExtras[player.slot ?? 0];
-    if (!player.alive || !extra.joined || extra.downed) continue;
-    if (!bubbles.some((bubble) => playerProtectedByBubble(player, bubble))) {
-      damageEntity(state, player, LEVIATHAN_SHOCK_DAMAGE, events, { kind: 'leviathan_discharge' });
+    if (!player.alive || !extra.joined) continue;
+    const d = Math.hypot(player.x - px, player.y - py);
+    if (d > LEVIATHAN_PROBE_RADIUS) continue;
+    damageEntity(state, player, LEVIATHAN_PROBE_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'sheet_leviathan',
+      elite: enemy.elite,
+    });
+    if (extra.downed) continue;
+    const away = d > 0.05 ? normalized(player.x - px, player.y - py) : { ...enemy.facing };
+    const push = LEVIATHAN_PROBE_PUSH_TILES * (1 - d / LEVIATHAN_PROBE_RADIUS);
+    const steps = 6;
+    for (let k = 0; k < steps; k++) {
+      const nx = player.x + (away.x * push) / steps;
+      const ny = player.y + (away.y * push) / steps;
+      const target = cellOf(state, nx, ny);
+      if (target < 0 || state.surface[target] === SURF_DEEP_WATER) break;
+      moveEntity(state, player, (away.x * push) / steps, (away.y * push) / steps);
     }
   }
-  events.push({
-    t: 'leviathan_discharge',
-    x: enemy.x,
-    y: enemy.y,
-    radius: Math.hypot(state.config.width, state.config.height),
-    bubbles,
-  });
-  state.bossRuntime.protectiveBubbles = [];
-  state.bossRuntime.leviathanShockAt = -1;
-  state.bossRuntime.leviathanShockRecoverAt = state.tick + LEVIATHAN_SHOCK_COOLDOWN_TICKS;
-  // A RECUPERACAO: bolhas escapando e um chamado quebrado, descendente. E o
-  // "o mundo mudou" da descarga — ela ja passou, e ele esta gasto.
-  events.push({
-    t: 'boss_state',
-    archetype: 'sheet_leviathan',
-    state: 'recover',
-    x: enemy.x,
-    y: enemy.y,
-  });
+  const wasDry = state.surface[cell] === SURF_NONE || state.surface[cell] === SURF_SCORCHED;
+  const deepened = probeImpact(state, cell, runtime.leviathanProbeDeepen);
+  runtime.leviathanProbeDeepen = false;
+  if (wasDry && runtime.leviathanPools.length < LEVIATHAN_MAX_NEW_POOLS) {
+    if (!runtime.leviathanPools.includes(cell)) runtime.leviathanPools.push(cell);
+  }
+  events.push({ t: 'pulse', x: px, y: py, radius: LEVIATHAN_PROBE_RADIUS });
+  void deepened;
 };
 
-const startLeviathanMassiveShock = (
+/**
+ * ARMA uma Sondagem: escolhe a celula, decide se ela afunda, e telegrafa nos
+ * dois lugares — no corpo (o canto, via `boss_windup`) e no chao (a marca,
+ * via `probe_marker`). Devolve `false` se nao ha onde bater.
+ */
+const startLeviathanProbe = (
   state: SurvivalState,
   enemy: Entity,
+  player: Entity,
   events: SemanticEvent[],
 ): boolean => {
-  if (
-    state.bossRuntime.leviathanShockAt >= 0 ||
-    state.tick < state.bossRuntime.leviathanShockRecoverAt
-  )
-    return false;
-  state.bossRuntime.leviathanShockSeq++;
-  const bubbles = protectiveBubblePositions(state, enemy);
-  if (bubbles.length !== 2) return false;
-  state.bossRuntime.protectiveBubbles = bubbles;
-  state.bossRuntime.leviathanShockAt = state.tick + LEVIATHAN_SHOCK_WINDUP_TICKS;
+  const runtime = state.bossRuntime;
+  const aimX = player.x + player.vx * LEVIATHAN_PROBE_LEAD_SECONDS;
+  const aimY = player.y + player.vy * LEVIATHAN_PROBE_LEAD_SECONDS;
+  const cell = probeTargetCell(state, enemy, aimX, aimY);
+  if (cell < 0) return false;
+  const w = state.config.width;
+  // AFUNDA se a mirada caiu em agua rasa e o centro pode virar nucleo com
+  // margem: a segunda Sondagem sobre a mesma poca e a que muda a arena.
+  const deepen =
+    state.surface[cell] === SURF_WATER &&
+    [cell - 1, cell + 1, cell - w, cell + w].every(
+      (n) =>
+        state.solid[n] !== SOLID_NONE ||
+        state.surface[n] === SURF_WATER ||
+        state.surface[n] === SURF_DEEP_WATER,
+    );
+  runtime.leviathanProbeCell = cell;
+  runtime.leviathanProbeDeepen = deepen;
+  const windup = deepen ? LEVIATHAN_PROBE_DEEPEN_WINDUP_TICKS : LEVIATHAN_PROBE_WINDUP_TICKS;
+  const px = (cell % w) + 0.5;
+  const py = Math.floor(cell / w) + 0.5;
+  const toward = normalized(px - enemy.x, py - enemy.y);
   startAction(
     state,
     enemy,
-    'massive_shock',
+    'probe',
+    toward,
+    windup,
+    LEVIATHAN_PROBE_RECOVERY_TICKS,
+    events,
+    player.id,
+    deepen ? 1 : 0.5,
+  );
+  events.push({
+    t: 'probe_marker',
+    x: px,
+    y: py,
+    radius: LEVIATHAN_PROBE_RADIUS,
+    releaseTick: state.tick + windup,
+    deepen,
+  });
+  return true;
+};
+
+/**
+ * A POCA DE DESTINO, escolhida de forma determinista.
+ *
+ * Candidatos sao centros de poca ocupaveis (`isPoolCore`: profunda, com os
+ * quatro vizinhos em agua) cujo nucleo cabe debaixo da manta, a uma distancia
+ * do ancoradouro atual entre o salto minimo e o maximo, longe de todo jogador
+ * vivo, com os 3x3 abertos para o corpo emergir sem atravessar parede. Entre
+ * os validos, o melhor e o que fica mais longe do Prospector — ele emerge
+ * para atacar A DISTANCIA — com um desempate por hash da celula e do numero
+ * do salto, que e o que da VARIEDADE sem sorteio.
+ */
+const leviathanPickDestination = (state: SurvivalState, enemy: Entity): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const here = cellOf(state, enemy.x, enemy.y);
+  const live: Entity[] = [];
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (player.alive && extra.joined && !extra.downed) live.push(player);
+  }
+  let best = -1;
+  let bestScore = -Infinity;
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      const i = y * w + x;
+      if (state.surface[i] !== SURF_DEEP_WATER || i === here) continue;
+      const hop = Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y);
+      if (hop < LEVIATHAN_HOP_MIN_TILES || hop > LEVIATHAN_HOP_MAX_TILES) continue;
+      if (!isPoolCore(state, i)) continue;
+      if (!occupiablePool(state, i)) continue;
+      let open = true;
+      for (let dy = -1; dy <= 1 && open; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (state.solid[(y + dy) * w + (x + dx)] !== SOLID_NONE) {
+            open = false;
+            break;
+          }
+        }
+      }
+      if (!open) continue;
+      let nearest = Infinity;
+      for (const player of live) {
+        nearest = Math.min(nearest, Math.hypot(player.x - (x + 0.5), player.y - (y + 0.5)));
+      }
+      if (nearest < LEVIATHAN_HOP_MIN_PLAYER_DIST) continue;
+      const score =
+        Math.min(nearest, 12) + (cellHash(i, state.bossRuntime.leviathanProbeSeq) % 1000) / 1000;
+      if (score > bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+  }
+  return best;
+};
+
+/**
+ * O nucleo desta poca CABE debaixo da manta? Todas as celulas profundas
+ * 4-conexas ao centro tem de estar a ate `LEVIATHAN_LID_RADIUS` dele — senao
+ * o corpo aberto deixaria uma borda fatal fora da tampa, escondida debaixo de
+ * uma asa. Uma cisterna natural grande nao e ancoradouro; a plus de cinco que
+ * a Sondagem afunda e.
+ */
+const occupiablePool = (state: SurvivalState, center: number): boolean => {
+  const w = state.config.width;
+  const cx = (center % w) + 0.5;
+  const cy = Math.floor(center / w) + 0.5;
+  const seen = new Set<number>([center]);
+  const queue = [center];
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head];
+    const x = cell % w;
+    const y = (cell - x) / w;
+    if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > LEVIATHAN_LID_RADIUS) return false;
+    for (const [dx, dy] of NEIGHBORS4) {
+      const n = (y + dy) * w + (x + dx);
+      if (n < 0 || n >= state.surface.length || seen.has(n)) continue;
+      if (state.surface[n] !== SURF_DEEP_WATER) continue;
+      seen.add(n);
+      queue.push(n);
+    }
+  }
+  return true;
+};
+
+/**
+ * COMECA o mergulho. `dest` e a celula central da poca de destino, ou -1 para
+ * "afunda aqui e fica" (o Diluvio). O aviso e o windup; a descida e a
+ * recuperacao; a tampa dura ate o fim (ver `leviathanLidActive`).
+ */
+const startLeviathanDive = (
+  state: SurvivalState,
+  enemy: Entity,
+  dest: number,
+  events: SemanticEvent[],
+): void => {
+  state.bossRuntime.leviathanDest = dest;
+  state.bossRuntime.leviathanSurfaceAt = -1;
+  enemy.mood = LEVIATHAN_DIVING;
+  startAction(
+    state,
+    enemy,
+    'dive',
     enemy.facing,
-    LEVIATHAN_SHOCK_WINDUP_TICKS,
-    LEVIATHAN_SHOCK_RECOVERY_TICKS,
+    LEVIATHAN_DIVE_TELEGRAPH_TICKS,
+    LEVIATHAN_DIVE_TICKS,
     events,
   );
-  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 5 });
-  return true;
+};
+
+/**
+ * O FIM do mergulho: a cauda sumiu. A poca abandonada volta a ser fatal
+ * agora, a posicao salta para o destino (ninguem ve o salto — nao ha um
+ * segmento visivel), e a poca de destino comeca a borbulhar.
+ */
+const leviathanSubmerged = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const runtime = state.bossRuntime;
+  const w = state.config.width;
+  events.push({
+    t: 'boss_state',
+    archetype: 'sheet_leviathan',
+    state: 'submerged',
+    x: enemy.x,
+    y: enemy.y,
+  });
+  enemy.mood = LEVIATHAN_HIDDEN;
+  enemy.vx = 0;
+  enemy.vy = 0;
+  const dest = runtime.leviathanDest;
+  if ((runtime.phasesFired & BOSS_PHASE_DELUGE) !== 0) {
+    // O Diluvio: ele fica onde esta, por baixo, ate o nivel passar da cabeca
+    // do Prospector. `leviathanSurfaceAt` negativo = "espera a agua".
+    runtime.leviathanSurfaceAt = -1;
+    return;
+  }
+  if (dest >= 0) {
+    const dx = (dest % w) + 0.5;
+    const dy = Math.floor(dest / w) + 0.5;
+    const hop = Math.hypot(dx - enemy.x, dy - enemy.y);
+    enemy.x = dx;
+    enemy.y = dy;
+    runtime.leviathanSurfaceAt =
+      state.tick + LEVIATHAN_TRAVEL_TICKS_BASE + Math.round(hop * LEVIATHAN_TRAVEL_TICKS_PER_TILE);
+    events.push({
+      t: 'boss_state',
+      archetype: 'sheet_leviathan',
+      state: 'surfacing',
+      x: dx,
+      y: dy,
+    });
+    return;
+  }
+  // Sem destino (nao devia acontecer: quem mergulha escolheu antes) ele
+  // ressurge onde estava, depois do intervalo minimo.
+  runtime.leviathanSurfaceAt = state.tick + LEVIATHAN_TRAVEL_TICKS_BASE;
+};
+
+/** COMECA a emergencia, na posicao atual. */
+const startLeviathanEmerge = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+  ticks: number,
+): void => {
+  enemy.mood = LEVIATHAN_EMERGING;
+  state.bossRuntime.leviathanSurfaceAt = -1;
+  startAction(state, enemy, 'emerge', enemy.facing, LEVIATHAN_EMERGE_HALO_TICKS, ticks, events);
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2.2 });
+};
+
+/**
+ * O FIM da emergencia: o corpo terminou de ocupar a poca (ou, depois do
+ * Diluvio, terminou de sair inteiro). A tampa volta AQUI e nao antes.
+ */
+const leviathanEmerged = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const runtime = state.bossRuntime;
+  runtime.leviathanDest = -1;
+  runtime.leviathanSurfaceAt = -1;
+  events.push({
+    t: 'boss_state',
+    archetype: 'sheet_leviathan',
+    state: 'emerged',
+    x: enemy.x,
+    y: enemy.y,
+  });
+  if ((runtime.phasesFired & BOSS_PHASE_DELUGE) !== 0) {
+    enemy.mood = LEVIATHAN_HUNTING;
+    enemy.nextActionAt = state.tick + LEVIATHAN_ANCHOR_SETTLE_TICKS;
+    return;
+  }
+  enemy.mood = LEVIATHAN_ANCHORED;
+  enemy.vx = 0;
+  enemy.vy = 0;
+  runtime.leviathanAnchorProbes = 0;
+  enemy.nextActionAt = state.tick + LEVIATHAN_ANCHOR_SETTLE_TICKS;
+};
+
+/**
+ * Quantas Sondagens ESTE ancoradouro solta: duas ou tres, alternando de
+ * forma determinista pelo numero do ancoradouro (o total de Sondagens menos
+ * as deste).
+ */
+const probesThisAnchor = (state: SurvivalState): number => {
+  const runtime = state.bossRuntime;
+  const anchorSeq = runtime.leviathanProbeSeq - runtime.leviathanAnchorProbes;
+  return (
+    LEVIATHAN_PROBES_MIN +
+    (cellHash(anchorSeq, 7) % (LEVIATHAN_PROBES_MAX - LEVIATHAN_PROBES_MIN + 1))
+  );
+};
+
+/** Gira o rumo devagar na direcao do alvo, sem translacao. */
+const leviathanTurnToward = (enemy: Entity, player: Entity, dt: number): void => {
+  const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const have = Math.atan2(enemy.facing.y, enemy.facing.x);
+  let delta = want - have;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const step = LEVIATHAN_TURN_RATE * dt;
+  const next = have + Math.max(-step, Math.min(step, delta));
+  enemy.facing = { x: Math.cos(next), y: Math.sin(next) };
+};
+
+/**
+ * O TICK CONDUZIDO PELA ACAO: roda enquanto o Leviata esta no meio de uma
+ * Sondagem, de um mergulho, de uma emergencia ou da carga da descarga — o
+ * fluxo de IA (`leviathanStep`) fica atras do portao de acao e nao ve nada
+ * disto.
+ *
+ * Duas coisas moram aqui porque nao podem esperar a acao acabar: o DILUVIO
+ * (cruzou o limiar no meio de uma Sondagem — ela e cancelada com seguranca e
+ * o mergulho comeca) e a JANELA DE DANO, que abre e fecha no meio do mergulho
+ * e da emergencia e precisa ser ANUNCIADA no tick em que muda. A transicao e
+ * detectada comparando a exposicao deste tick com a do anterior — funcao pura
+ * do tick, entao as duas maquinas anunciam no mesmo instante.
+ */
+const leviathanActionStride = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  if (state.bossRuntime.awake) leviathanDeluge(state, enemy, events);
+  const action = enemy.action;
+  if (!action) return;
+  if (action.kind === 'dive' || action.kind === 'emerge') {
+    const before = leviathanTargetable({ ...enemy, action }, state.tick - 1);
+    const now = leviathanTargetable(enemy, state.tick);
+    if (before !== now) {
+      events.push({
+        t: 'boss_vulnerable',
+        archetype: 'sheet_leviathan',
+        x: enemy.x,
+        y: enemy.y,
+        open: now,
+      });
+    }
+  }
+  if (enemy.mood === LEVIATHAN_HUNTING) {
+    enemy.vx = 0;
+    enemy.vy = 0;
+  }
 };
 
 const leviathanStep = (
@@ -5025,143 +5556,163 @@ const leviathanStep = (
   dt: number,
   events: SemanticEvent[],
 ): void => {
+  const runtime = state.bossRuntime;
+  // Nenhuma postura da primeira fase anda: `vx`/`vy` sao zerados todo tick e
+  // so a cacada os escreve, para o proprio cliente ler deslocamento de agua.
+  enemy.vx = 0;
+  enemy.vy = 0;
+  // O DILUVIO e a primeira coisa que ele consulta, e nao um ramo do ciclo:
+  // uma carta que muda o mapa nao pode ficar esperando a fase certa para
+  // sair. Cruzou o limiar com o encontro em curso, ela sai.
+  if (runtime.awake) {
+    leviathanDeluge(state, enemy, events);
+    // A virada pode ter COMECADO um mergulho agora mesmo: a acao esta no
+    // telegrafo, a tampa ainda vale, e os ramos abaixo so leem posturas cuja
+    // acao JA VENCEU. Sem esta saida o mergulho recem-aberto era tratado como
+    // acabado no mesmo tick — a tampa sumia debaixo do jogador sem o aviso
+    // de 26 ticks, e o corpo nunca afundava por segmentos.
+    if (enemy.action) return;
+  }
+  const delugeFired = (runtime.phasesFired & BOSS_PHASE_DELUGE) !== 0;
+
+  // O mergulho ACABOU (a acao venceu neste tick): a cauda sumiu.
+  if (enemy.mood === LEVIATHAN_DIVING) {
+    leviathanSubmerged(state, enemy, events);
+    return;
+  }
+  // A emergencia ACABOU: o corpo ocupou a poca (ou saiu inteiro).
+  if (enemy.mood === LEVIATHAN_EMERGING) {
+    leviathanEmerged(state, enemy, events);
+    return;
+  }
+
+  if (enemy.mood === LEVIATHAN_HIDDEN) {
+    // A PRESENCA: chamados longos, graves e espacados, de algo enorme
+    // navegando fora da camera. O canto CALA durante a carga da descarga.
+    if (runtime.leviathanShockAt < 0 && state.tick % LEVIATHAN_CALL_INTERVAL_TICKS === 0) {
+      events.push({
+        t: 'boss_state',
+        archetype: 'sheet_leviathan',
+        state: 'call',
+        x: enemy.x,
+        y: enemy.y,
+      });
+    }
+    if (delugeFired) {
+      // Espera o NIVEL: so quando a agua passa da cabeca do Prospector (na
+      // celula dele proprio, que e onde a poca central ferve) ele sobe
+      // inteiro. Ate la o lencol e que esta trabalhando.
+      const here = cellOf(state, enemy.x, enemy.y);
+      if (here >= 0 && delugeDepth(state, here) >= PROSPECTOR_HEAD_HEIGHT) {
+        startLeviathanEmerge(state, enemy, events, LEVIATHAN_DELUGE_EMERGE_TICKS);
+      }
+      return;
+    }
+    if (runtime.leviathanSurfaceAt >= 0 && state.tick >= runtime.leviathanSurfaceAt) {
+      startLeviathanEmerge(state, enemy, events, LEVIATHAN_EMERGE_TICKS);
+    }
+    return;
+  }
+
+  if (enemy.mood === LEVIATHAN_HUNTING) {
+    leviathanHunt(state, enemy, player, dt, events);
+    return;
+  }
+
+  // ANCORADO. Parado sobre a poca, corpo aberto: tampa, alvo, Sondagem.
+  if (!player) return;
+  if (!diverEngaged(state, enemy, player, LEVIATHAN_ANCHOR_SETTLE_TICKS, events)) return;
+  leviathanTurnToward(enemy, player, dt);
+  if (delugeFired) {
+    // A virada: ele mergulha na propria poca e espera o lencol subir.
+    startLeviathanDive(state, enemy, -1, events);
+    return;
+  }
+  if (state.tick < enemy.nextActionAt) return;
+  if (runtime.leviathanAnchorProbes < probesThisAnchor(state)) {
+    if (startLeviathanProbe(state, enemy, player, events)) return;
+    // Sem onde bater (arena de pedra, alvo emparedado): tenta o salto.
+  }
+  const dest = leviathanPickDestination(state, enemy);
+  if (dest >= 0) {
+    startLeviathanDive(state, enemy, dest, events);
+    return;
+  }
+  // Sem poca valida para onde ir, ele continua sondando — e cada Sondagem
+  // sobre uma poca dele e um destino a mais no mapa. A pressao nao para.
+  if (!startLeviathanProbe(state, enemy, player, events)) {
+    enemy.nextActionAt = state.tick + LEVIATHAN_PROBE_INTERVAL_TICKS;
+  }
+};
+
+/**
+ * A CACADA da segunda fase: nadar direto no alvo, corpo inteiro fora.
+ *
+ * `moveEntity` continua valendo — parede e parede, mesmo submersa — e a agua
+ * profunda nao o barra (`CROSSES_DEEP_WATER`). Contato quando encosta;
+ * descarga massiva quando o alvo esta submerso e a recarga permite. Durante a
+ * carga ele PARA (a acao segura o corpo) e depois da recuperacao volta a
+ * nadar.
+ */
+const leviathanHunt = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  if (!player) return;
   const w = state.config.width;
-  // O DILUVIO e a primeira coisa que ele consulta, e nao um ramo do mergulho:
-  // uma carta que muda o mapa nao pode ficar esperando a fase certa do ciclo
-  // para sair. Cruzou o limiar com o encontro em curso, ela sai.
-  if (player && state.bossRuntime.awake) leviathanDeluge(state, enemy, events);
   if (
-    player &&
     delugeDepth(state, Math.floor(player.y) * w + Math.floor(player.x)) >= PROSPECTOR_HEAD_HEIGHT
   ) {
     if (startLeviathanMassiveShock(state, enemy, events)) return;
   }
-  if (enemy.mood === DEVOURER_SURFACED) {
-    if (state.tick >= enemy.nextActionAt) {
-      enemy.mood = DEVOURER_BURROWED;
-      enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
-      return;
-    }
-    if (!player) return;
-    const toward = normalized(player.x - enemy.x, player.y - enemy.y);
-    enemy.facing = { ...toward };
-    const def = ARCHETYPES.sheet_leviathan;
-    if (
-      distTo(enemy, player) < enemy.radius + player.radius + 0.2 &&
-      state.tick >= enemy.contactReadyAt
-    ) {
-      enemy.contactReadyAt = state.tick + def.contactCooldown;
-      startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
-      return;
-    }
-    moveEntity(
-      state,
-      enemy,
-      toward.x * LEVIATHAN_SURFACE_SPEED * dt,
-      toward.y * LEVIATHAN_SURFACE_SPEED * dt,
-    );
-    return;
-  }
-
-  if (!player) return;
-  if (!diverEngaged(state, enemy, player, LEVIATHAN_DIVE_MIN_TICKS, events)) return;
-  // A PRESENCA: chamados longos, graves e espacados, de algo enorme
-  // navegando fora da camera. O canto CALA durante a carga da descarga — o
-  // silencio subito e parte do aviso, e por isso o portao esta aqui e nao no
-  // cliente.
-  if (state.bossRuntime.leviathanShockAt < 0 && state.tick % LEVIATHAN_CALL_INTERVAL_TICKS === 0) {
-    events.push({
-      t: 'boss_state',
-      archetype: 'sheet_leviathan',
-      state: 'call',
-      x: enemy.x,
-      y: enemy.y,
-    });
-  }
   const toward = normalized(player.x - enemy.x, player.y - enemy.y);
   enemy.facing = { ...toward };
-  // Submerso ele anda pela LAMINA, e nao pelo chao: passos que continuem em
-  // agua. Sem lamina para onde ir ele guarda a margem — que e exatamente a
-  // leitura que o jogador precisa ter dele.
-  // Submerso no proprio elemento, ele desliza um pouco mais rapido — e nada em
-  // QUALQUER lugar, que e o presente de verdade do Diluvio.
-  const step =
-    LEVIATHAN_SWIM_SPEED * dt * (delugeFront(state) >= 0 ? LEVIATHAN_DELUGE_SPEED_SCALE : 1);
-  const wet = (mx: number, my: number): boolean => {
-    const i = Math.floor(enemy.y + my) * w + Math.floor(enemy.x + mx);
-    return i >= 0 && i < state.surface.length && isConductiveCell(state, i);
-  };
-  const sx = toward.x * step;
-  const sy = toward.y * step;
-  if (wet(sx, sy)) moveEntity(state, enemy, sx, sy);
-  else if (wet(sx, 0)) moveEntity(state, enemy, sx, 0);
-  else if (wet(0, sy)) moveEntity(state, enemy, 0, sy);
-
-  if (state.tick < enemy.nextActionAt) return;
-  const leadX = player.x + player.vx * LEVIATHAN_LEAD_SECONDS;
-  const leadY = player.y + player.vy * LEVIATHAN_LEAD_SECONDS;
-  const spot = leviathanBreachSpot(state, Math.floor(leadX), Math.floor(leadY));
-  if (spot < 0) {
-    // Sem agua sob o alvo ele nao tem por onde subir. Nao e um contra-jogo
-    // ativo como o vidro do Devorador — e o terreno seco do proprio Aquifero,
-    // e saber onde ele NAO alcanca e metade de atravessar o setor.
-    //
-    // Metade, e nao a luta inteira: negada a emergencia, ele EMPURRA a lamina
-    // para o lado do alvo. Ver `leviathanSurge`.
-    enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
-    leviathanSurge(state, enemy, player, events);
+  const def = ARCHETYPES.sheet_leviathan;
+  if (
+    distTo(enemy, player) < enemy.radius + player.radius + 0.2 &&
+    state.tick >= enemy.contactReadyAt
+  ) {
+    enemy.contactReadyAt = state.tick + def.contactCooldown;
+    startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
     return;
   }
-  enemy.x = (spot % w) + 0.5;
-  enemy.y = Math.floor(spot / w) + 0.5;
-  startAction(state, enemy, 'erupt', toward, LEVIATHAN_BREACH_WINDUP_TICKS, 6, events, player.id);
+  const speed = LEVIATHAN_SWIM_SPEED * (delugeFront(state) >= 0 ? LEVIATHAN_DELUGE_SPEED_SCALE : 1);
+  enemy.vx = toward.x * speed;
+  enemy.vy = toward.y * speed;
+  moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
 };
 
 /**
- * A ENCHENTE: negada a emergencia, o lencol AVANCA.
- *
- * O que ela conserta: sem ela, chao seco nao atrasava o Leviata, apagava o
- * Leviata. Ele so anda e so emerge por superficie condutiva, entao um jogador
- * de pe em rocha seca fora do alcance da lamina nao tinha o que esquivar —
- * ficava atirando num chefe de 800 de vida sem uma unica resposta possivel. O
- * playtest resumiu em duas palavras: facil de kitar.
- *
- * O que ela NAO e: um golpe. Ela nao causa dano, nao tem telegrafo e nao mira.
- * Ela move a FRONTEIRA — o refugio de agora e o territorio dele daqui a pouco,
- * e a pressao que isso cria e a de ter de continuar recuando para um mapa que
- * esta encolhendo. Um chefe de aquifero avanca alagando; e o unico verbo que
- * ele tem.
- *
- * O preco e simetrico e e o que a mantem justa: a agua dele conduz nos dois
- * sentidos. Quem deixa a enchente chegar recebe junto o chao em que a propria
- * descarga o atordoa — a mesma materia e a ameaca e a ferramenta.
- *
- * Pinta so sobre chao limpo ou cinza, pela mesma regra do rastro do Devorador:
- * um chefe que sobrescrevesse gelo, fogo ou vidro estaria apagando decisao do
- * jogador com o proprio corpo.
- */
-/**
  * O DILUVIO: a carta unica do Leviata, e a virada do encontro.
  *
- * Uma vez, sob PRESSAO — e a ordem importa. A primeira metade da luta e
- * territorial: chao seco o atrasa, a enchente incremental avanca tile a tile, e
- * o jogador aprende que o mapa e o assunto. O Diluvio e a resposta do Aquifero
- * a quem venceu esse jogo: ele para de disputar margem e levanta o lencol
- * inteiro. Depois dele nao ha margem, e a pergunta do encontro troca de "onde
- * ele NAO alcanca" para "de onde eu solto a corrente".
+ * Uma vez, sob PRESSAO. A primeira fase e territorial: ele ancora, sonda,
+ * abre pocas e viaja por baixo. O Diluvio e a resposta do Aquifero a quem
+ * venceu esse jogo: ele para de disputar poca a poca e levanta o lencol
+ * inteiro — dutos, pocas naturais e pocas que ele abriu ressoam juntos, e a
+ * transicao vende que todas eram manifestacoes do mesmo lencol. Depois dele
+ * nao ha margem, ele emerge por completo e a pergunta do encontro troca de
+ * "onde ele vai reaparecer" para "de onde eu solto a corrente".
  *
- * E ele NAO e so um buff. Quem alaga o setor inteiro entrega ao jogador um
- * condutor do tamanho do setor inteiro — e o Leviata e o unico chefe do jogo
- * que a propria descarga atordoa. A carta que o liberta e a mesma que o expoe;
- * o que decide quem ganha o troco e a distancia (ver DELUGE_SHOCK_FULL_RANGE).
+ * A Sondagem em curso e CANCELADA com seguranca (marca apagada, `action_end`
+ * para o cliente): um chefe que terminasse um golpe enquanto o mapa vira
+ * outro estaria em dois encontros ao mesmo tempo.
  *
- * `phasesFired` guarda que ela ja saiu: uma fase de uma vez nao volta atras nem
- * se o chefe for curado, e o bit ja viaja no snapshot e ja entra no hash.
+ * `phasesFired` guarda que ela ja saiu: uma fase de uma vez nao volta atras
+ * nem se o chefe for curado, e o bit ja viaja no snapshot e ja entra no hash.
  */
 const leviathanDeluge = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   if ((state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE) !== 0) return;
   if (enemy.maxHp <= 0 || enemy.hp / enemy.maxHp > DELUGE_HP_FRACTION) return;
   state.bossRuntime.phasesFired |= BOSS_PHASE_DELUGE;
+  if (enemy.action?.kind === 'probe') {
+    enemy.action = undefined;
+    state.bossRuntime.leviathanProbeCell = -1;
+    state.bossRuntime.leviathanProbeDeepen = false;
+    events.push({ t: 'action_end', entity: enemy.id });
+  }
   // A subida comeca DEPOIS do telegrafo: `delugeAt` no futuro deixa
   // `delugeFront` negativo ate la, entao a regra e a apresentacao concordam
   // sozinhas sobre o instante em que o setor comeca a submergir.
@@ -5188,119 +5739,201 @@ const leviathanDeluge = (state: SurvivalState, enemy: Entity, events: SemanticEv
     y: enemy.y,
     releaseTick: state.bossRuntime.delugeAt,
   });
+  // Se ele esta ANCORADO e livre, mergulha ja; nos outros estados o ciclo
+  // cuida (o mergulho em curso termina em HIDDEN e espera a agua; a
+  // emergencia em curso termina em ANCHORED e mergulha no tick seguinte).
+  if (enemy.mood === LEVIATHAN_ANCHORED && !enemy.action) {
+    startLeviathanDive(state, enemy, -1, events);
+  }
 };
 
-/** Ordem FIXA de vizinhanca: o que torna a frente da enchente determinista. */
-const NEIGHBORS4: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
+// ---------------------------------------------------------------------------
+// AS BOLHAS PROTETORAS e a DESCARGA MASSIVA — a segunda fase.
+// ---------------------------------------------------------------------------
 
-const leviathanSurge = (
+/**
+ * Uma bolha e valida aqui?
+ *
+ * Longe do corpo dele e das outras; centro sobre chao aberto e NAO profundo,
+ * com a area segura inteira livre de solido e de agua profunda (uma bolha com
+ * um nucleo dentro seria um abrigo em que se morre de outra coisa); submersa
+ * de verdade (o Diluvio ja passou da cabeca ali); e ALCANCAVEL: a
+ * distancia geodesica caminhavel a partir de pelo menos um jogador vivo cabe
+ * nos 72 ticks de carga, e — no co-op — cada jogador vivo tem pelo menos uma
+ * bolha ao alcance (ver `protectiveBubblePositions`).
+ */
+const bubblePositionValid = (
+  state: SurvivalState,
+  boss: Entity,
+  bubble: ProtectiveBubble,
+  placed: readonly ProtectiveBubble[],
+  reach: Int32Array,
+): boolean => {
+  const w = state.config.width;
+  const h = state.config.height;
+  if (bubble.x < 2 || bubble.y < 2 || bubble.x >= w - 2 || bubble.y >= h - 2) return false;
+  if (Math.hypot(bubble.x - boss.x, bubble.y - boss.y) < boss.radius + bubble.radius + 0.65)
+    return false;
+  if (
+    placed.some(
+      (other) =>
+        Math.hypot(bubble.x - other.x, bubble.y - other.y) < bubble.radius + other.radius + 0.5,
+    )
+  )
+    return false;
+  const center = Math.floor(bubble.y) * w + Math.floor(bubble.x);
+  if (reach[center] < 0 || reach[center] > LEVIATHAN_BUBBLE_REACH_TILES) return false;
+  for (
+    let y = Math.floor(bubble.y - bubble.radius);
+    y <= Math.floor(bubble.y + bubble.radius);
+    y++
+  ) {
+    for (
+      let x = Math.floor(bubble.x - bubble.radius);
+      x <= Math.floor(bubble.x + bubble.radius);
+      x++
+    ) {
+      if (x < 0 || y < 0 || x >= w || y >= h) return false;
+      if (Math.hypot(x + 0.5 - bubble.x, y + 0.5 - bubble.y) > bubble.radius + 0.5) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE || state.surface[i] === SURF_DEEP_WATER) return false;
+    }
+  }
+  return delugeDepth(state, center) >= PROSPECTOR_HEAD_HEIGHT;
+};
+
+/**
+ * Dois abrigos deterministas e deliberadamente assimetricos: o primeiro tende
+ * a ficar longe do chefe; o segundo, mais perto dele. A rotacao sai da seed e
+ * da sequencia do golpe, sem Math.random e sem quebrar replay/network.
+ *
+ * O ALCANCE e por jogador: o primeiro abrigo e medido a partir do primeiro
+ * jogador vivo e o segundo a partir do ultimo (no solo sao o mesmo), entao no
+ * co-op cada um tem uma bolha a que consegue chegar. A busca exaustiva de
+ * reserva percorre o mapa em ordem determinista quando os aneis nao servem.
+ */
+const protectiveBubblePositions = (state: SurvivalState, boss: Entity): ProtectiveBubble[] => {
+  const out: ProtectiveBubble[] = [];
+  const w = state.config.width;
+  const live: number[] = [];
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    const cell = cellOf(state, player.x, player.y);
+    if (cell >= 0) live.push(cell);
+  }
+  if (live.length === 0) return out;
+  const reaches = [
+    walkableDistances(state, [live[0]]),
+    walkableDistances(state, [live[live.length - 1]]),
+  ];
+  const base =
+    (((state.config.seed ^ (state.bossRuntime.leviathanShockSeq * 0x9e3779b9)) >>> 0) % 6283) /
+    1000;
+  const rings = [6.2, 3.4];
+  for (let slot = 0; slot < 2; slot++) {
+    for (let n = 0; n < 40; n++) {
+      const angle = base + slot * 2.17 + n * 2.399963;
+      const radius = rings[slot] + ((n % 5) - 2) * 0.35;
+      const bubble = {
+        x: Math.floor(boss.x + Math.cos(angle) * radius) + 0.5,
+        y: Math.floor(boss.y + Math.sin(angle) * radius) + 0.5,
+        radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
+      };
+      if (!bubblePositionValid(state, boss, bubble, out, reaches[slot])) continue;
+      out.push(bubble);
+      break;
+    }
+    if (out.length !== slot + 1) {
+      // Arenas muito recortadas: busca exaustiva, ainda determinista.
+      for (let i = 0; i < state.surface.length; i++) {
+        const idx = (i * 97 + state.bossRuntime.leviathanShockSeq * 53) % state.surface.length;
+        const bubble = {
+          x: (idx % w) + 0.5,
+          y: Math.floor(idx / w) + 0.5,
+          radius: LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS,
+        };
+        if (bubblePositionValid(state, boss, bubble, out, reaches[slot])) {
+          out.push(bubble);
+          break;
+        }
+      }
+    }
+  }
+  return out;
+};
+
+const leviathanMassiveDischarge = (
   state: SurvivalState,
   enemy: Entity,
-  player: Entity,
   events: SemanticEvent[],
 ): void => {
-  if (state.tick < enemy.rangedReadyAt) return;
-  enemy.rangedReadyAt = state.tick + LEVIATHAN_SURGE_COOLDOWN_TICKS;
-  const w = state.config.width;
-  const h = state.config.height;
-  const dir = normalized(player.x - enemy.x, player.y - enemy.y);
-  let raised = 0;
-  // A lamina avanca por CONECTIVIDADE, e nao por distancia.
-  //
-  // A primeira versao tracava faixas retas e so pulava a celula solida; a
-  // segunda interrompia a faixa na parede. As duas vazavam, e a segunda vazava
-  // de um jeito instrutivo: com o eixo chefe->alvo na diagonal, o deslocamento
-  // perpendicular da faixa ja punha a origem dela quase em cima da parede, e o
-  // primeiro passo caía do outro lado sem nunca amostrar a coluna solida. Uma
-  // parede transversal fechada nao segurava nada — e o chefe depois emergia
-  // atras dela, no unico lugar que o jogador tinha escolhido por ser
-  // inalcancavel.
-  //
-  // Uma frente em largura a partir do CORPO dele nao tem esse buraco: cada
-  // celula so entra se um vizinho aberto ja estiver molhado, que e como agua
-  // anda de verdade. O corredor (a frente do eixo, dentro da meia-largura) e o
-  // que a mantem uma investida dirigida em vez de uma bolha.
-  //
-  // Deterministica: a fronteira e um array em ordem de insercao e os vizinhos
-  // saem em ordem fixa. Duas maquinas da mesma sala alagam as MESMAS celulas.
-  const sx = Math.floor(enemy.x);
-  const sy = Math.floor(enemy.y);
-  const seen = new Set<number>([sy * w + sx]);
-  let frontier = [sy * w + sx];
-  for (let step = 1; step <= LEVIATHAN_SURGE_LENGTH && frontier.length > 0; step++) {
-    const next: number[] = [];
-    for (const cell of frontier) {
-      const cx = cell % w;
-      const cy = (cell - cx) / w;
-      for (const [dx, dy] of NEIGHBORS4) {
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
-        const i = y * w + x;
-        if (seen.has(i)) continue;
-        if (state.solid[i] !== SOLID_NONE) continue;
-        const ox = x + 0.5 - enemy.x;
-        const oy = y + 0.5 - enemy.y;
-        if (ox * dir.x + oy * dir.y <= 0) continue;
-        if (Math.abs(ox * -dir.y + oy * dir.x) > LEVIATHAN_SURGE_WIDTH) continue;
-        seen.add(i);
-        next.push(i);
-        // Superficie ocupada nao recebe agua, mas CONDUZ a frente adiante: uma
-        // poca de biofluido no caminho nao e uma barragem.
-        if (state.surface[i] !== SURF_NONE && state.surface[i] !== SURF_SCORCHED) continue;
-        // AGUA NATIVA (timer zero), e nao agua com contagem regressiva.
-        //
-        // Agua com timer tem semantica fechada no motor: e agua DERRETIDA DE
-        // GELO, e `stepCells` a devolve como `SURF_ICE` quando a contagem
-        // acaba. Reutiliza-la aqui teria feito a enchente virar gelo permanente
-        // no Aquifero — e gelo nao e condutivo, ou seja, a correcao teria
-        // acabado desligando o Leviata de novo, setenta segundos depois e longe
-        // da causa.
-        //
-        // A lamina que sobe e a mesma materia de que os lagos do estrato sao
-        // feitos, e lago nao tem prazo. O que limita a enchente nao e um
-        // relogio, e a propria condicao que a dispara: ela so sai quando a
-        // emergencia foi NEGADA, e para no instante em que a agua alcanca o
-        // alvo. Ela avanca ate resolver o problema dela e nao um metro alem.
-        setSurface(state, i, SURF_WATER, 0);
-        raised++;
-      }
+  const bubbles = state.bossRuntime.protectiveBubbles.map((bubble) => ({ ...bubble }));
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    // O MESMO predicado que o desenho, o HUD e o som usam: se a apresentacao
+    // confirmou "dentro" neste tick, a simulacao nao cobra.
+    if (!insideAnyBubble(player.x, player.y, bubbles)) {
+      damageEntity(state, player, LEVIATHAN_SHOCK_DAMAGE, events, { kind: 'leviathan_discharge' });
     }
-    frontier = next;
   }
-  // So anuncia o que ACONTECEU: uma investida contra uma parede nao levantou
-  // lamina nenhuma, e um pulso ali prometeria ao jogador um avanco que ele nao
-  // vai encontrar no chao.
-  if (raised > 0) events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2.5 });
+  events.push({
+    t: 'leviathan_discharge',
+    x: enemy.x,
+    y: enemy.y,
+    radius: Math.hypot(state.config.width, state.config.height),
+    bubbles,
+  });
+  state.bossRuntime.protectiveBubbles = [];
+  state.bossRuntime.leviathanShockAt = -1;
+  state.bossRuntime.leviathanShockRecoverAt = state.tick + LEVIATHAN_SHOCK_COOLDOWN_TICKS;
+  // A RECUPERACAO: bolhas escapando e um chamado quebrado, descendente. E o
+  // "o mundo mudou" da descarga — ela ja passou, e ele esta gasto.
+  events.push({
+    t: 'boss_state',
+    archetype: 'sheet_leviathan',
+    state: 'recover',
+    x: enemy.x,
+    y: enemy.y,
+  });
 };
 
-/** Agua aberta mais proxima do ponto mirado, ou -1. Varredura em anel fixa. */
-const leviathanBreachSpot = (state: SurvivalState, cx: number, cy: number): number => {
-  const w = state.config.width;
-  const h = state.config.height;
-  for (let r = 0; r <= LEVIATHAN_BREACH_SEARCH; r++) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
-        const i = y * w + x;
-        if (state.solid[i] !== SOLID_NONE) continue;
-        // `isConductiveCell` e nao `isConductiveSurface`: depois do Diluvio o
-        // setor inteiro e lamina, e ele emerge onde quiser. E exatamente essa a
-        // virada que a carta unica dele compra.
-        if (!isConductiveCell(state, i)) continue;
-        return i;
-      }
-    }
-  }
-  return -1;
+/**
+ * A CARGA da descarga massiva. So na cacada (segunda fase): a primeira fase
+ * nao tem bolhas nem descarga global — ela tem a Sondagem. Sem o pulso
+ * generico: o telegrafo desta carga e o corpo inteiro (linhas condutivas
+ * acendendo da cauda a cabeca, asas rigidas), e um anel de pulso ao lado
+ * disso seria um segundo aviso concorrendo com o primeiro.
+ */
+const startLeviathanMassiveShock = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): boolean => {
+  if (enemy.mood !== LEVIATHAN_HUNTING) return false;
+  if (
+    state.bossRuntime.leviathanShockAt >= 0 ||
+    state.tick < state.bossRuntime.leviathanShockRecoverAt
+  )
+    return false;
+  state.bossRuntime.leviathanShockSeq++;
+  const bubbles = protectiveBubblePositions(state, enemy);
+  if (bubbles.length !== 2) return false;
+  state.bossRuntime.protectiveBubbles = bubbles;
+  state.bossRuntime.leviathanShockAt = state.tick + LEVIATHAN_SHOCK_WINDUP_TICKS;
+  enemy.vx = 0;
+  enemy.vy = 0;
+  startAction(
+    state,
+    enemy,
+    'massive_shock',
+    enemy.facing,
+    LEVIATHAN_SHOCK_WINDUP_TICKS,
+    LEVIATHAN_SHOCK_RECOVERY_TICKS,
+    events,
+  );
+  return true;
 };
 
 /**
@@ -6156,69 +6789,6 @@ const magnetarchStep = (
   }
 };
 
-/**
- * A EMERGENCIA do Leviata: ele rompe a lamina sob o alvo.
- *
- * Nao abre sumidouro como o Devorador — nao ha o que desabar debaixo de agua.
- * O que ele faz e DESLOCAR: o golpe espalha a lamina para os lados, e a poca
- * cresce. Cada emergencia deixa o Aquifero um pouco mais condutivo, o que
- * torna eletrifica-lo mais tentador e mais perigoso ao mesmo tempo.
- */
-const leviathanBreach = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
-  const w = state.config.width;
-  const h = state.config.height;
-  const cx = Math.floor(enemy.x);
-  const cy = Math.floor(enemy.y);
-  // A poca cresce por CONECTIVIDADE, pela mesma razao da enchente: o esguicho
-  // carimbava um disco e so pulava a celula solida, entao a agua deslocada
-  // aparecia do outro lado de uma parede que ela nunca atravessou. Isso nao era
-  // so estranho de olhar — era uma cadeia: aquela agua virava ponto de
-  // emergencia valido, e o chefe passava a romper o chao atras da barreira que
-  // o jogador tinha escolhido justamente por ser inalcancavel.
-  const start = cy * w + cx;
-  const seen = new Set<number>([start]);
-  let frontier = [start];
-  const splash = (i: number): void => {
-    // Agua deslocada cobre chao nu e cinza; nao apaga fogo do jogador nem
-    // desfaz gelo — as duas coisas sao decisoes de alguem.
-    if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
-      setSurface(state, i, SURF_WATER, 0);
-    }
-  };
-  if (state.solid[start] === SOLID_NONE) splash(start);
-  for (let step = 1; step <= LEVIATHAN_BREACH_RADIUS && frontier.length > 0; step++) {
-    const next: number[] = [];
-    for (const cell of frontier) {
-      const fx = cell % w;
-      const fy = (cell - fx) / w;
-      for (const [dx, dy] of NEIGHBORS4) {
-        const x = fx + dx;
-        const y = fy + dy;
-        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
-        const i = y * w + x;
-        if (seen.has(i) || state.solid[i] !== SOLID_NONE) continue;
-        if (Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y) > LEVIATHAN_BREACH_RADIUS) continue;
-        seen.add(i);
-        next.push(i);
-        splash(i);
-      }
-    }
-    frontier = next;
-  }
-  for (const player of state.players) {
-    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
-    if (distTo(enemy, player) > LEVIATHAN_BREACH_RADIUS) continue;
-    damageEntity(state, player, LEVIATHAN_BREACH_DAMAGE, events, {
-      kind: 'enemy_contact',
-      archetype: 'sheet_leviathan',
-      elite: enemy.elite,
-    });
-  }
-  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: LEVIATHAN_BREACH_RADIUS });
-  enemy.mood = DEVOURER_SURFACED;
-  enemy.nextActionAt = state.tick + LEVIATHAN_SURFACE_TICKS;
-};
-
 /** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
 const hasModule = (state: SurvivalState, module: number): boolean =>
   (state.bossRuntime.modulesLost & (1 << module)) === 0;
@@ -6636,6 +7206,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         enemy.action.phase !== 'windup'
       ) {
         archcantorChainStride(state, enemy, events);
+      }
+      // O LEVIATA no meio de uma acao: a Sondagem, o mergulho, a emergencia
+      // ou a carga. Nada dele drifta — ancorado ele nao se mexe, e a janela de
+      // dano abre e fecha AQUI, no meio da acao (ver `leviathanActionStride`).
+      else if (enemy.archetype === 'sheet_leviathan') {
+        leviathanActionStride(state, enemy, events);
       } else if (enemy.archetype === 'frost_wraith') {
         // O bote do Espectro: o impulso de sempre, e depois dele o passo que
         // resolve o contato (ver `frostWraithLungeStride`).

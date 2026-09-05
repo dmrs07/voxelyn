@@ -433,14 +433,14 @@ chefe, a alavanca que a própria geologia já tem. É a mesma regra do bestiári
 assinatura, e vale ainda mais aqui — um chefe que trouxesse mecânica própria seria um
 chefe que poderia estar em qualquer mapa.
 
-| Chefe                   | Estrato             | A alavanca                                                                        | O contra-jogo                                                                                      |
-| ----------------------- | ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Arquicantor**         | Catedral Prismática | rege: quatro Ressonantes em órbita cardinal, e todo cristal ao alcance descarrega | romper a órbita para abrir ângulo, **e** esvaziar a sala — a Catedral é a luz e o recurso do setor |
-| **Leviatã do Lençol**   | Aquífero Negro      | só anda e só emerge por superfície condutiva                                      | o terreno seco, e eletrificar a água (que fica mortal para você também)                            |
-| **Pulmão-Matriz**       | Fenda Sulfurosa     | inspira o gás da câmara, expele em outra direção                                  | **incendiar a expiração** — a única janela de dano que o jogador abre                              |
-| **Coração da Fornalha** | Fornalha Abissal    | ciclo térmico; setores da arena acendem em sequência                              | estar no lugar certo quando ele esfria                                                             |
-| **Rainha da Geada**     | Cripta Glacial      | a couraça é o gelo em volta; Espectros como extensões                             | derreter o lago — e a água que sobra conduz nos dois sentidos                                      |
-| **Magnetarca**          | Estrato Ferrífero   | polaridade alterna: atrai, depois repele                                          | achar a **faixa**, que troca de lado a cada ciclo                                                  |
+| Chefe                   | Estrato             | A alavanca                                                                                                             | O contra-jogo                                                                                                   |
+| ----------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Arquicantor**         | Catedral Prismática | rege: quatro Ressonantes em órbita cardinal, e todo cristal ao alcance descarrega                                      | romper a órbita para abrir ângulo, **e** esvaziar a sala — a Catedral é a luz e o recurso do setor              |
+| **Leviatã do Lençol**   | Aquífero Negro      | ancora sobre uma poça profunda e **tampa** o núcleo; a Sondagem Abissal abre e afunda poças; viaja por baixo do lençol | sair do centro marcado, não ficar sobre o corpo quando ele mergulha, e — depois do Dilúvio — eletrificar a água |
+| **Pulmão-Matriz**       | Fenda Sulfurosa     | inspira o gás da câmara, expele em outra direção                                                                       | **incendiar a expiração** — a única janela de dano que o jogador abre                                           |
+| **Coração da Fornalha** | Fornalha Abissal    | ciclo térmico; setores da arena acendem em sequência                                                                   | estar no lugar certo quando ele esfria                                                                          |
+| **Rainha da Geada**     | Cripta Glacial      | a couraça é o gelo em volta; Espectros como extensões                                                                  | derreter o lago — e a água que sobra conduz nos dois sentidos                                                   |
+| **Magnetarca**          | Estrato Ferrífero   | polaridade alterna: atrai, depois repele                                                                               | achar a **faixa**, que troca de lado a cada ciclo                                                               |
 
 Notas de desenho que valem registrar:
 
@@ -462,6 +462,65 @@ Notas de desenho que valem registrar:
   filhotes, e nascem com vida parcial.
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
   (fogo, descarga, explosão) as esqueça.
+
+### O Leviatã do Lençol em duas fases (`SIMULATION_VERSION` 59)
+
+Spec própria: `docs/superpowers/specs/2026-09-05-survival-aquifero-leviata-lencol.md`.
+
+O encontro conta duas histórias. Na **primeira fase** ele não persegue ninguém: é uma
+criatura **estacionária** que ocupa uma poça profunda com o corpo aberto por cima —
+uma **tampa viva**: `plungeIntoDeepWater` ignora as células profundas que ele cobre
+(`leviathanCovers`, derivado da posição, do raio autorado da silhueta e da grade),
+enquanto ele está ancorado e durante o mergulho até a cauda sumir. Ele gira devagar
+para acompanhar o Prospector, solta duas ou três **Sondagens Abissais** (um canto
+grave atravessa o lençol e a pressão rompe o chão sob a posição prevista: dano,
+empurrão e uma poça rasa irregular; a segunda sobre a mesma poça **afunda** o centro
+e deixa um núcleo profundo com margem rasa, que passa a ser destino), escolhe
+deterministicamente uma poça válida, telegrafa, **afunda por segmentos** (cabeça,
+asas, tronco, cauda), viaja completamente submerso — a posição só muda quando nada
+dele é visível; escondido ele **não é alvo** — e emerge por segmentos no destino.
+A poça abandonada volta a ser fatal no tick em que a cauda some.
+
+Abaixo de `DELUGE_HP_FRACTION` vem a virada: a Sondagem em curso é cancelada, ele
+mergulha, dutos e poças ressoam, o Dilúvio enche a sala, e quando o nível passa da
+cabeça do Prospector ele emerge **inteiro** em `hunting` — nunca mais ancora nem
+teleporta. A **segunda fase** é a arraia inteira nadando direto no Prospector, com o
+corpo seguindo as curvas da cabeça; a descarga massiva e as duas bolhas protetoras
+pertencem a ela.
+
+O corpo é **uma raia, não uma cobra**: o rastro por comprimento de arco ganhou um
+coeficiente de rigidez (`TrailConfig.stiffness`, 0,72 no Leviatã, 0 no Devorador,
+que não mudou). A cabeça é o vetor, a raiz das asas herda o rumo dela e cada elo só
+desvia do anterior até 12° — o corpo vira do tronco para trás, sem serpentear. As
+peças do corpo têm **oito rumos** (`part-sheet-leviathan-wings` e
+`part-sheet-leviathan-tail`, `dirFromFacing8`): os quatro eixos do mundo e as quatro
+diagonais, que na tela são a horizontal e a vertical — um corpo nadando na vertical
+com peças só nos eixos empilhava oito quadros `dr` e lia como escada. Os rumos
+intermediários são o mesmo modelo voxel girado meio passo e re-rasterizado
+(`rotatedVoxels`).
+
+E ele é **largo e do fundo**: pouco mais de quatro tiles de vão, dorso quase preto e
+ventre pálido — contra a água escura o que se lê é a orla clara das pontas das asas,
+o brilho molhado da borda de ataque, os olhos, os poros e as linhas condutivas — e,
+por baixo da lâmina, uma **massa** escura sem borda desenhada sob cada peça, só sobre
+água, que persiste enquanto ele afunda: o corpo parece maior do que o que rompe a
+superfície.
+
+As posturas são explícitas (`LEVIATHAN_ANCHORED/DIVING/HIDDEN/EMERGING/HUNTING`;
+`charging` é derivada). O Aquífero ganhou **bacias** geradas por erosão (margem rasa
+garantida por construção, núcleo `SURF_DEEP_WATER` permanente que nunca entra em
+`iceHoles`), e a arena karst escava cinco poças ocupáveis. Leviatã e Lampreia
+atravessam água profunda; terrestres continuam barrados.
+
+**As bolhas** têm um contrato de raio único: `bubble.radius` é o raio seguro para o
+**centro** do Prospector e `playerProtectedByBubble` é o único predicado — dano,
+HUD, som, renderer e testes. O defeito anterior era geométrico: a regra subtraía o
+raio do corpo (área segura de 1,01 tile) enquanto o domo desenhava `R·TILE_W` numa
+elipse errada, e o jogador morria dentro do desenho. O anel do chão usa a projeção
+correta (`R·TILE_W/2·√2`, `R·TILE_H/2·√2`); a casca visual é `bubbleShellRadius`.
+Bolhas nascem sobre chão utilizável (nunca sobre água profunda), a distância
+caminhável de cada jogador vivo, e viajam por quadro (`BossFrame` no cliente online,
+`bossRuntime` por retrato no solo) — a mesma linha do tempo dos corpos.
 
 ### A Rainha da Geada e o gelo que RACHA (`SIMULATION_VERSION` 56)
 
@@ -669,7 +728,10 @@ Duas notas de implementação:
   que o dano entrou inteiro (ou que a alavanca cobrou). A do Magnetarca é a única que
   marca uma **ausência** de dano — porque ali o entendimento é exatamente não ter sido
   cobrado.
-- A do Leviatã mora nos **três** caminhos de atordoamento por descarga (`run.ts`), e
+- A do Leviatã só é alcançável na **segunda fase**: na primeira ele está ancorado
+  sobre a poça e viaja por baixo do lençol, e o que se aprende ali é sair do centro
+  marcado da Sondagem Abissal. Ela mora nos **três** caminhos de atordoamento por
+  descarga (`run.ts`), e
   não num deles: o contra-jogo é "eletrificar a água", não "eletrificar a água com
   aquele módulo específico".
 

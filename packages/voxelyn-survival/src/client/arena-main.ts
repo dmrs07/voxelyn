@@ -43,6 +43,12 @@ import {
   arenaFrostReadout,
   type FrostScenario,
 } from './arena-frost-debug';
+import {
+  LEVIATHAN_SCENARIOS,
+  applyLeviathanScenario,
+  leviathanReadout,
+  type LeviathanScenario,
+} from './arena-leviathan-debug';
 
 const FROST_SCENARIO_LABELS: Record<FrostScenario, string> = {
   clear: 'Medidor vazio',
@@ -95,6 +101,9 @@ const frostPanel = document.getElementById('frost-panel') as HTMLDivElement;
 const frostReadout = document.getElementById('frost-readout') as HTMLDivElement;
 const frostButtons = document.getElementById('frost-buttons') as HTMLDivElement;
 const frostFastDecay = document.getElementById('frost-fast-decay') as HTMLInputElement;
+const leviathanPanel = document.getElementById('leviathan-panel') as HTMLDivElement;
+const leviathanReadoutEl = document.getElementById('leviathan-readout') as HTMLDivElement;
+const leviathanButtons = document.getElementById('leviathan-buttons') as HTMLDivElement;
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
@@ -185,6 +194,65 @@ for (const scenario of FROST_SCENARIOS) {
   });
   frostButtons.appendChild(button);
 }
+// ---------------------------------------------------------------------------
+// O painel do Leviata: cada postura do ciclo e a leitura exata do encontro
+// (arena-leviathan-debug.ts). Os botoes agem sobre a run ATIVA.
+// ---------------------------------------------------------------------------
+const LEVIATHAN_SCENARIO_LABELS: Record<LeviathanScenario, string> = {
+  anchor: 'ancorar',
+  faceN: 'rumo N',
+  faceE: 'rumo E',
+  faceS: 'rumo S',
+  faceW: 'rumo W',
+  probeDry: 'Sondagem (piso seco)',
+  probeDeepen: 'Sondagem (aprofundar)',
+  standOnLid: 'jogador sobre a tampa',
+  stepOff: 'jogador ao lado, em piso seco',
+  dive: 'mergulho',
+  hidden: 'viagem escondida',
+  emerge: 'emergência',
+  deluge: 'Dilúvio',
+  hunting: 'perseguição',
+  charge: 'carga da descarga',
+  bubbleIn: 'jogador dentro da bolha',
+  bubbleEdge: 'jogador na borda',
+  bubbleOut: 'jogador fora',
+};
+for (const scenario of LEVIATHAN_SCENARIOS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = LEVIATHAN_SCENARIO_LABELS[scenario];
+  button.dataset.scenario = scenario;
+  button.addEventListener('click', () => {
+    if (!activeFrostState) return;
+    applyLeviathanScenario(activeFrostState, scenario);
+  });
+  leviathanButtons.appendChild(button);
+}
+const LEVIATHAN_READOUT_INTERVAL_MS = 100;
+let leviathanReadoutAt = -1;
+const updateLeviathanPanel = (state: SurvivalState, nowMs: number): void => {
+  if (leviathanReadoutAt >= 0 && nowMs - leviathanReadoutAt < LEVIATHAN_READOUT_INTERVAL_MS) return;
+  leviathanReadoutAt = nowMs;
+  const r = leviathanReadout(state);
+  if (!r) {
+    leviathanReadoutEl.innerHTML = '<div>sem Leviatã em campo</div>';
+    return;
+  }
+  const rows: string[] = [
+    `postura <b>${r.posture}</b>`,
+    `exposição <b>${Math.round(r.exposure * 100)}%</b> ${r.targetable ? '<span class="danger">alvo</span>' : '<span class="safe">fora de alcance</span>'}`,
+    `tampa <b>${r.lidCells}</b> células`,
+    `Sondagens <b>${r.anchorProbes}</b> aqui / <b>${r.probeSeq}</b> total`,
+    `marca <b>${r.probeCell >= 0 ? (r.probeDeepen ? 'afunda' : 'rasa') : '—'}</b>`,
+    `poças abertas <b>${r.pools}</b>`,
+    `destino <b>${r.dest >= 0 ? r.dest : '—'}</b>${r.surfaceIn !== null ? ` emerge em <b>${r.surfaceIn}</b>` : ''}`,
+    `Dilúvio <b>${r.deluged ? 'sim' : 'não'}</b>`,
+    `descarga <b>${r.shockIn !== null ? `em ${r.shockIn} ticks` : '—'}</b> · bolhas <b>${r.bubbles}</b>`,
+    `bolha: <b class="${r.insideBubble ? 'safe' : 'danger'}">${r.insideBubble ? 'PROTEGIDO' : 'exposto'}</b>${r.bubbleMargin !== null ? ` (${r.bubbleMargin >= 0 ? '+' : ''}${r.bubbleMargin.toFixed(2)})` : ''}`,
+  ];
+  leviathanReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
+};
 const FROST_READOUT_INTERVAL_MS = 100;
 let frostReadoutAt = -1;
 const updateFrostPanel = (state: SurvivalState, nowMs: number): void => {
@@ -333,8 +401,10 @@ const runArena = (conditions: ArenaConditions): void => {
   // zeros permanentes tapando um canto da tela.
   icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   frostPanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
+  leviathanPanel.classList.toggle('hidden', conditions.boss !== 'sheet_leviathan');
   icePanelAt = -1;
   frostReadoutAt = -1;
+  leviathanReadoutAt = -1;
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
@@ -442,6 +512,7 @@ const runArena = (conditions: ArenaConditions): void => {
       updateIcePanel(state, now);
       updateFrostPanel(state, now);
     }
+    if (conditions.boss === 'sheet_leviathan') updateLeviathanPanel(state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {

@@ -72,11 +72,28 @@ export const dirFromFacing = (fx: number, fy: number): string => {
   return 'ur';
 };
 
+/**
+ * Os oito rumos de uma peca, em setores de 45 graus no plano da TELA, na
+ * ordem do angulo: `r` centrado em 0 (a direita da tela), `dr` em 45, `d` em
+ * 90 (para baixo), e assim por diante. Os quatro rumos de `dirFromFacing` sao
+ * os mesmos quadros aqui — o que muda e que cada um passa a valer so nos 45
+ * graus em volta do proprio centro, e as diagonais do mundo (a horizontal e a
+ * vertical da tela) ganham quadro proprio.
+ */
+export const DIRS8_BY_ANGLE = ['r', 'dr', 'd', 'dl', 'l', 'ul', 'u', 'ur'] as const;
+
+/** Map a world-space facing vector to one of the eight authored facings. */
+export const dirFromFacing8 = (fx: number, fy: number): string => {
+  const angle = Math.atan2(fx + fy, fx - fy);
+  const sector = Math.round(angle / (Math.PI / 4));
+  return DIRS8_BY_ANGLE[((sector % 8) + 8) % 8];
+};
+
 export const resolveFrame = (
   manifest: SpriteManifestEntry,
   animation: string,
   direction: string,
-  frame: number
+  frame: number,
 ): FrameRect => {
   const useAnim = manifest.animations[animation] ? animation : Object.keys(manifest.animations)[0];
   const flip = Boolean(manifest.flipPairs[direction]);
@@ -102,9 +119,10 @@ export const resolveFrame = (
 export const frameAtTime = (
   manifest: SpriteManifestEntry,
   animation: string,
-  elapsedMs: number
+  elapsedMs: number,
 ): number => {
-  const def = manifest.animations[animation] ?? manifest.animations[Object.keys(manifest.animations)[0]];
+  const def =
+    manifest.animations[animation] ?? manifest.animations[Object.keys(manifest.animations)[0]];
   const index = Math.floor((Math.max(0, elapsedMs) / 1000) * def.fps);
   return def.loop ? index % def.frames : Math.min(index, def.frames - 1);
 };
@@ -152,6 +170,15 @@ export const CHARACTER_SPRITE_IDS = [
   'part-devourer-brood',
   'enemy-archcantor',
   'enemy-sheet-leviathan',
+  // O CORPO do Leviata, um corte transversal por quadro (raiz das asas,
+  // membranas, tronco, pedunculo, cauda). `part-` pela mesma razao do anel do
+  // Devorador: nao e um bicho, e uma peca que o cliente pendura atras da
+  // cabeca — numa pose autorada quando ele esta ancorado, no rastro da cabeca
+  // quando caca. Os quadros sao POSTOS, do mais largo ao mais fino, em oito
+  // rumos, e em DOIS atlas — as asas e a cauda — porque um atlas tem um
+  // tamanho de quadro so e a cauda nao pode pagar o quadro das asas.
+  'part-sheet-leviathan-wings',
+  'part-sheet-leviathan-tail',
   'enemy-lung-matrix',
   'enemy-furnace-heart',
   'enemy-frost-queen',

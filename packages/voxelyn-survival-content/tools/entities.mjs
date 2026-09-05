@@ -17,8 +17,20 @@ import {
 // nenhuma chamada, e o lint do repositorio ja os acusava.
 import { fillDiamond, fillEllipse, fillRect, grid, outlineWith, set, thickLine } from './lib.mjs';
 
-export const ANIM_ORDER = ['idle', 'walk', 'attack', 'special', 'hit', 'downed', 'revive', 'die', 'fly', 'burst'];
+export const ANIM_ORDER = [
+  'idle',
+  'walk',
+  'attack',
+  'special',
+  'hit',
+  'downed',
+  'revive',
+  'die',
+  'fly',
+  'burst',
+];
 const DIRS = ['dr', 'dl', 'ur', 'ul'];
+const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
 
 // ---------------------------------------------------------------------------
 // player-prospector — SHEET COMPLETO do bot PX
@@ -35,7 +47,7 @@ const DIRS = ['dr', 'dl', 'ur', 'ul'];
 // `hit`, `die`, `downed` e `revive` —, e por ser o caminho de recuo enquanto os
 // tres atlas de camada nao carregaram.
 // ---------------------------------------------------------------------------
-const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
+const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3, r: 4, d: 5, l: 6, u: 7 };
 
 /**
  * Progresso da morte, de 0 (corpo ainda inteiro, no frame do golpe) a 1 (so
@@ -55,7 +67,8 @@ const prospectorStanding = (pose) => {
 const prospectorModel = (anim, f) => {
   if (anim === 'idle') return prospectorStanding({ bob: [0, 0, 1, 0][f % 4] });
   if (anim === 'walk') return prospectorStanding({ swing: WALK_SWING[f % WALK_FRAMES] });
-  if (anim === 'attack') return prospectorStanding({ kick: [0, 2, 1, 0][f % 4], flash: f % 4 === 1 });
+  if (anim === 'attack')
+    return prospectorStanding({ kick: [0, 2, 1, 0][f % 4], flash: f % 4 === 1 });
   // dano: recuo real do tronco e da cabeca, nao um pixel de bob
   if (anim === 'hit') return prospectorStanding({ lean: [1, 0][f % 2], bob: [1, 0][f % 2] });
   // queda: dois frames tombando, depois o corpo ja no chao assentando
@@ -83,7 +96,7 @@ const prospectorFrame = (dir, anim, f) =>
     PROSPECTOR_FRAME_WIDTH,
     PROSPECTOR_FRAME_HEIGHT,
     PROSPECTOR_RENDER_ANCHOR_X,
-    PROSPECTOR_RENDER_ANCHOR_Y
+    PROSPECTOR_RENDER_ANCHOR_Y,
   );
 
 // ---------------------------------------------------------------------------
@@ -133,7 +146,8 @@ const stalkerModel = (anim, f) => {
   b.push(box(3, -1.5 - lunge, 4.5, 0.5, 0.5, 0.5, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const stalkerFrame = (dir, anim, f) =>
+  renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-spitter 32x32 — anfibio fungico bojudo, garganta acida, olhos em haste
@@ -181,7 +195,8 @@ const spitterModel = (anim, f) => {
   b.push(box(2, -1, 6 + z, 1, 1, 1, 'biolum'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const spitterFrame = (dir, anim, f) =>
+  renderVoxels(spitterModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-spore-bomber 32x32 — encapuzado, olho unico, pod que incha antes de estourar
@@ -224,7 +239,8 @@ const bomberModel = (anim, f) => {
   b.push(box(1, 4, 3.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const bomberFrame = (dir, anim, f) =>
+  renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-bruiser 48x56 — geodo de ombros largos, placas palidas, nucleo eletrico
@@ -294,7 +310,10 @@ const bruiserModel = (anim, f) => {
   const armRaise = anim === 'special' ? Math.min(10, hurlLift) : slam;
   const fistL = armRaise + (anim === 'walk' ? Math.max(0, -step) : 0);
   const fistR = armRaise + (anim === 'walk' ? Math.max(0, step) : 0);
-  for (const [side, fist] of [[-1, fistL], [1, fistR]]) {
+  for (const [side, fist] of [
+    [-1, fistL],
+    [1, fistR],
+  ]) {
     const ox = side < 0 ? -6 : 3.5; // ombro
     const fx = side < 0 ? -7.5 : 4.5; // punho
     const ax = side < 0 ? -7 : 5; // antebraco
@@ -329,7 +348,8 @@ const bruiserModel = (anim, f) => {
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 96, 136, 44, 124);
+const bruiserFrame = (dir, anim, f) =>
+  renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 96, 136, 44, 124);
 
 // ---------------------------------------------------------------------------
 // enemy-guardian 96x112 — a cidadela-montanha que anda (concept ANOMALIA
@@ -443,8 +463,8 @@ export const guardianModel = (anim, f) => {
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 112, 128, 52, 116);
-
+const guardianFrame = (dir, anim, f) =>
+  renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 112, 128, 52, 116);
 
 // ---------------------------------------------------------------------------
 // enemy-bishop 56x76 — clerigo fungico: torre de manto, mitra, baculo, raizes
@@ -467,8 +487,18 @@ const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR
 // chao, que e o que as raizes sao.
 // ---------------------------------------------------------------------------
 const BISHOP_ROOTS = [
-  [-6, -4], [-5, 2], [-3, -5], [-2, 4], [2, -5], [3, 4], [5, -3], [6, 1],
-  [-7, 0], [7, -1], [-4, 5], [4, -6],
+  [-6, -4],
+  [-5, 2],
+  [-3, -5],
+  [-2, 4],
+  [2, -5],
+  [3, 4],
+  [5, -3],
+  [6, 1],
+  [-7, 0],
+  [7, -1],
+  [-4, 5],
+  [4, -6],
 ];
 
 const bishopModel = (anim, f) => {
@@ -499,7 +529,11 @@ const bishopModel = (anim, f) => {
 
   // Cogumelos na bainha: brotos de meio-passo com chapeu palido, no arco onde
   // a cortina toca o chao. Tres, e nao um tapete — o tapete e o chao do mapa.
-  for (const [mx, my] of [[-4.5, -4], [3.5, -4.5], [5, -2]]) {
+  for (const [mx, my] of [
+    [-4.5, -4],
+    [3.5, -4.5],
+    [5, -2],
+  ]) {
     b.push(box(mx, my, 0, 0.5, 0.5, 1, 'rust'));
     b.push(box(mx - 0.5, my - 0.5, 1, 1, 1, 0.5, 'bone'));
   }
@@ -577,7 +611,8 @@ const bishopModel = (anim, f) => {
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 112, 124, 52, 108);
+const bishopFrame = (dir, anim, f) =>
+  renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 112, 124, 52, 108);
 
 // ---------------------------------------------------------------------------
 // enemy-fungal-horse 64x48 — Corcel: o unico quadrupede HORIZONTAL do bestiario
@@ -836,7 +871,8 @@ const horseModel = (anim, f) => {
 // diagonal do modelo, e o enquadramento tem de acompanhar. O ancoradouro segue a
 // mesma regra de antes (centro na largura, seis pixels acima da base), entao a
 // criatura continua assentando no mesmo ponto do chao.
-const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 160, 168, 80, 156);
+const horseFrame = (dir, anim, f) =>
+  renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 160, 168, 80, 156);
 
 // ---------------------------------------------------------------------------
 // enemy-miner 48x60 — automato de extracao abandonado
@@ -894,7 +930,10 @@ const minerModel = (anim, f) => {
 
   // PERNAS digitigradas e ESCURAS, encostadas no quadril: sem vao entre elas e
   // o corpo, senao voltam a parecer postes plantados ao lado de um tronco.
-  for (const [lx, phase] of [[-3, step], [1, -step]]) {
+  for (const [lx, phase] of [
+    [-3, step],
+    [1, -step],
+  ]) {
     const lift = Math.max(0, phase);
     b.push(box(lx, -0.5, lift, 2, 3, 1, 'rockDeep')); // pe comprido
     b.push(box(lx, 0.5, 1 + lift, 2, 2, 4, 'rockDeep')); // canela (recuada)
@@ -927,9 +966,14 @@ const minerModel = (anim, f) => {
   // livre, que e onde moram a veia azul e o chassi.
   b.push(box(-3.5, 0.5, 16 + up, 7, 3, 2, 'rockDeep')); // ombreira
   const shroud = [
-    [-3.5, 1, 5, 'rockDeep'], [-2.5, 2.5, 8, 'scorch'], [-1.5, 3, 5, 'rockDeep'],
-    [-0.5, 3.5, 7, 'scorch'], [0.5, 3.5, 4, 'rockDeep'], [1.5, 3, 6, 'scorch'],
-    [2.5, 2.5, 4, 'rockDeep'], [3, 1, 7, 'scorch'],
+    [-3.5, 1, 5, 'rockDeep'],
+    [-2.5, 2.5, 8, 'scorch'],
+    [-1.5, 3, 5, 'rockDeep'],
+    [-0.5, 3.5, 7, 'scorch'],
+    [0.5, 3.5, 4, 'rockDeep'],
+    [1.5, 3, 6, 'scorch'],
+    [2.5, 2.5, 4, 'rockDeep'],
+    [3, 1, 7, 'scorch'],
   ];
   for (const [sx, sy, len, mat] of shroud) {
     b.push(box(sx, sy, 16 - len + up, 1, 1, len, mat));
@@ -945,7 +989,10 @@ const minerModel = (anim, f) => {
   // BRACOS longos e escuros, colados ao tronco, com a MAO no fim. Escuros
   // porque a coluna clara ja e a figura: um braco de latao ao lado de um torso
   // de latao devolveria a mancha unica que este rework existe para desfazer.
-  for (const [ax, side] of [[-4.5, -1], [3.5, 1]]) {
+  for (const [ax, side] of [
+    [-4.5, -1],
+    [3.5, 1],
+  ]) {
     b.push(box(ax, 0 + lean, 13 + up, 1.5, 2, 4, 'rockDeep')); // braco
     b.push(box(ax, 0 + lean, 6 + up, 1.5, 2, 7, 'rockDeep')); // antebraco
     b.push(box(ax - 0.25, -0.5 + lean, 4 + up, 2, 3, 2, 'rust')); // mao
@@ -1018,7 +1065,8 @@ const minerModel = (anim, f) => {
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 96, 120, 48, 108);
+const minerFrame = (dir, anim, f) =>
+  renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 96, 120, 48, 108);
 
 // ---------------------------------------------------------------------------
 // BESTIARIO DE ASSINATURA — um inimigo por estrato, e cada silhueta diz qual
@@ -1081,7 +1129,8 @@ const resonantModel = (anim, f) => {
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const resonantFrame = (dir, anim, f) => renderVoxels(resonantModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const resonantFrame = (dir, anim, f) =>
+  renderVoxels(resonantModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-mud-lamprey 64x64 — serpente de lodo, baixa e comprida, ondulando.
 // Quase todo o tempo de jogo ela esta SUBMERSA (o cliente desenha ondulacao,
@@ -1219,7 +1268,12 @@ const frostWraithModel = (anim, f) => {
   // arredondam de um jeito por quadro e ocluem os olhos num quadro sim, outro
   // nao — o que o teste de estroboscopio pega.
   const wave = (s) => (anim === 'walk' ? 0.5 * Math.round(Math.sin((s + f) * 1.05)) : 0);
-  const hover = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : anim === 'walk' ? [0, 0.5, 0.5, 0.5, 0, 0][f % 6] : 0;
+  const hover =
+    anim === 'idle'
+      ? [0, 0.5, 0.5, 0][f % 4]
+      : anim === 'walk'
+        ? [0, 0.5, 0.5, 0.5, 0, 0][f % 6]
+        : 0;
   const flinch = anim === 'hit' ? [0.6, 0][f % 2] : 0;
   // A materializacao (`special`, o telegrafo do bote): a nevoa converge e
   // cristaliza DE BAIXO PARA CIMA. `form` e a fracao do corpo que ja existe.
@@ -1232,7 +1286,15 @@ const frostWraithModel = (anim, f) => {
     const phase = (i * 2.3 + (anim === 'idle' || anim === 'walk' ? f : 0)) % 4;
     const dx = -0.5 - i * 0.55 - phase * 0.08;
     const dz = 0.4 + i * 0.3 + Math.abs(Math.sin(i + phase)) * 0.4;
-    return box(tailX + dx, -0.25 + (i % 2 ? 0.35 : -0.35), dz + hover * 0.5, 0.5, 0.5, 0.5, i % 2 ? 'ice' : 'glass');
+    return box(
+      tailX + dx,
+      -0.25 + (i % 2 ? 0.35 : -0.35),
+      dz + hover * 0.5,
+      0.5,
+      0.5,
+      0.5,
+      i % 2 ? 'ice' : 'glass',
+    );
   };
   if (form >= 0.15) for (let i = 0; i < 2; i++) b.push(frag(i));
 
@@ -1252,18 +1314,21 @@ const frostWraithModel = (anim, f) => {
     // corpo, e o bicho lia como trenó.
     if (s >= 1 && s <= 3) b.push(box(x + 0.25, y - 0.3, z + 0.5, 0.5, 1.9, 0.5, 'ice'));
     // Espinho dorsal: cristal claro, inclinado para tras (mais alto atras).
-    if (s >= 1 && s <= 4) b.push(box(x + 0.25, y + 0.4, z + 1.5, 0.5, 0.5, 0.5 + (4 - s) * 0.15, 'glass'));
+    if (s >= 1 && s <= 4)
+      b.push(box(x + 0.25, y + 0.4, z + 1.5, 0.5, 0.5, 0.5 + (4 - s) * 0.15, 'glass'));
   }
 
   // O PESCOCO e o NUCLEO: a ligacao entre tronco e cabeca, com a luz ciana
   // na garganta — o unico ponto emissivo, e ele fica ENTRE as costelas.
-  const neckX = tailX + 0.8 + (WRAITH_SEGMENTS - 1) * 0.95 + 0.95 + (coil > 0 ? coil * 0.9 : coil * 0.4);
+  const neckX =
+    tailX + 0.8 + (WRAITH_SEGMENTS - 1) * 0.95 + 0.95 + (coil > 0 ? coil * 0.9 : coil * 0.4);
   const neckZ = wraithArch(WRAITH_SEGMENTS - 1) + hover + 0.2 - (coil < 0 ? 0.5 : 0);
   if (form >= 0.85) {
     b.push(box(neckX, -0.45, neckZ, 0.9, 0.9, 1.0, 'rockDeep'));
     // O nucleo na GARGANTA, saindo da frente do pescoco (dentro dele nao se
     // veria). Pisca no hit (dois quadros: aceso, apagado) — uma transicao so.
-    const coreMat = anim === 'hit' && f % 2 === 1 ? 'ice' : anim === 'die' ? 'rockDeep' : 'electric';
+    const coreMat =
+      anim === 'hit' && f % 2 === 1 ? 'ice' : anim === 'die' ? 'rockDeep' : 'electric';
     b.push(box(neckX + 0.7, -0.3, neckZ - 0.3, 0.6, 0.6, 0.6, coreMat));
   }
 
@@ -1361,7 +1426,8 @@ const sulfurBomberModel = (anim, f) => {
   b.push(box(1, 3.5, 3 + z, 0.5, 0.5, 0.5, 'rust'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const sulfurBomberFrame = (dir, anim, f) => renderVoxels(sulfurBomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const sulfurBomberFrame = (dir, anim, f) =>
+  renderVoxels(sulfurBomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-undertaker 96x120 — o Coveiro: catador de sucata do Ferrifero.
 //
@@ -1447,7 +1513,8 @@ const undertakerModel = (anim, f) => {
   b.push(box(2.5, -1.5, 4.5 + idle - slam, 2.5, 3, 0.5, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const undertakerFrame = (dir, anim, f) => renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
+const undertakerFrame = (dir, anim, f) =>
+  renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
 
 // ===========================================================================
 // CHEFES — um por estrato, mais os dois de ocupacao forte.
@@ -1552,7 +1619,17 @@ const diamandisModel = (anim, f) => {
     // giro que faz um cone virar broca — sem ele e um bico.
     const a = ((spin + i) * Math.PI) / 2;
     const r = 2.4 - i * 0.45;
-    b.push(box(Math.cos(a) * r - 0.3, bit + 1.4 - i * 1.6, z + 2.6 + Math.sin(a) * r - 0.3, 0.6, 1.2, 0.6, 'rust'));
+    b.push(
+      box(
+        Math.cos(a) * r - 0.3,
+        bit + 1.4 - i * 1.6,
+        z + 2.6 + Math.sin(a) * r - 0.3,
+        0.6,
+        1.2,
+        0.6,
+        'rust',
+      ),
+    );
   }
 
   // MODULO 2 — O RACK DE DEMOLICAO, acima do deck e para tras. Ele fica ACIMA
@@ -1637,7 +1714,15 @@ const twitch = (i, f) => {
 const DEVOURER_SCALE = 1.4;
 
 const scaleBoxes = (boxes, k) =>
-  boxes.map((b) => ({ ...b, x: b.x * k, y: b.y * k, z: b.z * k, w: b.w * k, d: b.d * k, h: b.h * k }));
+  boxes.map((b) => ({
+    ...b,
+    x: b.x * k,
+    y: b.y * k,
+    z: b.z * k,
+    w: b.w * k,
+    d: b.d * k,
+    h: b.h * k,
+  }));
 
 const devourerModel = (anim, f) => scaleBoxes(devourerBody(anim, f), DEVOURER_SCALE);
 
@@ -1799,7 +1884,17 @@ const devourerMaw = (f, open) => {
       // As fendas: escuro entre os montinhos de areia, apontando para dentro.
       if (i % 3 === 0) {
         const rc = r - 1.6 - rSink * 1.4;
-        b.push(box(Math.cos(a) * rc - 0.5, Math.sin(a) * rc - 0.5, -0.5, 1, 1, 0.5 * shown + 0.2, 'rockDeep'));
+        b.push(
+          box(
+            Math.cos(a) * rc - 0.5,
+            Math.sin(a) * rc - 0.5,
+            -0.5,
+            1,
+            1,
+            0.5 * shown + 0.2,
+            'rockDeep',
+          ),
+        );
       }
     }
   }
@@ -1847,7 +1942,17 @@ const devourerMaw = (f, open) => {
         // porque o problema nunca foi a forma. Com a gola em carne o sprite
         // passa a ter tres valores separados: osso claro, vao escuro, carne
         // vermelha. So assim a boca da forma normal continua reconhecivel aqui.
-        b.push(box(Math.cos(a) * r - w2 / 2, Math.sin(a) * r - w2 / 2, z, w2, w2, 0.7, s === 2 ? 'silt' : 'blood'));
+        b.push(
+          box(
+            Math.cos(a) * r - w2 / 2,
+            Math.sin(a) * r - w2 / 2,
+            z,
+            w2,
+            w2,
+            0.7,
+            s === 2 ? 'silt' : 'blood',
+          ),
+        );
       }
     }
   }
@@ -1859,7 +1964,17 @@ const devourerMaw = (f, open) => {
   for (let i = 0; i < 30 && rGum > 0; i++) {
     const a = (i * Math.PI * 2) / 30;
     const r = (R_GUM * (0.96 + (gulp - 1) * 0.4) + warp(i + 11) * 0.35) * (0.5 + rGum * 0.5);
-    b.push(box(Math.cos(a) * r - 1, Math.sin(a) * r - 1, -0.2, 2, 2, (0.7 + jerk(i) * 0.3) * rGum, 'blood'));
+    b.push(
+      box(
+        Math.cos(a) * r - 1,
+        Math.sin(a) * r - 1,
+        -0.2,
+        2,
+        2,
+        (0.7 + jerk(i) * 0.3) * rGum,
+        'blood',
+      ),
+    );
   }
   // Respingos escorrendo da carne para a areia. Poucos e assimetricos —
   // sujeira, nao um segundo anel.
@@ -1885,7 +2000,8 @@ const devourerMaw = (f, open) => {
   //    tem tremor proprio, e nenhum se move junto com o vizinho.
   for (let i = 0; i < 12 && rTeeth > 0; i++) {
     const a = (i * Math.PI) / 6;
-    const r = (R_TEETH + (i % 2) * 0.35 * MOUTH) * (0.98 + (beat(i) - 1) * 0.4) + warp(i + 100) * 0.3;
+    const r =
+      (R_TEETH + (i % 2) * 0.35 * MOUTH) * (0.98 + (beat(i) - 1) * 0.4) + warp(i + 100) * 0.3;
     // 1,2 e o comprimento do dente na cabeca. Aqui ele aponta para CIMA, e
     // por isso vira altura — e por isso tambem nao pode crescer: um dente alto
     // na beirada de perto tapa o vao inteiro (ver a conta de altura acima).
@@ -1902,11 +2018,21 @@ const devourerMaw = (f, open) => {
     // desencosta do centro, e e tambem o que a palavra "aberta" quer dizer:
     // esta boca nao esta mordendo, esta escancarada.
     const tip = 0.7 * MOUTH;
-    b.push(box(Math.cos(a) * (r + 0.6) - tip / 2, Math.sin(a) * (r + 0.6) - tip / 2, 0.4 + h * 0.55, tip, tip, h * 0.6, 'bone'));
+    b.push(
+      box(
+        Math.cos(a) * (r + 0.6) - tip / 2,
+        Math.sin(a) * (r + 0.6) - tip / 2,
+        0.4 + h * 0.55,
+        tip,
+        tip,
+        h * 0.6,
+        'bone',
+      ),
+    );
     // O SEGUNDO ANEL. Meio passo abaixo e 0,9 para dentro, como na cabeca —
     // la ele da PROFUNDIDADE ao furo, aqui ele forra a garganta. Mesma peca,
     // mesmo trabalho, outro angulo.
-    const r2 = (r - 0.9 * MOUTH);
+    const r2 = r - 0.9 * MOUTH;
     const t2 = 0.8 * MOUTH;
     b.push(box(Math.cos(a) * r2 - t2 / 2, Math.sin(a) * r2 - t2 / 2, -0.5, t2, t2, 1.1, 'silt'));
   }
@@ -1965,7 +2091,9 @@ const devourerMaw = (f, open) => {
     for (let s = 0; s <= 7; s++) {
       const t = s / 7 - 0.5;
       const sag = 0.8 - (1 - Math.abs(t) * 2) * 1.6;
-      b.push(box(Math.cos(a) * t * span * 2, Math.sin(a) * t * span * 2, sag, 0.6, 0.6, 0.6, 'blood'));
+      b.push(
+        box(Math.cos(a) * t * span * 2, Math.sin(a) * t * span * 2, sag, 0.6, 0.6, 0.6, 'blood'),
+      );
     }
   }
   return b;
@@ -2069,15 +2197,35 @@ const devourerBody = (anim, f) => {
     const a = (i * Math.PI) / 6;
     const r = 2.5 + (i % 2) * 0.35; // dentes desiguais: arcada, nao engrenagem
     // Os dentes AVANCAM no bote — a boca abre para fora em vez de so subir.
-    b.push(box(hx + rear * 0.25, Math.cos(a) * r - 0.45, hz + Math.sin(a) * r - 0.45, 1.2, 0.9, 0.9, 'bone'));
+    b.push(
+      box(
+        hx + rear * 0.25,
+        Math.cos(a) * r - 0.45,
+        hz + Math.sin(a) * r - 0.45,
+        1.2,
+        0.9,
+        0.9,
+        'bone',
+      ),
+    );
     // Segundo anel, meio passo atras e mais fechado: da PROFUNDIDADE ao furo.
-    b.push(box(hx - 1.1, Math.cos(a) * (r - 0.9) - 0.4, hz + Math.sin(a) * (r - 0.9) - 0.4, 1, 0.8, 0.8, 'silt'));
+    b.push(
+      box(
+        hx - 1.1,
+        Math.cos(a) * (r - 0.9) - 0.4,
+        hz + Math.sin(a) * (r - 0.9) - 0.4,
+        1,
+        0.8,
+        0.8,
+        'silt',
+      ),
+    );
   }
   // Areia escorrendo dos flancos enquanto ele esta fora. So no bote — submerso
   // nao ha sprite, e parado ele ja assentou.
   if (rear > 0) {
     for (let i = 0; i < 4; i++) {
-      b.push(box(-4.6 + i * 1.7, (i % 2 ? 2.4 : -3), 0.4 + (3 - i) * 0.6, 0.6, 0.6, 0.6, 'silt'));
+      b.push(box(-4.6 + i * 1.7, i % 2 ? 2.4 : -3, 0.4 + (3 - i) * 0.6, 0.6, 0.6, 0.6, 'silt'));
     }
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
@@ -2303,9 +2451,8 @@ const broodFrame = (dir, anim, f) =>
     24,
     16,
     12,
-    12
+    12,
   );
-
 
 // ---------------------------------------------------------------------------
 // enemy-archcantor — o Arquicantor da Catedral Prismatica.
@@ -2386,88 +2533,250 @@ const archcantorModel = (anim, f) => {
 };
 
 // ---------------------------------------------------------------------------
-// enemy-sheet-leviathan — o Leviata do Lencol, no Aquifero Negro.
+// enemy-sheet-leviathan — o Leviata do Lencol, no Aquifero Negro: a CABECA.
 //
-// Mesma gramatica do Devorador (mergulha, marca, emerge) e por isso a silhueta
-// tem de ser o OPOSTO da dele: onde o verme e um tubo que se levanta, este e uma
-// LAMINA larga — uma arraia de agua escura. Duas ameaças com o mesmo ciclo e a
-// mesma forma seriam a mesma criatura pintada de outra cor.
+// O chefe deixou de ser um sprite unico de arraia curta. O atlas do arquetipo
+// desenha so o que e AUTORITATIVO — a cabeca achatada e musculosa, os lobos
+// cefalicos em volta da boca larga, os olhos pequenos no topo, as fendas
+// branquiais fundas e o comeco do disco onde as asas nascem. E o disco e a
+// regiao vulneravel: a reacao de impacto, os eletroporos e o inicio das duas
+// linhas condutivas moram aqui para o jogador saber ONDE bater.
 //
-// A cor, alias, foi o primeiro erro: o corpo saiu em `pool`, cuja face de topo e
-// verde de fungo. Um chefe do Aquifero NEGRO nao pode ser verde — verde e do
-// micelio, e o jogo inteiro depende dessa separacao. Agora ele e `water`, a
-// familia azul da rocha, exatamente como a crosta do lago em que ele vive.
+// O resto do corpo — raizes e membranas das asas, tronco, pedunculo e a cauda
+// em chicote — e o atlas `part-sheet-leviathan-body`, oito cortes
+// transversais que o cliente monta atras da cabeca (ver leviathan-body.ts no
+// cliente): numa pose autorada quando ele esta ancorado sobre a poca, e
+// pendurados no rastro da cabeca quando ele caca na segunda fase. A razao de
+// existir dos segmentos e a SUBMERSAO: cabeca, asas, tronco e cauda atravessam
+// a lamina em momentos diferentes, e um sprite unico nao tem como fazer isso.
 //
-// As linhas laterais condutivas sao o contra-jogo desenhado no corpo: o que o
-// detem e eletrificar a agua. Autorado com a frente em +x.
+// A cor: `water` (a familia azul da rocha) para o dorso, com manchas de
+// `rockDeep` quase pretas — nunca verde, que e do micelio. O ventre e `rock`
+// (cinza-azulado); cicatrizes claras em `bone`; cracas em `rock` de pe; poros
+// eletrossensoriais e as linhas condutivas em `electric`, o unico brilho.
+// Autorado com a frente em +x.
 // ---------------------------------------------------------------------------
-const leviathanModel = (anim, f) => {
-  const breach = anim === 'attack' ? [0, 2, 4, 2][f % 4] : anim === 'special' ? Math.min(3, f) : 0;
-  // As asas batem devagar sempre — mesmo encalhado ele nao para de nadar.
-  const flap =
-    anim === 'walk'
-      ? [0, 1, 2, 1, 0, -1][f % 6]
-      : anim === 'idle'
-        ? [0, 0.5, 1, 0.5][f % 4]
-        : breach * 0.5;
-  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const b = [];
-  const z = 0.5 + breach * 0.7 + flinch * 0.3;
 
-  // Corpo central: baixo e largo, mas com LOMBO. A primeira versao tinha 3 de
-  // altura contra 12 de comprimento e projetava como um tapete; o dorso agora
-  // sobe ao dobro no meio, e e essa corcova que separa "bicho" de "mancha".
-  for (let s = 0; s < 5; s++) {
-    const x = -6 + s * 2.4;
-    const d = 5.4 - s * 0.7;
-    const h = [3.5, 5, 5.5, 4, 2.6][s];
-    b.push(box(x, -d / 2, z, 2.4, d, h, 'water'));
-  }
-  // Cauda em chicote: quatro segmentos finos, ondulando fora de fase.
-  for (let s = 0; s < 4; s++) {
-    const ph = Math.round(Math.sin((s + f) * 1.2)) * 0.6;
-    b.push(box(-8.4 - s * 1.6, -0.7 + ph, z + 0.6, 1.6, 1.4, 1.4 - s * 0.2, 'water'));
-  }
-  // AS ASAS: as duas placas largas que dao nome ao bicho. Nascem coladas ao
-  // lombo e DESCEM ate a borda, entao a secao le como asa e nao como prateleira
-  // saindo do meio do corpo. A ponta bate o dobro da raiz.
-  // Cinco tiras por asa, com a corda encolhendo e as pontas alinhadas para
-  // TRAS: a membrana sai triangular, como asa de arraia. Em tres tiras largas
-  // com degraus de altura, como estava, ela projetava como uma escadaria de
-  // prateleiras saindo do meio do corpo.
+/** Quantos cortes transversais o corpo tem. Igual ao `LEVIATHAN_BODY_RANKS` do cliente. */
+export const LEVIATHAN_BODY_RANKS = 8;
+
+/** Um hash inteiro estavel para espalhar cracas e cicatrizes sem sorteio. */
+const levHash = (a, b, c) => {
+  let h = (a * 73856093) ^ (b * 19349663) ^ (c * 83492791);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x5bd1e995) >>> 0;
+  return h ^ (h >>> 15);
+};
+
+/**
+ * As duas LINHAS CONDUTIVAS, correndo o comprimento de uma peca em y = +-side.
+ * Continuidade perfeita entre pecas: toda peca as poe na MESMA altura relativa
+ * ao topo do dorso e na mesma cota lateral, e o rastro do cliente as alinha.
+ * `lit` (0..1) e o quanto delas esta aceso — a carga da descarga as acende da
+ * cauda ate a cabeca.
+ */
+const conductiveLines = (b, x0, len, side, top, lit = 1) => {
   for (const s of [-1, 1]) {
-    for (let w = 0; w < 5; w++) {
-      const lift = flap * (w + 1) * 0.3 * s;
-      const wy = s > 0 ? 2.4 + w * 1.1 : -3.5 - w * 1.1;
-      b.push(box(-5.4 + w * 1.1, wy, z + 2.4 - w * 0.25 + lift * 0.5, 7.2 - w * 1.2, 1.1, 1, 'water'));
+    // SOBRE o dorso (e nao embutida nele): num corte estreito a linha
+    // embutida ficava escondida atras da crista do lombo em duas das oito
+    // pecas, e a continuidade — a razao de ela existir — se quebrava no
+    // pedunculo e na borda das asas.
+    b.push(box(x0, s * side - 0.3, top, len, 0.6, 0.5, lit > 0.5 ? 'electric' : 'glass'));
+  }
+};
+
+/**
+ * Cracas e cicatrizes espalhadas pelo dorso de uma peca, sem sorteio.
+ *
+ * Em PARES espelhados em x (uma em +x, outra em -x): a caixa envolvente de
+ * cada peca do corpo tem de continuar centrada, senao a fila de postos
+ * "treme" de um quadro para o outro — o validador cobra isso (jitter
+ * horizontal), e cobra com razao: no rastro, um posto descentrado e uma
+ * peca que salta para o lado quando o corpo passa por ela.
+ */
+const barnaclesAndScars = (b, seed, x0, len, halfWidth, top, count) => {
+  for (let k = 0; k < count; k++) {
+    const h = levHash(seed, k, 11);
+    const dx = 0.4 + ((h % 1000) / 1000) * (len / 2 - 1.6);
+    const y = ((((h >>> 10) % 1000) / 1000) * 2 - 1) * (halfWidth - 0.8);
+    const mid = x0 + len / 2;
+    for (const s of [-1, 1]) {
+      const x = mid + s * dx;
+      if ((h >>> 20) % 3 === 0) {
+        // Cicatriz clara: um risco raso no dorso.
+        b.push(box(x - 0.6, y, top - 0.2, 1.2, 0.4, 0.3, 'bone'));
+      } else {
+        // Craca: um deposito calcario de pe.
+        b.push(box(x - 0.25, y, top, 0.5, 0.5, 0.5, 'rock'));
+      }
     }
   }
-  // LINHAS LATERAIS CONDUTIVAS: dois frisos de corrente correndo do focinho a
-  // cauda, na quina do lombo. Sao o unico brilho do corpo e apontam para o
-  // contra-jogo — o que para este bicho e eletrificar a agua embaixo dele.
-  for (let s = 0; s < 5; s++) {
-    const d = 5.4 - s * 0.7;
-    const h = [3.5, 5, 5.5, 4, 2.6][s];
-    b.push(box(-6 + s * 2.4, -d / 2 - 0.3, z + h - 1.2, 2.4, 0.6, 0.6, 'electric'));
-    b.push(box(-6 + s * 2.4, d / 2 - 0.3, z + h - 1.2, 2.4, 0.6, 0.6, 'electric'));
+};
+
+const leviathanModel = (anim, f) => {
+  // A Sondagem (`attack`): guelras e eletroporos VIBRAM — as fendas abrem e os
+  // poros acendem. A carga da descarga (`special`): as linhas condutivas
+  // acendem e o disco se tensiona. O `hit` e o recuo do disco.
+  const probe = anim === 'attack' ? [0.2, 0.6, 1, 0.5][f % 4] : 0;
+  const charge = anim === 'special' ? Math.min(1, (f + 1) / 4) : 0;
+  const flinch = anim === 'hit' ? [1, 0.4][f % 2] : 0;
+  // Respiracao: o disco sobe e desce um nada; nadando, o bob e maior.
+  const breath =
+    anim === 'idle'
+      ? [0, 0.15, 0.3, 0.15][f % 4]
+      : anim === 'walk'
+        ? [0, 0.25, 0.5, 0.25, 0, -0.2][f % 6]
+        : 0;
+  const b = [];
+  const z = 0.4 + breath + flinch * 0.4;
+  const top = z + 3.4;
+
+  // O DISCO CEFALICO: quatro lajes, da nuca ao focinho, afinando em cunha. A
+  // primeira e a mais alta — e a corcova que separa "bicho" de "mancha".
+  const slabs = [
+    { x: -3.5, w: 3.5, d: 11, h: 3.4 },
+    { x: 0, w: 3, d: 10, h: 3.1 },
+    { x: 3, w: 2.5, d: 8, h: 2.6 },
+    { x: 5.5, w: 2, d: 5.2, h: 2 },
+  ];
+  for (const sl of slabs) {
+    // Ventre palido embaixo, dorso QUASE PRETO por cima. O bicho e uma coisa
+    // do fundo: contra a agua escura o que se le dele e a orla clara do
+    // ventre, os olhos, os poros e as duas linhas — a massa em si e sombra.
+    // O ventre so aparece quando ele inclina ou emerge, que e exatamente
+    // quando o jogador o ve de baixo.
+    b.push(box(sl.x, -sl.d / 2, z, sl.w, sl.d, sl.h * 0.35, 'rock'));
+    b.push(box(sl.x, -sl.d / 2, z + sl.h * 0.35, sl.w, sl.d, sl.h * 0.65, 'rockDeep'));
   }
-  // A cabeca: cunha achatada e larga, com fendas branquiais e a boca em fresta
-  // — nao um focinho de peixe, um sugador de fundo.
-  const hx = 6.4 + breach * 0.4;
-  b.push(box(hx - 0.4, -3, z, 1.4, 6, 3, 'water'));
-  b.push(box(hx + 1, -2.2, z, 1.2, 4.4, 2.4, 'water'));
-  b.push(box(hx + 2.2, -1.4, z, 1.2, 2.8, 1.8, 'water')); // focinho em cunha
-  b.push(box(hx + 1, -2, z + 0.2, 0.8, 4, 1, 'bone')); // a boca
-  for (const dy of [-2.8, 2.2]) {
-    b.push(box(hx - 0.2, dy, z + 0.6, 0.6, 0.6, 1.8, 'rockDeep'));
-    b.push(box(hx + 1, dy, z + 0.6, 0.6, 0.6, 1.8, 'rockDeep'));
+  // Brilhos de pele molhada no dorso: o unico azul da cabeca.
+  for (let k = 0; k < 5; k++) {
+    const h = levHash(3, k, 5);
+    const x = -3 + ((h % 1000) / 1000) * 7;
+    const y = ((((h >>> 10) % 1000) / 1000) * 2 - 1) * 3.6;
+    b.push(box(x, y, top - 0.5, 1.4, 1.1, 0.5, 'water'));
   }
-  // Olhos no TOPO da cabeca, nao na frente: ele vive por baixo e olha para
-  // cima, que e de onde a presa vem.
-  b.push(box(hx + 0.2, -1.9, z + 3, 0.8, 0.8, 0.6, 'electric'));
-  b.push(box(hx + 0.2, 1.1, z + 3, 0.8, 0.8, 0.6, 'electric'));
+  // OS LOBOS CEFALICOS: dois dedos para a frente, flanqueando a boca.
+  for (const s of [-1, 1]) {
+    b.push(box(6.2, s > 0 ? 2.4 : -4.2, z + 0.2, 2.4 + probe * 0.4, 1.8, 1.6, 'rockDeep'));
+  }
+  // A BOCA: uma fenda larga e escura sob o focinho.
+  b.push(box(6.6, -2.2, z + 0.2, 0.9, 4.4, 0.8 + probe * 0.6, 'floor'));
+  // OLHOS pequenos no TOPO: ele vive por baixo e olha para cima.
+  b.push(box(3.2, -2.4, top - 0.6, 0.7, 0.7, 0.8, 'electric'));
+  b.push(box(3.2, 1.7, top - 0.6, 0.7, 0.7, 0.8, 'electric'));
+  // FENDAS BRANQUIAIS: cinco sulcos fundos em cada flanco, que ABREM na Sondagem.
+  for (const s of [-1, 1]) {
+    for (let g = 0; g < 5; g++) {
+      const gx = -2.6 + g * 1.1;
+      b.push(box(gx, s > 0 ? 4.6 : -5.2, z + 0.6, 0.5, 0.6, 1.4 + probe * 0.5, 'floor'));
+    }
+  }
+  // ELETROPOROS: pontos ciano em volta da borda do disco. Acesos na Sondagem
+  // e na carga.
+  const poreMat = probe > 0.4 || charge > 0.5 ? 'electric' : 'glass';
+  for (let k = 0; k < 6; k++) {
+    const t = k / 5;
+    b.push(box(4.2 + t * 2.2, -3.6 + t * 1.2, top - 1.2 + t * 0.4, 0.5, 0.5, 0.5, poreMat));
+    b.push(box(4.2 + t * 2.2, 3.1 - t * 1.2, top - 1.2 + t * 0.4, 0.5, 0.5, 0.5, poreMat));
+  }
+  // AS LINHAS CONDUTIVAS comecam aqui e continuam por todas as pecas do corpo.
+  conductiveLines(b, -3.5, 8.5, 4.2, top, charge > 0 ? charge : 1);
+  barnaclesAndScars(b, 1, -3.2, 6.5, 4.6, top, 4);
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
+
+/**
+ * Um CORTE TRANSVERSAL do corpo, de posto `rank` (0 = raiz das asas, colado ao
+ * disco; 7 = ponta da cauda).
+ *
+ * A peca e um slab de comprimento fixo (7 unidades) centrado em x = 0, mais
+ * comprido que o passo entre pecas (5,2 unidades, ver o cliente) para as
+ * curvas nunca abrirem fresta. A largura, a altura e a asa mudam por posto:
+ *
+ *   0  raiz das asas: tronco largo e as asas em crescente descendo do lombo
+ *   1  meio das asas: o MAIOR vao — perto da cabeca, como pede a silhueta
+ *   2  borda traseira: a membrana encolhe, bordas serrilhadas
+ *   3  tronco com restos de nadadeira
+ *   4  tronco
+ *   5  pedunculo
+ *   6  cauda
+ *   7  ponta: fina, com o orgao eletrico discreto
+ */
+const leviathanBodyModel = (rank) => {
+  const L = 7;
+  const trunkD = [9.2, 8.6, 7.6, 6.4, 5, 3.4, 2.2, 1.4][rank];
+  const trunkH = [3.4, 3.2, 2.9, 2.5, 2.1, 1.6, 1.2, 0.9][rank];
+  // O VAO: 17 unidades para cada lado no meio das asas — 34 de ponta a ponta,
+  // pouco mais de quatro tiles. Era 24 (tres tiles): uma raia de tres tiles
+  // com a cabeca de dois lia como um peixe grande; com quatro e um pedaco do
+  // fundo que se levantou.
+  const wingSpan = [15, 17, 13.5, 8.5, 3.2, 0, 0, 0][rank];
+  const b = [];
+  const z = 0.4;
+  const top = z + trunkH;
+  // Tronco: ventre palido por baixo, dorso quase preto por cima; a unica
+  // linha azul e a crista molhada do lombo, para a coluna ler como uma so
+  // linha de peca em peca.
+  b.push(box(-L / 2, -trunkD / 2, z, L, trunkD, trunkH * 0.35, 'rock'));
+  b.push(box(-L / 2, -trunkD / 2, z + trunkH * 0.35, L, trunkD, trunkH * 0.65, 'rockDeep'));
+  b.push(box(-L / 2, -trunkD * 0.1, top, L, trunkD * 0.2, 0.3, 'water'));
+  // AS ASAS: doze tiras que se SOBREPOEM (passo menor que a profundidade),
+  // descendo do lombo ate a ponta numa curva que acelera — a asa de uma
+  // raia e quase plana perto do corpo e cai na ponta. A corda encolhe em
+  // crescente e a borda traseira sai serrilhada. O dorso da asa e sombra; o
+  // que a desenha contra a agua e o brilho molhado da borda de ataque, em
+  // tiras alternadas, e a orla palida do ventre nas ultimas tiras.
+  if (wingSpan > 0) {
+    const strips = 12;
+    const reach = wingSpan - trunkD / 2;
+    const stripDepth = Math.max(1, (reach / strips) * 1.7);
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < strips; k++) {
+        const t = (k + 1) / strips;
+        const y = trunkD / 2 + t * reach - stripDepth;
+        const chord = Math.max(2.4, L - t * t * 3.2 - (levHash(rank, k, 3) % 2) * 0.5);
+        const lift = Math.max(z + 0.4, top - 0.8 - t * t * 2.8);
+        // Centrada em x com um leve recuo para tras (a membrana e mais longa
+        // atras do que na frente), pequeno o bastante para a caixa envolvente
+        // de cada posto continuar centrada — ver `barnaclesAndScars`.
+        const x0 = -chord / 2 - (L - chord) * 0.12;
+        const yy = s > 0 ? y : -y - stripDepth;
+        b.push(box(x0, yy, lift, chord, stripDepth, 0.9, 'rockDeep'));
+        b.push(box(x0, yy, lift - 0.4, chord, stripDepth, 0.4, 'rock'));
+        if (k % 2 === 1) {
+          b.push(box(x0 + chord - 0.7, yy, lift + 0.9, 0.7, stripDepth, 0.25, 'water'));
+        }
+        if (k >= strips - 3) {
+          b.push(box(x0, yy, lift + 0.9, 0.5, stripDepth, 0.25, 'rock'));
+        }
+      }
+    }
+  }
+  // Restos de nadadeira no tronco: duas quilhas curtas.
+  if (rank === 3 || rank === 4) {
+    for (const s of [-1, 1]) {
+      b.push(box(-1.5, s > 0 ? trunkD / 2 : -trunkD / 2 - 0.8, z + 0.6, 3, 0.8, 0.9, 'rockDeep'));
+    }
+  }
+  // O ORGAO ELETRICO da ponta: um espinho curto, discreto.
+  if (rank === LEVIATHAN_BODY_RANKS - 1) {
+    b.push(box(-L / 2 + 0.2, -0.3, z + trunkH, 1.4, 0.6, 0.5, 'electric'));
+  }
+  // As linhas condutivas, na mesma cota relativa ao topo em toda peca.
+  conductiveLines(b, -L / 2, L, Math.max(0.5, trunkD / 2 - 0.4), top, 1);
+  barnaclesAndScars(b, 20 + rank, -L / 2, L, trunkD / 2, top, rank < 4 ? 4 : 1);
+  return b;
+};
+
+/**
+ * As pecas do corpo vivem em DOIS atlas: as asas (postos 0..3) e a cauda
+ * (postos 4..7). Um atlas so tem um tamanho de quadro, e a raiz das asas
+ * precisa de um quadro de 200 e tantos pixels que a ponta da cauda, de
+ * cinquenta, pagaria em branco trinta e duas vezes no orcamento de boot.
+ */
+export const LEVIATHAN_WING_RANKS = 4;
+/** Os modelos do Leviata por posto, para o teste que mede o quadro. */
+export const leviathanBodyPiece = (rank) => quarterTurn(leviathanBodyModel(rank));
 
 // ---------------------------------------------------------------------------
 // enemy-lung-matrix — o Pulmao-Matriz da Fenda Sulfurosa.
@@ -2532,7 +2841,12 @@ const lungMatrixModel = (anim, f) => {
   // COSTELAS: quatro arcos de osso subindo pela abobada em degraus que seguem
   // a curva dela. Elas NAO mudam de tamanho com o folego — e por isso que o
   // saco parece pressionado por elas em vez de simplesmente encolher.
-  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+  for (const [dx, dy] of [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]) {
     let rz = z;
     for (const layer of layers) {
       const w = layer.w + swell;
@@ -2602,7 +2916,12 @@ const furnaceHeartModel = (anim, f) => {
   b.push(box(-2, -2, 12, 4, 4, 2.4, 'fire'));
 
   // PLACAS: quatro laminas em volta do nucleo, afastando-se dele quando abre.
-  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+  for (const [dx, dy] of [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]) {
     const px = -2.5 + dx * (3.2 + gap * 0.8) - (dx < 0 ? 1.5 : 0);
     const py = -2.5 + dy * (3.2 + gap * 0.8) - (dy < 0 ? 1.5 : 0);
     const pw = dx === 0 ? 6.8 : 2;
@@ -2613,7 +2932,12 @@ const furnaceHeartModel = (anim, f) => {
   // ESPINHAS: sobem no superaquecimento e somem no resfriar. Sao o aviso que se
   // le de mais longe — a SILHUETA muda antes de a cor mudar.
   if (shut >= 1) {
-    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ]) {
       b.push(box(sx * 3.4 - 0.5, sy * 3.4 - 0.5, 11.8, 1, 1, 1.5 + shut, 'scorch'));
     }
   }
@@ -2693,7 +3017,15 @@ const frostQueenDeath = (f, intact) => {
   const k = far ? 1.1 : 1;
   const shrink = far ? 0.68 : 1;
   const shard = (x, y, z, w, d, h, mat = 'ice') =>
-    box(x * k - (w * shrink) / 2, y * k - (d * shrink) / 2, z * k, w * shrink, d * shrink, h * shrink, mat);
+    box(
+      x * k - (w * shrink) / 2,
+      y * k - (d * shrink) / 2,
+      z * k,
+      w * shrink,
+      d * shrink,
+      h * shrink,
+      mat,
+    );
 
   // Pares opostos em X, Y e diagonais, mais duas lascas verticais. O centro
   // fica quase vazio no quadro do impacto: primeiro some a agulha, depois o
@@ -2744,15 +3076,17 @@ const frostQueenModel = (anim, f) => {
   for (let i = 0; i < 5; i++) {
     const a = (i * 2 * Math.PI) / 5 + glide * 0.22;
     const r = i === 0 ? 3.6 : 3.15;
-    b.push(box(
-      Math.cos(a) * r - 0.35,
-      Math.sin(a) * 2.8 - 0.35,
-      z + (i % 2) * 0.55,
-      0.7,
-      0.7,
-      0.9 + (i % 3) * 0.55,
-      'ice'
-    ));
+    b.push(
+      box(
+        Math.cos(a) * r - 0.35,
+        Math.sin(a) * 2.8 - 0.35,
+        z + (i % 2) * 0.55,
+        0.7,
+        0.7,
+        0.9 + (i % 3) * 0.55,
+        'ice',
+      ),
+    );
   }
 
   // CINTURA e TRONCO: a parte mais estreita do corpo inteiro, e e ela que faz a
@@ -2802,7 +3136,17 @@ const frostQueenModel = (anim, f) => {
   [2.1, 3.2, 4.5, 1.4, 2.65].forEach((hgt, i) => {
     // A quarta ponta e o dente quebrado da coroa. Nenhuma fileira regular: ela
     // e uma soberana arruinada, nao uma cerca de cristais.
-    b.push(box(-1.5 + i * 0.75, -0.15 + (i % 2) * 0.25, z + 18.4 - flinch * 0.5, 0.55, 0.65, hgt + raise * 0.5, 'ice'));
+    b.push(
+      box(
+        -1.5 + i * 0.75,
+        -0.15 + (i % 2) * 0.25,
+        z + 18.4 - flinch * 0.5,
+        0.55,
+        0.65,
+        hgt + raise * 0.5,
+        'ice',
+      ),
+    );
   });
   return anim === 'die' ? frostQueenDeath(f, b) : b;
 };
@@ -2844,7 +3188,17 @@ const magnetarchModel = (anim, f) => {
   // referencia e o jogador nao sabe onde ele esta pisando.
   for (let i = 0; i < 5; i++) {
     const a = (i * 2 * Math.PI) / 5 + f * 0.4;
-    b.push(box(Math.cos(a) * 2.4 - 0.35, Math.sin(a) * 2.4 - 0.35, 0.4 + (i % 3) * 0.5, 0.7, 0.7, 0.7, 'rust'));
+    b.push(
+      box(
+        Math.cos(a) * 2.4 - 0.35,
+        Math.sin(a) * 2.4 - 0.35,
+        0.4 + (i % 3) * 0.5,
+        0.7,
+        0.7,
+        0.7,
+        'rust',
+      ),
+    );
   }
 
   const z = 6 + hover + glide * 0.5 - flinch;
@@ -2864,9 +3218,13 @@ const magnetarchModel = (anim, f) => {
   // lento com o quadro para nao lerem como estrutura parada.
   for (let i = 0; i < RING_SEGMENTS; i++) {
     const a = (i * 2 * Math.PI) / RING_SEGMENTS + f * 0.16;
-    b.push(box(Math.cos(a) * r - 0.7, -0.7, z + 3.2 + Math.sin(a) * r - 0.7, 1.4, 1.4, 1.4, 'rust'));
+    b.push(
+      box(Math.cos(a) * r - 0.7, -0.7, z + 3.2 + Math.sin(a) * r - 0.7, 1.4, 1.4, 1.4, 'rust'),
+    );
     const a2 = a + Math.PI / RING_SEGMENTS;
-    b.push(box(-0.7, Math.cos(a2) * r - 0.7, z + 3.2 + Math.sin(a2) * r - 0.7, 1.4, 1.4, 1.4, 'rust'));
+    b.push(
+      box(-0.7, Math.cos(a2) * r - 0.7, z + 3.2 + Math.sin(a2) * r - 0.7, 1.4, 1.4, 1.4, 'rust'),
+    );
   }
   // SUCATA presa ao campo: tres cacos de ferro, e sao TRES porque cinco viravam
   // ruido em volta do anel. Colados no nucleo quando ele puxa, arremessados
@@ -2875,15 +3233,17 @@ const magnetarchModel = (anim, f) => {
   const debris = 1.4 + pull * -0.3 + push * 0.8;
   for (let i = 0; i < 3; i++) {
     const a = (i * 2 * Math.PI) / 3 - f * 0.3;
-    b.push(box(
-      Math.cos(a) * (r + debris) - 0.7,
-      Math.sin(a) * (r + debris) - 0.7,
-      z + 2 + (i % 3) * 1.6,
-      1.4,
-      1.4,
-      1.4,
-      i % 2 ? 'bone' : 'rust'
-    ));
+    b.push(
+      box(
+        Math.cos(a) * (r + debris) - 0.7,
+        Math.sin(a) * (r + debris) - 0.7,
+        z + 2 + (i % 3) * 1.6,
+        1.4,
+        1.4,
+        1.4,
+        i % 2 ? 'bone' : 'rust',
+      ),
+    );
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
@@ -2894,8 +3254,15 @@ const devourerFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 152, 76, 104);
 const archcantorFrame = (dir, anim, f) =>
   renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
+// O quadro da cabeca e o menor que enquadra as quatro rotacoes com 2px de
+// margem (104x63 de conteudo): o canvas de 132x88 de antes pagava 28px de
+// largura e 20 de altura em branco, em cem quadros, no orcamento de boot.
 const leviathanFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 124, 80, 60, 51);
+  renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 112, 68, 56, 41);
+const leviathanWingsFrame = (dir, anim, f) =>
+  renderVoxels(leviathanBodyPiece(f), DIR_INDEX[dir], 208, 112, 104, 61);
+const leviathanTailFrame = (dir, anim, f) =>
+  renderVoxels(leviathanBodyPiece(LEVIATHAN_WING_RANKS + f), DIR_INDEX[dir], 64, 44, 32, 30);
 const lungMatrixFrame = (dir, anim, f) =>
   renderVoxels(lungMatrixModel(anim, f), DIR_INDEX[dir], 116, 112, 56, 88);
 const furnaceHeartFrame = (dir, anim, f) =>
@@ -2920,7 +3287,16 @@ const boltFrame = (_dir, _anim, f) => {
   fillDiamond(g, 14, 14, 2, 2, 'player');
   // Halo esparso cintilando: um terco dos pontos se apaga por quadro, em
   // rodizio — energia respingando do nucleo, nao um aro fixo.
-  const halo = [[16, 6], [25, 11], [26, 16], [22, 24], [16, 26], [9, 23], [6, 16], [9, 9]];
+  const halo = [
+    [16, 6],
+    [25, 11],
+    [26, 16],
+    [22, 24],
+    [16, 26],
+    [9, 23],
+    [6, 16],
+    [9, 9],
+  ];
   halo.forEach(([hx, hy], i) => {
     if ((i + f) % 3 === 0) return;
     set(g, hx, hy, 'biolum');
@@ -3088,7 +3464,19 @@ const wraithLiving = { ...living, special: { frames: 4, fps: 7, loop: false } };
 // `version` sobe junto com qualquer mudanca de pixel no atlas (production spec
 // §13). A subdivisao da grade (MODEL_SCALE) redesenhou TODO atlas de entidade,
 // entao o piso agora e 3.
-const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 4) => ({
+const base = (
+  id,
+  frameWidth,
+  frameHeight,
+  anchorX,
+  anchorY,
+  hitbox,
+  footprint,
+  animations,
+  draw,
+  prompt,
+  version = 4,
+) => ({
   id,
   version,
   frameWidth,
@@ -3104,6 +3492,17 @@ const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, 
   draw,
   prompt,
 });
+
+/**
+ * Uma PECA em oito rumos: os quatro eixos do mundo e as quatro diagonais.
+ *
+ * So para `part-`: um bicho vivo continua em quatro (o validador exige, e o
+ * rumo dele passa pela histerese de `facing.ts`). Uma peca de corpo comprido
+ * e escolhida pela tangente do caminho, que aponta para qualquer lado, e em
+ * quatro rumos metade das tangentes cai a 45 graus do quadro mais proximo —
+ * um corpo nadando na vertical da tela virava uma escada de quadros `dr`.
+ */
+const eightWay = (spec) => ({ ...spec, directions: 8, authoredDirs: DIRS8 });
 
 export const ENTITY_SPECS = [
   base(
@@ -3124,49 +3523,228 @@ export const ENTITY_SPECS = [
     },
     prospectorFrame,
     'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm',
-    5
+    5,
   ),
-  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 6),
-  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 6),
-  base('enemy-spore-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 6, fps: 10, loop: false },
-  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 6),
-  base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 6),
-  base('enemy-guardian', 112, 128, 56, 124, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 10, loop: false },
-  }, guardianFrame, 'voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with seven mushroom spire towers and gold finial, round diffuse electric core with radial cracks, six armored crawler legs, twin dominion claws, stalactite fringe', 6),
-  base('enemy-bishop', 112, 124, 56, 116, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 6, fps: 9, loop: false },
-  }, bishopFrame, 'voxel-isometric fungal cleric, decaying root-curtain vestment with frayed hem, open blessing arms, halo-disc pastoral staff, hanging censer, chitinous three-pronged crown, mycelial roots and mushrooms at the hem', 6),
-  base('enemy-fungal-horse', 160, 168, 80, 156, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 6, fps: 10, loop: false },
-  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane crest and burning tail tip, split hooves, draped organic plate barding with gold flank medallions, crested war mask', 5),
-  base('enemy-miner', 96, 120, 48, 108, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
+  base(
+    'enemy-stalker',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.64, h: 0.6 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    living,
+    stalkerFrame,
+    'voxel-isometric low red chitin predator with one mineral blade, four authored directions',
+    6,
+  ),
+  base(
+    'enemy-spitter',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.68, h: 0.72 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    living,
+    spitterFrame,
+    'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents',
+    6,
+  ),
+  base(
+    'enemy-spore-bomber',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.62, h: 0.72 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 6, fps: 10, loop: false },
+    },
+    bomberFrame,
+    'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod',
+    6,
+  ),
+  base(
+    'enemy-bruiser',
+    96,
+    136,
+    48,
+    132,
+    { w: 0.92, h: 1.1 },
+    { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 8, fps: 10, loop: false },
+    },
+    bruiserFrame,
+    'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core',
+    6,
+  ),
+  base(
+    'enemy-guardian',
+    112,
+    128,
+    56,
+    124,
+    { w: 1.36, h: 1.4 },
+    { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 10, loop: false },
+    },
+    guardianFrame,
+    'voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with seven mushroom spire towers and gold finial, round diffuse electric core with radial cracks, six armored crawler legs, twin dominion claws, stalactite fringe',
+    6,
+  ),
+  base(
+    'enemy-bishop',
+    112,
+    124,
+    56,
+    116,
+    { w: 1.2, h: 1.9 },
+    { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 6, fps: 9, loop: false },
+    },
+    bishopFrame,
+    'voxel-isometric fungal cleric, decaying root-curtain vestment with frayed hem, open blessing arms, halo-disc pastoral staff, hanging censer, chitinous three-pronged crown, mycelial roots and mushrooms at the hem',
+    6,
+  ),
+  base(
+    'enemy-fungal-horse',
+    160,
+    168,
+    80,
+    156,
+    { w: 1.4, h: 0.95 },
+    { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 6, fps: 10, loop: false },
+    },
+    horseFrame,
+    'voxel-isometric fungal warhorse, long low body, ember mane crest and burning tail tip, split hooves, draped organic plate barding with gold flank medallions, crested war mask',
+    5,
+  ),
+  base(
+    'enemy-miner',
+    96,
+    120,
+    48,
+    108,
+    { w: 0.92, h: 1.5 },
+    { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 },
+    living,
+    minerFrame,
+    'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe',
+  ),
   // Bestiario de assinatura (um por estrato). `version` nasce em 1: sao os
   // primeiros pixels destes atlases.
-  base('enemy-resonant', 64, 64, 32, 60, { w: 0.88, h: 0.9 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, resonantFrame, 'voxel-isometric slow mineral node crowned with living electric crystals, dark rock body with glowing seams', 1),
-  base('enemy-mud-lamprey', 64, 64, 32, 60, { w: 0.8, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, mudLampreyFrame, 'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes', 2),
-  base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 2),
-  base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 2),
-  base('enemy-frost-wraith', 96, 96, 48, 90, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, wraithLiving, frostWraithFrame, 'voxel-isometric frost manawyrm elemental: short arched serpentine body floating above the ground, dark ice vertebrae with pale rib plates and swept-back dorsal spikes, crystalline head clearly separated from the trunk with angular dark jaw, wedge snout, backswept ice horns, twin electric eyes and a glowing cyan core in the throat, tail dissolving into drifting ice fragments', 3),
+  base(
+    'enemy-resonant',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.88, h: 0.9 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    living,
+    resonantFrame,
+    'voxel-isometric slow mineral node crowned with living electric crystals, dark rock body with glowing seams',
+    1,
+  ),
+  base(
+    'enemy-mud-lamprey',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.8, h: 0.6 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    living,
+    mudLampreyFrame,
+    'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes',
+    2,
+  ),
+  base(
+    'enemy-bellows',
+    64,
+    64,
+    32,
+    60,
+    { w: 1, h: 0.9 },
+    { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 },
+    living,
+    bellowsFrame,
+    'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet',
+    2,
+  ),
+  base(
+    'enemy-scoriac',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.88, h: 0.8 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    living,
+    scoriacFrame,
+    'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs',
+    2,
+  ),
+  base(
+    'enemy-frost-wraith',
+    96,
+    96,
+    48,
+    90,
+    { w: 0.72, h: 0.6 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    wraithLiving,
+    frostWraithFrame,
+    'voxel-isometric frost manawyrm elemental: short arched serpentine body floating above the ground, dark ice vertebrae with pale rib plates and swept-back dorsal spikes, crystalline head clearly separated from the trunk with angular dark jaw, wedge snout, backswept ice horns, twin electric eyes and a glowing cyan core in the throat, tail dissolving into drifting ice fragments',
+    3,
+  ),
   // Fauna afinada por bioma. O de enxofre herda o `special` do Spore Bomber
   // (mesmo telegrafo de pod inchando), e o Coveiro tem o proprio: a carga do
   // eletroima, que e o aviso mais importante do bicho.
-  base('enemy-sulfur-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 6, fps: 10, loop: false },
-  }, sulfurBomberFrame, 'voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves', 1),
-  base('enemy-undertaker', 72, 88, 34, 78, { w: 1, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 6, fps: 10, loop: false },
-  }, undertakerFrame, 'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens', 1),
+  base(
+    'enemy-sulfur-bomber',
+    64,
+    64,
+    32,
+    60,
+    { w: 0.62, h: 0.72 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 6, fps: 10, loop: false },
+    },
+    sulfurBomberFrame,
+    'voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves',
+    1,
+  ),
+  base(
+    'enemy-undertaker',
+    72,
+    88,
+    34,
+    78,
+    { w: 1, h: 1.5 },
+    { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 6, fps: 10, loop: false },
+    },
+    undertakerFrame,
+    'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens',
+    1,
+  ),
   // Chefes. Todos nascem em `version: 1` — sao os primeiros pixels destes
   // atlases; ate agora estes oito arquetipos desenhavam pelo recuo do cliente.
   //
@@ -3176,34 +3754,58 @@ export const ENTITY_SPECS = [
   // congelamento, campo invertendo. Foi o que o Coveiro ensinou — apontar o
   // `special` para o golpe seguinte em vez de para o aviso em curso mostra o
   // membro errado se movendo na hora que decide a luta.
-  base('enemy-diamandis', 120, 138, 58, 114, { w: 1.8, h: 2.4 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 8, loop: false },
-  }, diamandisFrame, 'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon', 1),
-  base('enemy-white-devourer', 156, 152, 76, 104, { w: 3.1, h: 1.7 }, { w: 2.8, h: 2.2, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 10, loop: false },
-    // `downed` e a BOCA ABERTA, e nao a morte: o Devorador e o unico inimigo
-    // que usa este slot em vida. O nome do slot ja existia no contrato de atlas
-    // e significa exatamente isto — "no chao, vulneravel".
-    //
-    // Seis quadros a 11 fps, e nao quatro a 5. A 5 fps a pose respirava, e
-    // respirar e calmo; o ciclo de 0,55 s com seis fases desalinhadas le como
-    // ESPASMO, que e o que uma coisa engolindo o setor faz. Seis tambem e o
-    // tamanho da tabela de gole (GULP): cada quadro do atlas e uma entrada
-    // dela, sem repetir nem sobrar.
-    downed: { frames: 6, fps: 11, loop: true },
-    // `burst` e a ABERTURA: o chao intacto rasgando ate virar a cratera de
-    // `downed`. Seis quadros a 6,25 fps — 0,96 s, uma vez so.
-    //
-    // Um slot proprio e nao os primeiros quadros de `downed`, porque `downed`
-    // e um CICLO: com a abertura na frente dela, o espasmo reabriria a boca a
-    // cada volta. E `burst` em vez de `revive` porque `revive` significa o
-    // caminho de VOLTA (levantar do chao), e este e o de ida.
-    //
-    // A duracao e derivada: ver DEVOURER_MAW_OPEN_FRAMES.
-    burst: { frames: DEVOURER_MAW_OPEN_FRAMES, fps: 6.25, loop: false },
-  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor', 3),
+  base(
+    'enemy-diamandis',
+    120,
+    138,
+    58,
+    114,
+    { w: 1.8, h: 2.4 },
+    { w: 2, h: 2, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 8, loop: false },
+    },
+    diamandisFrame,
+    'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon',
+    1,
+  ),
+  base(
+    'enemy-white-devourer',
+    156,
+    152,
+    76,
+    104,
+    { w: 3.1, h: 1.7 },
+    { w: 2.8, h: 2.2, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 10, loop: false },
+      // `downed` e a BOCA ABERTA, e nao a morte: o Devorador e o unico inimigo
+      // que usa este slot em vida. O nome do slot ja existia no contrato de atlas
+      // e significa exatamente isto — "no chao, vulneravel".
+      //
+      // Seis quadros a 11 fps, e nao quatro a 5. A 5 fps a pose respirava, e
+      // respirar e calmo; o ciclo de 0,55 s com seis fases desalinhadas le como
+      // ESPASMO, que e o que uma coisa engolindo o setor faz. Seis tambem e o
+      // tamanho da tabela de gole (GULP): cada quadro do atlas e uma entrada
+      // dela, sem repetir nem sobrar.
+      downed: { frames: 6, fps: 11, loop: true },
+      // `burst` e a ABERTURA: o chao intacto rasgando ate virar a cratera de
+      // `downed`. Seis quadros a 6,25 fps — 0,96 s, uma vez so.
+      //
+      // Um slot proprio e nao os primeiros quadros de `downed`, porque `downed`
+      // e um CICLO: com a abertura na frente dela, o espasmo reabriria a boca a
+      // cada volta. E `burst` em vez de `revive` porque `revive` significa o
+      // caminho de VOLTA (levantar do chao), e este e o de ida.
+      //
+      // A duracao e derivada: ver DEVOURER_MAW_OPEN_FRAMES.
+      burst: { frames: DEVOURER_MAW_OPEN_FRAMES, fps: 6.25, loop: false },
+    },
+    devourerFrame,
+    'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor',
+    3,
+  ),
   // O CORPO do Devorador, uma peca por quadro. Nao e uma criatura e nao entra
   // em `ARCHETYPE_SPRITE`: a simulacao nao tem entidade nenhuma para ele — os
   // dez aneis sao posicao derivada do rastro da cabeca, no cliente, e a colisao
@@ -3213,76 +3815,257 @@ export const ENTITY_SPECS = [
   // instantes: o cliente pede o quadro `k` por indice. A cadencia declarada
   // existe so porque o contrato de atlas exige uma, e nenhum caminho de desenho
   // a consulta.
-  base('part-white-devourer-coil', 64, 58, 30, 47, { w: 0.64, h: 0.64 }, { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 }, {
-    idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
-  }, devourerCoilFrame, 'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip', 1),
+  base(
+    'part-white-devourer-coil',
+    64,
+    58,
+    30,
+    47,
+    { w: 0.64, h: 0.64 },
+    { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 },
+    {
+      idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
+    },
+    devourerCoilFrame,
+    'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip',
+    1,
+  ),
   // A NINHADA do Devorador: uma linha de bloquinhos, tres variantes x seis
   // fases num slot so. `part-` e nao `enemy-` pela mesma razao do anel de
   // corpo: a validacao cobra de todo `enemy-` o conjunto de animacoes de uma
   // criatura, e um filhote inofensivo nao tem ataque nem pose de morte.
-  base('part-devourer-brood', 24, 16, 10, 10, { w: 0.3, h: 0.16 }, { w: 0.3, h: 0.3, offsetX: 0, offsetY: 0 }, {
-    idle: { frames: BROOD_VARIANTS * BROOD_PHASES, fps: 1, loop: true },
-  }, broodFrame, 'voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths', 1),
-  base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 9, loop: false },
-  }, archcantorFrame, 'voxel-isometric prismatic cathedral cantor boss, dark rock body with five uneven electric crystal organ pipes growing from its back, resonance cavity instead of a face, crown of crystal shards, no arms and no weapon', 1),
-  base('enemy-sheet-leviathan', 124, 80, 60, 51, { w: 2.2, h: 1.4 }, { w: 2, h: 1.8, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 10, loop: false },
-  }, leviathanFrame, 'voxel-isometric black aquifer ray-leviathan boss, broad flat wing sheets, whip tail, conductive electric lateral lines running nose to tail, flattened wedge head with gill slits and a slit mouth, top-mounted eyes', 1),
+  base(
+    'part-devourer-brood',
+    24,
+    16,
+    10,
+    10,
+    { w: 0.3, h: 0.16 },
+    { w: 0.3, h: 0.3, offsetX: 0, offsetY: 0 },
+    {
+      idle: { frames: BROOD_VARIANTS * BROOD_PHASES, fps: 1, loop: true },
+    },
+    broodFrame,
+    'voxel-isometric tiny pale silica worm hatchling, a short line of small tapering cubes with a single dark red segment behind the nose, no head and no eyes, three body lengths',
+    1,
+  ),
+  base(
+    'enemy-archcantor',
+    64,
+    114,
+    30,
+    97,
+    { w: 1.4, h: 2.2 },
+    { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 9, loop: false },
+    },
+    archcantorFrame,
+    'voxel-isometric prismatic cathedral cantor boss, dark rock body with five uneven electric crystal organ pipes growing from its back, resonance cavity instead of a face, crown of crystal shards, no arms and no weapon',
+    1,
+  ),
+  // A CABECA do Leviata: o disco cefalico, que e a regiao autoritativa de
+  // dano — o hitbox e o do disco, e nao da cauda inteira. `special` e a carga
+  // da descarga (as linhas acendem); `attack` e a Sondagem (guelras vibram).
+  base(
+    'enemy-sheet-leviathan',
+    112,
+    68,
+    56,
+    41,
+    { w: 1.7, h: 1.2 },
+    { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 10, loop: false },
+    },
+    leviathanFrame,
+    'voxel-isometric black aquifer ray-leviathan boss head: flattened muscular cephalic disc, forward cephalic lobes around a wide slit mouth, small top-mounted cyan eyes, deep gill slits, cyan electrosensory pores, two conductive lateral lines starting at the nape, near-black navy and wet slate dorsum, blue-grey belly',
+    3,
+  ),
+  // O CORPO do Leviata, um corte transversal por quadro: raiz das asas,
+  // membranas, tronco, pedunculo e cauda. `part-` pela mesma razao do anel do
+  // Devorador — nao e um bicho, e uma peca; os quadros sao POSTOS.
+  //
+  // OITO RUMOS, e nao quatro: a peca e escolhida pela tangente do caminho, e
+  // um corpo nadando na horizontal ou na vertical da tela (as diagonais do
+  // mundo) ficava a 45 graus de qualquer quadro autorado — oito quadros `dr`
+  // empilhados na vertical leem como escada. Dois atlas (asas e cauda) pelo
+  // tamanho do quadro, ver `LEVIATHAN_WING_RANKS`; os quadros sao os menores
+  // que enquadram as oito rotacoes de cada metade com 2px de margem.
+  eightWay(
+    base(
+      'part-sheet-leviathan-wings',
+      208,
+      112,
+      104,
+      61,
+      { w: 1.7, h: 1.2 },
+      { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+      {
+        idle: { frames: LEVIATHAN_WING_RANKS, fps: 1, loop: true },
+      },
+      leviathanWingsFrame,
+      'voxel-isometric cross-sections of an abyssal ray-leviathan wing region in eight facings, four ranks from broad crescent wing roots through the widest span of over four tiles to narrowing membranes with serrated pale trailing edges and wet leading-edge sheen, near-black dorsum, pale belly, two continuous conductive lines along the dorsum, barnacles and pale scars',
+      1,
+    ),
+  ),
+  eightWay(
+    base(
+      'part-sheet-leviathan-tail',
+      64,
+      44,
+      32,
+      30,
+      { w: 1.7, h: 1.2 },
+      { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+      {
+        idle: { frames: LEVIATHAN_BODY_RANKS - LEVIATHAN_WING_RANKS, fps: 1, loop: true },
+      },
+      leviathanTailFrame,
+      'voxel-isometric cross-sections of an abyssal ray-leviathan tail in eight facings, four ranks from a tapering trunk with fin remnants through a thin peduncle to a whip tail tipped with a discreet electric organ, near-black dorsum with a wet crest, two continuous conductive lines',
+      1,
+    ),
+  ),
   // Pulmao e Coracao sao FIXOS na simulacao (speed 0) e por isso nao tem
   // `walk`: um atlas com marcha para quem nunca sai do lugar seria 24 quadros
   // de textura que nenhum frame do jogo chega a pedir. O cliente ja cai em
   // `idle` para animacao ausente.
-  base('enemy-lung-matrix', 116, 112, 56, 88, { w: 1.8, h: 1.8 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
-    idle: { frames: 4, fps: 5, loop: true },
-    attack: { frames: 4, fps: 10, loop: false },
-    special: { frames: 4, fps: 6, loop: false },
-    hit: { frames: 2, fps: 12, loop: false },
-    die: { frames: 5, fps: 10, loop: false },
-  }, lungMatrixFrame, 'voxel-isometric anchored sulfur lung organ boss, huge yellow gas sac caged by four bone ribs, rusted root pipes biting the floor, frontal trachea valve venting sulfur, accessory sacs on the back — no legs', 1),
-  base('enemy-furnace-heart', 116, 108, 56, 84, { w: 2, h: 2 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
-    idle: { frames: 4, fps: 5, loop: true },
-    attack: { frames: 4, fps: 10, loop: false },
-    special: { frames: 4, fps: 8, loop: false },
-    hit: { frames: 2, fps: 12, loop: false },
-    die: { frames: 5, fps: 10, loop: false },
-  }, furnaceHeartFrame, 'voxel-isometric anchored igneous core boss, four dark slag plates opening and closing around a permanent molten core, charred plate edges, scoria mound base, spines rising when overheated — no legs', 1),
-  base('enemy-frost-queen', 60, 118, 28, 101, { w: 1.2, h: 2.2 }, { w: 1.4, h: 1.4, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 9, loop: false },
-  }, frostQueenFrame, 'voxel-isometric glacial crypt queen boss, humanoid posture, dragging skirt of ice and mist instead of legs, dark narrow body showing through gaps between ice plates, icicle arms without hands, five-shard crown, two electric eyes', 1),
-  base('enemy-magnetarch', 128, 98, 62, 83, { w: 1.4, h: 1.8 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    special: { frames: 4, fps: 9, loop: false },
-  }, magnetarchFrame, 'voxel-isometric hovering magnetite core boss, rough dark octahedron with glowing electric seams, two perpendicular iron segment rings that tighten or widen with polarity, orbiting scrap debris, suspended iron filings below — no legs, no face', 1),
+  base(
+    'enemy-lung-matrix',
+    116,
+    112,
+    56,
+    88,
+    { w: 1.8, h: 1.8 },
+    { w: 2, h: 2, offsetX: 0, offsetY: 0 },
+    {
+      idle: { frames: 4, fps: 5, loop: true },
+      attack: { frames: 4, fps: 10, loop: false },
+      special: { frames: 4, fps: 6, loop: false },
+      hit: { frames: 2, fps: 12, loop: false },
+      die: { frames: 5, fps: 10, loop: false },
+    },
+    lungMatrixFrame,
+    'voxel-isometric anchored sulfur lung organ boss, huge yellow gas sac caged by four bone ribs, rusted root pipes biting the floor, frontal trachea valve venting sulfur, accessory sacs on the back — no legs',
+    1,
+  ),
+  base(
+    'enemy-furnace-heart',
+    116,
+    108,
+    56,
+    84,
+    { w: 2, h: 2 },
+    { w: 2, h: 2, offsetX: 0, offsetY: 0 },
+    {
+      idle: { frames: 4, fps: 5, loop: true },
+      attack: { frames: 4, fps: 10, loop: false },
+      special: { frames: 4, fps: 8, loop: false },
+      hit: { frames: 2, fps: 12, loop: false },
+      die: { frames: 5, fps: 10, loop: false },
+    },
+    furnaceHeartFrame,
+    'voxel-isometric anchored igneous core boss, four dark slag plates opening and closing around a permanent molten core, charred plate edges, scoria mound base, spines rising when overheated — no legs',
+    1,
+  ),
+  base(
+    'enemy-frost-queen',
+    60,
+    118,
+    28,
+    101,
+    { w: 1.2, h: 2.2 },
+    { w: 1.4, h: 1.4, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 9, loop: false },
+    },
+    frostQueenFrame,
+    'voxel-isometric glacial crypt queen boss, humanoid posture, dragging skirt of ice and mist instead of legs, dark narrow body showing through gaps between ice plates, icicle arms without hands, five-shard crown, two electric eyes',
+    1,
+  ),
+  base(
+    'enemy-magnetarch',
+    128,
+    98,
+    62,
+    83,
+    { w: 1.4, h: 1.8 },
+    { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      special: { frames: 4, fps: 9, loop: false },
+    },
+    magnetarchFrame,
+    'voxel-isometric hovering magnetite core boss, rough dark octahedron with glowing electric seams, two perpendicular iron segment rings that tighten or widen with polarity, orbiting scrap debris, suspended iron filings below — no legs, no face',
+    1,
+  ),
   {
-    id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
-    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },
+    id: 'fx-projectile-bolt',
+    version: 4,
+    frameWidth: 32,
+    frameHeight: 32,
+    anchorX: 16,
+    anchorY: 16,
+    directions: 1,
+    authoredDirs: ['n'],
+    flipPairs: {},
+    hitbox: { w: 0.2, h: 0.2 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { fly: { frames: 4, fps: 16, loop: true } }, draw: boltFrame,
+    animations: { fly: { frames: 4, fps: 16, loop: true } },
+    draw: boltFrame,
     prompt: 'faceted cyan energy shard, shimmering halo, twin orbiting electric sparks',
   },
   {
-    id: 'fx-impact-burst', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
-    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0, h: 0 },
+    id: 'fx-impact-burst',
+    version: 4,
+    frameWidth: 32,
+    frameHeight: 32,
+    anchorX: 16,
+    anchorY: 16,
+    directions: 1,
+    authoredDirs: ['n'],
+    flipPairs: {},
+    hitbox: { w: 0, h: 0 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { burst: { frames: 5, fps: 14, loop: false } }, draw: impactFrame,
+    animations: { burst: { frames: 5, fps: 14, loop: false } },
+    draw: impactFrame,
     prompt: 'fragmenting impact burst, elongated shards, fading inner ring',
   },
   {
-    id: 'fx-seeker-drone', version: 1, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
-    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.32, h: 0.32 },
+    id: 'fx-seeker-drone',
+    version: 1,
+    frameWidth: 32,
+    frameHeight: 32,
+    anchorX: 16,
+    anchorY: 16,
+    directions: 1,
+    authoredDirs: ['n'],
+    flipPairs: {},
+    hitbox: { w: 0.32, h: 0.32 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { fly: { frames: 4, fps: 12, loop: true } }, draw: droneFrame,
-    prompt: 'voxel-isometric kamikaze quadcopter drone, four solid rotor discs in X, faceted cold chassis, pulsing amber demolition core — machine, not insect',
+    animations: { fly: { frames: 4, fps: 12, loop: true } },
+    draw: droneFrame,
+    prompt:
+      'voxel-isometric kamikaze quadcopter drone, four solid rotor discs in X, faceted cold chassis, pulsing amber demolition core — machine, not insect',
   },
   {
-    id: 'fx-fire-cyclone', version: 1, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 27,
-    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.85, h: 0.85 },
+    id: 'fx-fire-cyclone',
+    version: 1,
+    frameWidth: 32,
+    frameHeight: 32,
+    anchorX: 16,
+    anchorY: 27,
+    directions: 1,
+    authoredDirs: ['n'],
+    flipPairs: {},
+    hitbox: { w: 0.85, h: 0.85 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { fly: { frames: 6, fps: 14, loop: true } }, draw: cycloneFrame,
-    prompt: 'voxel-isometric fire tornado, tall funnel of ember and white-hot flame, two counter-rotating spiral threads, smoke curling off the top, embers kicked up at the base',
+    animations: { fly: { frames: 6, fps: 14, loop: true } },
+    draw: cycloneFrame,
+    prompt:
+      'voxel-isometric fire tornado, tall funnel of ember and white-hot flame, two counter-rotating spiral threads, smoke curling off the top, embers kicked up at the base',
   },
 ];

@@ -1,0 +1,85 @@
+{
+  "id": "part-sheet-leviathan-wings",
+  "version": 1,
+  "atlas": "part-sheet-leviathan-wings.png",
+  "normalAtlas": "part-sheet-leviathan-wings.normal.png",
+  "normalScale": 2,
+  "frameWidth": 208,
+  "frameHeight": 112,
+  "columns": 16,
+  "anchorX": 104,
+  "anchorY": 61,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.7,
+    "h": 1.2
+  },
+  "footprint": {
+    "w": 1.6,
+    "h": 1.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0
+    },
+    "dl": {
+      "idle": 4
+    },
+    "ur": {
+      "idle": 8
+    },
+    "ul": {
+      "idle": 12
+    },
+    "r": {
+      "idle": 16
+    },
+    "d": {
+      "idle": 20
+    },
+    "l": {
+      "idle": 24
+    },
+    "u": {
+      "idle": 28
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric cross-sections of an abyssal ray-leviathan wing region in eight facings, four ranks from broad crescent wing roots through the widest span of over four tiles to narrowing membranes with serrated pale trailing edges and wet leading-edge sheen, near-black dorsum, pale belly, two continuous conductive lines along the dorsum, barnacles and pale scars",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

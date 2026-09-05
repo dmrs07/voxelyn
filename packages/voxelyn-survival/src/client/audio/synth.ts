@@ -1928,31 +1928,221 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       detune: 7,
     });
   },
-  // A rompida da lamina: agua fazendo pressao para cima, e um estalo.
-  leviathanBreach: (ctx, out, t0, noise) => {
-    burst(ctx, out, t0, noise, {
-      peak: 0.36,
-      decay: 0.9,
+  // A SONDAGEM ABISSAL, no corpo: um canto de cetaceo CURTO e grave — sobe um
+  // pouco e cai — com um segundo parcial abafado. Nenhum agudo eletrico.
+  leviathanProbeCall: (ctx, out, t0) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 58,
+      to: 96,
+      peak: 0.46,
+      attack: 0.12,
+      hold: 0.3,
+      release: 0.35,
+    });
+    sustain(ctx, out, t0 + 0.05, {
+      type: 'triangle',
+      from: 116,
+      to: 170,
+      peak: 0.1,
+      attack: 0.15,
+      hold: 0.25,
+      release: 0.3,
+      detune: 9,
+    });
+  },
+  // A marca, NO PONTO: a resposta abafada surgindo pelo lencol, bolhas
+  // pequenas e pedra cedendo. Um grave curto filtrado, e um chiado de bolhas.
+  leviathanProbeMark: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 44,
+      to: 60,
+      peak: 0.3,
+      attack: 0.2,
+      hold: 0.35,
+      release: 0.4,
+    });
+    burst(ctx, out, t0 + 0.15, noise, {
+      peak: 0.14,
+      decay: 0.7,
+      type: 'bandpass',
+      from: 900,
+      to: 1500,
+      q: 1.4,
+      attack: 0.3,
+    });
+    burst(ctx, out, t0 + 0.5, noise, { peak: 0.12, decay: 0.25, type: 'lowpass', from: 260 });
+  },
+  // A liberacao: o golpe HIDRAULICO — agua negra rompendo o chao. Grave e
+  // seco, com um estalo curto de pedra e um chiado de agua caindo. Sem cauda
+  // eletrica: isso e da descarga.
+  leviathanProbeRelease: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 110, to: 34, peak: 0.6, decay: 0.42, attack: 0.01 });
+    burst(ctx, out, t0, noise, { peak: 0.4, decay: 0.09, type: 'lowpass', from: 900, to: 300 });
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 700,
+      to: 400,
+      q: 1.2,
+    });
+  },
+  // O aviso do mergulho: a agua sendo PUXADA para baixo — um grave que desce
+  // e um sopro de succao. Quem esta sobre o corpo tem de sair agora.
+  leviathanDiveWarn: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 96,
+      to: 52,
+      peak: 0.4,
+      attack: 0.1,
+      hold: 0.6,
+      release: 0.5,
+    });
+    burst(ctx, out, t0 + 0.1, noise, {
+      peak: 0.18,
+      decay: 1.0,
       type: 'lowpass',
-      from: 200,
-      to: 1400,
+      from: 1400,
+      to: 200,
       attack: 0.4,
+    });
+  },
+  // A descida: som DESCENDENTE acompanhando cabeca, corpo e cauda — tres
+  // camadas de agua fechando, cada uma mais grave e mais tarde.
+  leviathanDive: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 3; i++) {
+      burst(ctx, out, t0 + i * 0.55, noise, {
+        peak: 0.24 - i * 0.04,
+        decay: 0.5,
+        type: 'lowpass',
+        from: 1100 - i * 260,
+        to: 180,
+        attack: 0.12,
+      });
+      tone(ctx, out, t0 + i * 0.55, {
+        type: 'sine',
+        from: 150 - i * 30,
+        to: 48,
+        peak: 0.26,
+        decay: 0.5,
+        attack: 0.03,
+      });
+    }
+  },
+  // O ultimo "gulp": a cauda sumiu, a superficie fechou. Curto, grave, uma
+  // bolha grande estourando de cabeca para baixo.
+  leviathanGulp: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 60, to: 180, peak: 0.42, decay: 0.16, attack: 0.02 });
+    tone(ctx, out, t0 + 0.1, {
+      type: 'sine',
+      from: 240,
+      to: 70,
+      peak: 0.28,
+      decay: 0.3,
+      attack: 0.02,
+    });
+    burst(ctx, out, t0 + 0.05, noise, { peak: 0.14, decay: 0.3, type: 'lowpass', from: 500 });
+  },
+  // O borbulhar CRESCENTE no destino: bolhas cada vez mais densas e um grave
+  // subindo por baixo delas — e o que diz "e aqui" sem depender de visao.
+  leviathanBubbling: (ctx, out, t0, noise) => {
+    for (let i = 0; i < 6; i++) {
+      tone(ctx, out, t0 + i * 0.12, {
+        type: 'sine',
+        from: 380 + i * 60,
+        to: 620 + i * 80,
+        peak: 0.07 + i * 0.015,
+        decay: 0.07,
+        attack: 0.01,
+      });
+    }
+    burst(ctx, out, t0, noise, {
+      peak: 0.16,
+      decay: 0.8,
+      type: 'bandpass',
+      from: 800,
+      to: 1600,
+      q: 1.6,
+      attack: 0.5,
     });
     sustain(ctx, out, t0, {
       type: 'sine',
-      from: 70,
-      to: 130,
-      peak: 0.3,
-      attack: 0.7,
-      hold: 0.1,
-      release: 0.1,
+      from: 42,
+      to: 70,
+      peak: 0.22,
+      attack: 0.5,
+      hold: 0.2,
+      release: 0.2,
     });
-    burst(ctx, out, t0 + 0.9, noise, {
-      peak: 0.3,
-      decay: 0.08,
+  },
+  // A emergencia: a RUPTURA pesada da lamina, agua deslocada em massa e as
+  // membranas molhadas se abrindo (um chiado largo, descendente).
+  leviathanEmerge: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 50, to: 110, peak: 0.5, decay: 0.6, attack: 0.05 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.42,
+      decay: 0.9,
+      type: 'lowpass',
+      from: 300,
+      to: 1600,
+      attack: 0.25,
+    });
+    burst(ctx, out, t0 + 0.6, noise, {
+      peak: 0.2,
+      decay: 0.8,
       type: 'bandpass',
-      from: 1600,
-      q: 2,
+      from: 2200,
+      to: 900,
+      q: 1.1,
+      attack: 0.1,
+    });
+  },
+  // A respiracao funda quando o corpo termina de ocupar a poca: um grave
+  // inspirado e solto, sem ataque, e agua escorrendo.
+  leviathanBreath: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sine',
+      from: 48,
+      to: 66,
+      peak: 0.36,
+      attack: 0.4,
+      hold: 0.3,
+      release: 0.7,
+    });
+    burst(ctx, out, t0 + 0.2, noise, {
+      peak: 0.1,
+      decay: 1.1,
+      type: 'lowpass',
+      from: 700,
+      to: 250,
+      attack: 0.3,
+    });
+  },
+  // A QUEDA NO AQUIFERO: a agua negra engole o chassi. Um golpe grave, abafado
+  // e aquatico, a coluna de bolhas subindo e a superficie fechando — nada de
+  // gelo, nada de estilhaco. Compare com `icePlunge`.
+  aquiferPlunge: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 140, to: 32, peak: 0.7, decay: 0.55, attack: 0.01 });
+    burst(ctx, out, t0, noise, { peak: 0.36, decay: 0.35, type: 'lowpass', from: 800, to: 200 });
+    for (let i = 0; i < 5; i++) {
+      tone(ctx, out, t0 + 0.18 + i * 0.09, {
+        type: 'sine',
+        from: 320 + i * 90,
+        to: 520 + i * 110,
+        peak: 0.09,
+        decay: 0.06,
+        attack: 0.01,
+      });
+    }
+    burst(ctx, out, t0 + 0.4, noise, {
+      peak: 0.1,
+      decay: 0.6,
+      type: 'lowpass',
+      from: 400,
+      to: 120,
     });
   },
   // Inicio do Diluvio: um chamado ASCENDENTE e distante; depois o
@@ -1986,37 +2176,72 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       attack: 0.5,
     });
   },
-  // Preparacao da descarga: o canto PARA, e sobe um gemido sustentado com
-  // harmonicos eletricos se acumulando por cima. 3,6 s de windup; o som
-  // ocupa quase tudo, porque o que anuncia perigo aqui e a tensao crescendo.
+  // Preparacao da descarga (3,6 s). O canto PARA, e o que sobe e PRESSAO:
+  // um grave sustentado como base, uma vocalizacao de cetaceo crescendo por
+  // cima, estalos curtos que aceleram, e — so no ultimo meio segundo — tres
+  // pulsos claros sincronizados com as tres contracoes do corpo. Os medios e
+  // agudos sao TRANSIENTES (estalos), nao uma parede: a versao anterior
+  // sustentava saw e ruido high-pass por dois segundos e meio, e era
+  // ensurdecedora. A energia prolongada de saw/ruido caiu ~50%; o resto do
+  // aviso esta no ritmo, nao no volume — e a descarga (`leviathanShockRelease`)
+  // continua sendo o maior impacto.
   leviathanShockCharge: (ctx, out, t0, noise) => {
     sustain(ctx, out, t0, {
       type: 'sine',
-      from: 58,
-      to: 92,
-      peak: 0.42,
+      from: 52,
+      to: 84,
+      peak: 0.34,
       attack: 0.8,
-      hold: 2.2,
+      hold: 2.3,
       release: 0.3,
     });
-    sustain(ctx, out, t0 + 0.6, {
+    // A vocalizacao: sobe uma oitava em tres segundos, abafada.
+    sustain(ctx, out, t0 + 0.3, {
+      type: 'triangle',
+      from: 70,
+      to: 150,
+      peak: 0.16,
+      attack: 2.4,
+      hold: 0.4,
+      release: 0.3,
+      detune: 6,
+    });
+    // O saw so entra tarde, baixo e curto: e tensao, nao sirene.
+    sustain(ctx, out, t0 + 2.2, {
       type: 'sawtooth',
-      from: 700,
-      to: 2400,
-      peak: 0.14,
-      attack: 2.2,
-      hold: 0.3,
-      release: 0.2,
-      detune: 18,
+      from: 900,
+      to: 1900,
+      peak: 0.06,
+      attack: 0.9,
+      hold: 0.2,
+      release: 0.15,
+      detune: 14,
     });
-    burst(ctx, out, t0 + 1.0, noise, {
-      peak: 0.22,
-      decay: 2.4,
-      type: 'highpass',
-      from: 1800,
-      to: 5000,
-      attack: 1.6,
-    });
+    // Estalos que ACELERAM: doze cliques de intervalo decrescente.
+    let at = 0.5;
+    for (let i = 0; i < 12; i++) {
+      burst(ctx, out, t0 + at, noise, {
+        peak: 0.16 + i * 0.012,
+        decay: 0.035,
+        type: 'bandpass',
+        from: 2200 + i * 120,
+        q: 3,
+      });
+      at += 0.32 - i * 0.02;
+    }
+    // As tres contracoes finais: pulsos claros, um por contracao do corpo.
+    for (const k of [0, 1, 2]) {
+      const p = t0 + 3.05 + k * 0.18;
+      tone(ctx, out, p, {
+        type: 'sine',
+        from: 160,
+        to: 110,
+        peak: 0.28,
+        decay: 0.09,
+        attack: 0.005,
+      });
+      burst(ctx, out, p, noise, { peak: 0.2, decay: 0.03, type: 'highpass', from: 3000 });
+    }
   },
   // Descarga massiva: um estalo agudo curtissimo, depois um golpe grave e
   // abafado atravessando a agua.

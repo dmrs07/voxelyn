@@ -42,7 +42,14 @@ import { resetMinigun } from './minigun.js';
 import { emptyBossRuntime } from './bosses.js';
 import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
-import { ARCHETYPES, SIGNATURE_OF_STRATUM, SIGNATURE_PACK, circleBlocked, spawnEnemy } from './entities.js';
+import { nearestPoolCore } from './leviathan.js';
+import {
+  ARCHETYPES,
+  SIGNATURE_OF_STRATUM,
+  SIGNATURE_PACK,
+  circleBlocked,
+  spawnEnemy,
+} from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { isIceSurface } from './constants.js';
@@ -58,7 +65,11 @@ import type { EnemyArchetype, SemanticEvent, SurvivalState, Vec2 } from './types
  */
 const resetLeylineNetwork = (
   state: SurvivalState,
-  world: { leylines: Array<{ cells: number[] }>; leylineNodes: Array<{ cell: number; segments: number[] }>; entry: Vec2 },
+  world: {
+    leylines: Array<{ cells: number[] }>;
+    leylineNodes: Array<{ cell: number; segments: number[] }>;
+    entry: Vec2;
+  },
 ): void => {
   const network = deriveLeylineNetwork(world, state.config.width);
   state.leylineNodes = network.nodes;
@@ -124,8 +135,16 @@ const PEDESTAL_KEEPOUT = 3;
 const plantBishopPocket = (state: SurvivalState, cx: number, cy: number): void => {
   const w = state.config.width;
   const h = state.config.height;
-  for (let y = Math.max(1, cy - BISHOP_POCKET_RADIUS); y <= Math.min(h - 2, cy + BISHOP_POCKET_RADIUS); y++) {
-    for (let x = Math.max(1, cx - BISHOP_POCKET_RADIUS); x <= Math.min(w - 2, cx + BISHOP_POCKET_RADIUS); x++) {
+  for (
+    let y = Math.max(1, cy - BISHOP_POCKET_RADIUS);
+    y <= Math.min(h - 2, cy + BISHOP_POCKET_RADIUS);
+    y++
+  ) {
+    for (
+      let x = Math.max(1, cx - BISHOP_POCKET_RADIUS);
+      x <= Math.min(w - 2, cx + BISHOP_POCKET_RADIUS);
+      x++
+    ) {
       const dx = x - cx;
       const dy = y - cy;
       if (dx * dx + dy * dy > BISHOP_POCKET_RADIUS * BISHOP_POCKET_RADIUS) continue;
@@ -293,7 +312,19 @@ export const populateSector = (
   if (bossHere) {
     if (bossArchetype === 'bishop') plantBishopPocket(state, bossSpawn.x, bossSpawn.y);
     if (!state.sectorBoss.defeated) {
-      const body = spawnEnemy(state, bossArchetype, bossSpawn.x, bossSpawn.y, false);
+      // O LEVIATA nasce SOBRE UMA POCA, e nao no ponto reservado: a primeira
+      // fase dele e ancorar num nucleo profundo com o corpo aberto por cima, e
+      // o ponto do chefe e chao seco por contrato (o 3x3 limpo). O nucleo
+      // ocupavel mais proximo, em varredura fixa — sem poca ao alcance (uma
+      // arena de teste sem karst) ele fica onde o ponto manda, ancorado em
+      // chao seco, que e um encontro valido, so nao o ideal.
+      let at = { x: bossSpawn.x, y: bossSpawn.y };
+      if (bossArchetype === 'sheet_leviathan') {
+        const core = nearestPoolCore(state, bossSpawn.x, bossSpawn.y, 10);
+        if (core >= 0)
+          at = { x: core % state.config.width, y: Math.floor(core / state.config.width) };
+      }
+      const body = spawnEnemy(state, bossArchetype, at.x, at.y, false);
       // O id do corpo em campo. E por ele que a morte sabe que ESTE cadaver era
       // o dono do setor, e nao um segundo exemplar do mesmo arquetipo — o que
       // acontece de verdade quando um Bispo guarda uma camara micelial cheia de
@@ -448,7 +479,12 @@ const populateMiners = (
         if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
         if (state.solid[y * w + x] !== SOLID_ORE) continue;
         // O veio e solido: ele fica ao LADO dele, num chao livre, nao dentro.
-        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [ox, oy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]) {
           const fx = x + ox;
           const fy = y + oy;
           const i = fy * w + fx;
@@ -529,7 +565,12 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   // relogio herdado recongelaria uma celula que hoje pode ser rocha.
   state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
-  state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
+  state.railTracks = world.railTracks.map((t) => ({
+    ...t,
+    readyAt: 0,
+    firingAt: 0,
+    fromEnd: 0 as const,
+  }));
   state.hallCenters = world.hallCenters;
   // Segmentos do setor novo, todos dormentes — os relogios do setor velho
   // descreviam paredes que ja nao existem.
@@ -672,7 +713,12 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   // relogio herdado recongelaria uma celula que hoje pode ser rocha.
   state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
-  state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
+  state.railTracks = world.railTracks.map((t) => ({
+    ...t,
+    readyAt: 0,
+    firingAt: 0,
+    fromEnd: 0 as const,
+  }));
   state.hallCenters = world.hallCenters;
   // Segmentos do setor novo, todos dormentes — os relogios do setor velho
   // descreviam paredes que ja nao existem.

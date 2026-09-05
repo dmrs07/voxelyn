@@ -299,11 +299,26 @@ export const openIceHole = (state: SurvivalState, i: number, events: SemanticEve
  */
 export const sealIceHole = (state: SurvivalState, i: number): boolean => {
   if (state.surface[i] !== SURF_DEEP_WATER) return false;
+  // So um BURACO DE GELO fecha — o registrado em `iceHoles`. A agua profunda
+  // NATIVA do Aquifero (as bacias, os nucleos que a Sondagem afunda) tem o
+  // mesmo id de superficie e outra origem: ela nunca entrou na lista, nunca
+  // recongela, e uma Nova da Rainha caida por cima dela (um Bispo num
+  // Aquifero micelial nao existe, mas um congelamento de teste sim) nao pode
+  // transforma-la em placa. A origem e o ciclo vivem no REGISTRO, nao no id.
   const at = state.iceHoles.findIndex((hole) => hole.idx === i);
-  if (at >= 0) state.iceHoles.splice(at, 1);
+  if (at < 0) return false;
+  state.iceHoles.splice(at, 1);
   setSurface(state, i, SURF_ICE, 0);
   return true;
 };
+
+/**
+ * Esta celula de agua profunda e um buraco de GELO (recongela) ou agua
+ * profunda NATIVA (permanente)? A pergunta que a apresentacao da queda faz:
+ * a mesma morte (`deep_water`) tem duas caras, e so o registro sabe qual.
+ */
+export const isIceHole = (state: SurvivalState, i: number): boolean =>
+  state.surface[i] === SURF_DEEP_WATER && state.iceHoles.some((hole) => hole.idx === i);
 
 /**
  * O que uma travessia faz com esta celula.

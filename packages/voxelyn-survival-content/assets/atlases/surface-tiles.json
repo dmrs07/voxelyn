@@ -1,6 +1,6 @@
 {
   "id": "surface-tiles",
-  "version": 8,
+  "version": 9,
   "atlas": "surface-tiles.png",
   "frameWidth": 64,
   "frameHeight": 76,
@@ -102,6 +102,11 @@
       "name": "deep-water",
       "frames": 4,
       "frameMs": 520
+    },
+    {
+      "name": "aquifer-deep-water",
+      "frames": 3,
+      "frameMs": 640
     }
   ],
   "variants": 3,

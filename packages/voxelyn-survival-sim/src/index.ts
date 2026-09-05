@@ -18,9 +18,13 @@ export {
   joinedPlayers,
   nearestStandingPlayer,
 } from './run.js';
+export * from './leviathan.js';
 export {
   generateWorld,
   floodOpen,
+  floodWalkable,
+  stampDeepBasins,
+  AQUIFER_ARENA_POOLS,
   chunkOf,
   cellIdx,
   DEFAULT_PROFILE,
@@ -145,6 +149,7 @@ export {
   advanceIceCrack,
   openIceHole,
   sealIceHole,
+  isIceHole,
   isGlacialStabilised,
   heatFungalCell,
   breakSolid,

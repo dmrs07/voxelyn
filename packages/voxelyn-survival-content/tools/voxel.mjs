@@ -309,7 +309,21 @@ const KEY_BIAS = 128;
  * Cada indice continua seguindo o contrato publico de renderVoxels:
  * 0=dr, 1=dl, 2=ur, 3=ul.
  */
-const DIRECTION_ROTATION = [1, 2, 0, 3];
+const DIRECTION_ROTATION = [1, 2, 0, 3, 0.5, 1.5, 2.5, 3.5];
+
+/**
+ * Os OITO rumos, na ordem dos indices de `renderVoxels`: os quatro autorados
+ * de sempre (os eixos do mundo, que na tela sao as diagonais) e os quatro
+ * intermediarios (as diagonais do mundo, que na tela sao a horizontal e a
+ * vertical): 4=r, 5=d, 6=l, 7=u.
+ *
+ * Um rumo intermediario e uma rotacao de MEIO passo (45 graus) do mesmo modelo,
+ * re-rasterizada na grade fina — ver `rotatedVoxels`. Existe por causa dos
+ * corpos compridos em pecas: um corpo que nada na vertical da tela com pecas
+ * autoradas so nos quatro eixos do mundo empilha oito quadros `dr` um sobre o
+ * outro, e le como escada, nao como bicho.
+ */
+export const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
 
 /**
  * Indice de direcao cuja rotacao e a identidade.
@@ -334,6 +348,74 @@ const rot = (x, y, r) => {
 };
 
 /**
+ * O modelo rotacionado por um numero NAO inteiro de quartos de volta,
+ * re-rasterizado na grade fina.
+ *
+ * As rotacoes de 90 graus preservam a grade: um voxel vira outro voxel. A de
+ * 45 nao — a caixa autorada vira um losango que atravessa celulas — entao o
+ * modelo e amostrado de novo: cada voxel fino da caixa e coberto por uma
+ * malha 2x2 de pontos, cada ponto e girado em torno do MESMO pivo das
+ * rotacoes inteiras (o canto (0.5, 0.5) da grade fina — e o que `rot` faz,
+ * escrito em coordenadas continuas) e cai na celula onde pousa. A malha tem
+ * passo 0,5, e uma celula unitaria sempre contem um ponto de uma malha de
+ * passo 0,5 girada de qualquer angulo (o disco inscrito tem raio 0,5, e a
+ * distancia maxima a um ponto da malha e 0,354): o interior sai macico, sem
+ * furo, e a borda fica serrilhada em um voxel — o serrilhado de um voxel e o
+ * grao do jogo.
+ *
+ * A ocupacao e a casca saem do MESMO conjunto, e a casca e o voxel com algum
+ * dos seis vizinhos vazio: a mesma definicao de interior que `shellVoxels`
+ * usa para as caixas, aplicada a forma girada.
+ */
+const rotatedVoxels = (boxes, r) => {
+  const angle = (r * Math.PI) / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const PIVOT = 0.5;
+  const cells = new Map();
+  for (const b of boxes) {
+    const ramp = RAMPS[b.mat];
+    if (!ramp) throw new Error(`material sem rampa: ${b.mat}`);
+    const x0 = fine(b.x);
+    const y0 = fine(b.y);
+    const z0 = fine(b.z);
+    const w = Math.max(1, fine(b.w));
+    const d = Math.max(1, fine(b.d));
+    const h = Math.max(1, fine(b.h));
+    for (let dx = 0; dx < w; dx++) {
+      for (let dy = 0; dy < d; dy++) {
+        for (const sx of [0.25, 0.75]) {
+          for (const sy of [0.25, 0.75]) {
+            const px = x0 + dx + sx - PIVOT;
+            const py = y0 + dy + sy - PIVOT;
+            const x = Math.floor(px * cos - py * sin + PIVOT);
+            const y = Math.floor(px * sin + py * cos + PIVOT);
+            for (let dz = 0; dz < h; dz++) {
+              // A caixa mais tarde na lista ganha a celula: e a ordem em que
+              // as caixas se sobrepoem quando o modelo e autorado por camadas.
+              cells.set(occupancyKey(x, y, z0 + dz), { x, y, z: z0 + dz, ramp, mat: b.mat });
+            }
+          }
+        }
+      }
+    }
+  }
+  const solid = new Set(cells.keys());
+  const shell = [];
+  for (const v of cells.values()) {
+    const buried =
+      solid.has(occupancyKey(v.x + 1, v.y, v.z)) &&
+      solid.has(occupancyKey(v.x - 1, v.y, v.z)) &&
+      solid.has(occupancyKey(v.x, v.y + 1, v.z)) &&
+      solid.has(occupancyKey(v.x, v.y - 1, v.z)) &&
+      solid.has(occupancyKey(v.x, v.y, v.z + 1)) &&
+      solid.has(occupancyKey(v.x, v.y, v.z - 1));
+    if (!buried) shell.push(v);
+  }
+  return { solid, shell };
+};
+
+/**
  * Expande caixas em voxels FINOS, descartando os internos (nunca visiveis).
  *
  * A subdivisao acontece aqui, e nao nos modelos: uma caixa autorada de 1x1x1
@@ -342,6 +424,7 @@ const rot = (x, y, r) => {
  * grade fina — e o meio-passo que da aos modelos a resolucao nova.
  */
 const shellVoxels = (boxes, r) => {
+  if (!Number.isInteger(r)) return rotatedVoxels(boxes, r).shell;
   const out = [];
   for (const b of boxes) {
     const ramp = RAMPS[b.mat];
@@ -355,8 +438,7 @@ const shellVoxels = (boxes, r) => {
     for (let dx = 0; dx < w; dx++) {
       for (let dy = 0; dy < d; dy++) {
         for (let dz = 0; dz < h; dz++) {
-          const interior =
-            dx > 0 && dx < w - 1 && dy > 0 && dy < d - 1 && dz > 0 && dz < h - 1;
+          const interior = dx > 0 && dx < w - 1 && dy > 0 && dy < d - 1 && dz > 0 && dz < h - 1;
           if (interior) continue;
           const [x, y] = rot(x0 + dx, y0 + dy, r);
           out.push({ x, y, z: z0 + dz, ramp, mat: b.mat });
@@ -378,6 +460,7 @@ const occupancyKey = (x, y, z) => `${x},${y},${z}`;
  * ha materia macica encostada nela.
  */
 const solidVoxels = (boxes, r) => {
+  if (!Number.isInteger(r)) return rotatedVoxels(boxes, r).solid;
   const solid = new Set();
   for (const b of boxes) {
     const x0 = fine(b.x);
@@ -533,7 +616,10 @@ const shadedRamp = (solid, v) => {
  */
 const CUBE_CELLS = (() => {
   // topo: losango afunilado, o que da a leitura de faceta
-  const cells = [[1, -2, 0], [2, -2, 0]];
+  const cells = [
+    [1, -2, 0],
+    [2, -2, 0],
+  ];
   for (let i = 0; i < 4; i++) cells.push([i, -1, 0]);
   // laterais
   for (let i = 0; i < VOX.zStep; i++) {
@@ -657,7 +743,8 @@ export const layerDepthDispute = (aBoxes, bBoxes, dirIndex) => {
 
 /**
  * Rasteriza um modelo numa grade `w`x`h`.
- * @param dirIndex 0=dr, 1=dl, 2=ur, 3=ul (rotacoes do mesmo modelo)
+ * @param dirIndex 0=dr, 1=dl, 2=ur, 3=ul (rotacoes do mesmo modelo) e, para
+ *   os rumos intermediarios, 4=r, 5=d, 6=l, 7=u (meio passo, re-rasterizado)
  */
 export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   const rotation = DIRECTION_ROTATION[dirIndex];
@@ -751,7 +838,7 @@ export const collapse = (boxes, t) => {
       minY: Math.min(a.minY, b.y),
       maxY: Math.max(a.maxY, b.y + b.d - 1),
     }),
-    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
   );
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const out = [];
@@ -771,12 +858,12 @@ export const collapse = (boxes, t) => {
       x: clamp(
         Math.round((b.x + halfW) * (1 - k * 0.5) + jitterX * k - halfW),
         limit.minX,
-        limit.maxX - b.w + 1
+        limit.maxX - b.w + 1,
       ),
       y: clamp(
         Math.round((b.y + halfD) * (1 - k * 0.5) + jitterY * k - halfD),
         limit.minY,
-        limit.maxY - b.d + 1
+        limit.maxY - b.d + 1,
       ),
       // assenta: o que estava alto cai mais, entao o monte fica baixo
       z: Math.round(b.z * (1 - k)),
@@ -819,7 +906,10 @@ export const modelBounds = (boxes, acc) => {
  * fitToMargin reescalou o sprite em silencio.
  */
 export const projectedBounds = (boxes) => {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (let r = 0; r < 4; r++) {
     for (const v of shellVoxels(boxes, r)) {
       const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);

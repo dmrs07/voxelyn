@@ -514,6 +514,12 @@ export class GameRoom {
         y: round3(bubble.y),
         radius: round3(bubble.radius),
       })),
+      // A PRIMEIRA FASE do Leviata: a marca da Sondagem e a viagem escondida,
+      // para quem reconecta no meio de uma ou de outra ver o aviso.
+      leviathanProbeCell: this.state.bossRuntime.leviathanProbeCell,
+      leviathanProbeDeepen: this.state.bossRuntime.leviathanProbeDeepen,
+      leviathanDest: this.state.bossRuntime.leviathanDest,
+      leviathanSurfaceAt: this.state.bossRuntime.leviathanSurfaceAt,
       // A BOCA em um numero. O cliente refaz o vortice inteiro a partir dele.
       mawOpenedAt: this.state.bossRuntime.mawOpenedAt,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que

@@ -206,7 +206,18 @@
 //     silencio possivel. Cliente antigo contra servidor novo: campos e eventos
 //     desconhecidos, ignorados; um Prospector travado sem nada que o diga. O
 //     bump transforma os dois em recusa no handshake.
-export const PROTOCOL_VERSION = 31;
+// 32: O LEVIATA DO LENCOL em duas fases. Tres acoes novas no enum do wire
+//     (`probe`, a Sondagem Abissal; `dive`; `emerge`), o evento `probe_marker`
+//     (a marca no chao, a dez tiles do corpo), `ice_fall` ganha `medium`
+//     OBRIGATORIO (`ice` | `water` — a queda na Cripta e a queda no Aquifero
+//     tem apresentacoes distintas), e `WorldFlags` carrega a primeira fase
+//     (`leviathanProbeCell`, `leviathanProbeDeepen`, `leviathanDest`,
+//     `leviathanSurfaceAt`) para quem reconecta no meio de uma Sondagem ou
+//     de uma viagem escondida. Cliente antigo contra servidor novo cairia no
+//     ramo generico de ataque para as tres acoes e desenharia o chefe inteiro
+//     de pe enquanto a sim o tem submerso e intocavel; cliente novo contra
+//     servidor antigo nunca receberia a marca nem o `medium`.
+export const PROTOCOL_VERSION = 32;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -887,7 +898,20 @@ export const PROTOCOL_VERSION = 31;
 //     bote do Espectro passa a RESOLVER contato (antes era um impulso sem
 //     dano), com dose de frio so quando encosta. Duas versoes discordam de
 //     quando um Prospector para de andar — e o hash carrega os quatro campos.
-export const SIMULATION_VERSION = 58;
+// 59: O AQUIFERO NEGRO E O LEVIATA DO LENCOL. O worldgen do Aquifero ganha
+//     BACIAS profundas (margem rasa, nucleo `SURF_DEEP_WATER` permanente) e a
+//     arena do chefe cinco pocas ocupaveis; todo ponto de interesse passa a
+//     ser sorteado sobre chao caminhavel (sem agua profunda), o que remapeia
+//     terminais, caches e spawns de todo setor com agua. O Leviata deixa de
+//     perseguir na primeira fase: ancora sobre uma poca (o corpo TAMPA o
+//     nucleo — `plungeIntoDeepWater` ignora as celulas cobertas), solta a
+//     Sondagem Abissal (cria e aprofunda pocas), mergulha por segmentos e
+//     reaparece em outra poca; depois do Diluvio caca com o corpo inteiro. A
+//     descarga e as bolhas so existem na segunda fase, e o predicado da bolha
+//     mudou (raio seguro para o CENTRO, sem subtrair o raio do corpo). Leviata
+//     e Lampreia atravessam agua profunda; `sealIceHole` so fecha buracos
+//     REGISTRADOS. Seis campos novos do `bossRuntime` entram no hash.
+export const SIMULATION_VERSION = 59;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1065,7 +1089,19 @@ export const SIMULATION_VERSION = 58;
 //     animacao nova `special` (a materializacao). O contrato do manifesto nao
 //     mudou; o que muda e o PNG e a geometria dele, e um cliente com o atlas
 //     antigo em cache desenharia o corpo velho — o bump invalida a precache.
-export const CONTENT_VERSION = 33;
+// 34: o LEVIATA DO LENCOL segmentado e a AGUA PROFUNDA DO AQUIFERO. O atlas
+//     `enemy-sheet-leviathan` (v2) passa a desenhar so a CABECA — o disco
+//     cefalico, que e a regiao autoritativa de dano — num quadro menor, e
+//     entra o atlas `part-sheet-leviathan-body`: oito cortes transversais
+//     (raiz das asas, membranas, tronco, pedunculo, cauda) que o cliente
+//     monta atras da cabeca, em pose autorada quando ele esta ancorado e no
+//     rastro da cabeca quando caca. O atlas de crostas (surface-tiles v9)
+//     ganha `aquifer-deep-water`, a agua profunda NATIVA das bacias — sem
+//     lasca de gelo —, escolhida por (superficie, estrato). Um cliente com os
+//     atlas antigos em cache desenharia a arraia curta inteira sobre um corpo
+//     que a simulacao tem por segmentos, e o nucleo das bacias com moldura de
+//     gelo; o bump invalida a precache.
+export const CONTENT_VERSION = 34;
 
 export type VersionTriple = {
   protocolVersion: number;

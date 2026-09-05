@@ -95,6 +95,13 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
     // O que ela entrega: 396 celulas de chao, 231 delas ja alagadas, e TRES
     // dutos com a boca despejando dentro da arena. A anterior servia para um
     // chefe que so nadava; nesta da para ver a agua entrar pelas paredes.
+    //
+    // Com as BACIAS e o Leviata em duas fases (SIMULATION_VERSION 59) ela
+    // continua servindo, medida de novo: ~540 celulas de chao num raio de 14
+    // do chefe, ~200 de agua rasa, 14 celulas profundas em tres pocas
+    // ocupaveis (o carimbo abre cinco; duas caem na moldura do pedestal e
+    // ficam so com a margem), chao seco caminhavel entre elas para a Sondagem
+    // abrir as outras, e espaco para a cacada da segunda fase.
     label: 'Leviatã do Lençol',
     place: 'Aquífero Negro',
     seed: 112,

@@ -524,6 +524,27 @@ export type EntityActionKind =
   | 'freeze'
   /** Carga global do Leviata; as bolhas de ar sao o contra-jogo. */
   | 'massive_shock'
+  /**
+   * A SONDAGEM ABISSAL do Leviata: o canto atravessa o lencol e a pressao
+   * rompe o chao sob a celula marcada (`bossRuntime.leviathanProbeCell`).
+   * Windup = telegrafo (circulos escuros contraindo no ponto); release = a
+   * coluna; recovery = o corpo assentando de novo sobre a poca.
+   */
+  | 'probe'
+  /**
+   * O MERGULHO do Leviata. Windup = o aviso (quem esta de pe sobre o corpo
+   * tem de sair); da liberacao ate `endsAt` os segmentos entram na agua em
+   * sequencia, cabeca primeiro e cauda por ultimo. A posicao autoritativa so
+   * muda em `endsAt`, quando nada dele esta visivel.
+   */
+  | 'dive'
+  /**
+   * A EMERGENCIA do Leviata, na poca de destino. Windup = o halo de pressao
+   * (o corpo ainda nao aparece); da liberacao ate `endsAt` a cabeca rompe a
+   * lamina, as asas se desdobram e a cauda sai por ultimo. Depois do Diluvio
+   * a mesma acao termina em `hunting` em vez de `anchored`.
+   */
+  | 'emerge'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -629,6 +650,9 @@ export type SectorBossState = {
  * de setor reinicia o encontro. O runtime e do setor atual, e e por isso que
  * `descend`/`ascend` o zeram.
  */
+/** Uma bolha protetora: centro e RAIO SEGURO (ver constants.ts). */
+export type ProtectiveBubble = { x: number; y: number; radius: number };
+
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
   awake: boolean;
@@ -756,7 +780,37 @@ export type BossRuntime = {
   leviathanShockAt: number;
   leviathanShockRecoverAt: number;
   leviathanShockSeq: number;
-  protectiveBubbles: Array<{ x: number; y: number; radius: number }>;
+  /**
+   * As bolhas protetoras. `radius` e o RAIO SEGURO para o centro do
+   * Prospector (ver `LEVIATHAN_PROTECTIVE_BUBBLE_RADIUS`): quem decide dano,
+   * desenho, HUD e som pergunta pelo mesmo predicado, `playerProtectedByBubble`.
+   */
+  protectiveBubbles: ProtectiveBubble[];
+  /**
+   * A PRIMEIRA FASE do Leviata, em cinco numeros e uma lista. Todos entram no
+   * hash: decidem onde o chao vira agua, onde o corpo reaparece e quando a
+   * poca ocupada deixa de ser tampada.
+   *
+   * `leviathanProbeCell`: a celula sob a qual a Sondagem em curso vai romper
+   * (-1 = nenhuma). `leviathanProbeDeepen`: esta Sondagem AFUNDA uma poca ja
+   * existente (telegrafo mais pesado, nucleo profundo no chao depois).
+   * `leviathanProbeSeq`: quantas Sondagens ja sairam no encontro — e o que
+   * torna deterministas a alternancia de 2/3 golpes por ancoradouro e a forma
+   * irregular de cada poca. `leviathanAnchorProbes`: quantas ja sairam DESTE
+   * ancoradouro. `leviathanDest`: a celula central da poca para onde ele esta
+   * viajando (-1 = nenhuma); `leviathanSurfaceAt`: o tick em que ele comeca a
+   * emergir la (-1 = nao esta viajando) — viaja no wire porque e dele que o
+   * cliente tira a rampa do borbulhar no destino. `leviathanPools`: os centros
+   * das bacias que a Sondagem abriu, para a fase respeitar
+   * `LEVIATHAN_MAX_NEW_POOLS` e preferir aprofundar a abrir.
+   */
+  leviathanProbeCell: number;
+  leviathanProbeDeepen: boolean;
+  leviathanProbeSeq: number;
+  leviathanAnchorProbes: number;
+  leviathanDest: number;
+  leviathanSurfaceAt: number;
+  leviathanPools: number[];
   /**
    * Os dois estados de blindagem que so existiam DENTRO do funil de dano e
    * que a apresentacao precisa ver como TRANSICAO (`boss_vulnerable`).
@@ -842,8 +896,11 @@ export type BossAbility =
   | 'maw'
   // Arquicantor.
   | 'song'
-  // Leviata do Lencol.
-  | 'breach'
+  // Leviata do Lencol: a Sondagem Abissal (primeira fase), o mergulho, a
+  // emergencia, o Diluvio (a virada) e a descarga massiva (segunda fase).
+  | 'probe'
+  | 'dive'
+  | 'emerge'
   | 'deluge'
   | 'massive_shock'
   // Coracao da Fornalha.
@@ -871,8 +928,14 @@ export type BossMoment =
   | 'burrow'
   | 'maw_open'
   | 'maw_close'
-  // Leviata: o chamado de presenca; a recuperacao depois da descarga.
+  // Leviata: o chamado de presenca (escondido); a cauda terminou de afundar
+  // (o ultimo "gulp" — a poca voltou a ser fatal); a poca de destino comecou a
+  // borbulhar; o corpo terminou de ocupar a poca (a respiracao funda, a tampa
+  // voltou); a recuperacao depois da descarga.
   | 'call'
+  | 'submerged'
+  | 'surfacing'
+  | 'emerged'
   | 'recover'
   // Pulmao-Matriz: as fases do ciclo e o ferimento (fole perfurado).
   | 'inhale'
@@ -1004,6 +1067,30 @@ export const DEVOURER_AIRBORNE = 2;
  * significados opostos — um caçando, o outro comendo de onde esta.
  */
 export const DEVOURER_MAW = 3;
+
+/**
+ * AS POSTURAS DO LEVIATA DO LENCOL. Proprias, e nao as do Devorador: o ciclo
+ * dele nao e "por baixo / exposto", e cinco lugares diferentes em relacao a
+ * lamina, e cada um decide coisas diferentes — se o corpo tampa a poca, se
+ * ele e alvo, se a posicao pode saltar, se ele anda.
+ *
+ *   ANCHORED  parado, corpo aberto sobre a poca; tampa viva; alvo; Sondagem.
+ *   DIVING    segmentos entrando na agua; a tampa dura ate a cauda sumir.
+ *   HIDDEN    completamente submerso, viajando; NAO e alvo; a posicao ja e a
+ *             do destino, e nada dele e desenhado.
+ *   EMERGING  segmentos surgindo na poca de destino; alvo quando a cabeca
+ *             esta fora; a tampa so volta no fim.
+ *   HUNTING   segunda fase: corpo inteiro fora, nadando atras do Prospector.
+ *             Nunca mais ancora nem teleporta.
+ *
+ * "charging" (parado carregando a descarga massiva) e DERIVADA: e `HUNTING`
+ * com a acao `massive_shock` em curso — ver `leviathanPosture`.
+ */
+export const LEVIATHAN_ANCHORED = 0;
+export const LEVIATHAN_DIVING = 1;
+export const LEVIATHAN_HIDDEN = 2;
+export const LEVIATHAN_EMERGING = 3;
+export const LEVIATHAN_HUNTING = 4;
 
 /**
  * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.
@@ -1568,7 +1655,30 @@ export type SemanticEvent =
    * cliente precisa saber que aquele `death` no mesmo tick nao e um tombo
    * comum.
    */
-  | { t: 'ice_fall'; x: number; y: number; slot: number }
+  /**
+   * O Prospector AFUNDOU em agua profunda. `medium` diz de que agua: `ice` e
+   * o buraco de uma placa que cedeu (Cripta — estilhacos, som de gelo,
+   * recongela), `water` e a agua profunda NATIVA do Aquifero (a lamina negra
+   * engole o chassi, coluna de bolhas, golpe abafado, nenhum gelo). A causa
+   * de morte continua sendo `deep_water`; o que muda e a apresentacao.
+   */
+  | { t: 'ice_fall'; x: number; y: number; slot: number; medium: 'ice' | 'water' }
+  /**
+   * A marca da SONDAGEM ABISSAL: onde a coluna vai romper e quando. Evento
+   * proprio, e nao um `boss_windup` reaproveitado: o windup soa no CORPO do
+   * chefe (o canto), e a marca fica a dez tiles dele, no chao — dois lugares,
+   * dois eventos. `deepen` = esta Sondagem vai afundar a poca (telegrafo mais
+   * pesado). Quem reconecta no meio le a mesma marca de
+   * `bossRuntime.leviathanProbeCell`.
+   */
+  | {
+      t: 'probe_marker';
+      x: number;
+      y: number;
+      radius: number;
+      releaseTick: number;
+      deepen: boolean;
+    }
   /**
    * O gelo foi RECOMPOSTO. Cobre os dois jeitos de isso acontecer, porque quem
    * escuta faz a mesma coisa nos dois: a Rainha recongelando a arena
