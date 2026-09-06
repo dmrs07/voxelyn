@@ -365,6 +365,37 @@ reator, com a leitura exata: estado e portador de cada peça, acúmulos, multipl
 estagger restante. Só aparece na arena do Diamandis. Capturas em
 `docs/media/diamandis/`.
 
+### O feixe de prospecção, visível (`beam_line` no cliente)
+
+O feixe era o único golpe de linha reta do jogo e o cliente não o desenhava: a
+simulação emitia `beam_line` (a varredura a cada quatro ticks no windup, a passagem
+com potência no release) e o renderer ignorava o evento. O jogador levava 26 de dano
+de uma medição que nunca viu. Agora (`diamandis-beam.ts`) o feixe tem três atos:
+
+| Ato              | Fonte                             | O que se vê                                                                                                                                                                    |
+| ---------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Levantamento** | `enemy.action` (windup, 2 s)      | a lente do mastro acende e varre o chão com um fio fino; no chão, uma **linha de medição** tracejada com estacas a cada tile, uma cabeça de leitura correndo e a estaca do fim |
+| **Passagem**     | `beam_line` com potência (520 ms) | o fio vira **coluna** — núcleo osso, corpo âmbar, halo de fogo, cintilação —, o chão na linha acende, a sala pisca em claroes ao longo dela, faíscas e lascas no ponto final   |
+| **Cicatriz**     | a mesma passagem, por 1,4 s       | um fio quente que some em meio segundo e **brasas** densas do amarelo ao vermelho, apagando uma a uma, com o calor baixo por cima na primeira metade                           |
+
+A linha de medição é **monótona**: azul-elétrico e aberta no começo, fecha o
+tracejado e clareia até **travar em âmbar** no último terço (`SURVEY_LOCK_AT`); a
+cabeça de leitura vai e volta, e travada corre só para a frente, cada vez mais
+rápido. O jogador lê "quanto falta" pela linha, sem número. O alcance é derivado no
+cliente pela mesma marcha da simulação (`beamReach`, parando na primeira parede ou na
+borda) e conferido contra o `beam_line` de verdade no teste.
+
+A passagem vem do **evento**, não da ação: a simulação encerra a ação do feixe no
+próprio release e o chefe já escolhe a próxima ferramenta no tick seguinte — pela
+ação, a coluna durava um quadro. Em **frenesi** a borda da coluna puxa do fogo para o
+sangue (`beamColors`), a mesma leitura do reator aplicada ao que sai dele. Com
+movimento reduzido a cintilação para e a cabeça de leitura anda linear.
+
+Arena: o cenário **feixe de prospecção** põe o Prospector na linha, a seis tiles, e
+começa o levantamento pelo `startAction` de verdade (exportado da simulação para
+isso); a leitura mostra ato, fração e alcance. Capturas
+`09-feixe-…` a `13-feixe-…` em `docs/media/diamandis/`.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

@@ -18,12 +18,17 @@ import {
   damageEntity,
   diamandisFrenzyMultiplier,
   diamandisFrenzyStacks,
+  DIAMANDIS_BEAM_LENGTH,
+  DIAMANDIS_BEAM_WINDUP_TICKS,
+  DIAMANDIS_BEAM_COOLDOWN_TICKS,
   ripDiamandisModule,
   spawnEnemy,
+  startAction,
 } from '@voxelyn/survival-sim';
 import type { Entity, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { dirFromFacing8 } from '@voxelyn/survival-content';
 import { DIAMANDIS_PART_NAMES, diamandisPartState } from './diamandis-body';
+import { beamPhaseAt, beamReach } from './diamandis-beam';
 
 export type DiamandisScenario =
   | 'reset'
@@ -41,7 +46,8 @@ export type DiamandisScenario =
   | 'ripNext'
   | 'killCarrier'
   | 'frenzyMax'
-  | 'reactor';
+  | 'reactor'
+  | 'beam';
 
 /** Os cenarios, na ordem do painel. Os rotulos vivem em `arena-main.ts`. */
 export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
@@ -61,6 +67,7 @@ export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
   'killCarrier',
   'frenzyMax',
   'reactor',
+  'beam',
 ];
 
 /**
@@ -269,10 +276,61 @@ export const applyDiamandisScenario = (
     case 'reactor':
       state.bossRuntime.phasesFired |= BOSS_PHASE_REACTOR;
       break;
+    case 'beam': {
+      // O FEIXE DE PROSPECCAO pelo caminho de verdade (`startAction`): o
+      // Prospector vai para a linha, a seis tiles no rumo atual do chefe (ou
+      // o mais perto disso em piso andavel), e o chefe comeca o levantamento
+      // apontando para ele. Os eventos (`action_start`, `boss_windup`) saem
+      // daqui como sairiam da simulacao; o resto — as varreduras, o release,
+      // a cicatriz — a simulacao faz sozinha nos ticks seguintes.
+      const fx = boss.facing.x || 1;
+      const fy = boss.facing.y || 0;
+      const norm = Math.hypot(fx, fy) || 1;
+      const dir = { x: fx / norm, y: fy / norm };
+      const w = state.config.width;
+      let placed = false;
+      for (let d = 6; d >= 2 && !placed; d -= 1) {
+        const cx = Math.floor(boss.x + dir.x * d);
+        const cy = Math.floor(boss.y + dir.y * d);
+        if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+        if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
+        state.player.x = cx + 0.5;
+        state.player.y = cy + 0.5;
+        placed = true;
+      }
+      const toward = { x: state.player.x - boss.x, y: state.player.y - boss.y };
+      const len = Math.hypot(toward.x, toward.y) || 1;
+      const aim = { x: toward.x / len, y: toward.y / len };
+      state.bossRuntime.staggerUntil = 0;
+      state.bossRuntime.awake = true;
+      boss.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+      startAction(
+        state,
+        boss,
+        'beam',
+        aim,
+        DIAMANDIS_BEAM_WINDUP_TICKS,
+        10,
+        events,
+        state.player.id,
+      );
+      break;
+    }
     default:
       break;
   }
   return events;
+};
+
+const beamReadout = (state: SurvivalState, boss: Entity): DiamandisReadout['beam'] => {
+  const phase = beamPhaseAt(boss.action, state.tick);
+  if (!phase || !boss.action) return null;
+  const reach = beamReach(state, boss.x, boss.y, boss.action.direction.x, boss.action.direction.y);
+  return {
+    phase: phase.kind,
+    progress: phase.progress,
+    reach: Math.min(reach, DIAMANDIS_BEAM_LENGTH),
+  };
 };
 
 export type DiamandisPartReadout = {
@@ -297,6 +355,8 @@ export type DiamandisReadout = {
   carriers: number;
   reactor: boolean;
   awake: boolean;
+  /** O feixe em curso: ato e fracao, ou nulo. */
+  beam: { phase: 'survey' | 'fire'; progress: number; reach: number } | null;
 };
 
 export const diamandisReadout = (state: SurvivalState): DiamandisReadout | null => {
@@ -339,5 +399,6 @@ export const diamandisReadout = (state: SurvivalState): DiamandisReadout | null 
     carriers,
     reactor: (runtime.phasesFired & BOSS_PHASE_REACTOR) !== 0,
     awake: runtime.awake,
+    beam: beamReadout(state, boss),
   };
 };

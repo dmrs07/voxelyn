@@ -196,6 +196,17 @@ import {
   type DiamandisPartDraw,
 } from './diamandis-body';
 import {
+  beamColors,
+  beamPhaseAt,
+  beamReach,
+  DiamandisBeamPresentation,
+  drawBeamBody,
+  drawFireGround,
+  drawScorch,
+  drawSurveyGround,
+  drawSurveyRay,
+} from './diamandis-beam';
+import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
   PROP_RESPONSE,
@@ -1897,6 +1908,8 @@ export class SurvivalRenderer {
    * arranque. Ver diamandis-body.ts.
    */
   private readonly diamandis = new DiamandisPresentation();
+  /** O feixe de prospeccao: a ultima passagem e as cicatrizes. Ver diamandis-beam.ts. */
+  private readonly diamandisBeam = new DiamandisBeamPresentation();
   /** Os atlas das pecas ja foram pedidos nesta sessao? (idempotente, mas e um laco por quadro) */
   private diamandisPartsRequested = false;
   /**
@@ -2129,6 +2142,7 @@ export class SurvivalRenderer {
     this.devourerAloft.clear();
     this.devourerLandedAt.clear();
     this.diamandis.reset();
+    this.diamandisBeam.reset();
     this.bossHealthBar.reset();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -2515,6 +2529,28 @@ export class SurvivalRenderer {
             tone: 'good',
           });
           break;
+        case 'beam_line': {
+          // A PASSAGEM COM POTENCIA acende a sala: claroes ao longo da linha
+          // (a luz que uma coluna de fogo joga nas paredes), faiscas no chao,
+          // lascas onde ela bate, e um solavanco curto. O levantamento (sem
+          // potencia) nao chega aqui: e desenhado do estado, quadro a quadro.
+          for (const fire of this.diamandisBeam.ingest([ev], nowMs)) {
+            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+            for (let d = 1.5; d <= fire.length; d += 3.5) {
+              this.addFlash(fire.x + fire.dx * d, fire.y + fire.dy * d, 3.2, 0.85, nowMs, 360);
+            }
+            for (let d = 2; d < fire.length; d += 4) {
+              this.particles.hit(fire.x + fire.dx * d, fire.y + fire.dy * d, 'spark', 14, fxScale);
+            }
+            const ex = fire.x + fire.dx * fire.length;
+            const ey = fire.y + fire.dy * fire.length;
+            this.addFlash(ex, ey, 4, 1, nowMs, 420);
+            this.particles.hit(ex, ey, 'rubble', 30, fxScale);
+            this.particles.hit(ex, ey, 'spark', 24, fxScale);
+            this.shake = { power: 4, until: nowMs + 220 };
+          }
+          break;
+        }
         case 'boss_module': {
           // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
           // decide cor, frase, clarao e se a peça fica marcada no chao — e a
@@ -4042,6 +4078,19 @@ export class SurvivalRenderer {
     // por cima da parede que a esconde mentiria sobre haver caminho ate ela.
     // Ver `stepDiamandisFloor`.
     this.stepDiamandisFloor(nowMs);
+    // AS CICATRIZES do feixe: onde a linha esteve, apagando.
+    this.diamandisBeam.step(nowMs);
+    for (const mark of this.diamandisBeam.scorches) {
+      const [msx, msy] = toScreen(
+        mark.x + mark.dx * mark.length * 0.5,
+        mark.y + mark.dy * mark.length * 0.5,
+      );
+      if (msx < -600 || msx > vw + 600 || msy < -400 || msy > vh + 400) continue;
+      items.push({
+        depth: mark.x + mark.y - 0.5,
+        draw: () => drawScorch(ctx, toScreen, mark, z, nowMs),
+      });
+    }
     for (const piece of this.diamandis.floor) {
       const [psx, psy] = toScreen(piece.x, piece.y);
       if (psx < -120 || psx > vw + 120 || psy < -140 || psy > vh + 120) continue;
@@ -4116,6 +4165,7 @@ export class SurvivalRenderer {
       this.devourerLandedAt.clear();
       // Setor novo: uma peca caida no mapa antigo nao existe no novo.
       this.diamandis.reset();
+      this.diamandisBeam.reset();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -4231,6 +4281,58 @@ export class SurvivalRenderer {
       const twitch = isDiamandis
         ? frenzyTwitch(frenzyStacks, nowMs, enemy.id, this.diamandis.joltAt, prefersReducedMotion())
         : NO_TWITCH;
+      // O FEIXE DE PROSPECCAO, do estado autoritativo: o ato (levantamento ou
+      // passagem), quanto dele passou e ate onde a linha vai (a mesma marcha
+      // da simulacao, parando na primeira parede). O chao entra na fila com
+      // profundidade propria, meio passo atras do chefe; a coluna e desenhada
+      // junto do chassi, saindo da lente do mastro.
+      // O LEVANTAMENTO vem da acao (quadro a quadro, com o alcance derivado); a
+      // PASSAGEM vem do evento `beam_line` com potencia, porque a acao acaba
+      // no proprio release e a coluna precisa ficar meio segundo na tela.
+      const actionPhase = isDiamandis ? beamPhaseAt(enemy.action, state.tick) : null;
+      const surveyPhase = actionPhase?.kind === 'survey' ? actionPhase : null;
+      const beamDir = surveyPhase && enemy.action ? enemy.action.direction : null;
+      const beamLength =
+        surveyPhase && beamDir ? beamReach(state, enemy.x, enemy.y, beamDir.x, beamDir.y) : 0;
+      const beamOrigin = { x: enemy.x, y: enemy.y };
+      const fireIntensity = isDiamandis ? this.diamandisBeam.fireIntensity(nowMs) : 0;
+      const fireLine = fireIntensity > 0 ? this.diamandisBeam.lastFire : null;
+      if (surveyPhase && beamDir) {
+        const phase = surveyPhase;
+        const dir = beamDir;
+        items.push({
+          depth: enemy.x + enemy.y - 0.5,
+          draw: () =>
+            drawSurveyGround(
+              ctx,
+              toScreen,
+              beamOrigin,
+              dir,
+              beamLength,
+              phase.progress,
+              z,
+              nowMs,
+              prefersReducedMotion(),
+            ),
+        });
+      }
+      if (fireLine) {
+        const line = fireLine;
+        items.push({
+          depth: enemy.x + enemy.y - 0.5,
+          draw: () =>
+            drawFireGround(
+              ctx,
+              toScreen,
+              line,
+              { x: line.dx, y: line.dy },
+              line.length,
+              fireIntensity,
+              beamColors(frenzyStacks),
+              z,
+            ),
+        });
+      }
       if (isDiamandis) {
         if (!this.diamandisPartsRequested) {
           this.diamandisPartsRequested = true;
@@ -4704,6 +4806,56 @@ export class SurvivalRenderer {
               ? drawCutByWaterline(ctx, waterLine, sx, enemy.radius * TILE_W * z, z, nowMs, paint)
               : paint(undefined);
           if (drew) drawParts(false);
+          // A COLUNA do feixe, saindo da LENTE do mastro (o encaixe `mast`
+          // mais a altura da lente). Sem o manifest do chassi ela sai do
+          // centro do corpo, um pouco acima do pe.
+          if (isDiamandis && ((surveyPhase && beamDir) || fireLine)) {
+            const chassisManifest = this.sprites.spriteForArchetype('diamandis')?.manifest;
+            const socket = chassisManifest
+              ? socketScreenPoint(
+                  chassisManifest,
+                  manifestDir(chassisManifest, presented.facingX, presented.facingY),
+                  'mast',
+                  bodyX,
+                  bodyDrawY,
+                  spriteZoom,
+                )
+              : null;
+            const lens = socket
+              ? { x: socket.x, y: socket.y - 14 * spriteZoom }
+              : { x: bodyX, y: bodyDrawY - 40 * spriteZoom };
+            const reduced = prefersReducedMotion();
+            if (surveyPhase && beamDir) {
+              drawSurveyRay(
+                ctx,
+                lens,
+                toScreen,
+                beamOrigin,
+                beamDir,
+                beamLength,
+                surveyPhase.progress,
+                z,
+                nowMs,
+                reduced,
+              );
+            }
+            if (fireLine) {
+              const end = toScreen(
+                fireLine.x + fireLine.dx * fireLine.length,
+                fireLine.y + fireLine.dy * fireLine.length,
+              );
+              drawBeamBody(
+                ctx,
+                lens,
+                end,
+                fireIntensity,
+                beamColors(frenzyStacks),
+                z,
+                nowMs,
+                reduced,
+              );
+            }
+          }
           // O COVEIRO CARREGADOR leva a peca pendurada no eletroima. Ver
           // `drawCarriedPart`: a peca e a mesma que sumiu do chassi.
           if (drew && enemy.archetype === 'undertaker') {

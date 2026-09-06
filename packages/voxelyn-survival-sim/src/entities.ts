@@ -1455,7 +1455,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
   }
 };
 
-const startAction = (
+export const startAction = (
   state: SurvivalState,
   enemy: Entity,
   action: EntityActionKind,

@@ -229,5 +229,7 @@ inspeção: no jogo só o chefe ativo aparece.
   encaixes, ordem por rumo, frenesi (tint, espasmos, relógio), peça caída.
 - `src/tests/arena-diamandis-debug.test.ts` — os cenários do painel do
   Diamandis contra uma run real: rumos, soltar, arrancar, abater, frenesi.
+- `src/tests/diamandis-beam.test.ts` — o feixe de prospecção: alcance igual ao
+  `beam_line` da simulação, atos, linha de medição, cores, cicatriz, cenário.
 
 Capturas em `docs/media/boss-health-bar/`.
