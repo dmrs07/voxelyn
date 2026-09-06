@@ -88,7 +88,11 @@ export const emptyResonance = (): ResonanceTally => ({ fire: 0, current: 0, blas
  * sozinho não ensina nada sobre o jogador, e deixá-lo contar faria a oferta do
  * poço descrever o comportamento dos inimigos em vez do dele.
  */
-export const recordResonance = (tally: ResonanceTally, kind: ResonanceKind, amount = 1): void => {
+export const recordResonance = (
+  tally: ResonanceTally,
+  kind: ResonanceKind,
+  amount = 1,
+): void => {
   // Teto por tipo: sem ele, uma poça grande de biofluido eletrificada uma vez
   // somaria cinquenta células e afogaria todo o resto do registro. O que a oferta
   // precisa saber é COM QUE FREQUÊNCIA o jogador recorre a cada reação, não o

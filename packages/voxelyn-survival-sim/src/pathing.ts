@@ -16,7 +16,12 @@
 // 2. Minerio e cristal sao INTRANSPONIVEIS, e nao caros. Sao recurso e luz do
 //    jogador; um chefe que abre passagem por dentro deles tira da mesa coisas
 //    que o jogador foi ali buscar, sem que ele possa disputar.
-import { SOLID_FRAGILE, SOLID_FRAGILE_WEAK, SOLID_NONE, SOLID_ROCK } from './constants.js';
+import {
+  SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
+  SOLID_NONE,
+  SOLID_ROCK,
+} from './constants.js';
 import type { SurvivalState } from './types.js';
 
 /** Andar por chao livre custa 1; arrombar parede custa isto. */
@@ -33,9 +38,7 @@ export const PATH_COST_BREAK = 7;
 export const PATH_NODE_BUDGET = 2600;
 
 const breakableCost = (solid: number): number =>
-  solid === SOLID_ROCK || solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK
-    ? PATH_COST_BREAK
-    : -1;
+  solid === SOLID_ROCK || solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK ? PATH_COST_BREAK : -1;
 
 /** Custo de entrar numa celula, ou -1 se ela for intransponivel. */
 const enterCost = (solid: number): number => (solid === SOLID_NONE ? 1 : breakableCost(solid));
@@ -52,7 +55,7 @@ export const hasLineOfSight = (
   x0: number,
   y0: number,
   x1: number,
-  y1: number,
+  y1: number
 ): boolean => {
   const w = state.config.width;
   const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2));
@@ -79,9 +82,7 @@ class MinHeap {
     // Desempate pelo INDICE da celula, e nao pela ordem de insercao: `sort` e a
     // ordem de descoberta variam com detalhes de implementacao, e este atlas de
     // decisoes precisa sair identico nas duas maquinas de uma sala de co-op.
-    return this.cost[a] !== this.cost[b]
-      ? this.cost[a] < this.cost[b]
-      : this.cell[a] < this.cell[b];
+    return this.cost[a] !== this.cost[b] ? this.cost[a] < this.cost[b] : this.cell[a] < this.cell[b];
   }
 
   private swap(a: number, b: number): void {
@@ -143,7 +144,7 @@ export const findPath = (
   startX: number,
   startY: number,
   targetX: number,
-  targetY: number,
+  targetY: number
 ): number[] => {
   const w = state.config.width;
   const h = state.config.height;
