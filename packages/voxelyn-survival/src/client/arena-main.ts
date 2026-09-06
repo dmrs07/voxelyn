@@ -353,6 +353,7 @@ const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
   reactor: 'colapso do reator',
   beam: 'feixe de prospecção',
   demolish: 'salva de demolição',
+  drill: 'avanço da broca',
 };
 for (const scenario of DIAMANDIS_SCENARIOS) {
   const button = document.createElement('button');

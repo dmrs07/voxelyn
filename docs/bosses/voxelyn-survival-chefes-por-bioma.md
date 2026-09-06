@@ -422,6 +422,31 @@ explosão continuam. `markDemolition` passou a ser exportado da simulação para
 cenário da arena (**salva de demolição**) armar a salva pelo caminho de verdade.
 Capturas `14-demolicao-…` a `17-demolicao-…` em `docs/media/diamandis/`.
 
+### O avanço da broca, rasgando o ar (`drill-wake.ts`)
+
+A simulação para o chefe por 1,8 s girando a broca e depois o atravessa a arena a
+7,5 tiles/s por 2,3 s, comendo parede. O cliente mostrava a broca girando e o corpo
+deslizando: nada dizia que aquilo era uma **investida**. O que faltava era o ar.
+
+- **Preparo.** Uma **faixa** no chão, da largura do corredor que a broca abre, do
+  chefe até onde o avanço chega (parando na borda do mapa, nunca na parede — a broca
+  a come), com setas no rumo a cada três tiles e o tracejado correndo para a frente.
+  Nasce apagada em âmbar e fecha até travar em fogo no último terço, a mesma
+  linguagem da linha de medição do feixe.
+- **Avanço.** Na ponta da broca o ar é **rasgado num cone**: uma cunha translúcida
+  da ponta para trás e, por cima dela, chevrons que nascem no vértice a cada 70 ms e
+  viajam para trás enquanto abrem — o ar jogado para os lados e para trás do corpo.
+  Riscos de velocidade correm pelas laterais, a ponta incandesce com uma faísca
+  girando em volta do eixo, a **poeira** (partículas) é cuspida no mesmo cone e a
+  câmera treme baixo e contínuo. Tudo se move para trás em relação ao chefe: é o que
+  lê como "ele vem". Esfria no último trecho do avanço.
+
+Tudo é derivado da ação autoritativa e do relógio de parede, sem estado: quem
+reconecta no meio do avanço vê o mesmo cone. Com movimento reduzido os chevrons não
+correm (ficam parados na posição média), os riscos somem e a câmera não treme; a
+faixa, a cunha e a ponta acesa continuam. Cenário da arena: **avanço da broca**.
+Capturas `18-broca-…` a `20-broca-…` em `docs/media/diamandis/`.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

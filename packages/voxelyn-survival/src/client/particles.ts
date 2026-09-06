@@ -242,6 +242,7 @@ export class VoxelParticles {
   private readonly lastOverheatBucket = new Map<number, number>();
   private lastFurnaceBucket = -1;
   private lastMalfunctionBucket = -1;
+  private lastDrillBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
   private readonly lastBubbleBucket = new Map<number, number>();
   /** Ultimo bucket de faisca do curto-circuito, por SLOT (ver emitDashJets). */
@@ -952,6 +953,45 @@ export class VoxelParticles {
    * pecas, funcionando alem do que devia. Mesma cadencia por bucket de tempo
    * real da Fornalha, para nascer por segundo e nao por quadro.
    */
+  /**
+   * A POEIRA que a broca do Diamandis cospe no avanco: nasce na ponta e sai
+   * PARA TRAS num cone, para os dois lados do corpo, com um pouco de faisca.
+   * Bucket de tempo real curto (50 ms): o avanco dura dois segundos e a
+   * poeira tem de ler como um jato continuo, nao como sopros.
+   */
+  emitDrillWake(
+    x: number,
+    y: number,
+    dirX: number,
+    dirY: number,
+    nowMs: number,
+    scale: number,
+  ): void {
+    const bucket = (nowMs / 50) | 0;
+    if (this.lastDrillBucket === bucket) return;
+    this.lastDrillBucket = bucket;
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2654435761)));
+    const count = Math.max(1, Math.round(4 * scale));
+    const sideX = -dirY;
+    const sideY = dirX;
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const spread = 0.6 + rnd() * 1.4;
+      const spark = i % 4 === 3;
+      this.push({
+        x: x + sideX * side * 0.2 + (rnd() - 0.5) * 0.2,
+        y: y + sideY * side * 0.2 + (rnd() - 0.5) * 0.2,
+        z: 0.3 + rnd() * 0.5,
+        vx: -dirX * (1.6 + rnd() * 1.4) + sideX * side * spread,
+        vy: -dirY * (1.6 + rnd() * 1.4) + sideY * side * spread,
+        vz: spark ? 0.9 + rnd() * 0.8 : 0.3 + rnd() * 0.5,
+        life: spark ? 220 : 420,
+        maxLife: spark ? 220 : 420,
+        kind: spark ? 'spark' : 'ash',
+      });
+    }
+  }
+
   emitMalfunctionSmoke(x: number, y: number, nowMs: number, scale: number, stacks: number): void {
     const bucket = (nowMs / 140) | 0;
     if (this.lastMalfunctionBucket === bucket) return;

@@ -218,6 +218,14 @@ import {
   tumbleAngle,
 } from './demolition-fx';
 import {
+  DRILL_TIP_AHEAD,
+  DRILL_TIP_HEIGHT,
+  drawDrillLane,
+  drawDrillWake,
+  drillLaneReach,
+  drillPhaseAt,
+} from './drill-wake';
+import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
   PROP_RESPONSE,
@@ -4383,6 +4391,48 @@ export class SurvivalRenderer {
       const beamOrigin = { x: enemy.x, y: enemy.y };
       const fireIntensity = isDiamandis ? this.diamandisBeam.fireIntensity(nowMs) : 0;
       const fireLine = fireIntensity > 0 ? this.diamandisBeam.lastFire : null;
+      // A BROCA (drill-wake.ts): no preparo, a faixa do corredor no chao; no
+      // avanco, o rasgo de ar na ponta — o cone abrindo para tras, os riscos,
+      // a poeira cuspida — e um tremor continuo e baixo. Tudo da acao.
+      const drillPhase = isDiamandis ? drillPhaseAt(enemy.action, state.tick) : null;
+      if (drillPhase && enemy.action) {
+        const dir = enemy.action.direction;
+        const origin = { x: enemy.x, y: enemy.y };
+        const reduced = prefersReducedMotion();
+        if (drillPhase.kind === 'windup') {
+          const progress = drillPhase.progress;
+          const reach = drillLaneReach(state, origin, dir);
+          items.push({
+            depth: enemy.x + enemy.y - 0.5,
+            draw: () =>
+              drawDrillLane(ctx, toScreen, origin, dir, reach, progress, z, nowMs, reduced),
+          });
+        } else {
+          const tip = {
+            x: enemy.x + dir.x * DRILL_TIP_AHEAD,
+            y: enemy.y + dir.y * DRILL_TIP_AHEAD,
+          };
+          // Esfria no ultimo trecho: o avanco acaba, o ar volta a fechar.
+          const intensity = 1 - Math.max(0, (drillPhase.progress - 0.85) / 0.15);
+          const liftPx = heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z);
+          items.push({
+            depth: enemy.x + enemy.y + 0.3,
+            draw: () =>
+              drawDrillWake(ctx, toScreen, tip, dir, liftPx, intensity, z, nowMs, reduced),
+          });
+          this.particles.emitDrillWake(
+            tip.x,
+            tip.y,
+            dir.x,
+            dir.y,
+            nowMs,
+            (this.quality.maxFx / PRESETS.high.maxFx) * intensity,
+          );
+          if (!reduced && this.shake.until < nowMs + 40) {
+            this.shake = { power: 2, until: nowMs + 80 };
+          }
+        }
+      }
       if (surveyPhase && beamDir) {
         const phase = surveyPhase;
         const dir = beamDir;

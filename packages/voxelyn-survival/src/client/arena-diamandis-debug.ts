@@ -23,6 +23,9 @@ import {
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
   DIAMANDIS_DEMOLISH_COOLDOWN_TICKS,
   DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  DIAMANDIS_DRILL_COOLDOWN_TICKS,
+  DIAMANDIS_DRILL_TICKS,
+  DIAMANDIS_DRILL_WINDUP_TICKS,
   markDemolition,
   ripDiamandisModule,
   spawnEnemy,
@@ -51,7 +54,8 @@ export type DiamandisScenario =
   | 'frenzyMax'
   | 'reactor'
   | 'beam'
-  | 'demolish';
+  | 'demolish'
+  | 'drill';
 
 /** Os cenarios, na ordem do painel. Os rotulos vivem em `arena-main.ts`. */
 export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
@@ -73,6 +77,7 @@ export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
   'reactor',
   'beam',
   'demolish',
+  'drill',
 ];
 
 /**
@@ -358,6 +363,26 @@ export const applyDiamandisScenario = (
         state.player,
         state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS,
         events,
+      );
+      break;
+    }
+    case 'drill': {
+      // A BROCA pelo caminho de verdade: o Prospector a doze tiles (dentro da
+      // faixa 9..20), o chefe fica 1,8 s parado girando e depois atravessa a
+      // arena comendo parede — tudo pela simulacao, nos ticks seguintes.
+      const aim = placePlayerAhead(state, boss, 12);
+      state.bossRuntime.staggerUntil = 0;
+      state.bossRuntime.awake = true;
+      boss.nextActionAt = state.tick + DIAMANDIS_DRILL_COOLDOWN_TICKS;
+      startAction(
+        state,
+        boss,
+        'drill',
+        aim,
+        DIAMANDIS_DRILL_WINDUP_TICKS,
+        DIAMANDIS_DRILL_TICKS,
+        events,
+        state.player.id,
       );
       break;
     }

@@ -233,5 +233,8 @@ inspeção: no jogo só o chefe ativo aparece.
   `beam_line` da simulação, atos, linha de medição, cores, cicatriz, cenário.
 - `src/tests/demolition-fx.test.ts` — a salva de demolição: cargas do estado,
   voo e estopim, parábola e tombo, detonação só do Diamandis, cenário.
+- `src/tests/drill-wake.test.ts` — o avanço da broca: atos, faixa do preparo,
+  onda cônica determinista, movimento reduzido, cenário com a simulação
+  atravessando o corredor.
 
 Capturas em `docs/media/boss-health-bar/`.
