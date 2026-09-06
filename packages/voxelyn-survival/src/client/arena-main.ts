@@ -352,6 +352,7 @@ const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
   frenzyMax: 'frenesi máximo',
   reactor: 'colapso do reator',
   beam: 'feixe de prospecção',
+  demolish: 'salva de demolição',
 };
 for (const scenario of DIAMANDIS_SCENARIOS) {
   const button = document.createElement('button');
@@ -393,7 +394,7 @@ const updateDiamandisPanel = (state: SurvivalState, nowMs: number): void => {
     `estagger <b>${r.staggerLeft > 0 ? `${r.staggerLeft}/${r.staggerTicks} ticks` : '—'}</b>`,
     `Coveiros <b>${r.undertakers}</b> · carregando <b>${r.carriers}</b>`,
     `reator <b>${r.reactor ? 'em colapso' : 'estável'}</b>`,
-    `feixe <b>${r.beam ? `${r.beam.phase === 'survey' ? 'levantamento' : 'passagem'} ${Math.round(r.beam.progress * 100)}%` : '—'}</b>${r.beam ? ` · alcance <b>${r.beam.reach.toFixed(1)}</b>` : ''}`,
+    `feixe <b>${r.beam ? `${r.beam.phase === 'survey' ? 'levantamento' : 'passagem'} ${Math.round(r.beam.progress * 100)}%` : '—'}</b>${r.beam ? ` · alcance <b>${r.beam.reach.toFixed(1)}</b>` : ''} · cargas <b>${r.charges}</b>`,
   ];
   diamandisReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
 };

@@ -21,6 +21,9 @@ import {
   DIAMANDIS_BEAM_LENGTH,
   DIAMANDIS_BEAM_WINDUP_TICKS,
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
+  DIAMANDIS_DEMOLISH_COOLDOWN_TICKS,
+  DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  markDemolition,
   ripDiamandisModule,
   spawnEnemy,
   startAction,
@@ -47,7 +50,8 @@ export type DiamandisScenario =
   | 'killCarrier'
   | 'frenzyMax'
   | 'reactor'
-  | 'beam';
+  | 'beam'
+  | 'demolish';
 
 /** Os cenarios, na ordem do painel. Os rotulos vivem em `arena-main.ts`. */
 export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
@@ -68,6 +72,7 @@ export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
   'frenzyMax',
   'reactor',
   'beam',
+  'demolish',
 ];
 
 /**
@@ -177,6 +182,34 @@ const openCellNear = (
 };
 
 /**
+ * Poe o Prospector a `dist` tiles no rumo atual do chefe (ou o mais perto
+ * disso em piso andavel) e devolve o rumo unitario chefe -> Prospector.
+ */
+const placePlayerAhead = (
+  state: SurvivalState,
+  boss: Entity,
+  dist: number,
+): { x: number; y: number } => {
+  const fx = boss.facing.x || 1;
+  const fy = boss.facing.y || 0;
+  const norm = Math.hypot(fx, fy) || 1;
+  const dir = { x: fx / norm, y: fy / norm };
+  const w = state.config.width;
+  for (let d = dist; d >= 2; d -= 1) {
+    const cx = Math.floor(boss.x + dir.x * d);
+    const cy = Math.floor(boss.y + dir.y * d);
+    if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+    if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
+    state.player.x = cx + 0.5;
+    state.player.y = cy + 0.5;
+    break;
+  }
+  const toward = { x: state.player.x - boss.x, y: state.player.y - boss.y };
+  const len = Math.hypot(toward.x, toward.y) || 1;
+  return { x: toward.x / len, y: toward.y / len };
+};
+
+/**
  * Aplica um cenario a run ativa e devolve os eventos que a simulacao teria
  * emitido — passam pelo mesmo funil dos de verdade (renderer e audio).
  */
@@ -283,24 +316,7 @@ export const applyDiamandisScenario = (
       // apontando para ele. Os eventos (`action_start`, `boss_windup`) saem
       // daqui como sairiam da simulacao; o resto — as varreduras, o release,
       // a cicatriz — a simulacao faz sozinha nos ticks seguintes.
-      const fx = boss.facing.x || 1;
-      const fy = boss.facing.y || 0;
-      const norm = Math.hypot(fx, fy) || 1;
-      const dir = { x: fx / norm, y: fy / norm };
-      const w = state.config.width;
-      let placed = false;
-      for (let d = 6; d >= 2 && !placed; d -= 1) {
-        const cx = Math.floor(boss.x + dir.x * d);
-        const cy = Math.floor(boss.y + dir.y * d);
-        if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
-        if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
-        state.player.x = cx + 0.5;
-        state.player.y = cy + 0.5;
-        placed = true;
-      }
-      const toward = { x: state.player.x - boss.x, y: state.player.y - boss.y };
-      const len = Math.hypot(toward.x, toward.y) || 1;
-      const aim = { x: toward.x / len, y: toward.y / len };
+      const aim = placePlayerAhead(state, boss, 6);
       state.bossRuntime.staggerUntil = 0;
       state.bossRuntime.awake = true;
       boss.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
@@ -313,6 +329,35 @@ export const applyDiamandisScenario = (
         10,
         events,
         state.player.id,
+      );
+      break;
+    }
+    case 'demolish': {
+      // A SALVA DE DEMOLICAO pelo caminho de verdade: o Prospector a sete
+      // tiles (dentro da faixa 4..13), o chefe arma e as tres marcas nascem
+      // agora (`markDemolition`), com a antecipacao de um alvo parado — o
+      // proprio lugar dele. As cargas voam, pousam e detonam nos ticks
+      // seguintes, pela simulacao.
+      const aim = placePlayerAhead(state, boss, 7);
+      state.bossRuntime.staggerUntil = 0;
+      state.bossRuntime.awake = true;
+      boss.rangedReadyAt = state.tick + DIAMANDIS_DEMOLISH_COOLDOWN_TICKS;
+      startAction(
+        state,
+        boss,
+        'demolish',
+        aim,
+        DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+        8,
+        events,
+        state.player.id,
+      );
+      markDemolition(
+        state,
+        boss,
+        state.player,
+        state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+        events,
       );
       break;
     }
@@ -357,6 +402,8 @@ export type DiamandisReadout = {
   awake: boolean;
   /** O feixe em curso: ato e fracao, ou nulo. */
   beam: { phase: 'survey' | 'fire'; progress: number; reach: number } | null;
+  /** Cargas de demolicao marcadas (em voo ou no chao). */
+  charges: number;
 };
 
 export const diamandisReadout = (state: SurvivalState): DiamandisReadout | null => {
@@ -400,5 +447,6 @@ export const diamandisReadout = (state: SurvivalState): DiamandisReadout | null 
     reactor: (runtime.phasesFired & BOSS_PHASE_REACTOR) !== 0,
     awake: runtime.awake,
     beam: beamReadout(state, boss),
+    charges: runtime.blastCells.length,
   };
 };

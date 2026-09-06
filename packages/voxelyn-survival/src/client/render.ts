@@ -207,6 +207,17 @@ import {
   drawSurveyRay,
 } from './diamandis-beam';
 import {
+  DemolitionPresentation,
+  arcHeightTiles,
+  chargeFlight,
+  demolitionCharges,
+  drawBlast,
+  drawChargeShadow,
+  drawCrater,
+  drawDynamiteCluster,
+  tumbleAngle,
+} from './demolition-fx';
+import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
   PROP_RESPONSE,
@@ -1910,6 +1921,8 @@ export class SurvivalRenderer {
   private readonly diamandis = new DiamandisPresentation();
   /** O feixe de prospeccao: a ultima passagem e as cicatrizes. Ver diamandis-beam.ts. */
   private readonly diamandisBeam = new DiamandisBeamPresentation();
+  /** A salva de demolicao: as detonacoes recentes. Ver demolition-fx.ts. */
+  private readonly demolition = new DemolitionPresentation();
   /** Os atlas das pecas ja foram pedidos nesta sessao? (idempotente, mas e um laco por quadro) */
   private diamandisPartsRequested = false;
   /**
@@ -2143,6 +2156,7 @@ export class SurvivalRenderer {
     this.devourerLandedAt.clear();
     this.diamandis.reset();
     this.diamandisBeam.reset();
+    this.demolition.reset();
     this.bossHealthBar.reset();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -2233,6 +2247,22 @@ export class SurvivalRenderer {
           // uma explosao nao e a bola de fogo, e o que ela revela em volta.
           this.addFlash(ev.x, ev.y, ev.radius * 2.6, 1, nowMs, 260);
           this.shake = { power: 5, until: nowMs + 220 };
+          // A CARGA DE DEMOLICAO do Diamandis detona de verdade: bola de fogo,
+          // onda de choque, fumaca e cratera (demolition-fx.ts), com mais luz,
+          // mais entulho e um solavanco maior que uma explosao comum. Decidido
+          // pelo DONO do evento — o modulo explosivo do Prospector e o gas
+          // continuam sendo a explosao de sempre.
+          for (const blast of this.demolition.ingest(
+            [ev],
+            nowMs,
+            (owner) => owner !== undefined && this.archetypeById.get(owner) === 'diamandis',
+          )) {
+            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+            this.addFlash(blast.x, blast.y, blast.radius * 3.4, 1, nowMs, 420);
+            this.particles.hit(blast.x, blast.y, 'rubble', 48, fxScale);
+            this.particles.hit(blast.x, blast.y, 'ember', 36, fxScale);
+            this.shake = { power: 8, until: nowMs + 300 };
+          }
           break;
         case 'discharge':
           // Uma luz so para a descarga inteira, no meio dela: uma por celula
@@ -4078,6 +4108,61 @@ export class SurvivalRenderer {
     // por cima da parede que a esconde mentiria sobre haver caminho ate ela.
     // Ver `stepDiamandisFloor`.
     this.stepDiamandisFloor(nowMs);
+    // AS CARGAS DE DEMOLICAO: arremessadas do rack, em voo ou no chao com o
+    // estopim aceso; e as CRATERAS das que ja detonaram. Do estado, como as
+    // marcas de chao — quem reconecta no meio do telegrafo ve o voo certo.
+    this.demolition.step(nowMs);
+    for (const blast of this.demolition.blasts) {
+      const [bsx, bsy] = toScreen(blast.x, blast.y);
+      if (bsx < -200 || bsx > vw + 200 || bsy < -200 || bsy > vh + 200) continue;
+      items.push({
+        depth: blast.x + blast.y - 0.5,
+        draw: () => drawCrater(ctx, blast, bsx, bsy, TILE_W, TILE_H, z, nowMs),
+      });
+    }
+    {
+      const boss = state.enemies.find(
+        (e) => e.alive && e.archetype === 'diamandis' && e.action?.kind === 'demolish',
+      );
+      const reduced = prefersReducedMotion();
+      for (const charge of demolitionCharges(state)) {
+        const flight = chargeFlight(charge, state.tick);
+        if (flight.phase === 'waiting' || !boss) continue;
+        if (flight.phase === 'landed') {
+          const [csx, csy] = toScreen(charge.x, charge.y);
+          if (csx < -80 || csx > vw + 80 || csy < -80 || csy > vh + 80) continue;
+          const fuse = flight.fuse;
+          items.push({
+            depth: charge.x + charge.y,
+            draw: () => {
+              drawChargeShadow(ctx, csx, csy, z, 0);
+              drawDynamiteCluster(ctx, csx, csy - 2 * z, z, 0.35, fuse, nowMs, reduced);
+            },
+          });
+          continue;
+        }
+        // EM VOO: da mao do rack (o encaixe `rack`, alto no chassi) ate a
+        // celula, em parabola. A posicao no chao e a interpolacao; a altura e
+        // o arco mais a altura de onde saiu, que vai a zero no pouso.
+        const t = flight.t;
+        const gx = boss.x + (charge.x - boss.x) * t;
+        const gy = boss.y + (charge.y - boss.y) * t;
+        const [gsx, gsy] = toScreen(gx, gy);
+        if (gsx < -80 || gsx > vw + 80 || gsy < -120 || gsy > vh + 80) continue;
+        const distance = Math.hypot(charge.x - boss.x, charge.y - boss.y);
+        const height = arcHeightTiles(t, distance);
+        const rackLift = this.diamandisRackLiftPx(boss, spriteZoom) * (1 - t);
+        const liftPx = heightToScreenPx(height, TILE_H, z) + rackLift;
+        const angle = tumbleAngle(t, charge.index, reduced);
+        items.push({
+          depth: gx + gy,
+          draw: () => {
+            drawChargeShadow(ctx, gsx, gsy, z, height + rackLift / (TILE_H * z));
+            drawDynamiteCluster(ctx, gsx, gsy - liftPx, z, angle, null, nowMs, reduced);
+          },
+        });
+      }
+    }
     // AS CICATRIZES do feixe: onde a linha esteve, apagando.
     this.diamandisBeam.step(nowMs);
     for (const mark of this.diamandisBeam.scorches) {
@@ -4166,6 +4251,7 @@ export class SurvivalRenderer {
       // Setor novo: uma peca caida no mapa antigo nao existe no novo.
       this.diamandis.reset();
       this.diamandisBeam.reset();
+      this.demolition.reset();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -5973,6 +6059,12 @@ export class SurvivalRenderer {
     this.casings.draw(ctx, toScreen, z, TILE_H, onCamera);
     this.moduleProps.drawWorld(ctx, toScreen, z, TILE_H, onCamera, nowMs);
     this.fxList = this.fxList.filter((fx) => (fx.life -= dtFx) > 0);
+    // AS DETONACOES por cima de tudo: a bola de fogo e a fumaca cobrem quem
+    // estiver na celula — e o que uma explosao faz.
+    for (const blast of this.demolition.blasts) {
+      const [bsx, bsy] = toScreen(blast.x, blast.y);
+      drawBlast(ctx, blast, bsx, bsy, TILE_W, TILE_H, z, nowMs, prefersReducedMotion());
+    }
     for (const fx of this.fxList) {
       const t = 1 - fx.life / fx.maxLife;
       if (fx.kind === 'ring') {
@@ -6875,6 +6967,24 @@ export class SurvivalRenderer {
     ctx.strokeStyle = PAL.dark;
     ctx.lineWidth = Math.max(1, z * 0.6);
     ctx.strokeRect(bx, by, 3 * z, 3 * z);
+  }
+
+  /**
+   * A altura da MAO do rack acima do pe do chassi, em pixels de tela: de onde
+   * a carga sai. Sem o manifest (atlas carregando), meio corpo.
+   */
+  private diamandisRackLiftPx(boss: Entity, zoom: number): number {
+    const chassis = this.sprites.spriteForArchetype('diamandis')?.manifest;
+    if (!chassis) return 40 * zoom;
+    const socket = socketScreenPoint(
+      chassis,
+      manifestDir(chassis, boss.facing.x, boss.facing.y),
+      'rack',
+      0,
+      0,
+      zoom,
+    );
+    return socket ? Math.max(0, -socket.y) : 40 * zoom;
   }
 
   /**

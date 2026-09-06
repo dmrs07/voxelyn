@@ -396,6 +396,32 @@ começa o levantamento pelo `startAction` de verdade (exportado da simulação p
 isso); a leitura mostra ato, fração e alcance. Capturas
 `09-feixe-…` a `13-feixe-…` em `docs/media/diamandis/`.
 
+### A salva de demolição, arremessada (`demolition-fx.ts`)
+
+As três cargas da salva existiam só como anel no chão: uma marca de interface que não
+saía de lugar nenhum, seguida de um clarão com partículas. Agora cada carga é um
+**feixe de dinamite** que sai do rack de demolição e é arremessado:
+
+- **Arremesso.** Uma por vez (o rack lança em sequência, três ticks entre cada), em
+  **parábola** da mão do rack (o encaixe `rack`, alto no chassi) até a célula marcada,
+  tombando no ar; a sombra no chão abre e desbota com a altura. Pousa na metade do
+  telegrafo.
+- **Estopim.** No chão, com o estopim aceso: pisca devagar e cada vez mais rápido até o
+  release — "vai agora" sem número. O anel vermelho de sempre continua dizendo onde e
+  quando.
+- **Detonação.** Só de explosões **do Diamandis** (decidido pelo dono do evento; o
+  módulo explosivo do Prospector e o gás continuam sendo a explosão comum): clarão
+  branco, **bola de fogo** que incha além do raio real e sobe, sopros de fogo em
+  voxel, **onda de choque** no chão, coluna de fumaça e a **cratera** escura que fica
+  por 2,6 s — com mais luz, mais entulho e um solavanco maior que uma explosão comum.
+
+Posição e tempo vêm do **estado** (as células em `blastCells` e o relógio da ação),
+como as marcas de chão: quem reconecta no meio do telegrafo vê as cargas no ponto
+certo do voo. Com movimento reduzido a dinamite não tomba nem pisca; arco, estopim e
+explosão continuam. `markDemolition` passou a ser exportado da simulação para o
+cenário da arena (**salva de demolição**) armar a salva pelo caminho de verdade.
+Capturas `14-demolicao-…` a `17-demolicao-…` em `docs/media/diamandis/`.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

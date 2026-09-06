@@ -231,5 +231,7 @@ inspeção: no jogo só o chefe ativo aparece.
   Diamandis contra uma run real: rumos, soltar, arrancar, abater, frenesi.
 - `src/tests/diamandis-beam.test.ts` — o feixe de prospecção: alcance igual ao
   `beam_line` da simulação, atos, linha de medição, cores, cicatriz, cenário.
+- `src/tests/demolition-fx.test.ts` — a salva de demolição: cargas do estado,
+  voo e estopim, parábola e tombo, detonação só do Diamandis, cenário.
 
 Capturas em `docs/media/boss-health-bar/`.

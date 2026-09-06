@@ -1605,7 +1605,7 @@ const guardianSalvoRelease = (
  * onde nasceu. Uma salva que perseguisse seria dano sem contra-jogo, com um
  * telegrafo bonito por cima.
  */
-const markDemolition = (
+export const markDemolition = (
   state: SurvivalState,
   enemy: Entity,
   target: Entity,
