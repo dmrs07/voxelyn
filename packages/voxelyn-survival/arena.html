@@ -395,6 +395,46 @@
         max-height: 100%;
       }
 
+      /* O INTERRUPTOR DAS FERRAMENTAS. Os paineis de debug (barra de chefe,
+         gelo, congelamento, Leviata) sao para ler ENTRE as tentativas; num
+         celular eles cobrem a sala e roubam o toque dos manches. Entao todos
+         obedecem a um so interruptor: `body.tools-hidden` os esconde, e o
+         botao — pequeno, no canto, o unico que fica — os traz de volta. Em
+         tela de toque comecam escondidos. */
+      #tools-toggle {
+        position: fixed;
+        top: calc(6px + var(--safe-area-inset-top));
+        right: calc(8px + var(--safe-area-inset-right));
+        z-index: 7;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #2a2d38;
+        background: rgba(10, 12, 18, 0.85);
+        color: #9fb3cc;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      #tools-toggle:hover {
+        background: #1f2532;
+      }
+      body.tools-hidden #tools-toggle {
+        color: #d8cfc0;
+      }
+      body.tools-hidden #bossbar-panel,
+      body.tools-hidden #frost-panel,
+      body.tools-hidden #leviathan-panel,
+      body.tools-hidden #ice-panel,
+      body.tools-hidden #hud-note {
+        display: none !important;
+      }
+      /* Com o interruptor no canto, a nota desce um pouco para nao bater nele. */
+      body:not(.tools-hidden) #tools-toggle + #hud-note {
+        top: calc(34px + var(--safe-area-inset-top));
+      }
+
       /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo, e a
          nota sobreposta ao HP era o primeiro pixel que o playtest via. */
       #hud-note {
@@ -463,6 +503,14 @@
   </head>
   <body>
     <canvas id="game" class="hidden"></canvas>
+    <button
+      type="button"
+      id="tools-toggle"
+      class="hidden"
+      title="Mostrar ou esconder os painéis de ferramenta"
+    >
+      ferramentas
+    </button>
     <div id="hud-note" class="hidden">
       Arena de teste — sem telemetria, sem placar, sem gravação de replay.
     </div>

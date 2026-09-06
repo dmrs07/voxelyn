@@ -139,6 +139,42 @@ const galleryCanvas = document.getElementById('gallery-canvas') as HTMLCanvasEle
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
+const toolsToggle = document.getElementById('tools-toggle') as HTMLButtonElement;
+
+// ---------------------------------------------------------------------------
+// O interruptor das ferramentas (ver o CSS de `#tools-toggle`). Um so estado
+// para todos os paineis de debug. Em tela de toque comeca ESCONDIDO: no
+// celular os paineis cobrem a sala e roubam o toque dos manches, e o que se
+// quer testar ali e jogar. A escolha do testador persiste no navegador.
+// ---------------------------------------------------------------------------
+const TOOLS_STORAGE_KEY = 'voxelyn.arena.tools';
+const coarsePointer = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const readToolsHidden = (): boolean => {
+  try {
+    const stored = localStorage.getItem(TOOLS_STORAGE_KEY);
+    if (stored === 'shown') return false;
+    if (stored === 'hidden') return true;
+  } catch {
+    /* sem storage: fica a regra por aparelho */
+  }
+  return coarsePointer() || window.innerWidth < 900;
+};
+const applyToolsHidden = (hidden: boolean): void => {
+  document.body.classList.toggle('tools-hidden', hidden);
+  toolsToggle.textContent = hidden ? 'ferramentas' : 'esconder ferramentas';
+  toolsToggle.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+};
+applyToolsHidden(readToolsHidden());
+toolsToggle.addEventListener('click', () => {
+  const hidden = !document.body.classList.contains('tools-hidden');
+  applyToolsHidden(hidden);
+  try {
+    localStorage.setItem(TOOLS_STORAGE_KEY, hidden ? 'hidden' : 'shown');
+  } catch {
+    /* sem storage: vale para esta sessao */
+  }
+});
 const icePanel = document.getElementById('ice-panel') as HTMLDivElement;
 const endOverlay = document.getElementById('end-overlay') as HTMLDivElement;
 const endTitle = document.getElementById('end-title') as HTMLHeadingElement;
@@ -593,6 +629,7 @@ const runArena = (conditions: ArenaConditions): void => {
   endOverlay.classList.add('hidden');
   canvas.classList.remove('hidden');
   hudNote.classList.remove('hidden');
+  toolsToggle.classList.remove('hidden');
   // O censo so faz sentido onde ha gelo. Nos outros chefes o painel seria cinco
   // zeros permanentes tapando um canto da tela.
   icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
@@ -765,6 +802,7 @@ btnReconfigure.addEventListener('click', () => {
   audio.ui();
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');
+  toolsToggle.classList.add('hidden');
   icePanel.classList.add('hidden');
   frostPanel.classList.add('hidden');
   leviathanPanel.classList.add('hidden');
