@@ -4,9 +4,9 @@ import { PNG } from 'pngjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { blitToAtlas, colorsUsed, fitSpriteToMargin, grid, isEmpty } from './lib.mjs';
+import { blitToAtlas, colorsUsed, fitShift, fitSpriteToMargin, grid, isEmpty } from './lib.mjs';
 import { ANIM_ORDER, ENTITY_SPECS } from './entities.mjs';
-import { withFaceCapture } from './voxel.mjs';
+import { DIRS8, modelDepth, projectModelPoint, withFaceCapture } from './voxel.mjs';
 import {
   BLOCK_KINDS,
   LIGHT_LEVELS,
@@ -114,6 +114,29 @@ const halveFaces = (frame) => {
  */
 const wantsNormalMap = (spec) => !spec.id.startsWith('fx-');
 
+/**
+ * Projeta os pontos de encaixe de `spec.sockets` (em unidades de modelo) para
+ * pixels do quadro FINAL, por rumo autorado: a mesma rotacao e projecao dos
+ * voxels, a ancora declarada, e o deslocamento do enquadramento.
+ */
+const socketsFor = (spec, shift) => {
+  const out = {};
+  for (const dir of spec.authoredDirs) {
+    const dirIndex = DIRS8.indexOf(dir);
+    out[dir] = {};
+    for (const [name, point] of Object.entries(spec.sockets)) {
+      const { sx, sy } = projectModelPoint(point.x, point.y, point.z, dirIndex);
+      out[dir][name] = {
+        x: Math.round(spec.anchorX + sx + shift.dx),
+        y: Math.round(spec.anchorY + sy + shift.dy),
+        // Ordem de desenho em relacao ao chassi (ver `modelDepth`).
+        depth: Math.round(modelDepth(point.x, point.y, dirIndex) * 1000) / 1000,
+      };
+    }
+  }
+  return out;
+};
+
 const buildEntity = (spec) => {
   const anims = orderedAnims(spec);
   const framesPerDir = anims.reduce((sum, a) => sum + spec.animations[a].frames, 0);
@@ -185,9 +208,15 @@ const buildEntity = (spec) => {
   const margin = 2;
   let frames;
   let faceFrames = [];
+  // O deslocamento do enquadramento, guardado para os ENCAIXES (abaixo): eles
+  // sao medidos no quadro cru e tem de receber o mesmo dx/dy que os pixels.
+  let shift = { dx: 0, dy: 0 };
   try {
-    if (spec.id.startsWith('fx-')) {
+    if (spec.id.startsWith('fx-') || spec.noFit) {
+      // `noFit`: a PECA e autorada em volta do proprio encaixe, e a ancora
+      // declarada E o encaixe. Recentraliza-la desfaria exatamente isso.
       frames = raw;
+      faceFrames = rawFaces;
     } else {
       // Os frames de FACE entram no MESMO enquadramento, e nao num paralelo.
       //
@@ -199,7 +228,9 @@ const buildEntity = (spec) => {
       // volume, e o defeito apareceria como um contorno sujo que ninguem
       // associaria ao enquadramento. Passando juntos, o deslocamento e o mesmo
       // por construcao.
-      const fitted = fitSpriteToMargin([...fitReference, ...raw, ...rawFaces], margin);
+      const all = [...fitReference, ...raw, ...rawFaces];
+      shift = fitShift(all, margin);
+      const fitted = fitSpriteToMargin(all, margin);
       frames = fitted.slice(fitReference.length, fitReference.length + raw.length);
       faceFrames = fitted.slice(fitReference.length + raw.length);
     }
@@ -260,6 +291,13 @@ const buildEntity = (spec) => {
     paletteColors: [...palette].sort(),
     animations: spec.animations,
     frameMap,
+    /**
+     * Os ENCAIXES das pecas destacaveis, por rumo, em pixels do quadro final:
+     * onde cada peca se prende ao corpo (ver `spec.sockets`). O cliente
+     * desenha o atlas da peca com a ancora dela neste ponto. Ausente na
+     * maioria dos sprites — so quem tem pecas publica.
+     */
+    ...(spec.sockets ? { sockets: socketsFor(spec, shift) } : {}),
     generation: {
       tool: 'procedural voxel raster (tools/entities.mjs)',
       prompt: spec.prompt,

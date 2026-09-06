@@ -46,6 +46,8 @@ import {
   BOSS_PHASE_OVERHEAT,
   DIAMANDIS_DEMOLISH_RADIUS,
   DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  DIAMANDIS_MODULE_ORE,
+  diamandisFrenzyStacks,
   FURNACE_HEART_STALACTITE_RADIUS,
   FURNACE_HEART_STALACTITE_WARNING_TICKS,
   BOSS_PHASE_UNSTABLE,
@@ -157,12 +159,7 @@ import {
   leapShadowAlpha,
   leapShadowScale,
 } from './leap-arc';
-import {
-  applyBossModuleMark,
-  bossModuleNameKey,
-  bossModulePresentation,
-  type BossModuleMark,
-} from './boss-module-presentation';
+import { bossModuleNameKey, bossModulePresentation } from './boss-module-presentation';
 import { DIAMANDIS_LINES, diamandisLineFor } from './audio/boss-voice-lines';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { COMBAT_PLANE_TILES, heightToScreenPx } from './combat-plane';
@@ -177,7 +174,27 @@ import {
   type Bounce,
   type WorldLight,
 } from './lighting';
-import { DEVOURER_BROOD_ATLAS, DEVOURER_COIL_ATLAS, type FaceLighting, type Tint } from './sprites';
+import { frameAtTime } from '@voxelyn/survival-content';
+import {
+  DEVOURER_BROOD_ATLAS,
+  DEVOURER_COIL_ATLAS,
+  DIAMANDIS_PART_ATLASES,
+  type FaceLighting,
+  type SpriteAnimationSelection,
+  type Tint,
+} from './sprites';
+import {
+  composeDiamandisParts,
+  diamandisPartAtlas,
+  DiamandisPresentation,
+  floorPieceLift,
+  frenzyTint,
+  frenzyTwitch,
+  manifestDir,
+  NO_TWITCH,
+  socketScreenPoint,
+  type DiamandisPartDraw,
+} from './diamandis-body';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -1876,13 +1893,12 @@ export class SurvivalRenderer {
   private readonly presentation = new EntityPresentation();
   private readonly modulePulseUntil = new Map<ModuleId, number>();
   /**
-   * Peças do Diamandis marcadas no chao, por indice de peça.
-   *
-   * Indexado pela PEÇA e nao pela posicao: a mesma broca pode soltar, ser
-   * arrancada, cair noutro canto e ser arrancada de novo, e cada transicao move
-   * a marca em vez de acrescentar mais uma. Ver applyBossModuleMark.
+   * O corpo composto do Diamandis: as pecas caidas e o instante do ultimo
+   * arranque. Ver diamandis-body.ts.
    */
-  private readonly bossModuleMarks = new Map<number, BossModuleMark>();
+  private readonly diamandis = new DiamandisPresentation();
+  /** Os atlas das pecas ja foram pedidos nesta sessao? (idempotente, mas e um laco por quadro) */
+  private diamandisPartsRequested = false;
   /**
    * A BARRA MONUMENTAL do chefe de setor (boss-health-bar.ts). Alimentada pelo
    * estado do quadro apresentado e pelos eventos daquele tick; desenhada por
@@ -2112,7 +2128,7 @@ export class SurvivalRenderer {
     this.leviathanBodies.reset();
     this.devourerAloft.clear();
     this.devourerLandedAt.clear();
-    this.bossModuleMarks.clear();
+    this.diamandis.reset();
     this.bossHealthBar.reset();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -2509,7 +2525,10 @@ export class SurvivalRenderer {
             until: nowMs + bm.toastMs,
           });
           this.addFlash(ev.x, ev.y, bm.flashRadius, bm.flashPower, nowMs, bm.flashMs);
-          applyBossModuleMark(this.bossModuleMarks, ev, nowMs);
+          // O corpo: a peca solta no chassi, a carregada pelo Coveiro, a que
+          // cai no chao e o solavanco do arranque — tudo em diamandis-body.ts.
+          // Nao ha marca no chao: a peca E a marca, onde quer que esteja.
+          this.diamandis.onBossModule(ev, nowMs);
           break;
         }
         case 'module_charge_consumed':
@@ -2584,6 +2603,10 @@ export class SurvivalRenderer {
           // quadro (`setCargoOre`). Os dois concordam quase sempre; quando nao
           // concordam — reconexao, resync — quem manda e o estado.
           this.cargoOre = ev.total;
+          // A LASCA DE UMA PECA CAIDA nao voa do corpo do Coveiro: fica com a
+          // peca e sai dela ao estilhacar (ver `renderDiamandisFloor`). O total
+          // ja foi corrigido acima — so o voo espera.
+          if (this.diamandis.claimOre(ev.x, ev.y, ev.amount, nowMs)) break;
           if (this.cargoFlights.length < 6) {
             this.cargoFlights.push({
               worldX: ev.x,
@@ -4013,15 +4036,38 @@ export class SurvivalRenderer {
       });
     }
 
-    // As peças do Diamandis caidas no chao. Entram na mesma fila ordenada pela
-    // mesma razao dos Ecos: elas estao NO mundo, e uma marca desenhada por cima
-    // da parede que a esconde mentiria sobre haver caminho ate ela.
-    for (const mark of this.bossModuleMarks.values()) {
-      const [msx, msy] = toScreen(mark.x, mark.y);
-      if (msx < -80 || msx > vw + 80 || msy < -100 || msy > vh + 80) continue;
+    // A PECA DO DIAMANDIS que o carregador deixou cair: pousa, fica menos de
+    // um segundo e estilhaca em lasca que voa para o contador. Entra na mesma
+    // fila ordenada pela mesma razao dos Ecos: ela esta NO mundo, e desenhada
+    // por cima da parede que a esconde mentiria sobre haver caminho ate ela.
+    // Ver `stepDiamandisFloor`.
+    this.stepDiamandisFloor(nowMs);
+    for (const piece of this.diamandis.floor) {
+      const [psx, psy] = toScreen(piece.x, piece.y);
+      if (psx < -120 || psx > vw + 120 || psy < -140 || psy > vh + 120) continue;
+      if (brightness(piece.x, piece.y) <= 0.05) continue;
       items.push({
-        depth: mark.x + mark.y,
-        draw: () => this.drawBossModuleMark(mark, msx, msy, z, nowMs),
+        depth: piece.x + piece.y,
+        draw: () => {
+          const atlas = diamandisPartAtlas(piece.module);
+          if (!atlas) return;
+          const lift = floorPieceLift(nowMs - piece.startedAt) * z;
+          drawShadow(psx, psy, TILE_W * 0.35 * z, 0.35);
+          this.sprites.drawPiece(
+            ctx,
+            atlas,
+            'floor',
+            0,
+            1,
+            0,
+            psx,
+            psy - lift,
+            spriteZoom,
+            undefined,
+            bodyLight(piece.x, piece.y, CREATURE_RESPONSE),
+            bodyFaceLight(piece.x, piece.y, CREATURE_RESPONSE),
+          );
+        },
       });
     }
 
@@ -4068,7 +4114,8 @@ export class SurvivalRenderer {
       this.leviathanBodies.reset();
       this.devourerAloft.clear();
       this.devourerLandedAt.clear();
-      this.bossModuleMarks.clear();
+      // Setor novo: uma peca caida no mapa antigo nao existe no novo.
+      this.diamandis.reset();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -4174,6 +4221,31 @@ export class SurvivalRenderer {
       if (headDark && enemy.archetype !== 'white_devourer') continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
+      // O DIAMANDIS EM FRENESI, fora do desenho: a fumaca nasce por segundo e
+      // nao por quadro (o emissor tem bucket proprio), os espasmos sao um
+      // deslocamento do CORPO (a sombra, a barra e o anel ficam no chao), e os
+      // atlas das pecas sao pedidos na primeira vez que o chefe aparece —
+      // sao os sprites mais caros do pacote e so quem o encontra paga por eles.
+      const isDiamandis = enemy.archetype === 'diamandis';
+      const frenzyStacks = isDiamandis ? diamandisFrenzyStacks(state) : 0;
+      const twitch = isDiamandis
+        ? frenzyTwitch(frenzyStacks, nowMs, enemy.id, this.diamandis.joltAt, prefersReducedMotion())
+        : NO_TWITCH;
+      if (isDiamandis) {
+        if (!this.diamandisPartsRequested) {
+          this.diamandisPartsRequested = true;
+          for (const id of DIAMANDIS_PART_ATLASES) this.sprites.requestPart(id);
+        }
+        if (frenzyStacks > 0) {
+          this.particles.emitMalfunctionSmoke(
+            enemy.x,
+            enemy.y,
+            nowMs,
+            this.quality.maxFx / PRESETS.high.maxFx,
+            frenzyStacks,
+          );
+        }
+      }
       // Espreitador DENTRO do elemento: o corpo nao aparece. A simulacao ja
       // manda a postura em `mood` (e por isso ela viaja no snapshot); desenhar
       // o sprite inteiro aqui apagaria a mecanica de ocultacao do Aquifero e
@@ -4544,6 +4616,45 @@ export class SurvivalRenderer {
           const waterDepth = leviathanHead ? 0 : delugeDepth(state, cell);
           const waterLine = waterDepth > 0 ? sy - waterDepth * TILE_H * z : null;
           const drawY = bodyY + (dip?.drop ?? 0) - swimLift;
+          // O corpo sacode; o chao nao. Ver `frenzyTwitch`.
+          const bodyX = sx + twitch.dx * z;
+          const bodyDrawY = drawY + twitch.dy * z;
+          // AS PECAS DO DIAMANDIS em volta do chassi, na ordem do encaixe: as
+          // de tras entram antes do corpo, as da frente depois. Sem o manifest
+          // do chassi (atlas ainda carregando) nao ha pecas — e o corpo cai no
+          // recuo de voxel como qualquer outro.
+          const parts: DiamandisPartDraw[] = isDiamandis
+            ? this.diamandisParts(
+                state,
+                presented,
+                frenzyStacks,
+                nowMs,
+                bodyX,
+                bodyDrawY,
+                spriteZoom,
+              )
+            : [];
+          const partLight = bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE);
+          const partFaces = bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE);
+          const drawParts = (behind: boolean): void => {
+            for (const part of parts) {
+              if (part.behind !== behind) continue;
+              this.sprites.drawPiece(
+                ctx,
+                part.atlas,
+                part.anim,
+                part.frame,
+                presented.facingX,
+                presented.facingY,
+                part.x,
+                part.y,
+                spriteZoom,
+                frenzyTint(frenzyStacks, nowMs),
+                partLight,
+                partFaces,
+              );
+            }
+          };
           const paint = (override: Tint | undefined): boolean =>
             this.sprites.drawEntity(
               ctx,
@@ -4552,8 +4663,8 @@ export class SurvivalRenderer {
               presented.facingX,
               presented.facingY,
               presented.elapsedMs,
-              sx,
-              drawY,
+              bodyX,
+              bodyDrawY,
               spriteZoom,
               // Um sheet de frames fixos nao sabe o humor da entidade, e o
               // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
@@ -4570,9 +4681,13 @@ export class SurvivalRenderer {
                     // coracao batendo.
                     enemy.archetype === 'furnace_heart'
                     ? furnaceBodyTint(livePhases, nowMs)
-                    : enemy.elite
-                      ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
-                      : undefined),
+                    : // O FRENESI do Diamandis: o reator vazando pela carcaca,
+                      // mais forte a cada peca arrancada. Ver diamandis-body.ts.
+                      isDiamandis
+                      ? frenzyTint(frenzyStacks, nowMs)
+                      : enemy.elite
+                        ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                        : undefined),
               // A LUZ DO MUNDO sobre a casca do bicho. Separada do tint acima de
               // proposito: aquele conta um ESTADO da criatura (elite, enfurecida,
               // colapsando) e este conta o que esta acontecendo AO REDOR dela. Se
@@ -4581,12 +4696,30 @@ export class SurvivalRenderer {
               bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
               bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
             );
+          drawParts(true);
           // Todo corpo que nao nada e CORTADO pela lamina: e a linha d'agua
           // que o jogador le para saber quanto a sala ja encheu.
           const drew =
             waterLine !== null
               ? drawCutByWaterline(ctx, waterLine, sx, enemy.radius * TILE_W * z, z, nowMs, paint)
               : paint(undefined);
+          if (drew) drawParts(false);
+          // O COVEIRO CARREGADOR leva a peca pendurada no eletroima. Ver
+          // `drawCarriedPart`: a peca e a mesma que sumiu do chassi.
+          if (drew && enemy.archetype === 'undertaker') {
+            this.drawCarriedPart(
+              ctx,
+              enemy,
+              state,
+              presented,
+              sx,
+              drawY,
+              spriteZoom,
+              partLight,
+              partFaces,
+              nowMs,
+            );
+          }
           if (!drew) {
             drawVoxelEntity(ctx, {
               sx,
@@ -6593,6 +6726,124 @@ export class SurvivalRenderer {
   }
 
   /**
+   * As pecas do Diamandis em volta do chassi neste quadro. Vazio enquanto o
+   * chassi nao carregou (sem manifest nao ha encaixe) e para toda peca cujo
+   * atlas ainda esta chegando — as demais entram normalmente.
+   */
+  private diamandisParts(
+    state: SurvivalState,
+    presented: {
+      anim: SpriteAnimationSelection;
+      facingX: number;
+      facingY: number;
+      elapsedMs: number;
+    },
+    stacks: number,
+    nowMs: number,
+    footX: number,
+    footY: number,
+    zoom: number,
+  ): DiamandisPartDraw[] {
+    const chassis = this.sprites.spriteForArchetype('diamandis');
+    if (!chassis) return [];
+    const parts = DIAMANDIS_PART_ATLASES.map((id) => this.sprites.get(id)?.manifest ?? null);
+    return composeDiamandisParts({
+      chassis: chassis.manifest,
+      parts,
+      exposed: state.bossRuntime.modulesExposed,
+      lost: state.bossRuntime.modulesLost,
+      // Um inimigo nunca tem a animacao em camadas do Prospector; o recuo e
+      // so para o tipo fechar.
+      chassisAnim: typeof presented.anim === 'string' ? presented.anim : 'idle',
+      facingX: presented.facingX,
+      facingY: presented.facingY,
+      elapsedMs: presented.elapsedMs,
+      nowMs,
+      stacks,
+      footX,
+      footY,
+      zoom,
+    });
+  }
+
+  /**
+   * A peca pendurada no eletroima de um Coveiro carregador.
+   *
+   * `mood` guarda o modulo reivindicado (m + 1) e o bit em `modulesLost` diz
+   * que o arranque ja aconteceu — antes disso ele esta so a caminho, de maos
+   * vazias. O encaixe e o `magnet` do manifest do Coveiro; a peca e a MESMA
+   * que sumiu do chassi, na pose `carried` (pendurada pelo topo).
+   *
+   * Desenhada no mesmo item da fila que o Coveiro, logo depois do corpo dele:
+   * separar os dois em profundidades diferentes abriria uma fresta entre a
+   * peca e o eletroima que a segura.
+   */
+  private drawCarriedPart(
+    ctx: CanvasRenderingContext2D,
+    enemy: Entity,
+    state: SurvivalState,
+    presented: { facingX: number; facingY: number },
+    footX: number,
+    footY: number,
+    zoom: number,
+    light: Tint | undefined,
+    faces: FaceLighting | undefined,
+    nowMs: number,
+  ): void {
+    const module = (enemy.mood ?? 0) - 1;
+    if (module < 0) return;
+    if ((state.bossRuntime.modulesLost & (1 << module)) === 0) return;
+    const atlas = diamandisPartAtlas(module);
+    const carrier = this.sprites.spriteForArchetype('undertaker');
+    if (!atlas || !carrier) return;
+    const part = this.sprites.get(atlas);
+    if (!part) return;
+    const dir = manifestDir(carrier.manifest, presented.facingX, presented.facingY);
+    const socket = socketScreenPoint(carrier.manifest, dir, 'magnet', footX, footY, zoom);
+    if (!socket) return;
+    const frame = frameAtTime(part.manifest, 'carried', nowMs + enemy.id * 211);
+    this.sprites.drawPiece(
+      ctx,
+      atlas,
+      'carried',
+      frame,
+      presented.facingX,
+      presented.facingY,
+      socket.x,
+      socket.y,
+      zoom,
+      undefined,
+      light,
+      faces,
+    );
+  }
+
+  /**
+   * Resolve as pecas caidas que ESTILHACARAM neste quadro: lascas de minerio
+   * e faiscas no ponto, e a lasca da recompensa sai dali para o contador. A
+   * quantidade e a que o `ore_gained` do mesmo tick trouxe; sem ele (resync
+   * no meio do voo) vale a da simulacao.
+   */
+  private stepDiamandisFloor(nowMs: number): void {
+    const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+    for (const piece of this.diamandis.shattered(nowMs)) {
+      this.particles.hit(piece.x, piece.y, 'oreChip', 40, fxScale);
+      this.particles.hit(piece.x, piece.y, 'spark', 16, fxScale);
+      if (this.cargoFlights.length < 6) {
+        this.cargoFlights.push({
+          worldX: piece.x,
+          worldY: piece.y,
+          startedAt: nowMs,
+          durationMs: 620,
+          amount: piece.ore ?? DIAMANDIS_MODULE_ORE,
+        });
+      } else {
+        this.cargoPulseUntil = nowMs + 320;
+      }
+    }
+  }
+
+  /**
    * Um Eco demonstrando uma habilidade ao lado do poço.
    *
    * Silhueta translúcida na cor da habilidade, e não um baú: o que o jogador
@@ -6604,42 +6855,6 @@ export class SurvivalRenderer {
    * fog of war revela luzes, não silhuetas" protege informação sobre o mundo —
    * uma oferta que o jogo está fazendo ao jogador não é informação sobre o mundo.
    */
-  /**
-   * Uma peça do chefe caida no chao: anel pulsando e um bloco pequeno em cima.
-   *
-   * Deliberadamente MENOR e mais discreto que a oferta do Poco. As duas coisas
-   * marcam "ha algo aqui para pegar", mas a do Poco e uma escolha de build que
-   * para a luta, e esta e uma peça de sucata no meio dela. Igualar as duas
-   * ensinaria o jogador a parar no meio do combate do Diamandis.
-   */
-  private drawBossModuleMark(
-    mark: BossModuleMark,
-    sx: number,
-    sy: number,
-    z: number,
-    nowMs: number,
-  ): void {
-    const ctx = this.ctx;
-    // A fase vem da POSICAO, e nao do instante em que a marca nasceu: duas
-    // peças caidas lado a lado pulsando em unissono lem como interface, e nao
-    // como duas coisas separadas no chao.
-    const breath = 0.5 + Math.sin(nowMs * 0.006 + mark.x + mark.y) * 0.3;
-    ctx.save();
-    ctx.globalAlpha = 0.3 + breath * 0.4;
-    ctx.strokeStyle = mark.color;
-    ctx.lineWidth = Math.max(1, z * 0.6);
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, (6 + breath * 2) * z, (3 + breath) * z, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = 0.75 + breath * 0.25;
-    ctx.fillStyle = mark.color;
-    ctx.fillRect(sx - 2 * z, sy - 5 * z, Math.max(2, 4 * z), Math.max(2, 4 * z));
-    ctx.restore();
-  }
-
   private drawWellOffer(
     offer: { ability: AbilityId; x: number; y: number },
     sx: number,

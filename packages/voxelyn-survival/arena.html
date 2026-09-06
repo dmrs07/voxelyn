@@ -210,7 +210,8 @@
         gap: 0 8px;
         margin-bottom: 6px;
       }
-      #leviathan-panel {
+      #leviathan-panel,
+      #diamandis-panel {
         position: fixed;
         left: calc(10px + var(--safe-area-inset-left));
         bottom: calc(150px + var(--safe-area-inset-bottom));
@@ -223,15 +224,21 @@
         color: #c9c2b4;
         z-index: 6;
       }
-      #leviathan-panel b {
+      #leviathan-panel b,
+      #diamandis-panel b {
         color: #9fd8ff;
         font-weight: 600;
       }
-      #leviathan-panel .safe {
+      #leviathan-panel .safe,
+      #diamandis-panel .safe {
         color: #8ff0c8;
       }
-      #leviathan-panel .danger {
+      #leviathan-panel .danger,
+      #diamandis-panel .danger {
         color: #ff9a7a;
+      }
+      #diamandis-readout {
+        margin-bottom: 6px;
       }
       #leviathan-readout {
         display: grid;
@@ -239,12 +246,14 @@
         gap: 0 8px;
         margin-bottom: 6px;
       }
-      #leviathan-buttons {
+      #leviathan-buttons,
+      #diamandis-buttons {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
       }
-      #leviathan-buttons button {
+      #leviathan-buttons button,
+      #diamandis-buttons button {
         font: inherit;
         font-size: 10px;
         padding: 3px 6px;
@@ -254,7 +263,8 @@
         color: #d8cfc0;
         cursor: pointer;
       }
-      #leviathan-buttons button:hover {
+      #leviathan-buttons button:hover,
+      #diamandis-buttons button:hover {
         background: #1f2532;
       }
       #frost-buttons {
@@ -395,6 +405,47 @@
         max-height: 100%;
       }
 
+      /* O INTERRUPTOR DAS FERRAMENTAS. Os paineis de debug (barra de chefe,
+         gelo, congelamento, Leviata) sao para ler ENTRE as tentativas; num
+         celular eles cobrem a sala e roubam o toque dos manches. Entao todos
+         obedecem a um so interruptor: `body.tools-hidden` os esconde, e o
+         botao — pequeno, no canto, o unico que fica — os traz de volta. Em
+         tela de toque comecam escondidos. */
+      #tools-toggle {
+        position: fixed;
+        top: calc(6px + var(--safe-area-inset-top));
+        right: calc(8px + var(--safe-area-inset-right));
+        z-index: 7;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #2a2d38;
+        background: rgba(10, 12, 18, 0.85);
+        color: #9fb3cc;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      #tools-toggle:hover {
+        background: #1f2532;
+      }
+      body.tools-hidden #tools-toggle {
+        color: #d8cfc0;
+      }
+      body.tools-hidden #bossbar-panel,
+      body.tools-hidden #frost-panel,
+      body.tools-hidden #leviathan-panel,
+      body.tools-hidden #diamandis-panel,
+      body.tools-hidden #ice-panel,
+      body.tools-hidden #hud-note {
+        display: none !important;
+      }
+      /* Com o interruptor no canto, a nota desce um pouco para nao bater nele. */
+      body:not(.tools-hidden) #tools-toggle + #hud-note {
+        top: calc(34px + var(--safe-area-inset-top));
+      }
+
       /* No canto DIREITO: o painel de status do jogo ocupa o esquerdo, e a
          nota sobreposta ao HP era o primeiro pixel que o playtest via. */
       #hud-note {
@@ -463,6 +514,14 @@
   </head>
   <body>
     <canvas id="game" class="hidden"></canvas>
+    <button
+      type="button"
+      id="tools-toggle"
+      class="hidden"
+      title="Mostrar ou esconder os painéis de ferramenta"
+    >
+      ferramentas
+    </button>
     <div id="hud-note" class="hidden">
       Arena de teste — sem telemetria, sem placar, sem gravação de replay.
     </div>
@@ -482,6 +541,14 @@
     <div id="leviathan-panel" class="hidden">
       <div id="leviathan-readout"></div>
       <div id="leviathan-buttons"></div>
+    </div>
+    <!-- O PAINEL DO DIAMANDIS (arena-diamandis-debug.ts): os oito rumos do
+         chassi, cada estado de cada peca (presa, solta, arrancada e carregada
+         por um Coveiro, caida), o frenesi no teto e a leitura exata do que a
+         simulacao decide. So aparece na arena do Diamandis. -->
+    <div id="diamandis-panel" class="hidden">
+      <div id="diamandis-readout"></div>
+      <div id="diamandis-buttons"></div>
     </div>
     <!-- O PAINEL DA BARRA DE CHEFE (arena-bossbar-debug.ts): cenarios sobre a
          luta corrente, a leitura exata do que a barra le, os alternadores de

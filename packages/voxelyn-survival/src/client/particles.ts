@@ -241,6 +241,7 @@ export class VoxelParticles {
    */
   private readonly lastOverheatBucket = new Map<number, number>();
   private lastFurnaceBucket = -1;
+  private lastMalfunctionBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
   private readonly lastBubbleBucket = new Map<number, number>();
   /** Ultimo bucket de faisca do curto-circuito, por SLOT (ver emitDashJets). */
@@ -940,6 +941,35 @@ export class VoxelParticles {
         life: hot ? 520 : 900,
         maxLife: hot ? 520 : 900,
         kind: hot ? 'ember' : 'ash',
+      });
+    }
+  }
+
+  /**
+   * A FUMACA DA AVARIA do Diamandis: fumaca preta em fio pelo reator e
+   * faiscas curtas, crescendo com os modulos arrancados (`stacks` 1..3). E o
+   * corpo dizendo que algo esta errado — um automato descartado, ja sem as
+   * pecas, funcionando alem do que devia. Mesma cadencia por bucket de tempo
+   * real da Fornalha, para nascer por segundo e nao por quadro.
+   */
+  emitMalfunctionSmoke(x: number, y: number, nowMs: number, scale: number, stacks: number): void {
+    const bucket = (nowMs / 140) | 0;
+    if (this.lastMalfunctionBucket === bucket) return;
+    this.lastMalfunctionBucket = bucket;
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2246822519)));
+    const count = Math.max(1, Math.round((1 + stacks) * scale));
+    for (let i = 0; i < count; i++) {
+      const spark = i % 4 === 3;
+      this.push({
+        x: x + rnd() * 0.8 - 0.4,
+        y: y + rnd() * 0.8 - 0.4,
+        z: 0.9 + rnd() * 0.4,
+        vx: (rnd() - 0.5) * (spark ? 1.6 : 0.3),
+        vy: (rnd() - 0.5) * (spark ? 1.6 : 0.3),
+        vz: spark ? 0.8 + rnd() * 0.8 : 0.5 + rnd() * 0.25 * stacks,
+        life: spark ? 260 : 1100,
+        maxLife: spark ? 260 : 1100,
+        kind: spark ? 'spark' : 'ash',
       });
     }
   }

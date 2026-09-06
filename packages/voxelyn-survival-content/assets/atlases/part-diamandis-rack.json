@@ -1,0 +1,150 @@
+{
+  "id": "part-diamandis-rack",
+  "version": 1,
+  "atlas": "part-diamandis-rack.png",
+  "normalAtlas": "part-diamandis-rack.normal.png",
+  "normalScale": 2,
+  "frameWidth": 60,
+  "frameHeight": 76,
+  "columns": 51,
+  "anchorX": 28,
+  "anchorY": 38,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.8,
+    "h": 0.8
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#ffd166"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "loose": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "carried": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "floor": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4,
+      "hit": 8,
+      "loose": 10,
+      "carried": 14,
+      "floor": 18
+    },
+    "dl": {
+      "idle": 19,
+      "attack": 23,
+      "hit": 27,
+      "loose": 29,
+      "carried": 33,
+      "floor": 37
+    },
+    "ur": {
+      "idle": 38,
+      "attack": 42,
+      "hit": 46,
+      "loose": 48,
+      "carried": 52,
+      "floor": 56
+    },
+    "ul": {
+      "idle": 57,
+      "attack": 61,
+      "hit": 65,
+      "loose": 67,
+      "carried": 71,
+      "floor": 75
+    },
+    "r": {
+      "idle": 76,
+      "attack": 80,
+      "hit": 84,
+      "loose": 86,
+      "carried": 90,
+      "floor": 94
+    },
+    "d": {
+      "idle": 95,
+      "attack": 99,
+      "hit": 103,
+      "loose": 105,
+      "carried": 109,
+      "floor": 113
+    },
+    "l": {
+      "idle": 114,
+      "attack": 118,
+      "hit": 122,
+      "loose": 124,
+      "carried": 128,
+      "floor": 132
+    },
+    "u": {
+      "idle": 133,
+      "attack": 137,
+      "hit": 141,
+      "loose": 143,
+      "carried": 147,
+      "floor": 151
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric detachable three-canister demolition rack of an industrial excavator, brass canisters with rusted caps, in eight facings, mounted, hanging loose, carried by an electromagnet and lying on the floor",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

@@ -59,10 +59,30 @@ export const facingQuadrant = (fx: number, fy: number): number => {
   return 3;
 };
 
+/**
+ * O SETOR do rumo entre `sectors` fatias iguais da tela, indexado a partir do
+ * angulo zero de tela — a generalizacao de `facingQuadrant` para os sprites
+ * de OITO rumos (o Diamandis e as pecas dele). Com quatro setores e o proprio
+ * quadrante; com oito, cada fatia tem 45 graus e o centro delas coincide com
+ * os oito quadros autorados (`dirFromFacing8`): os eixos da tela sao centros,
+ * nao fronteiras.
+ */
+export const facingSector = (fx: number, fy: number, sectors: number): number => {
+  if (sectors === 4) return facingQuadrant(fx, fy);
+  const width = TAU / sectors;
+  // Centrado: o setor 0 vai de -width/2 a +width/2 em volta do angulo zero,
+  // que e onde `dirFromFacing8` poe o quadro `r`.
+  const angle = normalized(screenAngle(fx, fy) + width / 2);
+  return Math.floor(angle / width) % sectors;
+};
+
 const normalized = (angle: number): number => ((angle % TAU) + TAU) % TAU;
 
 /** Centro do quadrante, no mesmo espaco normalizado de `normalized`. */
 const quadrantCenter = (quadrant: number): number => quadrant * QUADRANT + QUADRANT / 2;
+/** O angulo de tela no centro do setor `sector`, para `sectors` fatias. */
+const sectorCenter = (sector: number, sectors: number): number =>
+  sectors === 4 ? quadrantCenter(sector) : sector * (TAU / sectors);
 
 /** Diferenca angular assinada, sempre no menor arco. */
 const signedDelta = (angle: number, from: number): number => {
@@ -83,7 +103,7 @@ const worldFromScreenAngle = (angle: number): { x: number; y: number } => {
   return { x: fx / length, y: fy / length };
 };
 
-type Held = { quadrant: number; seenMs: number };
+type Held = { quadrant: number; sectors: number; seenMs: number };
 
 /** Com que frequencia varrer entradas de entidades que sumiram do mundo. */
 const SWEEP_EVERY_MS = 2_000;
@@ -108,31 +128,43 @@ export class FacingHysteresis {
    * proprio vetor recebido, sem tocar em nada: quem le o resultado (o recoil,
    * por exemplo) continua enxergando a direcao continua de verdade.
    */
-  resolve(key: number, fx: number, fy: number, nowMs = 0): { x: number; y: number } {
+  resolve(
+    key: number,
+    fx: number,
+    fy: number,
+    nowMs = 0,
+    /**
+     * Em quantas fatias a tela esta dividida para este rumo: 4 para quase
+     * todo sprite, 8 para os de oito rumos. A margem de histerese e a mesma
+     * em radianos; a fatia e que encolhe.
+     */
+    sectors = 4,
+  ): { x: number; y: number } {
     // Vetor nulo nao tem rumo: devolver o proprio evita inventar um quadrante e
     // grava-lo como se fosse decisao.
     if (fx === 0 && fy === 0) return { x: fx, y: fy };
 
-    const quadrant = facingQuadrant(fx, fy);
+    const quadrant = facingSector(fx, fy, sectors);
     const previous = this.held.get(key);
-    if (previous === undefined || previous.quadrant === quadrant) {
-      this.held.set(key, { quadrant, seenMs: nowMs });
+    if (previous === undefined || previous.sectors !== sectors || previous.quadrant === quadrant) {
+      this.held.set(key, { quadrant, sectors, seenMs: nowMs });
       return { x: fx, y: fy };
     }
 
-    const center = quadrantCenter(previous.quadrant);
+    const half = TAU / sectors / 2;
+    const center = sectorCenter(previous.quadrant, sectors);
     const delta = signedDelta(screenAngle(fx, fy), center);
-    if (Math.abs(delta) > QUADRANT / 2 + FACING_HYSTERESIS_RAD) {
-      // Virada de verdade: o vetor cru entrou fundo no quadrante vizinho.
-      this.held.set(key, { quadrant, seenMs: nowMs });
+    if (Math.abs(delta) > half + FACING_HYSTERESIS_RAD) {
+      // Virada de verdade: o vetor cru entrou fundo no setor vizinho.
+      this.held.set(key, { quadrant, sectors, seenMs: nowMs });
       return { x: fx, y: fy };
     }
 
-    // Empate no fio da fronteira: segura o quadrante que ja esta desenhado e
+    // Empate no fio da fronteira: segura o setor que ja esta desenhado e
     // devolve o angulo preso na borda de dentro dele — o desvio maximo e a
     // propria margem, invisivel em qualquer uso continuo do vetor.
     previous.seenMs = nowMs;
-    const limit = QUADRANT / 2 - EDGE_EPSILON;
+    const limit = half - EDGE_EPSILON;
     return worldFromScreenAngle(center + Math.max(-limit, Math.min(limit, delta)));
   }
 

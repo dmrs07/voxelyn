@@ -50,6 +50,12 @@ import {
   type LeviathanScenario,
 } from './arena-leviathan-debug';
 import {
+  DIAMANDIS_SCENARIOS,
+  applyDiamandisScenario,
+  diamandisReadout,
+  type DiamandisScenario,
+} from './arena-diamandis-debug';
+import {
   BOSS_BAR_SCENARIOS,
   BossBarGallery,
   BossBarScenarioDriver,
@@ -119,6 +125,9 @@ const frostFastDecay = document.getElementById('frost-fast-decay') as HTMLInputE
 const leviathanPanel = document.getElementById('leviathan-panel') as HTMLDivElement;
 const leviathanReadoutEl = document.getElementById('leviathan-readout') as HTMLDivElement;
 const leviathanButtons = document.getElementById('leviathan-buttons') as HTMLDivElement;
+const diamandisPanel = document.getElementById('diamandis-panel') as HTMLDivElement;
+const diamandisReadoutEl = document.getElementById('diamandis-readout') as HTMLDivElement;
+const diamandisButtons = document.getElementById('diamandis-buttons') as HTMLDivElement;
 const bossBarPanel = document.getElementById('bossbar-panel') as HTMLDivElement;
 const bossBarReadoutEl = document.getElementById('bossbar-readout') as HTMLDivElement;
 const bossBarButtons = document.getElementById('bossbar-buttons') as HTMLDivElement;
@@ -139,6 +148,42 @@ const galleryCanvas = document.getElementById('gallery-canvas') as HTMLCanvasEle
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
 const hudNote = document.getElementById('hud-note') as HTMLDivElement;
+const toolsToggle = document.getElementById('tools-toggle') as HTMLButtonElement;
+
+// ---------------------------------------------------------------------------
+// O interruptor das ferramentas (ver o CSS de `#tools-toggle`). Um so estado
+// para todos os paineis de debug. Em tela de toque comeca ESCONDIDO: no
+// celular os paineis cobrem a sala e roubam o toque dos manches, e o que se
+// quer testar ali e jogar. A escolha do testador persiste no navegador.
+// ---------------------------------------------------------------------------
+const TOOLS_STORAGE_KEY = 'voxelyn.arena.tools';
+const coarsePointer = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const readToolsHidden = (): boolean => {
+  try {
+    const stored = localStorage.getItem(TOOLS_STORAGE_KEY);
+    if (stored === 'shown') return false;
+    if (stored === 'hidden') return true;
+  } catch {
+    /* sem storage: fica a regra por aparelho */
+  }
+  return coarsePointer() || window.innerWidth < 900;
+};
+const applyToolsHidden = (hidden: boolean): void => {
+  document.body.classList.toggle('tools-hidden', hidden);
+  toolsToggle.textContent = hidden ? 'ferramentas' : 'esconder ferramentas';
+  toolsToggle.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+};
+applyToolsHidden(readToolsHidden());
+toolsToggle.addEventListener('click', () => {
+  const hidden = !document.body.classList.contains('tools-hidden');
+  applyToolsHidden(hidden);
+  try {
+    localStorage.setItem(TOOLS_STORAGE_KEY, hidden ? 'hidden' : 'shown');
+  } catch {
+    /* sem storage: vale para esta sessao */
+  }
+});
 const icePanel = document.getElementById('ice-panel') as HTMLDivElement;
 const endOverlay = document.getElementById('end-overlay') as HTMLDivElement;
 const endTitle = document.getElementById('end-title') as HTMLHeadingElement;
@@ -284,6 +329,71 @@ const updateLeviathanPanel = (state: SurvivalState, nowMs: number): void => {
     `bolha: <b class="${r.insideBubble ? 'safe' : 'danger'}">${r.insideBubble ? 'PROTEGIDO' : 'exposto'}</b>${r.bubbleMargin !== null ? ` (${r.bubbleMargin >= 0 ? '+' : ''}${r.bubbleMargin.toFixed(2)})` : ''}`,
   ];
   leviathanReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
+};
+// ---------------------------------------------------------------------------
+// O painel do Diamandis: os oito rumos, cada estado de cada peca, o frenesi e
+// a leitura do que a simulacao decide (arena-diamandis-debug.ts).
+// ---------------------------------------------------------------------------
+const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
+  reset: 'peças de volta',
+  wake: 'acordar',
+  beside: 'jogador ao lado',
+  faceR: 'rumo →',
+  faceDR: 'rumo ↘',
+  faceD: 'rumo ↓',
+  faceDL: 'rumo ↙',
+  faceL: 'rumo ←',
+  faceUL: 'rumo ↖',
+  faceU: 'rumo ↑',
+  faceUR: 'rumo ↗',
+  exposeNext: 'soltar próxima peça',
+  ripNext: 'arrancar (com Coveiro)',
+  killCarrier: 'abater carregador',
+  frenzyMax: 'frenesi máximo',
+  reactor: 'colapso do reator',
+};
+for (const scenario of DIAMANDIS_SCENARIOS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = DIAMANDIS_SCENARIO_LABELS[scenario];
+  button.dataset.scenario = scenario;
+  button.addEventListener('click', () => {
+    if (!activeFrostState) return;
+    const events = applyDiamandisScenario(activeFrostState, scenario);
+    // Pelo mesmo funil dos eventos de verdade: o corpo, a barra, o som e o
+    // clarao sao o que se esta testando.
+    if (events.length > 0) activeFrostEvents?.(events);
+  });
+  diamandisButtons.appendChild(button);
+}
+const DIAMANDIS_READOUT_INTERVAL_MS = 100;
+let diamandisReadoutAt = -1;
+const updateDiamandisPanel = (state: SurvivalState, nowMs: number): void => {
+  if (diamandisReadoutAt >= 0 && nowMs - diamandisReadoutAt < DIAMANDIS_READOUT_INTERVAL_MS) return;
+  diamandisReadoutAt = nowMs;
+  const r = diamandisReadout(state);
+  if (!r) {
+    diamandisReadoutEl.innerHTML = '<div>sem Diamandis em campo</div>';
+    return;
+  }
+  const PART_STATE_LABEL = { mounted: 'presa', loose: 'solta', gone: 'arrancada' } as const;
+  const parts = r.parts
+    .map((p) => {
+      const cls = p.state === 'mounted' ? 'safe' : p.state === 'loose' ? '' : 'danger';
+      const carrier = p.carrier !== null ? ` (Coveiro #${p.carrier})` : '';
+      return `${p.name} <b class="${cls}">${PART_STATE_LABEL[p.state]}</b>${carrier}`;
+    })
+    .join(' · ');
+  const rows: string[] = [
+    `vida <b>${Math.round(r.hpFraction * 100)}%</b> · rumo <b>${r.facing}</b> · ${r.awake ? 'acordado' : 'dormindo'}`,
+    parts,
+    `próxima peça solta a <b>${r.nextExposeAt !== null ? `${Math.round(r.nextExposeAt * 100)}%` : '—'}</b>`,
+    `frenesi <b class="${r.stacks > 0 ? 'danger' : ''}">${r.stacks}</b> · dano ×<b>${r.multiplier.toFixed(2)}</b> (teto ×${r.cap.toFixed(2)})`,
+    `estagger <b>${r.staggerLeft > 0 ? `${r.staggerLeft}/${r.staggerTicks} ticks` : '—'}</b>`,
+    `Coveiros <b>${r.undertakers}</b> · carregando <b>${r.carriers}</b>`,
+    `reator <b>${r.reactor ? 'em colapso' : 'estável'}</b>`,
+  ];
+  diamandisReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
 };
 // ---------------------------------------------------------------------------
 // O painel da barra de chefe (arena-bossbar-debug.ts): cenarios sobre a luta
@@ -593,17 +703,20 @@ const runArena = (conditions: ArenaConditions): void => {
   endOverlay.classList.add('hidden');
   canvas.classList.remove('hidden');
   hudNote.classList.remove('hidden');
+  toolsToggle.classList.remove('hidden');
   // O censo so faz sentido onde ha gelo. Nos outros chefes o painel seria cinco
   // zeros permanentes tapando um canto da tela.
   icePanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   frostPanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   leviathanPanel.classList.toggle('hidden', conditions.boss !== 'sheet_leviathan');
+  diamandisPanel.classList.toggle('hidden', conditions.boss !== 'diamandis');
   bossBarPanel.classList.remove('hidden');
   bossBarDriver.reset();
   bossBarReadoutAt = -1;
   icePanelAt = -1;
   frostReadoutAt = -1;
   leviathanReadoutAt = -1;
+  diamandisReadoutAt = -1;
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
@@ -715,6 +828,7 @@ const runArena = (conditions: ArenaConditions): void => {
       updateFrostPanel(state, now);
     }
     if (conditions.boss === 'sheet_leviathan') updateLeviathanPanel(state, now);
+    if (conditions.boss === 'diamandis') updateDiamandisPanel(state, now);
     updateBossBarPanel(state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
@@ -765,9 +879,11 @@ btnReconfigure.addEventListener('click', () => {
   audio.ui();
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');
+  toolsToggle.classList.add('hidden');
   icePanel.classList.add('hidden');
   frostPanel.classList.add('hidden');
   leviathanPanel.classList.add('hidden');
+  diamandisPanel.classList.add('hidden');
   bossBarPanel.classList.add('hidden');
   activeFrostState = null;
   activeFrostEvents = null;

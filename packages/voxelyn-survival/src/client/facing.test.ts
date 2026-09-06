@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { dirFromFacing } from '@voxelyn/survival-content';
-import { FACING_HYSTERESIS_RAD, FacingHysteresis, facingQuadrant, screenAngle } from './facing';
+import { DIRS8_BY_ANGLE, dirFromFacing, dirFromFacing8 } from '@voxelyn/survival-content';
+import {
+  FACING_HYSTERESIS_RAD,
+  FacingHysteresis,
+  facingQuadrant,
+  facingSector,
+  screenAngle,
+} from './facing';
 
 const DIRS = ['dr', 'dl', 'ul', 'ur'];
 
@@ -54,8 +60,8 @@ describe('FacingHysteresis', () => {
       [-0.7075, -0.7067],
       [-0.7067, -0.7075],
       [-0.7071, -0.7071],
-      [-0.7080, -0.7062],
-      [-0.7062, -0.7080],
+      [-0.708, -0.7062],
+      [-0.7062, -0.708],
     ] as const;
 
     const dirs = noisy.map(([x, y]) => {
@@ -108,5 +114,63 @@ describe('FacingHysteresis', () => {
     hysteresis.sweep(10_000);
     // Sem memoria, o primeiro rumo depois da varredura volta a ser aceito cru.
     expect(hysteresis.resolve(1, -1, 0, 10_000)).toEqual({ x: -1, y: 0 });
+  });
+});
+
+describe('facingSector (oito rumos)', () => {
+  it('com quatro setores e o proprio quadrante', () => {
+    for (let deg = 0; deg < 360; deg += 3) {
+      const rad = (deg * Math.PI) / 180;
+      expect(facingSector(Math.cos(rad), Math.sin(rad), 4)).toBe(
+        facingQuadrant(Math.cos(rad), Math.sin(rad)),
+      );
+    }
+  });
+
+  it('com oito setores concorda com dirFromFacing8 em toda a volta', () => {
+    for (let deg = 0; deg < 360; deg += 1) {
+      const rad = (deg * Math.PI) / 180;
+      const x = Math.cos(rad);
+      const y = Math.sin(rad);
+      expect(DIRS8_BY_ANGLE[facingSector(x, y, 8)]).toBe(dirFromFacing8(x, y));
+    }
+  });
+
+  it('os eixos da tela sao CENTROS de setor, nao fronteiras', () => {
+    // Direita da tela (mundo +x, -y): setor 0 = `r`, e um desvio pequeno para
+    // qualquer lado continua em `r`.
+    expect(DIRS8_BY_ANGLE[facingSector(1, -1, 8)]).toBe('r');
+    expect(DIRS8_BY_ANGLE[facingSector(1, -0.8, 8)]).toBe('r');
+    expect(DIRS8_BY_ANGLE[facingSector(0.8, -1, 8)]).toBe('r');
+    // Para baixo da tela (mundo +x, +y): `d`.
+    expect(DIRS8_BY_ANGLE[facingSector(1, 1, 8)]).toBe('d');
+  });
+
+  it('a histerese segura o setor de oito como segura o quadrante', () => {
+    const hysteresis = new FacingHysteresis();
+    // Centro de `r`, depois um passo pequeno alem da fronteira com `dr`: sem
+    // histerese trocaria; com ela, segura.
+    const edge = Math.PI / 8 + FACING_HYSTERESIS_RAD * 0.5;
+    const held = hysteresis.resolve(7, 1, -1, 0, 8);
+    expect(DIRS8_BY_ANGLE[facingSector(held.x, held.y, 8)]).toBe('r');
+    const nudged = hysteresis.resolve(
+      7,
+      Math.cos(edge) + Math.sin(edge),
+      Math.sin(edge) - Math.cos(edge),
+      16,
+      8,
+    );
+    // O vetor devolvido ainda cai no setor `r`.
+    expect(DIRS8_BY_ANGLE[facingSector(nudged.x, nudged.y, 8)]).toBe('r');
+    // Bem alem da faixa de histerese, troca para `dr`.
+    const far = Math.PI / 8 + FACING_HYSTERESIS_RAD * 2;
+    const swapped = hysteresis.resolve(
+      7,
+      Math.cos(far) + Math.sin(far),
+      Math.sin(far) - Math.cos(far),
+      32,
+      8,
+    );
+    expect(DIRS8_BY_ANGLE[facingSector(swapped.x, swapped.y, 8)]).toBe('dr');
   });
 });

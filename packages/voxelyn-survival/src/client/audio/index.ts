@@ -22,6 +22,7 @@ import {
   runSectorCount,
   insideAnyBubble,
   LEVIATHAN_SHOCK_WINDUP_TICKS,
+  diamandisFrenzyStacks,
 } from '@voxelyn/survival-sim';
 import type { Entity, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
@@ -29,6 +30,7 @@ import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents, type Cue } from './cues';
 import { DevourerVortexBus } from './devourer-vortex-bus';
 import { FurnaceHeartBus } from './furnace-heart-bus';
+import { DiamandisFrenzyBus } from './diamandis-frenzy-bus';
 import { LungBreathBus } from './lung-breath-bus';
 import { MinigunBus } from './minigun-bus';
 import { CueMixer, NEAR_CUTOFF_HZ, distanceGain } from './mixer';
@@ -129,6 +131,7 @@ export class AudioDirector {
   private devourerBus: DevourerVortexBus | null = null;
   private lungBus: LungBreathBus | null = null;
   private furnaceBus: FurnaceHeartBus | null = null;
+  private frenzyBus: DiamandisFrenzyBus | null = null;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
@@ -439,6 +442,8 @@ export class AudioDirector {
       this.lungBus.start();
       this.furnaceBus = new FurnaceHeartBus(ctx, bossLofi, this.noise);
       this.furnaceBus.start();
+      this.frenzyBus = new DiamandisFrenzyBus(ctx, bossLofi, this.noise);
+      this.frenzyBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
       this.musicBus.setVolume(this.musicVolume);
@@ -631,6 +636,7 @@ export class AudioDirector {
     this.devourerBus?.silence();
     this.lungBus?.silence();
     this.furnaceBus?.silence();
+    this.frenzyBus?.silence();
   }
 
   /**
@@ -667,6 +673,13 @@ export class AudioDirector {
         presence,
       });
     } else this.furnaceBus?.silence();
+
+    // O frenesi do Diamandis: os degraus vem dos modulos ARRANCADOS que ja
+    // contam neste tick — a mesma conta da simulacao (`diamandisFrenzyStacks`),
+    // entao o leito sobe no mesmo tick em que o dano sobe.
+    if (boss?.archetype === 'diamandis') {
+      this.frenzyBus?.set({ stacks: diamandisFrenzyStacks(state), presence });
+    } else this.frenzyBus?.silence();
   }
 
   /**

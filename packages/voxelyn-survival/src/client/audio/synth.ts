@@ -1700,6 +1700,36 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   },
   // Falha operacional: o motor comeca a funcionar fora dos limites —
   // batimento entre duas serras que nao se acertam, e um rele estalando.
+  diamandisFrenzy: (ctx, out, t0, noise) => {
+    // O rele: um estalo seco. Depois os servos SUBINDO de regime — dois
+    // dentes de serra em batimento, varrendo para cima — e uma rajada de
+    // metal raspando por baixo. Curto (0,7 s): e a virada, nao um estado.
+    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.04, type: 'bandpass', from: 1900, q: 2.5 });
+    tone(ctx, out, t0 + 0.04, {
+      type: 'sawtooth',
+      from: 90,
+      to: 210,
+      peak: 0.34,
+      decay: 0.7,
+      attack: 0.03,
+    });
+    tone(ctx, out, t0 + 0.04, {
+      type: 'sawtooth',
+      from: 97,
+      to: 226,
+      peak: 0.26,
+      decay: 0.7,
+      attack: 0.03,
+    });
+    burst(ctx, out, t0 + 0.1, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 520,
+      to: 1400,
+      q: 4,
+    });
+  },
   diamandisReactorFail: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, { peak: 0.45, decay: 0.05, type: 'bandpass', from: 2600, q: 3 });
     sustain(ctx, out, t0 + 0.05, {

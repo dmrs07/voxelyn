@@ -142,6 +142,7 @@ import {
   stunEntity,
   surfaceSpeedMul,
   updateEnemies,
+  diamandisFrenzyMultiplier,
 } from './entities.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
@@ -340,6 +341,16 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.ability = STARTING_ABILITY;
   extra.resonance = emptyResonance();
   clearFreeze(extra);
+};
+
+/**
+ * O multiplicador de dano ao jogador de uma explosao pelo DONO dela: so o
+ * Diamandis em frenesi escala; qualquer outra origem vale 1.
+ */
+const explosionOwnerScale = (state: SurvivalState, owner: number | undefined): number => {
+  if (owner === undefined) return 1;
+  const ent = state.enemies.find((e) => e.id === owner);
+  return ent && ent.archetype === 'diamandis' ? diamandisFrenzyMultiplier(state) : 1;
 };
 
 export const createRun = (config: RunConfig): SurvivalState => {
@@ -887,7 +898,13 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         ev.y,
         ev.radius,
         events,
-        ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1,
+        ev.source === 'player'
+          ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
+          : // A SALVA do Diamandis em frenesi: a explosao e dele (o `owner` e o
+            // chefe), entao o dano ao jogador sobe com os modulos arrancados,
+            // como o da broca e o do feixe. Uma explosao de qualquer outra
+            // origem — bomber, gas, o proprio jogador — nao escala.
+            explosionOwnerScale(state, ev.owner),
         ev.source,
       );
     }
@@ -3667,6 +3684,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // luta e na recompensa.
   mix(state.bossRuntime.modulesExposed);
   mix(state.bossRuntime.modulesLost);
+  mix(state.bossRuntime.frenzyRipTick);
+  mix(state.bossRuntime.frenzyRipCount);
+  mix(state.bossRuntime.staggerUntil);
   // O ARCO do Devorador: onde ele vai cair e quantos saltos faltam na rajada.
   //
   // Os dois sao escolhidos UMA vez, na decolagem, e mandam no resto do ciclo —

@@ -10,16 +10,21 @@
 // A economia dos Coveiros so e uma decisao se o jogador conseguir acompanhar o
 // placar, e o placar e este:
 //
-//   exposed   soltou da carcaça. E uma OFERTA — a peça esta no chao e ninguem
-//             ainda a reclamou. Ouro, e a unica que fica marcada no mundo.
+//   exposed   soltou da carcaça. E uma OFERTA — a peça esta pendurada no
+//             chassi, balancando, e um Coveiro ja pode engatar. Ouro.
 //   detached  um Coveiro engatou e esta LEVANDO. Ainda da tempo: matar o
-//             carregador devolve a peça ao chao. Ambar, urgente.
-//   dropped   o carregador caiu e a peça voltou ao chao. Recuperavel de novo,
-//             entao volta a ser marcada — mas em verde, porque a leitura e
-//             "voce ganhou isto de volta", nao "apareceu algo novo".
+//             carregador devolve a sucata. Ambar, urgente.
+//   dropped   o carregador caiu e a peça caiu com ele — e vira lasca de
+//             minerio ali mesmo. Verde, porque a leitura e "voce ganhou isto
+//             de volta", nao "apareceu algo novo".
 //   lost      saiu do mapa. Nao ha o que fazer, e o aviso e uma nota de
-//             prejuizo: vermelho, sem marca no mundo, porque marcar um lugar
-//             onde nao ha nada e mentir sobre o estado do mapa.
+//             prejuizo: vermelho.
+//
+// O CORPO e quem mostra onde a peca esta em cada estado (diamandis-body.ts):
+// presa ou solta no chassi, pendurada no eletroima do Coveiro, caida no chao.
+// Por isso nao ha mais uma marca de chao separada — a versao anterior punha
+// uma cruz no ponto do evento, e no `exposed` esse ponto e onde o chefe ESTAVA,
+// nao onde a peça esta.
 //
 // Vive fora do renderer porque e uma TABELA, e uma tabela pode ser conferida
 // sem um canvas por perto — inclusive a garantia de que os quatro estados sao
@@ -45,14 +50,6 @@ export type BossModulePresentation = {
   flashRadius: number;
   flashPower: number;
   flashMs: number;
-  /**
-   * O estado deixa uma MARCA no mundo, na posicao do evento?
-   *
-   * Só quando ha uma peça no chao naquele ponto. `detached` viaja com o
-   * Coveiro e `lost` nao esta em lugar nenhum — marcar qualquer um dos dois
-   * apontaria o jogador para um lugar vazio.
-   */
-  marks: boolean;
 };
 
 const TABLE: Record<BossModuleState, BossModulePresentation> = {
@@ -63,7 +60,6 @@ const TABLE: Record<BossModuleState, BossModulePresentation> = {
     flashRadius: 4,
     flashPower: 0.8,
     flashMs: 320,
-    marks: true,
   },
   detached: {
     color: '#ffa63f',
@@ -72,7 +68,6 @@ const TABLE: Record<BossModuleState, BossModulePresentation> = {
     flashRadius: 5,
     flashPower: 0.95,
     flashMs: 280,
-    marks: false,
   },
   dropped: {
     color: '#59f2c2',
@@ -81,7 +76,6 @@ const TABLE: Record<BossModuleState, BossModulePresentation> = {
     flashRadius: 3.5,
     flashPower: 0.7,
     flashMs: 300,
-    marks: true,
   },
   lost: {
     color: '#d93b4c',
@@ -90,7 +84,6 @@ const TABLE: Record<BossModuleState, BossModulePresentation> = {
     flashRadius: 2.5,
     flashPower: 0.5,
     flashMs: 420,
-    marks: false,
   },
 };
 
@@ -112,40 +105,3 @@ export const BOSS_MODULE_NAME_KEYS: readonly MessageKey[] = [
 
 export const bossModuleNameKey = (module: number): MessageKey =>
   BOSS_MODULE_NAME_KEYS[module] ?? 'bossModule.unknown';
-
-/** Uma peça marcada no chao, esperando alguem que a reclame. */
-export type BossModuleMark = {
-  module: number;
-  x: number;
-  y: number;
-  color: string;
-  startedMs: number;
-};
-
-/**
- * Aplica um evento a lista de marcas.
- *
- * A lista e indexada pelo MODULO e nao pela posicao: a mesma peça pode ser
- * exposta, arrancada, derrubada noutro canto e arrancada de novo, e cada
- * transicao tem de mover a marca em vez de acrescentar mais uma. Com uma marca
- * por evento, um modulo que trocou de mao tres vezes deixaria tres cruzes no
- * mapa e duas delas apontariam para chao vazio.
- */
-export const applyBossModuleMark = (
-  marks: Map<number, BossModuleMark>,
-  event: { module: number; x: number; y: number; state: BossModuleState },
-  nowMs: number,
-): void => {
-  const presentation = bossModulePresentation(event.state);
-  if (!presentation.marks) {
-    marks.delete(event.module);
-    return;
-  }
-  marks.set(event.module, {
-    module: event.module,
-    x: event.x,
-    y: event.y,
-    color: presentation.color,
-    startedMs: nowMs,
-  });
-};

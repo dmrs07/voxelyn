@@ -44,6 +44,9 @@ import wraithManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost
 import sulfurBomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.json';
 import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
 import diamandisManifest from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.json';
+import diamandisDrillManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.json';
+import diamandisRackManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.json';
+import diamandisMastManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
@@ -113,6 +116,9 @@ import wraithUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wrai
 import sulfurBomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.png?url';
 import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.png?url';
 import diamandisUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.png?url';
+import diamandisDrillUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.png?url';
+import diamandisRackUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.png?url';
+import diamandisMastUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.png?url';
 import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
 import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.png?url';
 import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
@@ -145,6 +151,9 @@ import enemyBellowsNormalUrl from '@voxelyn/survival-content/assets/atlases/enem
 import enemyBishopNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-bishop.normal.png?url';
 import enemyBruiserNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.normal.png?url';
 import enemyDiamandisNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.normal.png?url';
+import partDiamandisDrillNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.normal.png?url';
+import partDiamandisRackNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.normal.png?url';
+import partDiamandisMastNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.normal.png?url';
 import enemyFrostQueenNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.normal.png?url';
 import enemyFrostWraithNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.normal.png?url';
 import enemyFungalHorseNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.normal.png?url';
@@ -187,6 +196,9 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-bishop.normal.png': enemyBishopNormalUrl,
   'enemy-bruiser.normal.png': enemyBruiserNormalUrl,
   'enemy-diamandis.normal.png': enemyDiamandisNormalUrl,
+  'part-diamandis-drill.normal.png': partDiamandisDrillNormalUrl,
+  'part-diamandis-rack.normal.png': partDiamandisRackNormalUrl,
+  'part-diamandis-mast.normal.png': partDiamandisMastNormalUrl,
   'enemy-frost-queen.normal.png': enemyFrostQueenNormalUrl,
   'enemy-frost-wraith.normal.png': enemyFrostWraithNormalUrl,
   'enemy-fungal-horse.normal.png': enemyFungalHorseNormalUrl,
@@ -602,6 +614,35 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
 ];
 
 /**
+ * Os atlas SOB DEMANDA das pecas do Diamandis — o mesmo mecanismo dos atlas
+ * de modulo (`requestModule`), pela mesma razao: sao os sprites mais caros do
+ * pacote em oito rumos, e so quem encontra o chefe precisa deles. O validador
+ * do pacote conta estes ids fora do orcamento de boot (`ON_DEMAND_ATLASES` em
+ * validate.mjs); o teste confere que as duas listas sao a mesma.
+ */
+export const DIAMANDIS_CHASSIS_ATLAS = 'enemy-diamandis';
+export const DIAMANDIS_PART_ATLASES: readonly string[] = [
+  'part-diamandis-drill',
+  'part-diamandis-rack',
+  'part-diamandis-mast',
+];
+export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set(DIAMANDIS_PART_ATLASES);
+const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'part-diamandis-drill': {
+    manifest: diamandisDrillManifest as unknown as SpriteManifestEntry,
+    url: diamandisDrillUrl,
+  },
+  'part-diamandis-rack': {
+    manifest: diamandisRackManifest as unknown as SpriteManifestEntry,
+    url: diamandisRackUrl,
+  },
+  'part-diamandis-mast': {
+    manifest: diamandisMastManifest as unknown as SpriteManifestEntry,
+    url: diamandisMastUrl,
+  },
+};
+
+/**
  * Arquetipo da simulacao -> atlas. Exportado por causa do TESTE, e o teste
  * existe por causa de uma falha real: oito chefes chegaram ao jogo sem entrada
  * aqui, e como `spriteForArchetype` devolve `null` para chave desconhecida e o
@@ -663,6 +704,18 @@ export const ARCHETYPE_SPRITE: Record<string, string> = {
   frost_queen: 'enemy-frost-queen',
   magnetarch: 'enemy-magnetarch',
 };
+
+/**
+ * Em quantos RUMOS o atlas de cada arquetipo foi autorado (4 ou 8). Lido dos
+ * manifests estaticos, entao nao depende de nada ter carregado: a histerese
+ * de rumo (`presentation.ts`) precisa disto antes do primeiro quadro.
+ */
+export const ARCHETYPE_DIRECTIONS: Record<string, number> = Object.fromEntries(
+  Object.entries(ARCHETYPE_SPRITE).map(([archetype, id]) => [
+    archetype,
+    SOURCES.find((source) => source.manifest.id === id)?.manifest.directions ?? 4,
+  ]),
+);
 
 /**
  * Banco de blocos de terreno. Separado do SpriteBank porque o eixo de variacao e
@@ -1281,6 +1334,12 @@ export class SpriteBank {
    */
   requestModule(layerId: string): void {
     const source = MODULE_SOURCES[layerId];
+    if (source) this.loadSource(source);
+  }
+
+  /** Pede o atlas de uma PECA do Diamandis, se ainda nao foi pedido. Ver `requestModule`. */
+  requestPart(id: string): void {
+    const source = PART_SOURCES[id];
     if (source) this.loadSource(source);
   }
 

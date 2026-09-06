@@ -718,6 +718,26 @@ export type BossRuntime = {
    */
   modulesLost: number;
   /**
+   * O tick do ultimo ARRANQUE de modulo e quantos houve nele.
+   *
+   * O frenesi do Diamandis e DERIVADO de `modulesLost` (nada a mais no
+   * estado decide o multiplicador), mas um arranque so passa a contar no tick
+   * SEGUINTE: um golpe liberado no mesmo tick do arranque — antes ou depois
+   * dele na ordem das entidades — sai com o dano de antes. Sem esta latch a
+   * ordem da lista de inimigos decidiria o dano, e duas maquinas com listas
+   * em ordens diferentes discordariam. Entram no hash.
+   */
+  frenzyRipTick: number;
+  frenzyRipCount: number;
+  /**
+   * Ate que tick o Diamandis esta TROPECANDO: sem decidir acao e sem andar.
+   * Escrito pelo arranque (`ripDiamandisModule`, meio segundo) — e pela Arena,
+   * que o usa para segurar o chefe num rumo. Nao e `stunnedUntil`: o chefe e de
+   * pedra (`isStoneEnemy`) e nao se atordoa; o tropeco e do proprio corpo, e
+   * nao desenha o indicador de atordoamento.
+   */
+  staggerUntil: number;
+  /**
    * Onde o salto do Devorador vai CAIR, escolhido na decolagem.
    *
    * Vive aqui e nao na acao pelo mesmo motivo das cargas de demolicao: o alvo
@@ -969,7 +989,12 @@ export type BossMoment =
   // O SOLISTA: a voz que nao coube no acorde. Tritono, e no lugar errado.
   | 'dissonance'
   // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.
-  | 'obstruction';
+  | 'obstruction'
+  // Diamandis: um modulo foi ARRANCADO e a maquina entrou em frenesi (ver
+  // `DIAMANDIS_FRENZY_PER_MODULE`). `intensity` e a fracao de modulos
+  // perdidos (1/3, 2/3, 1): e o que o reator, a barra e a camada de pressao
+  // do audio leem para escalar sem um evento por grau.
+  | 'frenzy';
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
 export const BOSS_PHASE_SUMMON = 1 << 0;

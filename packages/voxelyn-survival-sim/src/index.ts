@@ -106,6 +106,9 @@ export {
   spawnEnemy,
   moveEntity,
   damageEntity,
+  diamandisFrenzyStacks,
+  diamandisFrenzyMultiplier,
+  ripDiamandisModule,
   isSolidAt,
   // A geometria da varredura do Coracao da Fornalha. Exportada porque o AVISO
   // dela e desenhado no cliente a partir do mesmo tick, e nao transmitido: uma

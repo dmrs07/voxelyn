@@ -307,6 +307,19 @@ export type WorldFlags = {
    */
   bossPhases: number;
   /**
+   * Os MODULOS do Diamandis: os que ja soltaram da carcaca (`exposed`) e os
+   * que um Coveiro ja arrancou (`lost`), por bit (BOSS_MODULE_*).
+   *
+   * Espelhados por dois motivos que o evento `boss_module` nao cobre: quem
+   * RECONECTA no meio do encontro precisa desenhar o chassi sem as pecas que
+   * ja se foram (e as pecas penduradas nos Coveiros certos), e o frenesi do
+   * chefe — derivado destes bits na simulacao — precisa do mesmo numero no
+   * cliente para o reator, a barra e o audio escalarem. Opcional: servidor
+   * antigo nao manda o campo, e o cliente le zero — o chefe inteiro, sem
+   * frenesi, que e o que ele mostrava antes de existir esta apresentacao.
+   */
+  bossModules?: { exposed: number; lost: number };
+  /**
    * As marcas de chao PENDENTES: onde alguma coisa vai cair, e em que tick.
    *
    * Elas existem no wire porque o aviso e o unico caminho legitimo ate o dano.

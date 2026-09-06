@@ -171,6 +171,9 @@ export type VoiceId =
   | 'diamandisBeamScan'
   | 'diamandisBeamLocked'
   | 'diamandisReactorFail'
+  // O FRENESI: um modulo arrancado e a maquina subindo de regime — servos
+  // sobrecarregados, um estalo de rele e o zumbido que fica mais alto.
+  | 'diamandisFrenzy'
   | 'diamandisShutdown'
   // Devorador Branco: friccao subterranea, garganta, vacuo. O som LOCALIZA o
   // que nao pode ser visto. O vortice em si e um leito (devourer-vortex-bus).
@@ -514,6 +517,7 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   diamandisBeamScan: { priority: 10, gain: 0.45, minIntervalMs: 90, spatial: true },
   diamandisBeamLocked: { priority: 9, gain: 0.55, minIntervalMs: 60, spatial: true },
   diamandisReactorFail: { priority: 10, gain: 0.8, minIntervalMs: 0, spatial: false },
+  diamandisFrenzy: { priority: 9, gain: 0.7, minIntervalMs: 300, spatial: false },
   diamandisShutdown: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
 
   // Devorador. O deslocamento sob a silica e MOVIMENTO FORA DA TELA (7): e

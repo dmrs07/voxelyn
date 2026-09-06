@@ -326,6 +326,51 @@ const DIRECTION_ROTATION = [1, 2, 0, 3, 0.5, 1.5, 2.5, 3.5];
 export const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
 
 /**
+ * Onde um PONTO do modelo cai na tela, em pixels relativos a ancora, para o
+ * rumo `dirIndex` — a mesma rotacao e a mesma projecao que `renderVoxels`
+ * aplica aos voxels (o pivo continuo da grade fina, `projectIso`).
+ *
+ * Existe para os ENCAIXES (sockets) das pecas destacaveis: o gerador publica no
+ * manifest onde cada peca se prende ao corpo, por rumo, e o cliente desenha o
+ * atlas da peca exatamente ali. Um ponto e projetado sem arredondar a grade
+ * fina — a peca inteira ja e rasterizada com o mesmo arredondamento nos dois
+ * atlas, e um arredondamento a mais aqui deslocaria o encaixe um pixel em
+ * metade dos rumos.
+ */
+export const projectModelPoint = (x, y, z, dirIndex) => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
+  const PIVOT = 0.5;
+  const angle = (rotation * Math.PI) / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const px = x * MODEL_SCALE - PIVOT;
+  const py = y * MODEL_SCALE - PIVOT;
+  const rx = px * cos - py * sin + PIVOT;
+  const ry = px * sin + py * cos + PIVOT;
+  return projectIso(rx, ry, z * MODEL_SCALE, VOX.tileW, VOX.tileH, VOX.zStep);
+};
+
+/**
+ * PROFUNDIDADE de um ponto do modelo num rumo, em tiles do mundo, relativa ao
+ * pivo: positivo esta MAIS PERTO da camera que o centro do corpo, negativo
+ * esta atras. E a soma (x + y) do ponto ja rotacionado — o mesmo eixo pelo
+ * qual o renderer ordena tudo o que desenha — e existe para as pecas
+ * encaixadas saberem se entram antes ou depois do chassi sem uma tabela de
+ * mao por rumo.
+ */
+export const modelDepth = (x, y, dirIndex) => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
+  const angle = (rotation * Math.PI) / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const px = x * MODEL_SCALE;
+  const py = y * MODEL_SCALE;
+  return px * cos - py * sin + (px * sin + py * cos);
+};
+
+/**
  * Indice de direcao cuja rotacao e a identidade.
  *
  * Cenario — bloco de terreno e crosta de chao — nao tem frente, entao passar

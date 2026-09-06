@@ -278,12 +278,92 @@ dois ficavam parados em cima do chefe sem nada para fazer.
 contábil de `AX-EXE-048` fecha: a reclassificação não o desativa, não o recupera e
 não o interrompe — ela apenas o remove do balanço.
 
-### O que fica para a próxima fatia
+### O corpo composto e o frenesi (`SIMULATION_VERSION` 61)
 
-- O **atlas voxel** do Diamandis. Hoje ele usa o renderizador de fallback, como o
-  Bispo e o Corcel usaram antes de ganharem atlas.
-- A apresentação dos módulos no cliente: `boss_module` já viaja com os quatro
-  estados, mas quem desenha ainda não os distingue.
+Até aqui o Diamandis era **um sprite**, inteiro do primeiro ao último ponto de vida,
+e o Coveiro saía da carcaça de mãos vazias: a economia dos módulos existia no toast e
+em lugar nenhum do corpo. Agora o corpo concorda com a simulação.
+
+**Um chassi de oito rumos e três peças que existem.** `enemy-diamandis` passou a ser
+só o chassi — pernas, barriga, convés, torre e reator — autorado nos oito rumos de
+tela (o primeiro ser vivo do jogo em 8 direções; o validador aceita 4 ou 8, e a
+histerese de rumo do cliente foi generalizada para N setores em `facing.ts`). Cada
+módulo é um atlas próprio, também em oito rumos: `part-diamandis-drill`,
+`part-diamandis-rack` (a torre de demolição) e `part-diamandis-mast` (a lente do
+scanner). O gerador publica no manifest do chassi os **encaixes** de cada peça por
+rumo — `sockets[dir][peça] = {x, y, depth}` — e o cliente monta o corpo em
+`diamandis-body.ts`: a peça entra na tela no pé do sprite mais o deslocamento do
+encaixe, e `depth` (o x + y do modelo rotacionado) diz se ela entra antes ou depois
+do chassi. Um teste do pacote reconstrói o modelo inteiro a partir do chassi mais as
+peças montadas: a soma é o Diamandis antigo, voxel a voxel.
+
+Os três atlas de peça são **sob demanda** (o mesmo mecanismo dos módulos do
+Prospector): são os sprites mais caros do pacote e só quem encontra o chefe paga por
+eles. O validador os conta num orçamento próprio (`ON_DEMAND_ATLASES`), e um teste do
+cliente confere que as duas listas são a mesma.
+
+Cada peça tem quatro vidas, e cada uma é uma animação do mesmo atlas:
+
+| Estado    | Onde                       | Pose                                                       |
+| --------- | -------------------------- | ---------------------------------------------------------- |
+| `mounted` | no encaixe do chassi       | segue a animação dele (ataca, treme; a broca gira no giro) |
+| `loose`   | no encaixe, mas **solta**  | afunda meio voxel, balança e faísca — o telégrafo          |
+| `carried` | no eletroímã de um Coveiro | pendurada pelo topo, balançando                            |
+| `floor`   | onde o carregador caiu     | deitada, por menos de um segundo                           |
+
+O Coveiro também publica um encaixe (`sockets[dir].magnet`), e a peça pendurada nele
+é a **mesma** que sumiu do chassi: `mood` guarda o módulo, o bit em `modulesLost` diz
+que o arranque já aconteceu. A marca de chão da versão anterior foi removida — no
+`exposed` ela apontava para onde o chefe _estava_, e agora a peça é a marca, onde quer
+que esteja.
+
+**A peça caída vira lasca.** A recompensa continua **imediata e autoritativa** na
+simulação (16 de minério no abate do carregador); o que mudou é só o voo. A peça cai
+do eletroímã, quica, fica ~650 ms no chão e **estilhaça** em lascas de minério que voam
+para o contador de carga. O `ore_gained` do mesmo tick fica retido na peça e sai dela,
+não do corpo do Coveiro. Nenhum estado físico de coleta, nenhuma mudança de protocolo.
+
+**O frenesi.** Perder uma peça deixa o chefe **mais perigoso**, não menos — a
+compensação que faz "deixar trabalhar" continuar sendo uma escolha:
+
+- dispara **só no arranque** (`ripDiamandisModule`), nunca ao soltar: soltar é o
+  telégrafo, arrancar é a consequência;
+- é **permanente** para a luta: recuperar a peça devolve minério, não a arma nem o
+  regime normal;
+- multiplica **todo dano autorado pelo Diamandis** — broca, demolição, feixe (enquanto
+  existir) e contato — por `1 + 0,15 × arrancados`, com teto em **1,45**. Nunca escala
+  Coveiros nem perigos da arena (a escala entra pela posse da explosão, em
+  `applyExplosionDamage`, e pelas três aplicações diretas em `entities.ts`);
+- a arma arrancada sai **antes** do frenesi valer: um golpe já liberado no tick do
+  arranque mantém o dano original. É um latch (`frenzyRipTick`/`frenzyRipCount`,
+  hasheados) — `diamandisFrenzyStacks` desconta os arranques deste tick, e a ordem em
+  que as entidades avançam no tick deixa de importar. Testes cobrem as duas ordens;
+- o arranque faz o chefe **tropeçar** por 500 ms (`bossRuntime.staggerUntil`, dez
+  ticks): ação cancelada, sem andar e sem decidir nada — o espaço para o jogador
+  ler o que acabou de acontecer. Não é `stunnedUntil`: ele é de pedra e não se
+  atordoa; o tropeço é do corpo e não desenha o indicador de atordoamento.
+
+Cada acúmulo é comunicado sem efeito de tela inteira: `boss_state: 'frenzy'` faz **uma**
+varredura do acento na barra monumental; o reator vaza pela carcaça (tint que pulsa
+mais rápido a cada peça); o maquinário sobrevivente **acelera** 25 % por peça perdida
+(as soltas não — o balanço delas é telégrafo); uma camada de **pressão sonora**
+(`DiamandisFrenzyBus`: zumbido que sobe e relé que estala mais rápido) cresce com os
+acúmulos e cala com o chefe; e a avaria aparece no corpo — **fumaça** preta em fio pelo
+reator com faíscas curtas, e **espasmos**: sacudidas curtas e irregulares em rajadas,
+mais frequentes e mais fortes quanto mais peças faltam, o automato velho funcionando
+com menos peças do que devia. Com movimento reduzido não há espasmo; tint, fumaça e som
+continuam contando a mesma coisa. O arranque em si dá um solavanco de 320 ms no corpo.
+
+**Online.** `WorldFlags` ganhou `bossModules` (opcional, aditivo: servidor antigo não
+manda, cliente lê zero) para o espelho remoto desenhar as peças certas — os bits nunca
+haviam viajado porque nada os lia.
+
+**Arena.** `arena-diamandis-debug.ts` põe o chassi em cada um dos oito rumos, solta a
+próxima peça pela vida (a simulação solta e chama os Coveiros), arranca com um
+carregador de verdade, abate o carregador, leva o frenesi ao teto e liga o colapso do
+reator, com a leitura exata: estado e portador de cada peça, acúmulos, multiplicador,
+estagger restante. Só aparece na arena do Diamandis. Capturas em
+`docs/media/diamandis/`.
 
 ## Devorador Branco — o chão é que decide
 

@@ -137,6 +137,16 @@ const MAX_TOTAL_PNG_BYTES = 10 * 1024 * 1024;
 const MAX_DECODED_BYTES = 160 * 1024 * 1024;
 /** Teto do que chega DEPOIS do boot, um arquetipo por vez. */
 const MAX_ON_DEMAND_DECODED_BYTES = 48 * 1024 * 1024;
+/**
+ * Atlas que o cliente NAO carrega no boot: chegam na primeira vez que sao
+ * pedidos. Tem de bater com `ON_DEMAND_ATLASES` em `sprites.ts` (o teste de
+ * validacao confere os dois lados).
+ */
+export const ON_DEMAND_ATLASES = new Set([
+  'part-diamandis-drill',
+  'part-diamandis-rack',
+  'part-diamandis-mast',
+]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 const framePixels = (png, m, index) => {
@@ -171,15 +181,21 @@ export const validateManifest = (id) => {
 
   const canonical = CANONICAL[id];
   if (canonical && (m.frameWidth !== canonical[0] || m.frameHeight !== canonical[1])) {
-    errors.push(`${id}: canvas ${m.frameWidth}x${m.frameHeight} != canônico ${canonical[0]}x${canonical[1]}`);
+    errors.push(
+      `${id}: canvas ${m.frameWidth}x${m.frameHeight} != canônico ${canonical[0]}x${canonical[1]}`,
+    );
   }
   if (png.width !== expectedW) errors.push(`${id}: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`${id}: altura ${png.height} != ${expectedH}`);
-  if (png.width > MAX_ATLAS_WIDTH) errors.push(`${id}: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (png.width > MAX_ATLAS_WIDTH)
+    errors.push(`${id}: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
   if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push(`${id}: PNG excede o teto de 1,5 MiB`);
   if (!(m.anchorX >= 0 && m.anchorX < m.frameWidth)) errors.push(`${id}: anchorX fora do frame`);
   if (!(m.anchorY >= 0 && m.anchorY < m.frameHeight)) errors.push(`${id}: anchorY fora do frame`);
-  if (!m.footprint || !['w', 'h', 'offsetX', 'offsetY'].every((k) => Number.isFinite(m.footprint[k]))) {
+  if (
+    !m.footprint ||
+    !['w', 'h', 'offsetX', 'offsetY'].every((k) => Number.isFinite(m.footprint[k]))
+  ) {
     errors.push(`${id}: footprint inválido`);
   } else if (m.footprint.w < 0 || m.footprint.h < 0) errors.push(`${id}: footprint negativo`);
 
@@ -188,18 +204,30 @@ export const validateManifest = (id) => {
       if (a === 'walk' && ANCHORED_NO_WALK.has(id)) continue;
       if (!m.animations[a]) errors.push(`${id}: animação obrigatória ausente: ${a}`);
     }
-    if (m.directions !== 4) errors.push(`${id}: entidade viva deve declarar 4 direções`);
-    for (const dir of ['dr', 'dl', 'ur', 'ul']) {
-      if (!m.authoredDirs.includes(dir) && !m.flipPairs[dir]) errors.push(`${id}: direção ${dir} não resolvível`);
+    // Quatro rumos e a regra; oito e a excecao de quem tem PECAS DESTACAVEIS
+    // (o Diamandis): um chassi em quatro rumos debaixo de ferramentas em oito
+    // discordaria dos encaixes e das silhuetas nas diagonais. Quem declara oito
+    // tem de autorar os oito — nao ha flip que resolva um rumo intermediario.
+    if (m.directions !== 4 && m.directions !== 8) {
+      errors.push(`${id}: entidade viva deve declarar 4 ou 8 direções`);
+    }
+    const required =
+      m.directions === 8 ? ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'] : ['dr', 'dl', 'ur', 'ul'];
+    for (const dir of required) {
+      if (!m.authoredDirs.includes(dir) && !m.flipPairs[dir])
+        errors.push(`${id}: direção ${dir} não resolvível`);
     }
   }
 
   for (const dir of m.authoredDirs) {
     if (!m.frameMap[dir]) errors.push(`${id}: frameMap sem ${dir}`);
-    else for (const a of anims) if (m.frameMap[dir][a] === undefined) errors.push(`${id}: frameMap[${dir}] sem ${a}`);
+    else
+      for (const a of anims)
+        if (m.frameMap[dir][a] === undefined) errors.push(`${id}: frameMap[${dir}] sem ${a}`);
   }
   for (const [dst, src] of Object.entries(m.flipPairs)) {
-    if (!m.authoredDirs.includes(src)) errors.push(`${id}: flipPairs.${dst} -> ${src} não autorada`);
+    if (!m.authoredDirs.includes(src))
+      errors.push(`${id}: flipPairs.${dst} -> ${src} não autorada`);
   }
 
   const atlasColors = new Set();
@@ -218,10 +246,14 @@ export const validateManifest = (id) => {
     }
   }
   if (atlasColors.size > MAX_ATLAS_COLORS) {
-    errors.push(`${id}: usa ${atlasColors.size} cores; máximo é ${MAX_ATLAS_COLORS} incluindo outline`);
+    errors.push(
+      `${id}: usa ${atlasColors.size} cores; máximo é ${MAX_ATLAS_COLORS} incluindo outline`,
+    );
   }
-  for (const hex of atlasColors) if (!m.paletteColors.includes(hex)) errors.push(`${id}: cor ${hex} não declarada`);
-  for (const hex of m.paletteColors) if (!atlasColors.has(hex)) errors.push(`${id}: cor declarada ${hex} não usada`);
+  for (const hex of atlasColors)
+    if (!m.paletteColors.includes(hex)) errors.push(`${id}: cor ${hex} não declarada`);
+  for (const hex of m.paletteColors)
+    if (!atlasColors.has(hex)) errors.push(`${id}: cor declarada ${hex} não usada`);
 
   for (const dir of m.authoredDirs) {
     for (const anim of anims) {
@@ -237,15 +269,26 @@ export const validateManifest = (id) => {
         }
         const xs = opaque.map((p) => p[0]);
         const ys = opaque.map((p) => p[1]);
-        const box = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
-        if (box.minX === 0 || box.maxX === m.frameWidth - 1 || box.minY === 0 || box.maxY === m.frameHeight - 1) {
+        const box = {
+          minX: Math.min(...xs),
+          maxX: Math.max(...xs),
+          minY: Math.min(...ys),
+          maxY: Math.max(...ys),
+        };
+        if (
+          box.minX === 0 ||
+          box.maxX === m.frameWidth - 1 ||
+          box.minY === 0 ||
+          box.maxY === m.frameHeight - 1
+        ) {
           errors.push(`${id}: conteúdo toca borda em ${dir}/${anim}/${f}`);
         }
         if (previousBox && ['idle', 'walk', 'hit'].includes(anim)) {
           // 6px de atlas = os mesmos 3px logicos de antes da subdivisao.
           const cx = (box.minX + box.maxX) / 2;
           const pcx = (previousBox.minX + previousBox.maxX) / 2;
-          if (Math.abs(cx - pcx) > 6) errors.push(`${id}: jitter horizontal >6px em ${dir}/${anim}/${f}`);
+          if (Math.abs(cx - pcx) > 6)
+            errors.push(`${id}: jitter horizontal >6px em ${dir}/${anim}/${f}`);
         }
         previousBox = box;
       }
@@ -274,19 +317,27 @@ export const validateTerrain = () => {
   const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
   if (png.width !== expectedW) errors.push(`terrain-blocks: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`terrain-blocks: altura ${png.height} != ${expectedH}`);
-  if (png.width > MAX_ATLAS_WIDTH) errors.push(`terrain-blocks: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('terrain-blocks: PNG excede o teto de 1,5 MiB');
-  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('terrain-blocks: originX fora do frame');
-  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('terrain-blocks: originY fora do frame');
+  if (png.width > MAX_ATLAS_WIDTH)
+    errors.push(`terrain-blocks: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES)
+    errors.push('terrain-blocks: PNG excede o teto de 1,5 MiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth))
+    errors.push('terrain-blocks: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight))
+    errors.push('terrain-blocks: originY fora do frame');
 
   const derived = bakedPalette(m.lightLevels);
   const seen = new Set();
   for (let i = 0; i < png.width * png.height; i++) {
     const alpha = png.data[i * 4 + 3];
-    if (alpha !== 0 && alpha !== 255) { errors.push(`terrain-blocks: alpha parcial (${alpha})`); break; }
+    if (alpha !== 0 && alpha !== 255) {
+      errors.push(`terrain-blocks: alpha parcial (${alpha})`);
+      break;
+    }
     if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
   }
-  for (const hex of seen) if (!derived.has(hex)) errors.push(`terrain-blocks: cor ${hex} nao deriva da paleta mestra`);
+  for (const hex of seen)
+    if (!derived.has(hex)) errors.push(`terrain-blocks: cor ${hex} nao deriva da paleta mestra`);
 
   // Cada frame tem de ter conteudo: um bloco vazio vira buraco no cenario.
   for (let index = 0; index < total; index++) {
@@ -295,7 +346,10 @@ export const validateTerrain = () => {
     let opaque = 0;
     for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
       for (let x = 0; x < m.frameWidth; x++) {
-        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) {
+          opaque++;
+          break;
+        }
       }
     }
     if (opaque === 0) errors.push(`terrain-blocks: frame ${index} vazio`);
@@ -315,11 +369,13 @@ const bakedPalette = (lightLevels) => {
     // validacao passar em silencio depois de mudarem os niveis de luz.
     const f = lightFactor(level);
     for (const [r, g, b] of Object.values(COLORS)) {
-      derived.add(toHex(
-        Math.max(0, Math.min(255, Math.round(r * f))),
-        Math.max(0, Math.min(255, Math.round(g * f))),
-        Math.max(0, Math.min(255, Math.round(b * f)))
-      ));
+      derived.add(
+        toHex(
+          Math.max(0, Math.min(255, Math.round(r * f))),
+          Math.max(0, Math.min(255, Math.round(g * f))),
+          Math.max(0, Math.min(255, Math.round(b * f))),
+        ),
+      );
     }
   }
   return derived;
@@ -342,14 +398,21 @@ export const validateSurfaces = () => {
   const png = PNG.sync.read(readFileSync(pngPath));
 
   if (m.kinds.length !== SURFACE_KINDS.length) {
-    errors.push(`surface-tiles: ${m.kinds.length} tipos declarados, gerador tem ${SURFACE_KINDS.length}`);
+    errors.push(
+      `surface-tiles: ${m.kinds.length} tipos declarados, gerador tem ${SURFACE_KINDS.length}`,
+    );
   }
   m.kinds.forEach((kind, i) => {
     const spec = SURFACE_KINDS[i];
     if (!spec) return;
-    if (kind.name !== spec.name) errors.push(`surface-tiles: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
-    if (kind.frames !== spec.frames) errors.push(`surface-tiles: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`);
-    if (kind.frames > 1 && !(kind.frameMs > 0)) errors.push(`surface-tiles: ${kind.name} anima sem frameMs`);
+    if (kind.name !== spec.name)
+      errors.push(`surface-tiles: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
+    if (kind.frames !== spec.frames)
+      errors.push(
+        `surface-tiles: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`,
+      );
+    if (kind.frames > 1 && !(kind.frameMs > 0))
+      errors.push(`surface-tiles: ${kind.name} anima sem frameMs`);
   });
 
   const total = m.kinds.reduce((sum, k) => sum + k.frames * m.variants * m.lightLevels, 0);
@@ -357,10 +420,14 @@ export const validateSurfaces = () => {
   const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
   if (png.width !== expectedW) errors.push(`surface-tiles: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`surface-tiles: altura ${png.height} != ${expectedH}`);
-  if (png.width > MAX_ATLAS_WIDTH) errors.push(`surface-tiles: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('surface-tiles: PNG excede o teto de 1,5 MiB');
-  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('surface-tiles: originX fora do frame');
-  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('surface-tiles: originY fora do frame');
+  if (png.width > MAX_ATLAS_WIDTH)
+    errors.push(`surface-tiles: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES)
+    errors.push('surface-tiles: PNG excede o teto de 1,5 MiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth))
+    errors.push('surface-tiles: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight))
+    errors.push('surface-tiles: originY fora do frame');
 
   const derived = bakedPalette(m.lightLevels);
   const seen = new Set();
@@ -369,10 +436,14 @@ export const validateSurfaces = () => {
     // O ponto do atlas inteiro: o gas antigo era um `rgba()` translucido, e a
     // troca foi por ocupacao esparsa de voxels opacos. Um pixel semitransparente
     // aqui significa que o alpha voltou por alguma porta.
-    if (alpha !== 0 && alpha !== 255) { errors.push(`surface-tiles: alpha parcial (${alpha})`); break; }
+    if (alpha !== 0 && alpha !== 255) {
+      errors.push(`surface-tiles: alpha parcial (${alpha})`);
+      break;
+    }
     if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
   }
-  for (const hex of seen) if (!derived.has(hex)) errors.push(`surface-tiles: cor ${hex} nao deriva da paleta mestra`);
+  for (const hex of seen)
+    if (!derived.has(hex)) errors.push(`surface-tiles: cor ${hex} nao deriva da paleta mestra`);
 
   // Cada frame tem de ter conteudo: uma crosta vazia vira buraco no chao.
   for (let index = 0; index < total; index++) {
@@ -381,7 +452,10 @@ export const validateSurfaces = () => {
     let opaque = 0;
     for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
       for (let x = 0; x < m.frameWidth; x++) {
-        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) {
+          opaque++;
+          break;
+        }
       }
     }
     if (opaque === 0) errors.push(`surface-tiles: frame ${index} vazio`);
@@ -407,14 +481,21 @@ export const validateProps = () => {
   const png = PNG.sync.read(readFileSync(pngPath));
 
   if (m.kinds.length !== PROP_KINDS.length) {
-    errors.push(`world-props: ${m.kinds.length} tipos declarados, gerador tem ${PROP_KINDS.length}`);
+    errors.push(
+      `world-props: ${m.kinds.length} tipos declarados, gerador tem ${PROP_KINDS.length}`,
+    );
   }
   m.kinds.forEach((kind, i) => {
     const spec = PROP_KINDS[i];
     if (!spec) return;
-    if (kind.name !== spec.name) errors.push(`world-props: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
-    if (kind.frames !== spec.frames) errors.push(`world-props: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`);
-    if (kind.frames > 1 && !(kind.frameMs > 0)) errors.push(`world-props: ${kind.name} anima sem frameMs`);
+    if (kind.name !== spec.name)
+      errors.push(`world-props: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
+    if (kind.frames !== spec.frames)
+      errors.push(
+        `world-props: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`,
+      );
+    if (kind.frames > 1 && !(kind.frameMs > 0))
+      errors.push(`world-props: ${kind.name} anima sem frameMs`);
   });
 
   const total = m.kinds.reduce((sum, k) => sum + k.frames, 0);
@@ -422,19 +503,27 @@ export const validateProps = () => {
   const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
   if (png.width !== expectedW) errors.push(`world-props: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`world-props: altura ${png.height} != ${expectedH}`);
-  if (png.width > MAX_ATLAS_WIDTH) errors.push(`world-props: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('world-props: PNG excede o teto de 1,5 MiB');
-  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('world-props: originX fora do frame');
-  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('world-props: originY fora do frame');
+  if (png.width > MAX_ATLAS_WIDTH)
+    errors.push(`world-props: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES)
+    errors.push('world-props: PNG excede o teto de 1,5 MiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth))
+    errors.push('world-props: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight))
+    errors.push('world-props: originY fora do frame');
 
   const seen = new Set();
   for (let i = 0; i < png.width * png.height; i++) {
     const alpha = png.data[i * 4 + 3];
-    if (alpha !== 0 && alpha !== 255) { errors.push(`world-props: alpha parcial (${alpha})`); break; }
+    if (alpha !== 0 && alpha !== 255) {
+      errors.push(`world-props: alpha parcial (${alpha})`);
+      break;
+    }
     if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
   }
   // Autoluminoso: as cores saem da paleta mestra SEM escurecimento assado.
-  for (const hex of seen) if (!ALLOWED_HEX.has(hex)) errors.push(`world-props: cor ${hex} fora da paleta mestra`);
+  for (const hex of seen)
+    if (!ALLOWED_HEX.has(hex)) errors.push(`world-props: cor ${hex} fora da paleta mestra`);
 
   for (let index = 0; index < total; index++) {
     const x0 = (index % m.columns) * m.frameWidth;
@@ -442,7 +531,10 @@ export const validateProps = () => {
     let opaque = 0;
     for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
       for (let x = 0; x < m.frameWidth; x++) {
-        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) {
+          opaque++;
+          break;
+        }
       }
     }
     if (opaque === 0) errors.push(`world-props: frame ${index} vazio`);
@@ -458,7 +550,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let onDemandDecodedBytes = 0;
   // Terreno e chao ficam FORA do index de sprites: nao tem animacao por
   // direcao, nem frameMap, e o validador de personagem tentaria le-los assim.
-  for (const [id, run] of [['terrain-blocks', validateTerrain], ['surface-tiles', validateSurfaces], ['world-props', validateProps]]) {
+  for (const [id, run] of [
+    ['terrain-blocks', validateTerrain],
+    ['surface-tiles', validateSurfaces],
+    ['world-props', validateProps],
+  ]) {
     const errs = run();
     totalErrors += errs.length;
     if (errs.length === 0) console.log(`  OK ${id}`);
@@ -487,7 +583,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (existsSync(pngPath)) {
       totalBytes += statSync(pngPath).size;
       const png = PNG.sync.read(readFileSync(pngPath));
-      decodedBytes += png.width * png.height * 4;
+      // As PECAS do Diamandis chegam SOB DEMANDA, como os mapas de faces: so
+      // quem encontra o chefe as carrega (ver `ON_DEMAND_ATLASES` em
+      // sprites.ts). Contam no orcamento de sob demanda, nao no de boot — e a
+      // regra escrita acima: peso novo e pago com carregamento sob demanda.
+      if (ON_DEMAND_ATLASES.has(id)) onDemandDecodedBytes += png.width * png.height * 4;
+      else decodedBytes += png.width * png.height * 4;
     }
     // O MAPA DE FACES conta no mesmo orcamento.
     //
@@ -520,13 +621,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   if (onDemandDecodedBytes > MAX_ON_DEMAND_DECODED_BYTES) {
     console.error(
-      `  FAIL memória decodificada (sob demanda) ${onDemandDecodedBytes} > ${MAX_ON_DEMAND_DECODED_BYTES}`
+      `  FAIL memória decodificada (sob demanda) ${onDemandDecodedBytes} > ${MAX_ON_DEMAND_DECODED_BYTES}`,
     );
     totalErrors++;
   }
   console.log(
     `\nPNG total: ${totalBytes} bytes; memória RGBA no boot: ${decodedBytes} bytes;` +
-      ` sob demanda: ${onDemandDecodedBytes} bytes`
+      ` sob demanda: ${onDemandDecodedBytes} bytes`,
   );
   if (totalErrors) process.exit(1);
   console.log(`${ids.length} sprites válidos.`);

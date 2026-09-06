@@ -201,6 +201,9 @@ import {
   DIAMANDIS_MODULE_COUNT,
   DIAMANDIS_MODULE_EXPOSE_AT,
   DIAMANDIS_MODULE_ORE,
+  DIAMANDIS_FRENZY_PER_MODULE,
+  DIAMANDIS_FRENZY_CAP,
+  DIAMANDIS_RIP_STAGGER_TICKS,
   DIAMANDIS_SALVAGE_CREW,
   DIAMANDIS_SALVAGE_CREW_CAP,
   DIAMANDIS_SALVAGE_CREW_RING,
@@ -1708,11 +1711,17 @@ const fireProspectingBeam = (
       if (hitPlayers.has(player.id)) continue;
       if (Math.hypot(player.x - fx, player.y - fy) > player.radius + 0.4) continue;
       hitPlayers.add(player.id);
-      damageEntity(state, player, DIAMANDIS_BEAM_DAMAGE, events, {
-        kind: 'enemy_contact',
-        archetype: 'diamandis',
-        elite: enemy.elite,
-      });
+      damageEntity(
+        state,
+        player,
+        DIAMANDIS_BEAM_DAMAGE * diamandisFrenzyMultiplier(state),
+        events,
+        {
+          kind: 'enemy_contact',
+          archetype: 'diamandis',
+          elite: enemy.elite,
+        },
+      );
     }
   }
   events.push({
@@ -1859,7 +1868,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   } else if (action.kind === 'contact' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     if (distTo(enemy, target) < enemy.radius + target.radius + 0.45) {
-      damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events, {
+      // O contato do Diamandis tambem entra no frenesi: com as tres pecas
+      // fora, e a unica arma que lhe sobra — e a ultima subida tem de pesar.
+      const frenzy = enemy.archetype === 'diamandis' ? diamandisFrenzyMultiplier(state) : 1;
+      damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1) * frenzy, events, {
         kind: 'enemy_contact',
         archetype: enemy.archetype as EnemyArchetype,
         elite: enemy.elite,
@@ -1949,10 +1961,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     // modulo NESTE instante — e a partir daqui o Coveiro vira um carregador,
     // que e um alvo diferente de um Coveiro caçando.
     const module = enemy.mood! - 1;
-    const bit = 1 << module;
-    if ((state.bossRuntime.modulesLost & bit) === 0) {
-      state.bossRuntime.modulesLost |= bit;
-      events.push({ t: 'boss_module', x: enemy.x, y: enemy.y, module, state: 'detached' });
+    if (ripDiamandisModule(state, module, enemy, events)) {
       // Ver o arranque e a Descoberta: e quando fica claro que o Coveiro nao
       // e minion do chefe — e um catador que chegou primeiro.
       const witness = nearestTarget(state, enemy.x, enemy.y);
@@ -2835,7 +2844,7 @@ const diamandisDrillStride = (
     distTo(enemy, victim) < enemy.radius + victim.radius + 0.4
   ) {
     enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
-    damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE, events, {
+    damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE * diamandisFrenzyMultiplier(state), events, {
       kind: 'enemy_contact',
       archetype: 'diamandis',
       elite: enemy.elite,
@@ -6789,6 +6798,81 @@ const magnetarchStep = (
   }
 };
 
+/**
+ * Quantos modulos do Diamandis ja CONTAM para o frenesi neste tick: os
+ * arrancados, menos os arrancados NESTE tick (eles passam a contar no
+ * seguinte — ver `frenzyRipTick` em `BossRuntime`).
+ */
+export const diamandisFrenzyStacks = (state: SurvivalState): number => {
+  const rt = state.bossRuntime;
+  let lost = 0;
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) if ((rt.modulesLost & (1 << m)) !== 0) lost++;
+  const pending = rt.frenzyRipTick === state.tick ? rt.frenzyRipCount : 0;
+  return Math.max(0, lost - pending);
+};
+
+/**
+ * O multiplicador do FRENESI sobre todo dano que o Diamandis autora:
+ * `1 + 0,15 x modulos arrancados`, teto 1,45. Derivado, nunca guardado.
+ */
+export const diamandisFrenzyMultiplier = (state: SurvivalState): number =>
+  Math.min(DIAMANDIS_FRENZY_CAP, 1 + DIAMANDIS_FRENZY_PER_MODULE * diamandisFrenzyStacks(state));
+
+/**
+ * O ARRANQUE de um modulo — o unico caminho pelo qual `modulesLost` ganha um
+ * bit. Usado pelo release do `haul` do Coveiro e pela Arena.
+ *
+ * Tres coisas acontecem aqui, nesta ordem, e a ordem e a regra:
+ *  1. O chefe PERDE a arma (`modulesLost`), e o evento `detached` sai.
+ *  2. O chefe TROPECA: larga a acao em curso e fica meio segundo sem decidir
+ *     nada. E a transicao legivel antes dos golpes mais fortes — e o que
+ *     garante que nada dele libera com o multiplicador novo neste tick.
+ *  3. O frenesi sobe um degrau, a partir do PROXIMO tick (`frenzyRipTick`),
+ *     e o evento `boss_state: frenzy` carrega a fracao de modulos perdidos.
+ *
+ * Devolve false quando o modulo ja estava arrancado (nada muda).
+ */
+export const ripDiamandisModule = (
+  state: SurvivalState,
+  module: number,
+  at: { x: number; y: number },
+  events: SemanticEvent[],
+): boolean => {
+  const bit = 1 << module;
+  if ((state.bossRuntime.modulesLost & bit) !== 0) return false;
+  state.bossRuntime.modulesLost |= bit;
+  events.push({ t: 'boss_module', x: at.x, y: at.y, module, state: 'detached' });
+
+  const boss = state.enemies.find((e) => e.alive && e.archetype === 'diamandis');
+  if (boss) {
+    boss.action = undefined;
+    boss.vx = 0;
+    boss.vy = 0;
+    boss.nextActionAt = Math.max(boss.nextActionAt, state.tick + DIAMANDIS_RIP_STAGGER_TICKS);
+    state.bossRuntime.staggerUntil = Math.max(
+      state.bossRuntime.staggerUntil,
+      state.tick + DIAMANDIS_RIP_STAGGER_TICKS,
+    );
+  }
+  const rt = state.bossRuntime;
+  if (rt.frenzyRipTick === state.tick) rt.frenzyRipCount += 1;
+  else {
+    rt.frenzyRipTick = state.tick;
+    rt.frenzyRipCount = 1;
+  }
+  let lost = 0;
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) if ((rt.modulesLost & (1 << m)) !== 0) lost++;
+  events.push({
+    t: 'boss_state',
+    archetype: 'diamandis',
+    state: 'frenzy',
+    x: boss?.x ?? at.x,
+    y: boss?.y ?? at.y,
+    intensity: lost / DIAMANDIS_MODULE_COUNT,
+  });
+  return true;
+};
+
 /** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
 const hasModule = (state: SurvivalState, module: number): boolean =>
   (state.bossRuntime.modulesLost & (1 << module)) === 0;
@@ -7232,6 +7316,17 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       continue;
     }
     if (enemy.stunnedUntil > state.tick) continue;
+    // O TROPECO do Diamandis (ver `ripDiamandisModule`): meio segundo parado,
+    // sem andar e sem decidir nada. `nextActionAt` sozinho nao bastava — ele
+    // gateia as ferramentas, nao a perseguicao, e um chefe que "tropeca"
+    // continuando a andar em cima do jogador nao tropecou.
+    // Inclusivo: o tick do arranque ja foi decidido quando o bit entra, entao
+    // sao os DEZ ticks seguintes que ficam parados — 500 ms inteiros.
+    if (enemy.archetype === 'diamandis' && state.tick <= state.bossRuntime.staggerUntil) {
+      enemy.vx = 0;
+      enemy.vy = 0;
+      continue;
+    }
 
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     const player = nearestTarget(state, enemy.x, enemy.y);

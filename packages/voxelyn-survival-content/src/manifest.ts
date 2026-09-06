@@ -14,6 +14,13 @@ export type SpriteFootprint = {
   offsetY: number;
 };
 
+/**
+ * Um ENCAIXE: onde uma peca destacavel se prende ao corpo, em pixels do
+ * quadro, e a profundidade dela em relacao ao centro do corpo naquele rumo
+ * (positivo = mais perto da camera, entao a peca e desenhada DEPOIS do corpo).
+ */
+export type SpriteSocket = { x: number; y: number; depth?: number };
+
 export type SpriteManifestEntry = {
   id: string;
   version: number;
@@ -50,6 +57,12 @@ export type SpriteManifestEntry = {
   animations: Record<string, SpriteAnimationDefinition>;
   /** dir -> anim -> starting column in the stable, single-row atlas. */
   frameMap: Record<string, Record<string, number>>;
+  /**
+   * Os ENCAIXES das pecas destacaveis, por rumo autorado: onde cada peca se
+   * prende ao corpo, em pixels do quadro (`sockets[dir][peca] = {x, y}`). So
+   * quem tem pecas publica (o chassi do Diamandis, o eletroima do Coveiro).
+   */
+  sockets?: Record<string, Record<string, SpriteSocket>>;
   generation?: { tool: string; prompt: string; seedOrRef?: string };
 };
 
@@ -179,6 +192,14 @@ export const CHARACTER_SPRITE_IDS = [
   // tamanho de quadro so e a cauda nao pode pagar o quadro das asas.
   'part-sheet-leviathan-wings',
   'part-sheet-leviathan-tail',
+  // AS PECAS DO DIAMANDIS: a broca, o rack de demolicao e o mastro-lente, cada
+  // uma um atlas de oito rumos com as quatro vidas (presa, solta, carregada,
+  // caida). `part-` porque nao sao arquetipos — o chassi (`enemy-diamandis`) e
+  // o corpo que a simulacao move; as pecas entram nos encaixes que o manifest
+  // dele publica. Carregadas sob demanda (`ON_DEMAND_ATLASES` no validador).
+  'part-diamandis-drill',
+  'part-diamandis-rack',
+  'part-diamandis-mast',
   'enemy-lung-matrix',
   'enemy-furnace-heart',
   'enemy-frost-queen',
