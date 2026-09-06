@@ -40,6 +40,7 @@ import {
   DIAMANDIS_DRILL_TIP_AHEAD,
   DIAMANDIS_DRILL_WALL_RECOVERY_TICKS,
   DIAMANDIS_DRILL_WIDTH,
+  DIAMANDIS_DRILL_WINDUP_TICKS,
   TICK_HZ,
   drillSpeedFractionAt,
   drillSpinAt,
@@ -233,7 +234,7 @@ export const chassisPoseAt = (
 // ---------------------------------------------------------------------------
 
 /** A partir de que fracao do preparo a faixa "trava" (o rumo esta fixo). */
-export const LANE_LOCK_AT = DIAMANDIS_DRILL_ALIGN_TICKS / 36;
+export const LANE_LOCK_AT = DIAMANDIS_DRILL_ALIGN_TICKS / DIAMANDIS_DRILL_WINDUP_TICKS;
 
 export type LaneStyle = { color: string; alpha: number; locked: boolean };
 
@@ -416,6 +417,10 @@ export const SCAR_MS = 60000;
 export const DRAG_EVERY_MS = 45;
 /** Afastamento lateral das duas esteiras de arrasto, em tiles. */
 export const DRAG_HALF = 0.55;
+/** Maior salto entre dois registros de arrasto que ainda e a mesma corrida. */
+export const DRAG_MAX_STEP = 2.5;
+/** `impactTick` logo depois do evento, antes de um quadro carimbar o tick. */
+export const IMPACT_PENDING = -2;
 
 /**
  * O que a broca deixa e o que ela fez de ultimo: marcas, impactos e a
@@ -428,6 +433,13 @@ export class DrillPresentation {
   recovery: { from: number; startMs: number; ticks: number } | null = null;
   /** Tick (em ms de parede) do ultimo `drill_lock`, para o clique visual. */
   lockedAtMs = -1;
+  /**
+   * O tick em que a broca BATEU, pela memoria dos eventos: `bossRuntime.
+   * drillImpactAt` nao viaja no wire, e o parceiro do co-op precisa entrar
+   * no recuo pelo mesmo caminho do audio. `IMPACT_PENDING` logo depois do
+   * evento, ate o primeiro quadro desenhado carimbar o tick; -1 sem impacto.
+   */
+  impactTick = -1;
   private lastDragBucket = -1;
   private lastDragAt: Vec | null = null;
 
@@ -436,8 +448,26 @@ export class DrillPresentation {
     this.impacts = [];
     this.recovery = null;
     this.lockedAtMs = -1;
+    this.impactTick = -1;
     this.lastDragBucket = -1;
     this.lastDragAt = null;
+  }
+
+  /** Carimba o tick do impacto pendente, no primeiro quadro que o ve. */
+  stampImpact(tick: number): void {
+    if (this.impactTick === IMPACT_PENDING) this.impactTick = tick;
+  }
+
+  /**
+   * O tick de impacto que vale para uma corrida: o autoritativo quando ele
+   * e desta corrida, senao o lembrado dos eventos, senao -1. A simulacao
+   * nunca zera `drillImpactAt` — sem o `releaseAt` de guarda, o impacto da
+   * primeira corrida travaria o giro de todas as seguintes.
+   */
+  impactAtFor(action: { releaseAt: number }, authoritative: number): number {
+    if (authoritative >= action.releaseAt) return authoritative;
+    if (this.impactTick >= action.releaseAt) return this.impactTick;
+    return -1;
   }
 
   /**
@@ -462,6 +492,7 @@ export class DrillPresentation {
         };
         this.impacts.push(impact);
         born.push(impact);
+        this.impactTick = IMPACT_PENDING;
         this.marks.push({ kind: 'scar', x: ev.x, y: ev.y, dx, dy, length: 1.2, bornMs: nowMs });
         this.recovery = {
           from: 0.15,
@@ -509,7 +540,11 @@ export class DrillPresentation {
         this.impacts.push(impact);
         born.push(impact);
       } else if (ev.state === 'drill_lock') {
+        // Corrida nova: o impacto lembrado era da anterior, e o arrasto
+        // recomeca do zero (um arranque interrompido nao deixa esteira).
         this.lockedAtMs = nowMs;
+        this.impactTick = -1;
+        this.lastDragAt = null;
       } else if (ev.state === 'drill_bearing') {
         // O clique e som e um tremor do corpo; nada a guardar.
       }
@@ -531,6 +566,10 @@ export class DrillPresentation {
     if (!last) return;
     const len = Math.hypot(x - last.x, y - last.y);
     if (len < 0.02) return;
+    // Um salto maior que qualquer passo e outra corrida (a anterior morreu
+    // sem impacto nem derrapagem — um modulo arrancado, por exemplo): nao ha
+    // esteira ligando as duas.
+    if (len > DRAG_MAX_STEP) return;
     const side = { x: -dir.y, y: dir.x };
     for (const s of [-1, 1]) {
       this.marks.push({

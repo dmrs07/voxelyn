@@ -236,6 +236,8 @@ inspeção: no jogo só o chefe ativo aparece.
 - `src/tests/drill-machine.test.ts` — a broca como máquina: fase do giro e pose
   em oito fases, passada pela distância, pose do chassi, telegrafo determinista,
   marcas e impactos dos eventos, cenários (corrida, veio, erro).
+- `src/tests/noise.test.ts` — o ruído de Perlin: determinista pela semente, zero
+  nos nós, dentro de [-1, 1], contínuo; `fbm` e o contorno irregular fechado.
 - `src/client/audio/drill-audio.test.ts` — o leito da broca: curvas, o que ele
   lê do estado e da memória dos eventos, e as vozes dos transientes.
 

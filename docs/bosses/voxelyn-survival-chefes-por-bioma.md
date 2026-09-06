@@ -422,6 +422,20 @@ explosão continuam. `markDemolition` passou a ser exportado da simulação para
 cenário da arena (**salva de demolição**) armar a salva pelo caminho de verdade.
 Capturas `14-demolicao-…` a `17-demolicao-…` em `docs/media/diamandis/`.
 
+**A forma da explosão vem de ruído de Perlin** (`noise.ts`: Perlin clássico em 2D
+com tabela de permutação semeada, `fbm2` em oitavas, `blobRadius` para contornos
+fechados). Nenhuma borda da detonação é um círculo: a **onda de choque** ondula
+(7% de amplitude, três lóbulos) e arrasta uma saia de poeira rente ao chão rasgada
+em nesgas; a **bola de fogo** é um volume irregular (30%) que evolui com a idade,
+com um núcleo mais quente deslocado para cima, e se rasga em **línguas** de fogo em
+voxel onde o ruído da borda é alto (mais longe e maiores quanto mais alto); a
+**fumaça** é uma coluna turbulenta de nove sopros que nascem de baixo para cima e se
+deslocam de lado pelo ruído, cada um com contorno ondulado; a **cratera** tem
+contorno irregular fixo e terra revirada onde o ruído é alto. Tudo é função da
+semente da detonação e da idade dela — o co-op vê a mesma forma, e um teste confere
+cada raio. Com movimento reduzido a forma não evolui (tempo zero), só cresce e apaga.
+Captura `30-demolicao-sequencia-perlin.png` (dezesseis quadros a 45 ms).
+
 ### A broca como MÁQUINA (`SIMULATION_VERSION` 62, `diamandis-drill.ts`, `drill-machine.ts`)
 
 A versão anterior mostrava o avanço como um rasgo de ar: uma onda de proa em lençóis

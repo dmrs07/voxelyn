@@ -23,10 +23,12 @@ import {
   type SemanticEvent,
 } from '@voxelyn/survival-sim';
 import {
+  DRAG_MAX_STEP,
   DRAG_MS,
   DRILL_RUN_TILES,
   DrillPresentation,
   IMPACT_FX_MS,
+  IMPACT_PENDING,
   LANE_LOCK_AT,
   SCAR_MS,
   chassisPoseAt,
@@ -444,5 +446,45 @@ describe('o cenario da arena', () => {
     const pm = new DrillPresentation();
     expect(pm.ingest(seenMiss, 0).map((e) => e.kind)).toEqual(['skid']);
     expect(miss.player.hp).toBe(hp0);
+  });
+});
+
+describe('a revisao', () => {
+  it('a trava da faixa segue o alinhamento da simulacao', () => {
+    expect(LANE_LOCK_AT).toBeCloseTo(DIAMANDIS_DRILL_ALIGN_TICKS / DIAMANDIS_DRILL_WINDUP_TICKS, 9);
+  });
+
+  it('o impacto lembrado dos eventos vale para a corrida dele, e so para ela', () => {
+    const p = new DrillPresentation();
+    const action = { releaseAt: 100 };
+    // Sem nada: nenhum impacto.
+    expect(p.impactAtFor(action, -1)).toBe(-1);
+    // O autoritativo de OUTRA corrida (antes do release) nao conta.
+    expect(p.impactAtFor(action, 50)).toBe(-1);
+    expect(p.impactAtFor(action, 120)).toBe(120);
+    // O evento chega pendente; o primeiro quadro carimba o tick.
+    p.ingest([moment('drill_impact', 1, 1, 0.8)], 0);
+    expect(p.impactTick).toBe(IMPACT_PENDING);
+    p.stampImpact(130);
+    p.stampImpact(131);
+    expect(p.impactTick).toBe(130);
+    expect(p.impactAtFor(action, -1)).toBe(130);
+    // A corrida seguinte trava o rumo e esquece o impacto.
+    p.ingest([moment('drill_lock')], 0);
+    expect(p.impactTick).toBe(-1);
+    expect(p.impactAtFor({ releaseAt: 300 }, 130)).toBe(-1);
+  });
+
+  it('um salto maior que um passo nao vira esteira: e outra corrida', () => {
+    const p = new DrillPresentation();
+    p.drag(0, 0, { x: 1, y: 0 }, 0);
+    p.drag(DRAG_MAX_STEP + 1, 0, { x: 1, y: 0 }, 60);
+    expect(p.marks.length).toBe(0);
+    p.drag(DRAG_MAX_STEP + 1.4, 0, { x: 1, y: 0 }, 120);
+    expect(p.marks.length).toBe(2);
+    // O `drill_lock` de uma corrida nova tambem zera o ponto anterior.
+    p.ingest([moment('drill_lock')], 200);
+    p.drag(20, 0, { x: 1, y: 0 }, 260);
+    expect(p.marks.length).toBe(2);
   });
 });

@@ -4238,6 +4238,27 @@ export class SurvivalRenderer {
         draw: () => drawScorch(ctx, toScreen, mark, z, nowMs),
       });
     }
+    // AS MARCAS DA BROCA (esteiras, raspagens, a cicatriz do impacto) e as
+    // faiscas do impacto: sao CHAO e ficam depois do chefe — fora do laco de
+    // inimigos de proposito, como as cicatrizes do feixe e as crateras. Dentro
+    // dele, sumiriam com o chefe morto ou no escuro.
+    this.drillMachine.step(nowMs);
+    if (this.drillMachine.marks.length > 0) {
+      const marks = this.drillMachine.marks;
+      items.push({
+        depth: -1e9,
+        draw: () => drawGroundMarks(ctx, toScreen, marks, z, nowMs),
+      });
+    }
+    for (const impact of this.drillMachine.impacts) {
+      const [isx, isy] = toScreen(impact.x, impact.y);
+      if (isx < -200 || isx > vw + 200 || isy < -200 || isy > vh + 200) continue;
+      const liftPx = heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z);
+      items.push({
+        depth: impact.x + impact.y + 0.4,
+        draw: () => drawImpactSparks(ctx, toScreen, impact, liftPx, z, nowMs),
+      });
+    }
     for (const piece of this.diamandis.floor) {
       const [psx, psy] = toScreen(piece.x, piece.y);
       if (psx < -120 || psx > vw + 120 || psy < -140 || psy > vh + 120) continue;
@@ -4464,8 +4485,14 @@ export class SurvivalRenderer {
         }
         const reduced = prefersReducedMotion();
         const tickF = state.tick + tickFraction(nowMs, this.drillTickSeenMs);
-        const impactAt = state.bossRuntime.drillImpactAt;
         const action = drillPhase && enemy.action ? enemy.action : null;
+        // O tick do impacto que vale para ESTA corrida: o autoritativo se e
+        // dela, senao o lembrado dos eventos (o parceiro do co-op nao recebe
+        // `drillImpactAt`), senao nenhum. Ver `impactAtFor`.
+        this.drillMachine.stampImpact(state.tick);
+        const impactAt = action
+          ? this.drillMachine.impactAtFor(action, state.bossRuntime.drillImpactAt)
+          : -1;
         chassisPose = chassisPoseAt(
           action,
           tickF,
@@ -4502,7 +4529,7 @@ export class SurvivalRenderer {
             // O chassi no preparo e o de REPOUSO, comprimido pela pose: a
             // pose de ataque do atlas e o solavanco, e ele ainda nao saiu.
             presented = { ...presented, anim: 'idle' };
-          } else if (impactAt >= 0 && impactAt >= enemy.action.releaseAt) {
+          } else if (impactAt >= 0) {
             // Recuando depois do impacto: parado nos pes, esmagado pela pose.
             presented = { ...presented, anim: 'idle' };
           } else {
@@ -4533,23 +4560,6 @@ export class SurvivalRenderer {
             }
           }
         }
-        // As marcas no chao ficam depois de a acao acabar: um item so, no
-        // fundo da pilha (sao chao, nao corpo).
-        if (this.drillMachine.marks.length > 0) {
-          const marks = this.drillMachine.marks;
-          items.push({
-            depth: -1e9,
-            draw: () => drawGroundMarks(ctx, toScreen, marks, z, nowMs),
-          });
-        }
-        for (const impact of this.drillMachine.impacts) {
-          const liftPx = heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z);
-          items.push({
-            depth: impact.x + impact.y + 0.4,
-            draw: () => drawImpactSparks(ctx, toScreen, impact, liftPx, z, nowMs),
-          });
-        }
-        this.drillMachine.step(nowMs);
       }
       if (surveyPhase && beamDir) {
         const phase = surveyPhase;

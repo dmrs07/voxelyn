@@ -21,6 +21,7 @@
 import { DIAMANDIS_DEMOLISH_RADIUS } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 import { drawEmissiveHalo } from './emissive-halo';
+import { blobRadius, fbm01, fbm2 } from './noise';
 import { PAL } from './palette';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 
@@ -251,7 +252,39 @@ export const drawChargeShadow = (
 const easeOut = (t: number): number => 1 - (1 - t) * (1 - t);
 
 /**
- * A CRATERA que a detonacao deixa: escura, com a borda queimada, apagando
+ * Um contorno IRREGULAR em volta de `(cx, cy)`: uma elipse `rx` x `ry` cuja
+ * borda ondula pelo ruido de Perlin (ver noise.ts) — `amount` e quanto o
+ * raio varia (0,25 = ate um quarto), `lobes` quantas ondulacoes cabem numa
+ * volta, `t` o tempo (segundos) que faz a forma evoluir. Fecha sempre: o
+ * angulo entra no ruido como um ponto num circulo.
+ */
+const blobPath = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  seed: number,
+  t: number,
+  amount: number,
+  lobes: number,
+  points = 40,
+): void => {
+  ctx.beginPath();
+  for (let i = 0; i <= points; i++) {
+    const a = (i / points) * Math.PI * 2;
+    const f = blobRadius(a, t, seed, amount, lobes);
+    const x = cx + Math.cos(a) * rx * f;
+    const y = cy + Math.sin(a) * ry * f;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+};
+
+/**
+ * A CRATERA que a detonacao deixa: escura, de contorno irregular (o ruido da
+ * propria detonacao, parado no tempo), com a borda queimada, apagando
  * devagar. Separada da detonacao porque vive no CHAO — entra na fila ordenada
  * com a profundidade da celula, por baixo de quem pisa nela; a bola de fogo e
  * a fumaca passam por cima de tudo.
@@ -274,13 +307,28 @@ export const drawCrater = (
   ctx.save();
   ctx.globalAlpha = 0.55 * (1 - crater);
   ctx.fillStyle = PAL.dark;
-  ctx.beginPath();
-  ctx.ellipse(sx, sy, rx * 0.8, ry * 0.8, 0, 0, Math.PI * 2);
+  blobPath(ctx, sx, sy, rx * 0.8, ry * 0.8, blast.seed ^ 0x51, 0, 0.18, 2.4, 32);
   ctx.fill();
   ctx.globalAlpha = 0.5 * (1 - crater) * (1 - crater);
   ctx.strokeStyle = PAL.rust;
   ctx.lineWidth = Math.max(1, 1.5 * z);
   ctx.stroke();
+  // Terra revirada em volta: cubinhos escuros onde o ruido e mais alto.
+  ctx.globalAlpha = 0.45 * (1 - crater);
+  const grain = Math.max(1, 1.6 * z);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2;
+    const n = fbm01(Math.cos(a) * 2.1, Math.sin(a) * 2.1 + 3, blast.seed ^ 0x77, 2);
+    if (n < 0.45) continue;
+    const d = 0.85 + 0.35 * n;
+    ctx.fillStyle = n > 0.7 ? PAL.rust : PAL.rockShadow;
+    ctx.fillRect(
+      Math.round(sx + Math.cos(a) * rx * d),
+      Math.round(sy + Math.sin(a) * ry * d),
+      Math.ceil(grain),
+      Math.ceil(grain * 0.6),
+    );
+  }
   ctx.restore();
 };
 
@@ -289,6 +337,13 @@ export const drawCrater = (
  * fumaca (a cratera e `drawCrater`). Cada camada tem o proprio relogio;
  * `tileW`/`tileH` sao a projecao do jogo (2:1), e `radius` o raio REAL do
  * estrago — a bola de fogo cobre exatamente a area que a simulacao cobrou.
+ *
+ * O que da a ela a materia de uma explosao de verdade e o RUIDO (noise.ts):
+ * nenhuma borda e um circulo. A onda de choque ondula, a bola de fogo e um
+ * volume irregular que se rasga em linguas de fogo onde o ruido e alto, e a
+ * fumaca e uma coluna turbulenta que se retorce enquanto sobe. Tudo pela
+ * semente da detonacao e pela idade dela: os dois clientes do co-op veem a
+ * mesma forma, e um teste pode conferir cada raio.
  */
 export const drawBlast = (
   ctx: CanvasRenderingContext2D,
@@ -305,93 +360,134 @@ export const drawBlast = (
   if (age < 0) return;
   const rx = blast.radius * tileW * 0.5 * Math.SQRT2 * z;
   const ry = blast.radius * tileH * 0.5 * Math.SQRT2 * z;
+  // Com movimento reduzido a forma nao evolui: cada camada tem o contorno do
+  // instante zero e so cresce e apaga.
+  const t = reducedMotion ? 0 : age / 1000;
 
   // A ONDA DE CHOQUE: um anel que abre ate alem do raio, grosso no comeco e
-  // fino no fim, e some.
+  // fino no fim, com a borda ondulando — e, atras dele, uma saia de poeira
+  // rente ao chao que o ruido rasga em nesgas.
   const shock = age / SHOCKWAVE_MS;
   if (shock < 1) {
     const k = easeOut(shock);
+    const grow = 0.2 + 1.3 * k;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.95 * (1 - shock);
     ctx.strokeStyle = PAL.player;
     ctx.lineWidth = Math.max(1, (7 - 6 * shock) * z);
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, rx * (0.2 + 1.3 * k), ry * (0.2 + 1.3 * k), 0, 0, Math.PI * 2);
+    blobPath(ctx, sx, sy, rx * grow, ry * grow, blast.seed ^ 0x11, t * 2, 0.07, 3, 48);
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.35 * (1 - shock);
+    ctx.fillStyle = PAL.bone;
+    blobPath(ctx, sx, sy, rx * grow * 0.92, ry * grow * 0.92, blast.seed ^ 0x13, t, 0.22, 2, 36);
+    ctx.fill();
     ctx.restore();
   }
 
-  // A BOLA DE FOGO, em tres tempos: o CLARAO branco (os primeiros 15%), a
-  // ESFERA laranja que incha alem do raio e sobe, e os SOPROS de fogo — cubos
-  // de voxel espalhados dentro do raio, subindo e apagando — que dao ao fogo a
-  // materia do resto do jogo. Tudo somado ('lighter'): fogo e luz.
+  // A BOLA DE FOGO, em tres tempos: o CLARAO branco (os primeiros 15%), o
+  // VOLUME laranja que incha alem do raio e sobe, e as LINGUAS de fogo — cubos
+  // de voxel onde o ruido rasga a borda, subindo e apagando — que dao ao fogo
+  // a materia do resto do jogo. Tudo somado ('lighter'): fogo e luz.
   const fire = age / FIREBALL_MS;
   if (fire < 1) {
     const k = easeOut(fire);
     const r = rx * (0.35 + 0.85 * k);
     const lift = ry * 0.8 * k;
+    const cy = sy - lift;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     if (fire < 0.15) {
       const flash = 1 - fire / 0.15;
       ctx.globalAlpha = 0.9 * flash;
       ctx.fillStyle = PAL.player;
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - ry * 0.3, rx * (0.5 + 0.5 * k), ry * (0.5 + 0.5 * k), 0, 0, Math.PI * 2);
+      blobPath(
+        ctx,
+        sx,
+        sy - ry * 0.3,
+        rx * (0.5 + 0.5 * k),
+        ry * (0.5 + 0.5 * k),
+        blast.seed,
+        t,
+        0.15,
+        2,
+      );
       ctx.fill();
     }
-    const grad = ctx.createRadialGradient(sx, sy - lift, r * 0.1, sx, sy - lift, r);
+    // O volume: um degrade radial recortado por um contorno de ruido — a
+    // borda se move enquanto o fogo dura, e nunca e um circulo.
+    const grad = ctx.createRadialGradient(sx, cy, r * 0.1, sx, cy, r * 1.15);
     grad.addColorStop(0, `rgba(255,244,214,${(0.95 * (1 - fire)).toFixed(3)})`);
     grad.addColorStop(0.4, `rgba(255,209,102,${(0.85 * (1 - fire)).toFixed(3)})`);
     grad.addColorStop(0.75, `rgba(255,122,47,${(0.6 * (1 - fire)).toFixed(3)})`);
     grad.addColorStop(1, 'rgba(217,59,76,0)');
     ctx.globalAlpha = 1;
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy - lift, r, r * 0.8, 0, 0, Math.PI * 2);
+    blobPath(ctx, sx, cy, r, r * 0.8, blast.seed ^ 0x21, t * 1.4, 0.3, 1.8, 44);
+    ctx.fill();
+    // Um segundo volume menor e mais quente, deslocado para cima: o nucleo
+    // que ainda esta queimando enquanto a casca esfria.
+    const core = ctx.createRadialGradient(sx, cy - r * 0.15, 0, sx, cy - r * 0.15, r * 0.6);
+    core.addColorStop(0, `rgba(255,244,214,${(0.8 * (1 - fire) * (1 - fire)).toFixed(3)})`);
+    core.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = core;
+    blobPath(ctx, sx, cy - r * 0.15, r * 0.6, r * 0.5, blast.seed ^ 0x23, t * 1.9, 0.35, 2.3, 32);
     ctx.fill();
     ctx.restore();
-    // Os sopros: seis cubos, cada um com o proprio rumo e tamanho pela semente.
+    // As LINGUAS: onde o ruido da borda e alto o fogo escapa em cubos, mais
+    // longe e maiores quanto mais alto ele e. Quentes no comeco, frias no fim.
     ctx.save();
-    for (let i = 0; i < 6; i++) {
-      const a = ((blast.seed >> (i * 4)) & 15) / 15;
-      const b = ((blast.seed >> (i * 4 + 2)) & 15) / 15;
-      const ang = a * Math.PI * 2;
-      const dist = (0.25 + 0.6 * b) * k;
-      const px = sx + Math.cos(ang) * rx * dist;
-      const py = sy - lift * (0.6 + 0.6 * b) + Math.sin(ang) * ry * dist;
-      const size = Math.max(3, rx * (0.16 + 0.12 * b) * (1 - 0.5 * fire));
-      ctx.globalAlpha = 0.9 * (1 - fire) * (1 - fire);
-      drawVoxel(ctx, px, py, size, fire < 0.5 ? FIRE_HOT : FIRE_COOL);
+    const tongues = 12;
+    for (let i = 0; i < tongues; i++) {
+      const ang = (i / tongues) * Math.PI * 2 + fire * 0.4;
+      const n = fbm01(Math.cos(ang) * 1.7 + t * 1.1, Math.sin(ang) * 1.7 + 5, blast.seed ^ 0x31, 3);
+      if (n < 0.42) continue;
+      const reach = (0.45 + 0.75 * n) * k;
+      const px = sx + Math.cos(ang) * rx * reach;
+      const py = cy - lift * 0.4 * n + Math.sin(ang) * ry * reach;
+      const size = Math.max(3, rx * (0.1 + 0.16 * n) * (1 - 0.5 * fire));
+      ctx.globalAlpha = 0.9 * (1 - fire) * (1 - fire) * (0.5 + 0.5 * n);
+      drawVoxel(ctx, px, py, size, fire < 0.5 && n > 0.6 ? FIRE_HOT : FIRE_COOL);
     }
     ctx.restore();
-    drawEmissiveHalo(ctx, PAL.fire, sx, sy - lift, r * 1.8, 0.95 * (1 - fire));
+    drawEmissiveHalo(ctx, PAL.fire, sx, cy, r * 1.8, 0.95 * (1 - fire));
   }
 
   // A COLUNA DE FUMACA: sopros escuros subindo do centro, abrindo e
-  // desbotando — o que fica quando o fogo acaba. Sem movimento reduzido eles
-  // derivam de lado, um a um.
+  // desbotando — o que fica quando o fogo acaba. A coluna e TURBULENTA: cada
+  // sopro se desloca de lado pelo ruido (parado com movimento reduzido), e o
+  // contorno de cada um ondula. Os mais altos sao os mais velhos e os mais
+  // abertos.
   const smoke = age / SMOKE_MS;
   if (smoke < 1 && smoke >= 0.2) {
     const k = (smoke - 0.2) / 0.8;
     ctx.save();
-    for (let i = 0; i < 6; i++) {
-      const s = ((blast.seed >> (i * 3)) & 7) / 7;
-      const rise = ry * (0.3 + 1.1 * k) * (0.7 + 0.6 * s);
-      const drift = reducedMotion ? 0 : (s - 0.5) * rx * 0.7 * k;
-      const puff = Math.max(4, rx * (0.22 + 0.3 * k) * (0.7 + 0.5 * s));
-      ctx.globalAlpha = 0.6 * (1 - k) * (0.6 + 0.4 * s);
-      ctx.fillStyle = PAL.rockShadow;
-      ctx.beginPath();
-      ctx.ellipse(
-        sx + drift + (i - 2.5) * rx * 0.14,
+    const puffs = 9;
+    for (let i = 0; i < puffs; i++) {
+      const s = i / (puffs - 1);
+      // Os de cima nascem antes: o sopro `i` so aparece quando a coluna ja
+      // subiu ate ele.
+      const born = Math.max(0, Math.min(1, (k - s * 0.55) / 0.45));
+      if (born <= 0) continue;
+      const rise = ry * (0.25 + 1.3 * s) * (0.6 + 0.6 * born);
+      const swirl = fbm2(s * 1.7 + 0.3, t * 0.8 + s * 0.9, blast.seed ^ 0x41, 3);
+      const drift = swirl * rx * (0.25 + 0.5 * s);
+      const puff = Math.max(4, rx * (0.16 + 0.26 * s) * (0.6 + 0.6 * born));
+      const shade = fbm01(s * 3.1, 2.2, blast.seed ^ 0x43, 2);
+      ctx.globalAlpha = 0.62 * (1 - k) * born * (0.55 + 0.45 * (1 - s));
+      ctx.fillStyle = shade > 0.55 ? PAL.rock : PAL.rockShadow;
+      blobPath(
+        ctx,
+        sx + drift,
         sy - rise,
         puff,
         puff * 0.8,
-        0,
-        0,
-        Math.PI * 2,
+        blast.seed ^ (0x45 + i * 17),
+        t * 0.7,
+        0.28,
+        2.2,
+        24,
       );
       ctx.fill();
     }

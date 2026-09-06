@@ -44,6 +44,7 @@ import {
   DIAMANDIS_DRILL_WINDUP_TICKS,
   SOLID_NONE,
   SOLID_ORE,
+  SOLID_ROCK,
   SURF_NONE,
   TICK_HZ,
 } from '../src/constants';
@@ -514,5 +515,61 @@ describe('determinismo', () => {
       expect(hashAuthoritativeState(a)).toBe(hashAuthoritativeState(b));
     }
     expect(a.bossRuntime.drillImpactAt).toBeGreaterThan(0);
+  });
+});
+
+describe('a revisao', () => {
+  it('a ponta fere quem esta DENTRO da capsula, nao quem esta mais perto do centro', () => {
+    const { state, boss } = stage(740, { x: 12, y: 0 });
+    // Um segundo jogador de pe ao lado do chassi, fora da capsula.
+    const first = state.player;
+    const second = { ...first, id: first.id + 1000, slot: 1, x: boss.x, y: boss.y + 1.0 };
+    state.players.push(second);
+    state.playerExtras[1] = { ...state.playerExtras[0], joined: true, downed: false };
+    // O primeiro na PONTA, dentro da capsula, a 1,6 tiles a frente.
+    first.x = boss.x - 1.6;
+    first.y = boss.y;
+    boss.facing = { x: -1, y: 0 };
+    boss.action = {
+      kind: 'drill',
+      phase: 'release',
+      startedAt: state.tick - 1,
+      releaseAt: state.tick - 1,
+      endsAt: state.tick + DIAMANDIS_DRILL_TICKS,
+      direction: { x: -1, y: 0 },
+    };
+    boss.contactReadyAt = 0;
+    const hp = first.hp;
+    stepRun(state, [emptyCommand(), emptyCommand()]);
+    expect(first.hp).toBeLessThan(hp);
+    expect(second.hp).toBe(hp);
+  });
+
+  it('na diagonal, um canto que pega em rocha nao dobra o passo: o alcance continua exato', () => {
+    const { state, boss } = stage(741, { x: 10, y: 10 });
+    const w = state.config.width;
+    // Rocha em TUDO fora de um corredor estreito na diagonal: as faixas comem
+    // o que esta a frente, e os cantos do corpo pegam no que sobra ao lado.
+    const bx = Math.floor(boss.x);
+    const by = Math.floor(boss.y);
+    for (let y = by - 24; y <= by + 3; y++) {
+      for (let x = bx - 24; x <= bx + 3; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        const along = (bx - x + (by - y)) / 2;
+        const lateral = Math.abs(bx - x - (by - y)) / 2;
+        if (lateral <= 0.6 && along >= -2) continue;
+        state.solid[y * w + x] = SOLID_ROCK;
+      }
+    }
+    state.player.x = boss.x - 12;
+    state.player.y = boss.y - 12;
+    boss.facing = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+    arm(state, boss, { x: -1, y: -1 });
+    const x0 = boss.x;
+    const y0 = boss.y;
+    const events = run(state, DIAMANDIS_DRILL_WINDUP_TICKS + DIAMANDIS_DRILL_TICKS);
+    expect(moments(events, 'drill_impact').length).toBe(0);
+    expect(Math.hypot(boss.x - x0, boss.y - y0)).toBeCloseTo(DIAMANDIS_DRILL_RUN_TILES, 3);
+    expect(Math.abs(boss.x - x0 - (boss.y - y0))).toBeLessThan(1e-6);
   });
 });

@@ -360,20 +360,7 @@ const placePlayerAhead = (
   const fx = boss.facing.x || 1;
   const fy = boss.facing.y || 0;
   const norm = Math.hypot(fx, fy) || 1;
-  const dir = { x: fx / norm, y: fy / norm };
-  const w = state.config.width;
-  for (let d = dist; d >= 2; d -= 1) {
-    const cx = Math.floor(boss.x + dir.x * d);
-    const cy = Math.floor(boss.y + dir.y * d);
-    if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
-    if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
-    state.player.x = cx + 0.5;
-    state.player.y = cy + 0.5;
-    break;
-  }
-  const toward = { x: state.player.x - boss.x, y: state.player.y - boss.y };
-  const len = Math.hypot(toward.x, toward.y) || 1;
-  return { x: toward.x / len, y: toward.y / len };
+  return placePlayerAlong(state, boss, { x: fx / norm, y: fy / norm }, dist);
 };
 
 /**

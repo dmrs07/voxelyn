@@ -2780,6 +2780,27 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
 };
 
 /**
+ * Quem a PONTA da broca alcanca neste tick: entre os jogadores de pe dentro
+ * da capsula, o mais perto da ponta. `null` se ninguem esta dentro.
+ */
+const drillVictim = (state: SurvivalState, enemy: Entity, dir: Vec2): Entity | null => {
+  const tip = drillTipAt(enemy.x, enemy.y, dir);
+  let best: Entity | null = null;
+  let bestD = Infinity;
+  for (const p of state.players) {
+    const e = state.playerExtras[p.slot ?? 0];
+    if (!e.joined || !p.alive || e.downed) continue;
+    if (!drillCapsuleHits(enemy.x, enemy.y, dir, p.x, p.y, p.radius)) continue;
+    const d = (p.x - tip.x) ** 2 + (p.y - tip.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+};
+
+/**
  * O ALINHAMENTO da broca, um tick da preparacao.
  *
  * O chassi gira ate encarar o corredor (`DIAMANDIS_DRILL_ALIGN_RATE`), e o
@@ -2942,12 +2963,42 @@ const diamandisDrillStride = (
     });
   }
 
-  let moved = moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
-  if ((moved.blockedX || moved.blockedY) && moved.blockCell) {
-    // Um canto do corpo pegou numa celula que a varredura das faixas nao
-    // cobriu (acontece na diagonal): se ela cai, cai agora, e o passo sai.
-    if (open(moved.blockCell.x, moved.blockCell.y)) {
-      moved = moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
+  const dx = action.direction.x * step;
+  const dy = action.direction.y * step;
+  let moved = moveEntity(state, enemy, dx, dy);
+  if (moved.blockedX || moved.blockedY) {
+    // Um canto do corpo pegou em celulas que a varredura das faixas nao
+    // cobriu (acontece na diagonal): o que cai, cai agora — os quatro cantos
+    // da posicao pretendida — e o passo sai. So o eixo que TRAVOU tenta de
+    // novo: `moveEntity` ja andou o outro, e repetir os dois dobraria o passo
+    // daquele eixo neste tick.
+    // `moveEntity` confere cada eixo contra a posicao INTERMEDIARIA (x novo
+    // com y velho, depois y novo): os cantos que importam sao os dessas duas
+    // posicoes e os do destino.
+    const nx = enemy.x + (moved.blockedX ? dx : 0);
+    const ny = enemy.y + (moved.blockedY ? dy : 0);
+    let cleared = false;
+    for (const [cx, cy] of [
+      [nx, enemy.y],
+      [enemy.x, ny],
+      [nx, ny],
+    ]) {
+      for (const [ox, oy] of [
+        [-enemy.radius, -enemy.radius],
+        [enemy.radius, -enemy.radius],
+        [-enemy.radius, enemy.radius],
+        [enemy.radius, enemy.radius],
+      ]) {
+        if (open(Math.floor(cx + ox), Math.floor(cy + oy))) cleared = true;
+      }
+    }
+    if (cleared) {
+      const retry = moveEntity(state, enemy, moved.blockedX ? dx : 0, moved.blockedY ? dy : 0);
+      moved = {
+        blockedX: moved.blockedX && retry.blockedX,
+        blockedY: moved.blockedY && retry.blockedY,
+        blockCell: retry.blockCell ?? moved.blockCell,
+      };
     }
   }
   if (moved.blockedX || moved.blockedY) {
@@ -2980,13 +3031,11 @@ const diamandisDrillStride = (
     // Encostou ja derrapando: nao e impacto, e o fim da corrida encostado.
   }
 
-  // A PONTA fere — depois do passo, onde ela esta agora.
-  const victim = nearestTarget(state, enemy.x, enemy.y);
-  if (
-    victim &&
-    state.tick >= enemy.contactReadyAt &&
-    drillCapsuleHits(enemy.x, enemy.y, action.direction, victim.x, victim.y, victim.radius)
-  ) {
+  // A PONTA fere — depois do passo, onde ela esta agora. Quem esta DENTRO da
+  // capsula e que apanha, e nao quem esta mais perto do centro do chassi: no
+  // co-op, um jogador colado no flanco nao blinda o que esta na ponta.
+  const victim = drillVictim(state, enemy, action.direction);
+  if (victim && state.tick >= enemy.contactReadyAt) {
     enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
     damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE * diamandisFrenzyMultiplier(state), events, {
       kind: 'enemy_contact',
