@@ -229,5 +229,16 @@ inspeção: no jogo só o chefe ativo aparece.
   encaixes, ordem por rumo, frenesi (tint, espasmos, relógio), peça caída.
 - `src/tests/arena-diamandis-debug.test.ts` — os cenários do painel do
   Diamandis contra uma run real: rumos, soltar, arrancar, abater, frenesi.
+- `src/tests/diamandis-beam.test.ts` — o feixe de prospecção: alcance igual ao
+  `beam_line` da simulação, atos, linha de medição, cores, cicatriz, cenário.
+- `src/tests/demolition-fx.test.ts` — a salva de demolição: cargas do estado,
+  voo e estopim, parábola e tombo, detonação só do Diamandis, cenário.
+- `src/tests/drill-machine.test.ts` — a broca como máquina: fase do giro e pose
+  em oito fases, passada pela distância, pose do chassi, telegrafo determinista,
+  marcas e impactos dos eventos, cenários (corrida, veio, erro).
+- `src/tests/noise.test.ts` — o ruído de Perlin: determinista pela semente, zero
+  nos nós, dentro de [-1, 1], contínuo; `fbm` e o contorno irregular fechado.
+- `src/client/audio/drill-audio.test.ts` — o leito da broca: curvas, o que ele
+  lê do estado e da memória dos eventos, e as vozes dos transientes.
 
 Capturas em `docs/media/boss-health-bar/`.

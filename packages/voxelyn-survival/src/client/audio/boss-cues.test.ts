@@ -132,7 +132,7 @@ describe('cada chefe tem assinatura, e ela usa os tres momentos', () => {
 describe('Diamandis: a maquina emite ordens de trabalho', () => {
   it('cada ferramenta sai com a ferramenta E a frase de sistema', () => {
     const drill = cuesForEvent(windup('diamandis', 'drill'), ctx).map((c) => c.voice);
-    expect(drill).toEqual(['diamandisDrillSpin', 'diamandisVoiceStandClear']);
+    expect(drill).toEqual(['diamandisDrillEngage', 'diamandisVoiceStandClear']);
     const demolish = cuesForEvent(windup('diamandis', 'demolish'), ctx).map((c) => c.voice);
     expect(demolish).toEqual(['diamandisChargeArmed', 'diamandisVoiceArmed']);
     const beam = cuesForEvent(windup('diamandis', 'beam'), ctx).map((c) => c.voice);
@@ -142,7 +142,7 @@ describe('Diamandis: a maquina emite ordens de trabalho', () => {
   it('a voz corporativa e personalidade: nunca disputa com um windup', () => {
     for (const id of Object.keys(VOICE_SPECS).filter((v) => v.startsWith('diamandisVoice'))) {
       expect(VOICE_SPECS[id as keyof typeof VOICE_SPECS].priority).toBeLessThan(
-        VOICE_SPECS.diamandisDrillSpin.priority,
+        VOICE_SPECS.diamandisDrillEngage.priority,
       );
     }
   });

@@ -3687,6 +3687,8 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.frenzyRipTick);
   mix(state.bossRuntime.frenzyRipCount);
   mix(state.bossRuntime.staggerUntil);
+  // A broca que BATEU: dali o corpo recua em vez de avancar.
+  mix(state.bossRuntime.drillImpactAt);
   // O ARCO do Devorador: onde ele vai cair e quantos saltos faltam na rajada.
   //
   // Os dois sao escolhidos UMA vez, na decolagem, e mandam no resto do ciclo —

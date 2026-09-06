@@ -193,7 +193,6 @@ import {
   DIAMANDIS_DRILL_DAMAGE,
   DIAMANDIS_DRILL_MAX_RANGE,
   DIAMANDIS_DRILL_MIN_RANGE,
-  DIAMANDIS_DRILL_SPEED,
   DIAMANDIS_DRILL_TICKS,
   DIAMANDIS_DRILL_WIDTH,
   DIAMANDIS_DRILL_WINDUP_TICKS,
@@ -325,6 +324,23 @@ import {
   UNDERTAKER_SLAM_WINDUP_TICKS,
   isIceSurface,
 } from './constants.js';
+import {
+  DIAMANDIS_DRILL_ALIGN_RATE,
+  DIAMANDIS_DRILL_CORRECT_RAD,
+  DIAMANDIS_DRILL_CORRECT_TICKS,
+  DIAMANDIS_DRILL_IMPACT_MIN_SPEED,
+  DIAMANDIS_DRILL_RECOIL_TICKS,
+  DIAMANDIS_DRILL_SKID_RECOVERY_TICKS,
+  DIAMANDIS_DRILL_WALL_RECOVERY_TICKS,
+  angleBetween,
+  drillCapsuleHits,
+  drillRecoilStepAt,
+  drillSpeedFractionAt,
+  drillStepAt,
+  drillTipAt,
+  octantOf,
+  turnToward,
+} from './diamandis-drill.js';
 import {
   breakSolid,
   markDirty,
@@ -1455,7 +1471,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
   }
 };
 
-const startAction = (
+export const startAction = (
   state: SurvivalState,
   enemy: Entity,
   action: EntityActionKind,
@@ -1477,7 +1493,10 @@ const startAction = (
     direction: { ...direction },
     target,
   };
-  enemy.facing = { ...direction };
+  // A broca NAO vira o chassi de uma vez: ele GIRA ate o rumo durante o
+  // proprio aviso (ver `diamandisDrillAlign`). Todo o resto encara o alvo no
+  // instante em que decide.
+  if (action !== 'drill') enemy.facing = { ...direction };
   events.push({
     t: 'action_start',
     entity: enemy.id,
@@ -1605,7 +1624,7 @@ const guardianSalvoRelease = (
  * onde nasceu. Uma salva que perseguisse seria dano sem contra-jogo, com um
  * telegrafo bonito por cima.
  */
-const markDemolition = (
+export const markDemolition = (
   state: SurvivalState,
   enemy: Entity,
   target: Entity,
@@ -2761,6 +2780,73 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
 };
 
 /**
+ * Quem a PONTA da broca alcanca neste tick: entre os jogadores de pe dentro
+ * da capsula, o mais perto da ponta. `null` se ninguem esta dentro.
+ */
+const drillVictim = (state: SurvivalState, enemy: Entity, dir: Vec2): Entity | null => {
+  const tip = drillTipAt(enemy.x, enemy.y, dir);
+  let best: Entity | null = null;
+  let bestD = Infinity;
+  for (const p of state.players) {
+    const e = state.playerExtras[p.slot ?? 0];
+    if (!e.joined || !p.alive || e.downed) continue;
+    if (!drillCapsuleHits(enemy.x, enemy.y, dir, p.x, p.y, p.radius)) continue;
+    const d = (p.x - tip.x) ** 2 + (p.y - tip.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+};
+
+/**
+ * O ALINHAMENTO da broca, um tick da preparacao.
+ *
+ * O chassi gira ate encarar o corredor (`DIAMANDIS_DRILL_ALIGN_RATE`), e o
+ * rumo TRAVA quando chega: dali em diante `facing` e `direction` sao a mesma
+ * coisa. Cada oitante cruzado e um clique do mancal (`drill_bearing`); a
+ * chegada e `drill_lock`. So `facing` muda — o rumo da acao foi decidido no
+ * tick em que a maquina escolheu o alvo e nao persegue ninguem.
+ */
+const diamandisDrillAlign = (
+  state: SurvivalState,
+  enemy: Entity,
+  action: EntityAction,
+  events: SemanticEvent[],
+): void => {
+  const before = enemy.facing;
+  const alignedBefore = Math.abs(angleBetween(before, action.direction)) < 1e-6;
+  if (!alignedBefore) {
+    enemy.facing = turnToward(before, action.direction, DIAMANDIS_DRILL_ALIGN_RATE);
+    if (octantOf(before) !== octantOf(enemy.facing)) {
+      events.push({
+        t: 'boss_state',
+        archetype: 'diamandis',
+        state: 'drill_bearing',
+        x: enemy.x,
+        y: enemy.y,
+        dx: enemy.facing.x,
+        dy: enemy.facing.y,
+      });
+    }
+  }
+  const aligned = Math.abs(angleBetween(enemy.facing, action.direction)) < 1e-6;
+  if (aligned && state.bossRuntime.drillLockedAt < action.startedAt) {
+    state.bossRuntime.drillLockedAt = state.tick;
+    events.push({
+      t: 'boss_state',
+      archetype: 'diamandis',
+      state: 'drill_lock',
+      x: enemy.x,
+      y: enemy.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+    });
+  }
+};
+
+/**
  * Uma passada da BROCA DE AVANCO: anda, abre o vao e atropela.
  *
  * Mora fora de `releaseAction` pelo mesmo motivo da investida do Corcel — a
@@ -2769,6 +2855,19 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
  * parede no caminho e o contra-jogo dele), a broca ATRAVESSA. Contra o
  * Diamandis a parede nao e resposta; a resposta e sair da linha, e o corredor
  * que fica aberto e permanente.
+ *
+ * A corrida tem PESO (ver diamandis-drill.ts): sai num solavanco, acelera
+ * forte no primeiro terco, chega ao maximo no meio e derrapa no fim. O passo
+ * de cada tick vem de `drillStepAt`, e o alcance total e o mesmo da broca de
+ * velocidade constante que ela substitui. O que fere e a CAPSULA da ponta
+ * (`drillCapsuleHits`), conferida DEPOIS do passo: o dano segue a ponta
+ * desenhada, nunca a frente dela.
+ *
+ * O que ela nao consegue comer — minerio, cristal, a borda do mapa — e
+ * IMPACTO: a maquina trava, recua (`drillRecoilStepAt`) e fica parada
+ * recuperando mais tempo do que depois de um erro. Passar reto e derrapar
+ * (`drill_skid`) tambem custa recuperacao, mais curta. As duas leituras sao
+ * diferentes de proposito.
  *
  * `canRip` decide o que cai: rocha e fragil vao, minerio e cristal FICAM de
  * pe. E a mesma regra do Britador, e e o que faz a passagem dele EXPOR veio
@@ -2780,11 +2879,38 @@ const diamandisDrillStride = (
   events: SemanticEvent[],
 ): void => {
   const action = enemy.action;
-  if (!action || action.kind !== 'drill' || action.phase === 'windup') return;
+  if (!action || action.kind !== 'drill') return;
+  if (action.phase === 'windup') {
+    diamandisDrillAlign(state, enemy, action, events);
+    return;
+  }
 
+  const rt = state.bossRuntime;
   const w = state.config.width;
-  const dt = 1 / TICK_HZ;
-  const step = DIAMANDIS_DRILL_SPEED * dt;
+
+  // RECUO depois do impacto: para tras, sem abrir nada, sem ferir.
+  if (rt.drillImpactAt >= 0 && rt.drillImpactAt >= action.releaseAt) {
+    const j = state.tick - rt.drillImpactAt - 1;
+    const back = drillRecoilStepAt(j);
+    if (back > 0) moveEntity(state, enemy, -action.direction.x * back, -action.direction.y * back);
+    return;
+  }
+
+  const k = state.tick - action.releaseAt;
+  const step = drillStepAt(k);
+  const speed = drillSpeedFractionAt(k);
+
+  // CORRECAO MINIMA nos primeiros instantes: alguns graus no total, para o
+  // alvo que ela escolheu, e so isso. Nao e perseguicao — quem saiu da linha
+  // continua fora dela.
+  if (k < DIAMANDIS_DRILL_CORRECT_TICKS && action.target !== undefined) {
+    const target = state.players.find((p) => p.id === action.target && p.alive);
+    if (target) {
+      const wanted = normalized(target.x - enemy.x, target.y - enemy.y);
+      const rate = DIAMANDIS_DRILL_CORRECT_RAD / DIAMANDIS_DRILL_CORRECT_TICKS;
+      action.direction = turnToward(action.direction, wanted, rate);
+    }
+  }
   enemy.facing = { ...action.direction };
 
   // Abre ANTES de andar, e nao depois: um corpo de raio 0,9 empurrado contra
@@ -2794,29 +2920,31 @@ const diamandisDrillStride = (
   const ahead = 1.2;
   const side = { x: -action.direction.y, y: action.direction.x };
   let obstructed = false;
+  const open = (cx: number, cy: number): boolean => {
+    if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) return false;
+    if (state.solid[cy * w + cx] === SOLID_NONE) return false;
+    // `breakSolid` primeiro (fragil e cristal tem resposta propria), e o que
+    // ele recusar vai para `ripSolid`, que e quem derruba rocha comum.
+    const opened = breakSolid(state, cx, cy, events) || ripSolid(state, cx, cy, events);
+    if (opened) obstructed = true;
+    // A obra VISTA e uma descoberta. So distancia, SEM linha de visao — e a
+    // unica testemunha do jogo em que exigir visada seria absurdo: a parede
+    // entre os dois e exatamente a coisa que esta sendo removida, e quem
+    // esta do outro lado dela e quem mais precisa entender o que aconteceu.
+    if (opened && (state.stats.discoveries & DISCOVERY_DIAMANDIS_CORRIDOR) === 0) {
+      const witness = nearestTarget(state, enemy.x, enemy.y);
+      if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
+        markDiscovery(state.stats, DISCOVERY_DIAMANDIS_CORRIDOR);
+      }
+    }
+    return opened;
+  };
   for (let lane = -DIAMANDIS_DRILL_WIDTH; lane <= DIAMANDIS_DRILL_WIDTH; lane++) {
     for (const reach of [ahead, ahead + 0.9]) {
-      const cx = Math.floor(enemy.x + action.direction.x * reach + side.x * lane);
-      const cy = Math.floor(enemy.y + action.direction.y * reach + side.y * lane);
-      if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
-      if (state.solid[cy * w + cx] === SOLID_NONE) continue;
-      // `breakSolid` primeiro (fragil e cristal tem resposta propria), e o que
-      // ele recusar vai para `ripSolid`, que e quem derruba rocha comum.
-      const opened = breakSolid(state, cx, cy, events) || ripSolid(state, cx, cy, events);
-      if (opened) obstructed = true;
-      // A obra VISTA e uma descoberta. Sai antes de qualquer raycast quando o
-      // bit ja esta aceso — a broca abre dezenas de celulas por passagem, e
-      // isto roda por celula.
-      // A obra VISTA e uma descoberta. So distancia, SEM linha de visao — e a
-      // unica testemunha do jogo em que exigir visada seria absurdo: a parede
-      // entre os dois e exatamente a coisa que esta sendo removida, e quem
-      // esta do outro lado dela e quem mais precisa entender o que aconteceu.
-      if (opened && (state.stats.discoveries & DISCOVERY_DIAMANDIS_CORRIDOR) === 0) {
-        const witness = nearestTarget(state, enemy.x, enemy.y);
-        if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
-          markDiscovery(state.stats, DISCOVERY_DIAMANDIS_CORRIDOR);
-        }
-      }
+      open(
+        Math.floor(enemy.x + action.direction.x * reach + side.x * lane),
+        Math.floor(enemy.y + action.direction.y * reach + side.y * lane),
+      );
     }
   }
 
@@ -2824,8 +2952,8 @@ const diamandisDrillStride = (
   // — a primeira celula que ela abre nesta corrida anuncia, as dezenas
   // seguintes nao. Um chefe que lesse a mesma linha a cada celula seria um
   // narrador, e a obra em si (o `break` por celula) ja soa.
-  if (obstructed && state.tick - state.bossRuntime.drillObstructedAt >= DIAMANDIS_DRILL_TICKS) {
-    state.bossRuntime.drillObstructedAt = state.tick;
+  if (obstructed && state.tick - rt.drillObstructedAt >= DIAMANDIS_DRILL_TICKS) {
+    rt.drillObstructedAt = state.tick;
     events.push({
       t: 'boss_state',
       archetype: 'diamandis',
@@ -2835,29 +2963,119 @@ const diamandisDrillStride = (
     });
   }
 
-  moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
+  const dx = action.direction.x * step;
+  const dy = action.direction.y * step;
+  let moved = moveEntity(state, enemy, dx, dy);
+  if (moved.blockedX || moved.blockedY) {
+    // Um canto do corpo pegou em celulas que a varredura das faixas nao
+    // cobriu (acontece na diagonal): o que cai, cai agora — os quatro cantos
+    // da posicao pretendida — e o passo sai. So o eixo que TRAVOU tenta de
+    // novo: `moveEntity` ja andou o outro, e repetir os dois dobraria o passo
+    // daquele eixo neste tick.
+    // `moveEntity` confere cada eixo contra a posicao INTERMEDIARIA (x novo
+    // com y velho, depois y novo): os cantos que importam sao os dessas duas
+    // posicoes e os do destino.
+    const nx = enemy.x + (moved.blockedX ? dx : 0);
+    const ny = enemy.y + (moved.blockedY ? dy : 0);
+    let cleared = false;
+    for (const [cx, cy] of [
+      [nx, enemy.y],
+      [enemy.x, ny],
+      [nx, ny],
+    ]) {
+      for (const [ox, oy] of [
+        [-enemy.radius, -enemy.radius],
+        [enemy.radius, -enemy.radius],
+        [-enemy.radius, enemy.radius],
+        [enemy.radius, enemy.radius],
+      ]) {
+        if (open(Math.floor(cx + ox), Math.floor(cy + oy))) cleared = true;
+      }
+    }
+    if (cleared) {
+      const retry = moveEntity(state, enemy, moved.blockedX ? dx : 0, moved.blockedY ? dy : 0);
+      moved = {
+        blockedX: moved.blockedX && retry.blockedX,
+        blockedY: moved.blockedY && retry.blockedY,
+        blockCell: retry.blockCell ?? moved.blockCell,
+      };
+    }
+  }
+  if (moved.blockedX || moved.blockedY) {
+    if (speed >= DIAMANDIS_DRILL_IMPACT_MIN_SPEED) {
+      // IMPACTO: minerio, cristal ou a borda — o que a broca nao come. A
+      // ferramenta trava, o corpo recua e a corrida acaba aqui; a recuperacao
+      // e mais longa do que a do erro, e e ela que abre a janela do jogador.
+      rt.drillImpactAt = state.tick;
+      action.endsAt = state.tick + 1 + DIAMANDIS_DRILL_RECOIL_TICKS;
+      rt.staggerUntil = Math.max(
+        rt.staggerUntil,
+        action.endsAt + DIAMANDIS_DRILL_WALL_RECOVERY_TICKS,
+      );
+      const tip = drillTipAt(enemy.x, enemy.y, action.direction);
+      const contact = moved.blockCell
+        ? { x: moved.blockCell.x + 0.5, y: moved.blockCell.y + 0.5 }
+        : tip;
+      events.push({
+        t: 'boss_state',
+        archetype: 'diamandis',
+        state: 'drill_impact',
+        x: contact.x,
+        y: contact.y,
+        dx: action.direction.x,
+        dy: action.direction.y,
+        intensity: speed,
+      });
+      return;
+    }
+    // Encostou ja derrapando: nao e impacto, e o fim da corrida encostado.
+  }
 
-  const victim = nearestTarget(state, enemy.x, enemy.y);
-  if (
-    victim &&
-    state.tick >= enemy.contactReadyAt &&
-    distTo(enemy, victim) < enemy.radius + victim.radius + 0.4
-  ) {
+  // A PONTA fere — depois do passo, onde ela esta agora. Quem esta DENTRO da
+  // capsula e que apanha, e nao quem esta mais perto do centro do chassi: no
+  // co-op, um jogador colado no flanco nao blinda o que esta na ponta.
+  const victim = drillVictim(state, enemy, action.direction);
+  if (victim && state.tick >= enemy.contactReadyAt) {
     enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
     damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE * diamandisFrenzyMultiplier(state), events, {
       kind: 'enemy_contact',
       archetype: 'diamandis',
       elite: enemy.elite,
     });
+    events.push({
+      t: 'boss_state',
+      archetype: 'diamandis',
+      state: 'drill_strike',
+      x: victim.x,
+      y: victim.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+      intensity: speed,
+    });
   }
 
   // Reator em colapso deixa brasa por onde passa: a obra vai esquentando a
   // sala sozinha, sem nenhum golpe a mais.
-  if ((state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0) {
+  if ((rt.phasesFired & BOSS_PHASE_REACTOR) !== 0) {
     const i = cellUnder(state, enemy);
     if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
       setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
     }
+  }
+
+  // PASSOU RETO: o ultimo tick da corrida e a derrapagem — a maquina para
+  // encostada no proprio momento e leva um instante para se recompor.
+  if (state.tick === action.endsAt - 1) {
+    rt.staggerUntil = Math.max(rt.staggerUntil, state.tick + DIAMANDIS_DRILL_SKID_RECOVERY_TICKS);
+    events.push({
+      t: 'boss_state',
+      archetype: 'diamandis',
+      state: 'drill_skid',
+      x: enemy.x,
+      y: enemy.y,
+      dx: action.direction.x,
+      dy: action.direction.y,
+    });
   }
 };
 

@@ -1651,43 +1651,63 @@ export const diamandisChassis = (anim, f) => {
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 
+/**
+ * As FASES DE ROTACAO da broca no `special`: oito poses discretas, um oitavo
+ * de volta cada. O cliente nao as toca em sequencia por relogio — ele escolhe
+ * a pose pela fase acumulada do giro (a mesma curva que o som le), entao a
+ * broca que acelera passa por elas cada vez mais depressa, e a de alta rotacao
+ * chocalha entre poses distantes. Exportado para o cliente contar com ele.
+ */
+export const DIAMANDIS_DRILL_SPIN_FRAMES = 8;
+
 /** Uma peca MONTADA, em coordenadas absolutas do chassi (o mesmo relogio). */
 const diamandisPartBoxes = (part, anim, f) => {
   const z = diamandisZ(anim, f);
   const fire = anim === 'attack' ? [0, 2, 1, 0][f % 4] : 0;
-  const wind = anim === 'special' ? Math.min(3, f) : 0;
   // A broca gira SEMPRE, em todo quadro de toda pose: uma ferramenta
   // industrial que so gira quando ataca e uma arma disfarçada de ferramenta.
-  const spin = f % 4;
+  // No idle/ataque, um quarto de volta por quadro. No `special` — a FASE DE
+  // ROTACAO da maquina (ver DIAMANDIS_DRILL_SPIN_FRAMES) — um oitavo: sao as
+  // oito poses discretas que o cliente escolhe pelo giro acumulado, da
+  // aceleracao lenta ao chocalho de alta rotacao. Sem avanco sobre o mancal:
+  // a compressao do corpo e do chassi, e o cliente a faz.
+  const spin =
+    anim === 'special'
+      ? (f % DIAMANDIS_DRILL_SPIN_FRAMES) * (Math.PI / 4)
+      : (f % 4) * (Math.PI / 2);
   const b = [];
   if (part === 'drill') {
     // Cone de cinco degraus afinando ate a ponta, saindo do mancal a frente
     // do ventre e na altura dele: a broca do jogo abre um CORREDOR no chao,
-    // entao ela nao pode estar apontada para o horizonte. Na carga (`special`)
-    // ela AVANCA sobre o mancal sem que o chefe saia do lugar — e o telegrafo
-    // mais longo do jogo e tem de PARECER longo.
-    const bit = -6 - wind - fire * 0.5;
+    // entao ela nao pode estar apontada para o horizonte.
+    const bit = -6 - fire * 0.5;
     b.push(box(-2.4, bit + 1.4, z + 0.6, 4.8, 2, 4.2, 'rockDeep'));
     b.push(box(-1.9, bit - 0.2, z + 1.1, 3.8, 2, 3.2, 'bone'));
     b.push(box(-1.4, bit - 1.8, z + 1.6, 2.8, 2, 2.2, 'bone'));
     b.push(box(-0.9, bit - 3.2, z + 2.1, 1.8, 1.6, 1.2, 'bone'));
     b.push(box(-0.4, bit - 4.4, z + 2.4, 0.8, 1.4, 0.6, 'bone'));
-    for (let i = 0; i < 4; i++) {
-      // Helicoide: um nub por degrau, girando um quarto de volta por quadro. E o
-      // giro que faz um cone virar broca — sem ele e um bico.
-      const a = ((spin + i) * Math.PI) / 2;
-      const r = 2.4 - i * 0.45;
-      b.push(
-        box(
-          Math.cos(a) * r - 0.3,
-          bit + 1.4 - i * 1.6,
-          z + 2.6 + Math.sin(a) * r - 0.3,
-          0.6,
-          1.2,
-          0.6,
-          'rust',
-        ),
-      );
+    // HELICOIDE de duas estrias, uma volta inteira da base a ponta: oito nubs
+    // por estria, um oitavo de volta por nub, com a segunda estria a meia
+    // volta da primeira e de outro material — assim cada uma das oito fases
+    // e uma silhueta diferente (uma so estria de dois materiais iguais
+    // repetiria a cada meia volta). E o giro que faz um cone virar broca.
+    for (let rib = 0; rib < 2; rib++) {
+      for (let i = 0; i < 8; i++) {
+        const a = spin + (i * Math.PI) / 4 + rib * Math.PI;
+        const r = 2.3 - i * 0.24;
+        const size = 0.6 - i * 0.02;
+        b.push(
+          box(
+            Math.cos(a) * r - size / 2,
+            bit + 1.6 - i * 0.78,
+            z + 2.6 + Math.sin(a) * r - size / 2,
+            size,
+            0.7,
+            size,
+            rib === 0 ? 'rust' : 'rockDeep',
+          ),
+        );
+      }
     }
   } else if (part === 'rack') {
     // TRES cilindros porque a salva tem tres cargas: quem contar o rack sabe
@@ -3976,7 +3996,11 @@ export const ENTITY_SPECS = [
         {
           idle: { frames: 4, fps: 6, loop: true },
           attack: { frames: 4, fps: 12, loop: false },
-          ...(part === 'drill' ? { special: { frames: 4, fps: 8, loop: false } } : {}),
+          // As fases de rotacao (ver DIAMANDIS_DRILL_SPIN_FRAMES). `loop` porque
+          // sao poses de um ciclo, nao uma sequencia com fim.
+          ...(part === 'drill'
+            ? { special: { frames: DIAMANDIS_DRILL_SPIN_FRAMES, fps: 8, loop: true } }
+            : {}),
           hit: { frames: 2, fps: 12, loop: false },
           loose: { frames: 4, fps: 6, loop: true },
           carried: { frames: 4, fps: 6, loop: true },

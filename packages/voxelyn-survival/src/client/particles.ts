@@ -47,6 +47,12 @@ export type ParticleKind =
    */
   | 'iceShard'
   /**
+   * POEIRA de obra: a nuvem baixa e densa que a broca do Diamandis levanta
+   * atras do chassi e no impacto. Nao e `ash` (fumaca preta de cano) nem
+   * `steam` (agua): e chao moido, ocre, que sobe pouco e assenta.
+   */
+  | 'dust'
+  /**
    * VAPOR do degelo: o que escapa pelas juntas do Prospector quando o motor
    * forca por baixo do gelo, e a nuvem curta da crosta se partindo. Nao e
    * `ash` (fumaca preta de cano) nem `bubble` (agua): e agua virando ar, e
@@ -127,6 +133,7 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // familia do tile de gelo, um passo mais claro para a lasca se separar dele.
   iceShard: ['#e8f1ff', '#7b8ba3', '#2e3a4d'],
   steam: ['#e8f1ff', '#b8a98f', '#7b8ba3'],
+  dust: ['#b8a98f', '#8a7154', '#6e4a33'],
 };
 
 /**
@@ -242,6 +249,7 @@ export class VoxelParticles {
   private readonly lastOverheatBucket = new Map<number, number>();
   private lastFurnaceBucket = -1;
   private lastMalfunctionBucket = -1;
+  private lastDrillBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
   private readonly lastBubbleBucket = new Map<number, number>();
   /** Ultimo bucket de faisca do curto-circuito, por SLOT (ver emitDashJets). */
@@ -952,6 +960,108 @@ export class VoxelParticles {
    * pecas, funcionando alem do que devia. Mesma cadencia por bucket de tempo
    * real da Fornalha, para nascer por segundo e nao por quadro.
    */
+  /**
+   * A POEIRA que a broca do Diamandis cospe no avanco: nasce na ponta e sai
+   * PARA TRAS num cone, para os dois lados do corpo, com um pouco de faisca.
+   * Bucket de tempo real curto (50 ms): o avanco dura dois segundos e a
+   * poeira tem de ler como um jato continuo, nao como sopros.
+   */
+  /**
+   * A ESTEIRA DA BROCA: poeira baixa e densa atras do chassi, pedras
+   * deslocadas pelos pes para os lados e para tras, um grao ou outro caindo
+   * do proprio corpo. Tudo se move para TRAS do rumo — e o chao reagindo a
+   * maquina passando, nao ar cortado. `speed` e a fracao da velocidade
+   * (0..1): a corrida devagar levanta pouco; o pico levanta muito.
+   */
+  emitDrillDust(
+    x: number,
+    y: number,
+    dirX: number,
+    dirY: number,
+    speed: number,
+    nowMs: number,
+    scale: number,
+  ): void {
+    const bucket = (nowMs / 50) | 0;
+    if (this.lastDrillBucket === bucket) return;
+    this.lastDrillBucket = bucket;
+    if (speed <= 0.05) return;
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2654435761)));
+    const count = Math.max(1, Math.round((3 + 6 * speed) * scale));
+    const sideX = -dirY;
+    const sideY = dirX;
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const kind: ParticleKind = i % 4 === 3 ? 'stone' : i % 5 === 4 ? 'debris' : 'dust';
+      const solid = kind !== 'dust';
+      // A poeira nasce ATRAS do corpo, rente ao chao; as pedras saem dos pes
+      // (nas laterais), para o lado e para tras.
+      const back = solid ? 0.3 + rnd() * 0.5 : 0.8 + rnd() * 1.2;
+      const lateral = solid ? 0.5 + rnd() * 0.4 : (rnd() - 0.5) * 1.4;
+      this.push({
+        x: x - dirX * back + sideX * (solid ? side * lateral : lateral),
+        y: y - dirY * back + sideY * (solid ? side * lateral : lateral),
+        z: solid ? 0.05 : 0.02 + rnd() * 0.1,
+        vx:
+          -dirX * (0.6 + rnd() * 1.4 * speed) +
+          sideX * side * (solid ? 1.2 + rnd() * 1.6 : 0.3 * rnd()),
+        vy:
+          -dirY * (0.6 + rnd() * 1.4 * speed) +
+          sideY * side * (solid ? 1.2 + rnd() * 1.6 : 0.3 * rnd()),
+        vz: solid ? 0.8 + rnd() * 1.4 * speed : 0.12 + rnd() * 0.18,
+        life: solid ? 480 : 900,
+        maxLife: solid ? 480 : 900,
+        kind,
+      });
+    }
+  }
+
+  /**
+   * O IMPACTO da broca no que ela nao come: fragmentos de rocha em leque para
+   * tras e para os lados do ponto de contato, e uma nuvem de poeira que sobe
+   * dali. `intensity` e a fracao da velocidade no instante da batida.
+   */
+  emitDrillImpact(
+    x: number,
+    y: number,
+    dirX: number,
+    dirY: number,
+    intensity: number,
+    scale: number,
+  ): void {
+    const rnd = seeded(eventSeed(x, y, 0x5eed1));
+    const shards = Math.max(4, Math.round((10 + 14 * intensity) * scale));
+    for (let i = 0; i < shards; i++) {
+      const ang = Math.atan2(-dirY, -dirX) + (rnd() - 0.5) * 2.4;
+      const sp = 1.5 + rnd() * 3 * intensity;
+      this.push({
+        x: x + (rnd() - 0.5) * 0.4,
+        y: y + (rnd() - 0.5) * 0.4,
+        z: 0.2 + rnd() * 0.4,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp,
+        vz: 1 + rnd() * 2.2,
+        life: 520,
+        maxLife: 520,
+        kind: i % 4 === 0 ? 'stone' : 'rubble',
+      });
+    }
+    const puffs = Math.max(3, Math.round(8 * scale));
+    for (let i = 0; i < puffs; i++) {
+      this.push({
+        x: x - dirX * (0.2 + rnd() * 0.8) + (rnd() - 0.5) * 1.2 * -dirY,
+        y: y - dirY * (0.2 + rnd() * 0.8) + (rnd() - 0.5) * 1.2 * dirX,
+        z: 0.05 + rnd() * 0.2,
+        vx: -dirX * (0.4 + rnd() * 0.8) + (rnd() - 0.5) * 0.6,
+        vy: -dirY * (0.4 + rnd() * 0.8) + (rnd() - 0.5) * 0.6,
+        vz: 0.2 + rnd() * 0.3,
+        life: 1100,
+        maxLife: 1100,
+        kind: 'dust',
+      });
+    }
+  }
+
   emitMalfunctionSmoke(x: number, y: number, nowMs: number, scale: number, stacks: number): void {
     const bucket = (nowMs / 140) | 0;
     if (this.lastMalfunctionBucket === bucket) return;
@@ -1156,6 +1266,7 @@ export class VoxelParticles {
         p.kind === 'gas' ||
         p.kind === 'sporeCloud' ||
         p.kind === 'ash' ||
+        p.kind === 'dust' ||
         p.kind === 'mycelium' ||
         p.kind === 'bubble'
       ) {
@@ -1202,7 +1313,8 @@ export class VoxelParticles {
       // A fumaca CRESCE enquanto se apaga; todo o resto encolhe. Materia quente
       // ou solida perde massa ao esfriar e ao assentar, fumaca se dilui — usar a
       // mesma curva para os dois faria a fumaca ler como mais uma brasa.
-      const size = p.kind === 'ash' ? 0.6 + (1 - life) * 0.9 : 0.45 + life * 0.55;
+      const size =
+        p.kind === 'ash' || p.kind === 'dust' ? 0.6 + (1 - life) * 0.9 : 0.45 + life * 0.55;
       drawVoxel(ctx, sx, py, base * size, RAMP[p.kind], p.visualSeed);
     }
     ctx.globalAlpha = 1;

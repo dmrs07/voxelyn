@@ -19,6 +19,7 @@ export {
   nearestStandingPlayer,
 } from './run.js';
 export * from './leviathan.js';
+export * from './diamandis-drill.js';
 export {
   generateWorld,
   floodOpen,
@@ -109,6 +110,8 @@ export {
   diamandisFrenzyStacks,
   diamandisFrenzyMultiplier,
   ripDiamandisModule,
+  startAction,
+  markDemolition,
   isSolidAt,
   // A geometria da varredura do Coracao da Fornalha. Exportada porque o AVISO
   // dela e desenhado no cliente a partir do mesmo tick, e nao transmitido: uma

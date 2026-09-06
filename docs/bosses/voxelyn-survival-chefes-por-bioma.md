@@ -365,6 +365,162 @@ reator, com a leitura exata: estado e portador de cada peça, acúmulos, multipl
 estagger restante. Só aparece na arena do Diamandis. Capturas em
 `docs/media/diamandis/`.
 
+### O feixe de prospecção, visível (`beam_line` no cliente)
+
+O feixe era o único golpe de linha reta do jogo e o cliente não o desenhava: a
+simulação emitia `beam_line` (a varredura a cada quatro ticks no windup, a passagem
+com potência no release) e o renderer ignorava o evento. O jogador levava 26 de dano
+de uma medição que nunca viu. Agora (`diamandis-beam.ts`) o feixe tem três atos:
+
+| Ato              | Fonte                             | O que se vê                                                                                                                                                                    |
+| ---------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Levantamento** | `enemy.action` (windup, 2 s)      | a lente do mastro acende e varre o chão com um fio fino; no chão, uma **linha de medição** tracejada com estacas a cada tile, uma cabeça de leitura correndo e a estaca do fim |
+| **Passagem**     | `beam_line` com potência (520 ms) | o fio vira **coluna** — núcleo osso, corpo âmbar, halo de fogo, cintilação —, o chão na linha acende, a sala pisca em claroes ao longo dela, faíscas e lascas no ponto final   |
+| **Cicatriz**     | a mesma passagem, por 1,4 s       | um fio quente que some em meio segundo e **brasas** densas do amarelo ao vermelho, apagando uma a uma, com o calor baixo por cima na primeira metade                           |
+
+A linha de medição é **monótona**: azul-elétrico e aberta no começo, fecha o
+tracejado e clareia até **travar em âmbar** no último terço (`SURVEY_LOCK_AT`); a
+cabeça de leitura vai e volta, e travada corre só para a frente, cada vez mais
+rápido. O jogador lê "quanto falta" pela linha, sem número. O alcance é derivado no
+cliente pela mesma marcha da simulação (`beamReach`, parando na primeira parede ou na
+borda) e conferido contra o `beam_line` de verdade no teste.
+
+A passagem vem do **evento**, não da ação: a simulação encerra a ação do feixe no
+próprio release e o chefe já escolhe a próxima ferramenta no tick seguinte — pela
+ação, a coluna durava um quadro. Em **frenesi** a borda da coluna puxa do fogo para o
+sangue (`beamColors`), a mesma leitura do reator aplicada ao que sai dele. Com
+movimento reduzido a cintilação para e a cabeça de leitura anda linear.
+
+Arena: o cenário **feixe de prospecção** põe o Prospector na linha, a seis tiles, e
+começa o levantamento pelo `startAction` de verdade (exportado da simulação para
+isso); a leitura mostra ato, fração e alcance. Capturas
+`09-feixe-…` a `13-feixe-…` em `docs/media/diamandis/`.
+
+### A salva de demolição, arremessada (`demolition-fx.ts`)
+
+As três cargas da salva existiam só como anel no chão: uma marca de interface que não
+saía de lugar nenhum, seguida de um clarão com partículas. Agora cada carga é um
+**feixe de dinamite** que sai do rack de demolição e é arremessado:
+
+- **Arremesso.** Uma por vez (o rack lança em sequência, três ticks entre cada), em
+  **parábola** da mão do rack (o encaixe `rack`, alto no chassi) até a célula marcada,
+  tombando no ar; a sombra no chão abre e desbota com a altura. Pousa na metade do
+  telegrafo.
+- **Estopim.** No chão, com o estopim aceso: pisca devagar e cada vez mais rápido até o
+  release — "vai agora" sem número. O anel vermelho de sempre continua dizendo onde e
+  quando.
+- **Detonação.** Só de explosões **do Diamandis** (decidido pelo dono do evento; o
+  módulo explosivo do Prospector e o gás continuam sendo a explosão comum): clarão
+  branco, **bola de fogo** que incha além do raio real e sobe, sopros de fogo em
+  voxel, **onda de choque** no chão, coluna de fumaça e a **cratera** escura que fica
+  por 2,6 s — com mais luz, mais entulho e um solavanco maior que uma explosão comum.
+
+Posição e tempo vêm do **estado** (as células em `blastCells` e o relógio da ação),
+como as marcas de chão: quem reconecta no meio do telegrafo vê as cargas no ponto
+certo do voo. Com movimento reduzido a dinamite não tomba nem pisca; arco, estopim e
+explosão continuam. `markDemolition` passou a ser exportado da simulação para o
+cenário da arena (**salva de demolição**) armar a salva pelo caminho de verdade.
+Capturas `14-demolicao-…` a `17-demolicao-…` em `docs/media/diamandis/`.
+
+**A forma da explosão vem de ruído de Perlin** (`noise.ts`: Perlin clássico em 2D
+com tabela de permutação semeada, `fbm2` em oitavas, `blobRadius` para contornos
+fechados). Nenhuma borda da detonação é um círculo: a **onda de choque** ondula
+(7% de amplitude, três lóbulos) e arrasta uma saia de poeira rente ao chão rasgada
+em nesgas; a **bola de fogo** é um volume irregular (30%) que evolui com a idade,
+com um núcleo mais quente deslocado para cima, e se rasga em **línguas** de fogo em
+voxel onde o ruído da borda é alto (mais longe e maiores quanto mais alto); a
+**fumaça** é uma coluna turbulenta de nove sopros que nascem de baixo para cima e se
+deslocam de lado pelo ruído, cada um com contorno ondulado; a **cratera** tem
+contorno irregular fixo e terra revirada onde o ruído é alto. Tudo é função da
+semente da detonação e da idade dela — o co-op vê a mesma forma, e um teste confere
+cada raio. Com movimento reduzido a forma não evolui (tempo zero), só cresce e apaga.
+Captura `30-demolicao-sequencia-perlin.png` (dezesseis quadros a 45 ms).
+
+### A broca como MÁQUINA (`SIMULATION_VERSION` 62, `diamandis-drill.ts`, `drill-machine.ts`)
+
+A versão anterior mostrava o avanço como um rasgo de ar: uma onda de proa em lençóis
+brancos e filetes em hélice na ponta. Lia como um dash de laser futurista — e o
+Diamandis é uma máquina de mineração passando dos limites de operação. O avanço
+virou uma **sequência física**, contada em ticks pela simulação e lida pelo cliente
+(pose, partículas) e pelo áudio da MESMA curva.
+
+**Na simulação** (`packages/voxelyn-survival-sim/src/diamandis-drill.ts`):
+
+- **Alinhamento.** `startAction` não vira mais o chassi de uma vez: durante o aviso
+  ele **gira** até o rumo a `π/12` rad por tick (meia volta em 600 ms) e o rumo
+  **trava** quando chega. Cada oitante cruzado é um `boss_state: drill_bearing`
+  (um clique do mancal); a chegada é `drill_lock`. Só `facing` muda — a direção da
+  ação foi decidida no tick da escolha e não persegue ninguém.
+- **Spool-up.** `drillSpinAt(action, tick, impactAt)` é a rotação da broca (0..1)
+  pelo relógio da ação: quase parada nos 12 ticks de alinhamento, subindo em curva
+  convexa até 0,8 no release, 1,0 no meio da corrida, um pouco abaixo na derrapagem.
+  Aceita tick fracionário: o cliente interpola entre ticks para a pose e o som.
+- **Corrida com peso.** `drillSpeedProfile(u)`: solavanco (0,25 → 0,35 nos primeiros
+  5%), aceleração forte no primeiro terço (smoothstep até 1,0 em 34%), máximo até
+  68%, derrapagem até 0,12 no fim. `drillStepAt(k)` distribui os passos de modo que
+  a soma seja o **mesmo alcance** de antes (17,25 tiles); o pico chega a 10,3 tiles/s
+  (era 7,5 constante). **Correção mínima**: nos seis primeiros ticks o rumo pode
+  girar no máximo 0,1 rad (~6°) no total para o alvo escolhido, e depois nada.
+- **A ponta fere.** O dano é a **cápsula** de um pouco atrás do centro até a ponta
+  (`DIAMANDIS_DRILL_TIP_AHEAD` 1,6 tiles, raio 0,55 + o do alvo), conferida
+  **depois** do passo: nunca à frente da ponta desenhada, nunca de lado. Acertar um
+  jogador emite `drill_strike` (posição do jogador, `intensity` = fração da
+  velocidade).
+- **Impacto.** Bater no que a broca não come — minério, cristal, a borda do mapa —
+  com velocidade ≥ 20% do máximo é `drill_impact` (`x,y` = célula de contato,
+  `dx,dy` = rumo, `intensity` = velocidade). A ferramenta trava (giro cai a 0,15 em
+  dois ticks), o corpo **recua** 1,1 tiles em 8 ticks (`drillRecoilStepAt`, um tranco
+  que morre) e fica parado 30 ticks (`staggerUntil`). `bossRuntime.drillImpactAt`
+  entra no hash. Um canto do corpo que pega em rocha comum na diagonal é aberto na
+  hora e o passo sai — só o que ela não come é impacto.
+- **Derrapagem.** Passar reto é `drill_skid` no último tick da corrida, com 14 ticks
+  parado. As duas recuperações são diferentes de propósito.
+
+**No cliente** (`drill-machine.ts`, substituindo `drill-wake.ts`):
+
+- **Telegrafo sem raio.** Faixa apagada (alfa ≤ 0,46, sem brilho) com **cascalho**
+  vibrando com o giro, **rachas finas** crescendo do pé no rumo do corredor e
+  **chevrons curtos**. Mostra a faixa inteira sem esconder o chefe.
+- **Pose do chassi** (`chassisPoseAt`): senta para trás como mola carregada no spool
+  (pitch −0,6, compressão 12%), chacoalha com o quadrado do giro, mergulha o nariz
+  no solavanco e na aceleração (pela derivada do perfil), levanta na derrapagem,
+  **esmaga** 28% por três compassos no impacto. É uma transformação em volta do pé —
+  a rotação segue o rumo **na tela** (para cima/baixo só a compressão fala).
+- **Passada hidráulica** (`drillGaitMs`): o quadro do `walk` vem da **distância**
+  percorrida (uma passada a cada 1,4 tiles), não do relógio — os pés não deslizam.
+- **Giro em oito fases.** O atlas `part-diamandis-drill` tem o `special` com **oito
+  poses de rotação** (hélice de duas estrias, um oitavo de volta por pose, uma estria
+  de cada material para as oito serem silhuetas diferentes). O cliente escolhe a pose
+  pela **fase acumulada** (`drillSpinPhase`, integral da curva a 12 voltas/s no
+  máximo): acelerando, as poses passam cada vez mais depressa; no máximo saltam mais
+  de meia volta por tick — o chocalho de alta rotação, sem borrão pintado.
+- **Rastro.** Duas esteiras de arrasto paralelas (0,55 tile de cada lado) gravadas a
+  cada 45 ms, apagando em 24 s; raspagens tortas na derrapagem; a **cicatriz** do
+  impacto (sulco escuro, borda clara, fragmentos parados) por 60 s.
+- **Poeira e entulho** (partículas): o tipo novo `dust` (ocre, baixo, cresce e
+  assenta) nasce atrás do chassi; pedras e entulho saem dos pés para os lados e para
+  trás; o impacto solta fragmentos em leque e uma nuvem no ponto de contato. Só as
+  **faíscas** da ponta e do mancal (e as do impacto) chegam ao branco.
+- **Câmera.** Um impulso por impacto (`impactShake`: parede 5–9, jogador 4,
+  derrapagem 2,5) pelo ajuste de tremor do jogador; tremor contínuo baixo na corrida
+  crescendo com a velocidade. Com movimento reduzido: sem chacoalho, sem mergulho de
+  nariz, sem vibração de cascalho, sem tremor; o resto fica.
+
+**No áudio** (`diamandis-drill-bus.ts`): um leito com motor sob carga (dente de
+serra grave + quinta, filtro abrindo com o giro), **uivo** cuja altura sobe de 90 Hz a
+1,1 kHz com o quadrado do giro e pulsa mais rápido, **chocalho** só acima de 55% do
+giro, **pés** raspando pelo ganho da velocidade, e **doppler** pela velocidade radial
+ao ouvinte (±7%). Depois do impacto ou da derrapagem o giro cai com `drillSpinDown`
+(engasgando), pela memória dos eventos — o parceiro do co-op ouve o mesmo. Transientes:
+`diamandisDrillEngage` (windup), `drill_bearing` → clique do mancal, `drill_lock` →
+trava, release → `diamandisDrillLaunch` (subgrave), `drill_impact` → pedra,
+`drill_skid` → raspagem sem baque, `drill_strike` → metal (chapa e guincho). Os três
+finais são vozes diferentes: quem está sem olhar sabe o que aconteceu.
+
+Cenários da arena: **avanço da broca** (escolhe o rumo com sala; os cenários de rumo
+decidem a direção), **broca contra veio** (impacto), **broca errando** (derrapagem).
+Capturas `18-broca-…` a `29-broca-…` em `docs/media/diamandis/`.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

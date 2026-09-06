@@ -103,6 +103,8 @@ export const emptyBossRuntime = (): BossRuntime => ({
   choirRotateAt: 0,
   choirRecruitAt: 0,
   drillObstructedAt: -1,
+  drillImpactAt: -1,
+  drillLockedAt: -1,
 });
 
 /**

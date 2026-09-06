@@ -181,6 +181,13 @@ export type ComposeArgs = {
   footX: number;
   footY: number;
   zoom: number;
+  /**
+   * A POSE DA BROCA escolhida pela fase do giro (drill-machine.ts). Quando
+   * definida, a broca montada mostra o `special` neste quadro, seja qual for
+   * a pose do chassi — o giro e um angulo integrado, nao uma animacao com
+   * inicio e fim, e por isso nao pode vir do relogio da pose.
+   */
+  drillFrame?: number;
 };
 
 /**
@@ -200,7 +207,9 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
     const atlas = diamandisPartAtlas(module);
     if (!manifest || !atlas) continue;
     const state = diamandisPartState(module, args.exposed, args.lost);
-    const anim = diamandisPartAnim(state, args.chassisAnim, module);
+    const spun =
+      args.drillFrame !== undefined && module === BOSS_MODULE_DRILL && state === 'mounted';
+    const anim = spun ? 'special' : diamandisPartAnim(state, args.chassisAnim, module);
     if (!anim) continue;
     const socket = socketScreenPoint(
       args.chassis,
@@ -220,7 +229,7 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
       module,
       atlas,
       anim,
-      frame: frameAtTime(manifest, anim, clock),
+      frame: spun ? (args.drillFrame as number) : frameAtTime(manifest, anim, clock),
       x: socket.x,
       y: socket.y,
       behind: socket.depth < 0,
