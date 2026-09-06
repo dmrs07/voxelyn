@@ -188,6 +188,11 @@ pequeno, dano grande, rajada (um golpe por tick), cura, transição de fase,
 ocultar/submergir, fora da câmera, morte. Mais: reconnect simulado (o
 presenter esquece e reentra no HP atual), menos movimento e língua.
 
+Todos os painéis de ferramenta da arena obedecem a um só interruptor, o botão
+**ferramentas** no canto superior direito. Em tela de toque (ou janela com
+menos de 900 px) começam escondidos: no celular eles cobriam a sala e roubavam
+o toque dos manches. A escolha persiste no navegador.
+
 A **galeria** (`?gallery=1&scenario=…&viewport=…&single=…&locale=…&fit=0`)
 desenha todos os chefes com a mesma estrutura e os respectivos acentos em uma
 viewport escolhida (1366×768, 1920×1080, 2560×1080, 568×320, 320×568), com os
