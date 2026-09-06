@@ -219,6 +219,83 @@ export const screenToWorldAim = (sx: number, sy: number): Vec2 => {
  * de mira/auto-fire a direita e quatro acoes separadas acima da mira.
  * Teclado+mouse continuam sendo a modalidade desktop.
  */
+/**
+ * A GEOMETRIA dos controles de toque, pura.
+ *
+ * `layoutButtons` a aplica ao estado; a barra de vida dos chefes a le para
+ * saber onde NAO pode ficar (`boss-health-bar-layout.ts`). Uma conta so, e nao
+ * duas copias da mesma aritmetica: a copia e o jeito mais facil de a barra
+ * cobrir um botao que se moveu meio centimetro numa versao seguinte.
+ */
+export type TouchControlGeometry = {
+  moveX: number;
+  moveY: number;
+  aimX: number;
+  aimY: number;
+  /** Raio visual de cada botao de acao. */
+  buttonRadius: number;
+  /** Raio do alvo de toque (maior que o visual). */
+  hitRadius: number;
+  /** Folga entre botoes vizinhos. */
+  gap: number;
+  /** Avanco horizontal entre centros de botoes na fileira de acoes. */
+  step: number;
+  /** Centro vertical da fileira de acoes (habilidade, Purga, interagir). */
+  actionY: number;
+  /** Centro do botao de esquiva, na linha do manche de mira. */
+  dodgeX: number;
+  /** A borda MAIS ALTA ocupada por qualquer controle. */
+  top: number;
+  /** A faixa horizontal LIVRE entre o manche de movimento e o grupo da direita. */
+  laneLeft: number;
+  laneRight: number;
+};
+
+export const touchControlGeometry = (
+  width: number,
+  height: number,
+  safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {},
+): TouchControlGeometry => {
+  const r = Math.max(24, Math.min(34, height * 0.066));
+  const horizontalInset = Math.max(18, width * 0.025);
+  const safeLeft = horizontalInset + Math.max(0, safeArea.left ?? 0);
+  const safeRight = horizontalInset + Math.max(0, safeArea.right ?? 0);
+  const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom ?? 0);
+  const moveX = MOVE_JOYSTICK_RADIUS + safeLeft;
+  const moveY = height - MOVE_JOYSTICK_RADIUS - safeBottom;
+  const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
+  const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
+  const aimActivationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
+
+  // Hit targets continuam grandes, mas nunca se sobrepoem. O espaco real entre
+  // eles e o que impede um polegar de acionar a acao vizinha por acidente.
+  const hitRadius = r * TOUCH_BUTTON_HIT_SCALE;
+  const gap = Math.max(14, Math.min(18, height * 0.04));
+  const step = hitRadius * 2 + gap;
+  const actionY = aimY - aimActivationRadius - hitRadius - gap;
+  const dodgeX = aimX - aimActivationRadius - hitRadius - gap;
+
+  const moveActivationRadius = MOVE_JOYSTICK_RADIUS * MOVE_STICK_ACTIVATION_SCALE;
+  const top = Math.min(moveY - moveActivationRadius, actionY - hitRadius);
+  const laneLeft = moveX + moveActivationRadius;
+  const laneRight = Math.min(dodgeX - hitRadius, aimX - step * 2 - hitRadius);
+  return {
+    moveX,
+    moveY,
+    aimX,
+    aimY,
+    buttonRadius: r,
+    hitRadius,
+    gap,
+    step,
+    actionY,
+    dodgeX,
+    top,
+    laneLeft,
+    laneRight,
+  };
+};
+
 export class SurvivalInput {
   private readonly keys: Record<string, boolean> = {};
   private mouse = { x: 0, y: 0, down: false };
@@ -285,37 +362,21 @@ export class SurvivalInput {
     height: number,
     safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {},
   ): void {
-    const r = Math.max(24, Math.min(34, height * 0.066));
-    const horizontalInset = Math.max(18, width * 0.025);
-    const safeLeft = horizontalInset + Math.max(0, safeArea.left ?? 0);
-    const safeRight = horizontalInset + Math.max(0, safeArea.right ?? 0);
-    const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom ?? 0);
-    const moveX = MOVE_JOYSTICK_RADIUS + safeLeft;
-    const moveY = height - MOVE_JOYSTICK_RADIUS - safeBottom;
-    const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
-    const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
-    const aimActivationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
+    const g = touchControlGeometry(width, height, safeArea);
 
     // Os dois controles ficam ancorados: a pele visual e a area de toque sempre
     // representam o mesmo lugar, em vez de o movimento nascer sob qualquer toque.
-    this.state.joystick.originX = moveX;
-    this.state.joystick.originY = moveY;
-    this.state.aimTouch.originX = aimX;
-    this.state.aimTouch.originY = aimY;
+    this.state.joystick.originX = g.moveX;
+    this.state.joystick.originY = g.moveY;
+    this.state.aimTouch.originX = g.aimX;
+    this.state.aimTouch.originY = g.aimY;
 
-    // Hit targets continuam grandes, mas nunca se sobrepoem. O espaco real entre
-    // eles e o que impede um polegar de acionar a acao vizinha por acidente.
-    const hitRadius = r * TOUCH_BUTTON_HIT_SCALE;
-    const gap = Math.max(14, Math.min(18, height * 0.04));
-    const step = hitRadius * 2 + gap;
-    const actionY = aimY - aimActivationRadius - hitRadius - gap;
-    const dodgeX = aimX - aimActivationRadius - hitRadius - gap;
-
+    const r = g.buttonRadius;
     this.state.buttons = [
-      { id: 'dodge', cx: dodgeX, cy: aimY, r, pressed: false },
-      { id: 'ability', cx: aimX - step * 2, cy: actionY, r, pressed: false },
-      { id: 'purge', cx: aimX - step, cy: actionY, r, pressed: false },
-      { id: 'interact', cx: aimX, cy: actionY, r, pressed: false },
+      { id: 'dodge', cx: g.dodgeX, cy: g.aimY, r, pressed: false },
+      { id: 'ability', cx: g.aimX - g.step * 2, cy: g.actionY, r, pressed: false },
+      { id: 'purge', cx: g.aimX - g.step, cy: g.actionY, r, pressed: false },
+      { id: 'interact', cx: g.aimX, cy: g.actionY, r, pressed: false },
     ];
   }
 

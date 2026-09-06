@@ -34,10 +34,7 @@
 // A repouso ela e um sussurro; o que puxa o olho e o que MUDA — a tecla que
 // esta apertada, a recarga correndo, o pulso do "voltou".
 
-import {
-  TICK_HZ,
-  type SurvivalState,
-} from '@voxelyn/survival-sim';
+import { TICK_HZ, type SurvivalState } from '@voxelyn/survival-sim';
 import { abilityPresentation } from './ability-presentation';
 import {
   abilityCooldownDurationTicks,
@@ -114,6 +111,12 @@ export type ControlBarLayout = {
 const BAR_HEIGHT = 40;
 /** Folga entre a faixa e a borda de baixo da area segura. */
 const BAR_BOTTOM_GAP = 12;
+/**
+ * Quanto do RODAPE a barra de comandos reserva (altura + folga), acima da area
+ * segura. A barra de vida dos chefes le isto para pousar acima dela
+ * (`boss-health-bar-layout.ts`) em vez de repetir a conta.
+ */
+export const DESKTOP_CONTROL_BAR_RESERVE = BAR_HEIGHT + BAR_BOTTOM_GAP;
 const SLOT_GAP = 6;
 const SLOT_PADDING = 10;
 
@@ -169,7 +172,8 @@ export const controlBarLayout = (
 ): ControlBarLayout => {
   const labels = controls.map(labelOf);
   const widths = controls.map((control, i) => slotWidth(control, labels[i]));
-  const natural = widths.reduce((sum, w) => sum + w, 0) + Math.max(0, controls.length - 1) * SLOT_GAP;
+  const natural =
+    widths.reduce((sum, w) => sum + w, 0) + Math.max(0, controls.length - 1) * SLOT_GAP;
   const available = Math.max(120, viewportWidth - 32);
   const scale = Math.min(1, available / natural);
   const w = natural * scale;
@@ -291,10 +295,7 @@ export class DesktopControlBar {
     // dizer, e esperar o jogador lembrar de olhar para um sussurro seria
     // devolver o problema que ela veio resolver.
     const busy = [...cooldowns.values()].some((cd) => cd.remaining > 0);
-    const emphasis = Math.max(
-      busy ? 0.92 : 0,
-      controlBarEmphasis(nowMs - this.startedAtMs),
-    );
+    const emphasis = Math.max(busy ? 0.92 : 0, controlBarEmphasis(nowMs - this.startedAtMs));
 
     ctx.save();
     ctx.globalAlpha = emphasis;
@@ -321,7 +322,10 @@ export class DesktopControlBar {
     input: InputState,
     nowMs: number,
   ): Map<DesktopCooldownId, { remaining: number; duration: number; accent: string }> {
-    const out = new Map<DesktopCooldownId, { remaining: number; duration: number; accent: string }>();
+    const out = new Map<
+      DesktopCooldownId,
+      { remaining: number; duration: number; accent: string }
+    >();
     if (state.phase !== 'running') {
       this.seenPressSeq.dodge = input.actionPressSeq.dodge;
       this.seenPressSeq.ability = input.actionPressSeq.ability;
@@ -427,7 +431,14 @@ export class DesktopControlBar {
       ctx.strokeStyle = cd?.accent ?? CAP_TEXT;
       ctx.lineWidth = Math.max(1, 1.6 * scale);
       ctx.beginPath();
-      roundedRect(ctx, x - eased * 4, y - eased * 4, w + eased * 8, h + eased * 8, radius + eased * 3);
+      roundedRect(
+        ctx,
+        x - eased * 4,
+        y - eased * 4,
+        w + eased * 8,
+        h + eased * 8,
+        radius + eased * 3,
+      );
       ctx.stroke();
       ctx.restore();
     } else if (pulseUntil > 0) {
@@ -443,7 +454,8 @@ export class DesktopControlBar {
     ctx.font = `bold ${capFont}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
     const capWidths = control.caps.map((cap) => (cap.length * 8 + 12) * scale);
-    const capsTotal = capWidths.reduce((sum, cw) => sum + cw, 0) + (control.caps.length - 1) * 4 * scale;
+    const capsTotal =
+      capWidths.reduce((sum, cw) => sum + cw, 0) + (control.caps.length - 1) * 4 * scale;
     let capX = x + (w - capsTotal) / 2;
     control.caps.forEach((cap, i) => {
       const cw = capWidths[i];

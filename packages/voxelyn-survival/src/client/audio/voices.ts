@@ -121,6 +121,17 @@ export type VoiceId =
   | 'uiTap'
   // A estatica do véu de deploy: a colmeia fechando sobre a tela.
   | 'deployStatic'
+  // A BARRA DE VIDA DO CHEFE se montando (boss-health-bar.ts): um encaixe
+  // curto de pedra ou metal e uma cauda do MATERIAL do chefe. Seis familias,
+  // nao dez vozes — o ouvido separa pedra de metal e cristal de agua, nao
+  // basalto de enxofre. E interface, nao criatura: toca no barramento de
+  // efeitos, fora da amarrotada lo-fi dos chefes, e abaixo do rugido.
+  | 'bossBarMineral'
+  | 'bossBarMetal'
+  | 'bossBarCrystal'
+  | 'bossBarFluid'
+  | 'bossBarEmber'
+  | 'bossBarIce'
   // --- OS CHEFES ---------------------------------------------------------
   //
   // Cada chefe tem uma ASSINATURA (um material, uma fisica), e cada
@@ -444,6 +455,15 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // Trava de 500 ms: o véu chama uma vez por varredura (fechar e abrir), e a
   // trava so existe para um duplo-disparo acidental nao somar duas estaticas.
   deployStatic: { priority: 8, gain: 0.5, minIntervalMs: 500, spatial: false },
+  // A assinatura da barra de chefe: prioridade abaixo do despertar (10) e do
+  // telegrafo fatal, ganho contido — acompanha a interface, nao compete com o
+  // rugido que sai no mesmo tick. Trava longa: uma montagem por encontro.
+  bossBarMineral: { priority: 7, gain: 0.34, minIntervalMs: 800, spatial: false },
+  bossBarMetal: { priority: 7, gain: 0.34, minIntervalMs: 800, spatial: false },
+  bossBarCrystal: { priority: 7, gain: 0.32, minIntervalMs: 800, spatial: false },
+  bossBarFluid: { priority: 7, gain: 0.34, minIntervalMs: 800, spatial: false },
+  bossBarEmber: { priority: 7, gain: 0.34, minIntervalMs: 800, spatial: false },
+  bossBarIce: { priority: 7, gain: 0.32, minIntervalMs: 800, spatial: false },
 
   // --- OS CHEFES ---------------------------------------------------------
   //

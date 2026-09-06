@@ -149,7 +149,12 @@ describe('Diamandis: a maquina emite ordens de trabalho', () => {
 
   it('liga em vez de acordar, falha em vez de enfurecer, desliga em vez de rugir', () => {
     const boot = cuesForEvent({ t: 'boss_awake', archetype: 'diamandis', x: 4, y: 4 }, ctx);
-    expect(boot.map((c) => c.voice)).toEqual(['diamandisBoot', 'diamandisVoiceUnmapped']);
+    // A barra de vida se montando vai junto (metal Aurix); a fala fecha a leva.
+    expect(boot.map((c) => c.voice)).toEqual([
+      'diamandisBoot',
+      'bossBarMetal',
+      'diamandisVoiceUnmapped',
+    ]);
     const fault = cuesForEvent(
       { t: 'boss_phase', archetype: 'diamandis', phase: BOSS_PHASE_REACTOR, x: 4, y: 4 },
       ctx,

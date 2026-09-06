@@ -791,3 +791,10 @@ sempre, e a maioria das tentativas passou a ser recusada — a geração inteira
    técnico; primeira derrota → incidente; condição especial → ordem executiva;
    descoberta composta → não classificado), junto de cada chefe — não numa etapa
    posterior.
+
+## A barra de vida do dono do setor
+
+A apresentação do encontro na HUD — a barra monumental do rodapé, o ritual de
+entrada, o eco da ferida, a cura, a fase e a morte, e como o chefe ativo é
+resolvido no solo, no online e no replay — vive em
+[`voxelyn-survival-boss-health-bar.md`](./voxelyn-survival-boss-health-bar.md).

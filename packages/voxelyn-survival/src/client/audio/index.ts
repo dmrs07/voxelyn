@@ -47,6 +47,7 @@ import { SoundtrackBus } from './soundtrack-bus';
 import { createBossLofi } from './lofi';
 import { VOICE_RENDERERS, createNoiseBuffer } from './synth';
 import { isBossVoice, voiceSpec, type VoiceId } from './voices';
+import { resolveSectorBoss } from '../boss-health-bar';
 
 export type { AmbienceLevels } from './ambience';
 export type { Cue } from './cues';
@@ -668,11 +669,12 @@ export class AudioDirector {
     } else this.furnaceBus?.silence();
   }
 
-  /** O corpo vivo do dono do setor, ou null. */
+  /**
+   * O corpo vivo do dono do setor, ou null — a MESMA resolucao da barra de
+   * vida (boss-health-bar.ts): por arquetipo, nunca por `entityId`.
+   */
   private sectorBossBody(state: SurvivalState): Entity | null {
-    const archetype = state.sectorBoss.archetype;
-    if (!archetype || state.sectorBoss.defeated) return null;
-    return state.enemies.find((e) => e.alive && e.archetype === archetype) ?? null;
+    return resolveSectorBoss(state);
   }
 
   /**

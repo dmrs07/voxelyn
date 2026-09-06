@@ -28,6 +28,7 @@ import type {
 } from '@voxelyn/survival-sim';
 import type { VoiceId } from './voices';
 import { DIAMANDIS_LINES, diamandisLineFor } from './boss-voice-lines';
+import { bossBarAccent, type BossBarTail } from '../boss-health-bar-palette';
 
 export type Cue = {
   voice: VoiceId;
@@ -43,6 +44,18 @@ export type Cue = {
    */
   scale: number;
 };
+
+/** A voz da barra de chefe, pela familia sonora do material do arquetipo. */
+const BOSS_BAR_VOICE: Record<BossBarTail, VoiceId> = {
+  mineral: 'bossBarMineral',
+  metal: 'bossBarMetal',
+  crystal: 'bossBarCrystal',
+  fluid: 'bossBarFluid',
+  ember: 'bossBarEmber',
+  ice: 'bossBarIce',
+};
+export const bossBarVoice = (archetype: EnemyArchetype | undefined): VoiceId =>
+  BOSS_BAR_VOICE[bossBarAccent(archetype).tail];
 
 /**
  * Telegrafo de cada acao.
@@ -789,8 +802,20 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // de trabalho — "AREA NAO MAPEADA" — de onde a maquina esta. Todos os
       // outros dividem o subgrave tectonico: e "algo enorme notou voce", e
       // esse aviso e o mesmo para um lago, uma sala ou uma pedra.
-      if (ev.archetype === 'diamandis') return [{ voice: 'diamandisBoot', x: 0, y: 0, scale: 1 }];
-      return [{ voice: 'guardianAwake', x: 0, y: 0, scale: 1 }];
+      //
+      // Junto vai a assinatura da BARRA DE VIDA se montando (boss-health-bar.ts)
+      // — o encaixe e a cauda do material do chefe. Um so pedido, e nao um
+      // segundo impacto: o subgrave e do despertar; a barra so acrescenta o
+      // estalo da moldura fechando e o timbre de que ela e feita.
+      return [
+        {
+          voice: ev.archetype === 'diamandis' ? 'diamandisBoot' : 'guardianAwake',
+          x: 0,
+          y: 0,
+          scale: 1,
+        },
+        { voice: bossBarVoice(ev.archetype), x: 0, y: 0, scale: 1 },
+      ];
 
     case 'player_down':
       return [{ voice: 'playerDown', x: ev.x, y: ev.y, scale: 1 }];
