@@ -91,6 +91,9 @@ describe('o Diamandis em pecas', () => {
         }
       }
     },
+    // Rasteriza 168 quadros do chassi (oito rumos, cinco animacoes) na grade
+    // fina: passa dos 5 s padrao no runner do CI, como a validacao do pacote.
+    60_000,
   );
 
   it('as pecas nao sao recentralizadas: a ancora e o encaixe', () => {
