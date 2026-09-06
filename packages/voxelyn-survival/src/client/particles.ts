@@ -971,23 +971,27 @@ export class VoxelParticles {
     if (this.lastDrillBucket === bucket) return;
     this.lastDrillBucket = bucket;
     const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2654435761)));
-    const count = Math.max(1, Math.round(4 * scale));
+    const count = Math.max(1, Math.round(6 * scale));
     const sideX = -dirY;
     const sideY = dirX;
     for (let i = 0; i < count; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const spread = 0.6 + rnd() * 1.4;
-      const spark = i % 4 === 3;
+      const spark = i % 6 === 5;
+      // Dois terços nascem do CHAO nas laterais, arrancados pela onda de
+      // proa; o resto sai da propria ponta, mais alto, com a faisca.
+      const floor = !spark && i % 3 !== 0;
+      const lateral = floor ? 0.6 + rnd() * 0.7 : 0.15 + rnd() * 0.2;
+      const spread = floor ? 0.5 + rnd() * 1.0 : 0.8 + rnd() * 1.4;
       this.push({
-        x: x + sideX * side * 0.2 + (rnd() - 0.5) * 0.2,
-        y: y + sideY * side * 0.2 + (rnd() - 0.5) * 0.2,
-        z: 0.3 + rnd() * 0.5,
-        vx: -dirX * (1.6 + rnd() * 1.4) + sideX * side * spread,
-        vy: -dirY * (1.6 + rnd() * 1.4) + sideY * side * spread,
-        vz: spark ? 0.9 + rnd() * 0.8 : 0.3 + rnd() * 0.5,
-        life: spark ? 220 : 420,
-        maxLife: spark ? 220 : 420,
-        kind: spark ? 'spark' : 'ash',
+        x: x + sideX * side * lateral + (rnd() - 0.5) * 0.2,
+        y: y + sideY * side * lateral + (rnd() - 0.5) * 0.2,
+        z: floor ? 0.02 + rnd() * 0.12 : 0.3 + rnd() * 0.4,
+        vx: -dirX * (1.2 + rnd() * 1.6) + sideX * side * spread,
+        vy: -dirY * (1.2 + rnd() * 1.6) + sideY * side * spread,
+        vz: spark ? 0.9 + rnd() * 0.8 : floor ? 0.5 + rnd() * 0.9 : 0.2 + rnd() * 0.4,
+        life: spark ? 220 : floor ? 520 : 400,
+        maxLife: spark ? 220 : floor ? 520 : 400,
+        kind: spark ? 'spark' : floor ? 'debris' : 'ash',
       });
     }
   }

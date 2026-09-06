@@ -15,16 +15,18 @@ import {
   type EntityAction,
 } from '@voxelyn/survival-sim';
 import {
-  CHEVRON_COUNT,
-  CHEVRON_EVERY_MS,
-  CHEVRON_REACH_TILES,
-  CHEVRON_SPREAD_TILES,
   DRILL_RUN_TILES,
+  EDDY_COUNT,
   LANE_LOCK_AT,
-  chevronsAt,
+  SHEET_COUNT,
+  SHEET_EVERY_MS,
+  WAKE_REACH_TILES,
+  bowHalfWidth,
   drillPhaseAt,
+  eddiesAt,
   laneStyle,
   streaksAt,
+  wakeSheetsAt,
 } from '../client/drill-wake';
 import { PAL } from '../client/palette';
 import { applyDiamandisScenario, bossOf } from '../client/arena-diamandis-debug';
@@ -82,42 +84,68 @@ describe('a faixa do preparo', () => {
   });
 });
 
-describe('a onda conica', () => {
-  it('nasce na ponta, abre e apaga para tras, e e determinista', () => {
+describe('a onda de proa', () => {
+  it('alarga pela raiz da distancia: abre rapido perto da ponta, devagar longe', () => {
+    expect(bowHalfWidth(0)).toBeGreaterThan(0);
+    const near = bowHalfWidth(0.5) - bowHalfWidth(0);
+    const far = bowHalfWidth(3) - bowHalfWidth(2.5);
+    expect(near).toBeGreaterThan(far);
+    expect(bowHalfWidth(WAKE_REACH_TILES)).toBeGreaterThan(bowHalfWidth(1));
+  });
+
+  it('os lencois nascem na ponta, correm para tras engrossando e apagando, e sao deterministas', () => {
     for (let t = 0; t < 3000; t += 31) {
-      const a = chevronsAt(t, false);
-      const b = chevronsAt(t, false);
+      const a = wakeSheetsAt(t, false);
+      const b = wakeSheetsAt(t, false);
       expect(a).toEqual(b);
       expect(a.length).toBeGreaterThan(0);
-      expect(a.length).toBeLessThanOrEqual(CHEVRON_COUNT);
+      expect(a.length).toBeLessThanOrEqual(SHEET_COUNT);
       let lastBack = -1;
-      for (const c of a) {
-        expect(c.back).toBeGreaterThanOrEqual(0);
-        expect(c.back).toBeLessThanOrEqual(CHEVRON_REACH_TILES);
-        expect(c.halfWidth).toBeLessThanOrEqual(0.22 + CHEVRON_SPREAD_TILES + 1e-9);
-        expect(c.alpha).toBeGreaterThan(0);
-        expect(c.alpha).toBeLessThanOrEqual(1);
-        // Da frente para tras: cada chevron esta atras do anterior e mais aberto.
-        expect(c.back).toBeGreaterThanOrEqual(lastBack);
-        lastBack = c.back;
+      let lastThickness = -1;
+      for (const sheet of a) {
+        expect(sheet.back).toBeGreaterThanOrEqual(0);
+        expect(sheet.back).toBeLessThanOrEqual(WAKE_REACH_TILES);
+        expect(sheet.halfWidth).toBeCloseTo(bowHalfWidth(sheet.back));
+        expect(sheet.alpha).toBeGreaterThan(0);
+        expect(sheet.alpha).toBeLessThanOrEqual(1);
+        // Da frente para tras: cada lencol esta atras do anterior e mais gordo.
+        expect(sheet.back).toBeGreaterThanOrEqual(lastBack);
+        expect(sheet.thickness).toBeGreaterThanOrEqual(lastThickness);
+        lastBack = sheet.back;
+        lastThickness = sheet.thickness;
       }
     }
   });
 
-  it('a cada intervalo nasce um chevron novo na ponta', () => {
-    const t = 10 * CHEVRON_EVERY_MS;
-    const fresh = chevronsAt(t, false)[0];
+  it('a cada intervalo nasce um lencol novo na ponta', () => {
+    const t = 10 * SHEET_EVERY_MS;
+    const fresh = wakeSheetsAt(t, false)[0];
     expect(fresh.age).toBe(0);
     expect(fresh.back).toBe(0);
-    const later = chevronsAt(t + CHEVRON_EVERY_MS / 2, false)[0];
-    expect(later.back).toBeGreaterThan(0);
+    expect(wakeSheetsAt(t + SHEET_EVERY_MS / 2, false)[0].back).toBeGreaterThan(0);
   });
 
-  it('com movimento reduzido o cone existe, mas nao corre', () => {
-    const a = chevronsAt(100, true);
-    const b = chevronsAt(1234, true);
-    expect(a).toEqual(b);
-    expect(a.length).toBe(CHEVRON_COUNT);
+  it('riscos helicoidais e redemoinhos ficam dentro da onda e giram com o tempo', () => {
+    for (let t = 0; t < 2000; t += 47) {
+      for (const s of streaksAt(t, false)) {
+        expect(s.back).toBeGreaterThanOrEqual(0);
+        expect(s.back + s.length).toBeLessThanOrEqual(WAKE_REACH_TILES + 0.5);
+        expect(s.alpha).toBeGreaterThanOrEqual(0);
+      }
+      const eddies = eddiesAt(t, false);
+      expect(eddies.length).toBe(EDDY_COUNT);
+      for (const e of eddies) {
+        expect(e.lateral).toBeLessThanOrEqual(bowHalfWidth(e.back));
+        expect(e.alpha).toBeGreaterThanOrEqual(0);
+      }
+    }
+    expect(streaksAt(100, false)[0].twist).not.toBe(streaksAt(140, false)[0].twist);
+  });
+
+  it('com movimento reduzido a onda existe mas nao corre, e os riscos somem', () => {
+    expect(wakeSheetsAt(100, true)).toEqual(wakeSheetsAt(1234, true));
+    expect(wakeSheetsAt(100, true).length).toBe(SHEET_COUNT);
+    expect(eddiesAt(100, true)).toEqual(eddiesAt(900, true));
     expect(streaksAt(500, true)).toEqual([]);
     expect(streaksAt(500, false).length).toBeGreaterThan(0);
   });

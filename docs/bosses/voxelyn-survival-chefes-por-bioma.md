@@ -433,19 +433,23 @@ deslizando: nada dizia que aquilo era uma **investida**. O que faltava era o ar.
   a come), com setas no rumo a cada três tiles e o tracejado correndo para a frente.
   Nasce apagada em âmbar e fecha até travar em fogo no último terço, a mesma
   linguagem da linha de medição do feixe.
-- **Avanço.** Na ponta da broca o ar é **rasgado num cone**: uma cunha translúcida
-  da ponta para trás e, por cima dela, chevrons que nascem no vértice a cada 70 ms e
-  viajam para trás enquanto abrem — o ar jogado para os lados e para trás do corpo.
-  Riscos de velocidade correm pelas laterais, a ponta incandesce com uma faísca
-  girando em volta do eixo, a **poeira** (partículas) é cuspida no mesmo cone e a
-  câmera treme baixo e contínuo. Tudo se move para trás em relação ao chefe: é o que
-  lê como "ele vem". Esfria no último trecho do avanço.
+- **Avanço.** Na ponta da broca o ar é **rasgado**, e rasgado como o ar rasga: uma
+  **onda de proa** cuja largura cresce com a raiz da distância atrás da ponta (abre
+  rápido junto dela, devagar longe), com a frente arredondada, em **lençóis**
+  translúcidos que nascem na ponta a cada 90 ms e correm para trás engrossando e se
+  dissolvendo em poeira — cada um traçado três vezes, largo e apagado, médio, fino e
+  claro, para ler como ar denso e não como linha. O giro da broca torce **filetes em
+  hélice** em volta do eixo (sobem de um lado, descem do outro), **redemoinhos**
+  soltam das bordas da onda e somem, a ponta incandesce com uma faísca girando no
+  eixo, a **poeira** é arrancada do chão nas laterais (partículas de entulho a partir
+  do piso, cinza da ponta) e a câmera treme baixo e contínuo. Tudo se move para trás
+  em relação ao chefe: é o que lê como "ele vem". Esfria no último trecho do avanço.
 
 Tudo é derivado da ação autoritativa e do relógio de parede, sem estado: quem
-reconecta no meio do avanço vê o mesmo cone. Com movimento reduzido os chevrons não
-correm (ficam parados na posição média), os riscos somem e a câmera não treme; a
-faixa, a cunha e a ponta acesa continuam. Cenário da arena: **avanço da broca**.
-Capturas `18-broca-…` a `20-broca-…` em `docs/media/diamandis/`.
+reconecta no meio do avanço vê o mesmo rasgo. Com movimento reduzido os lençóis e os
+redemoinhos não correm (ficam parados na posição média), os filetes somem e a câmera
+não treme; a faixa, a massa de ar e a ponta acesa continuam. Cenário da arena:
+**avanço da broca**. Capturas `18-broca-…` a `21-broca-…` em `docs/media/diamandis/`.
 
 ## Devorador Branco — o chão é que decide
 
