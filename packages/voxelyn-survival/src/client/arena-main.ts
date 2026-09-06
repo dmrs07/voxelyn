@@ -338,6 +338,7 @@ const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
   reset: 'peças de volta',
   wake: 'acordar',
   beside: 'jogador ao lado',
+  center: 'os dois no meio da sala',
   faceR: 'rumo →',
   faceDR: 'rumo ↘',
   faceD: 'rumo ↓',
@@ -354,6 +355,8 @@ const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
   beam: 'feixe de prospecção',
   demolish: 'salva de demolição',
   drill: 'avanço da broca',
+  drillWall: 'broca contra veio',
+  drillMiss: 'broca errando',
 };
 for (const scenario of DIAMANDIS_SCENARIOS) {
   const button = document.createElement('button');
@@ -395,7 +398,7 @@ const updateDiamandisPanel = (state: SurvivalState, nowMs: number): void => {
     `estagger <b>${r.staggerLeft > 0 ? `${r.staggerLeft}/${r.staggerTicks} ticks` : '—'}</b>`,
     `Coveiros <b>${r.undertakers}</b> · carregando <b>${r.carriers}</b>`,
     `reator <b>${r.reactor ? 'em colapso' : 'estável'}</b>`,
-    `feixe <b>${r.beam ? `${r.beam.phase === 'survey' ? 'levantamento' : 'passagem'} ${Math.round(r.beam.progress * 100)}%` : '—'}</b>${r.beam ? ` · alcance <b>${r.beam.reach.toFixed(1)}</b>` : ''} · cargas <b>${r.charges}</b>`,
+    `feixe <b>${r.beam ? `${r.beam.phase === 'survey' ? 'levantamento' : 'passagem'} ${Math.round(r.beam.progress * 100)}%` : '—'}</b>${r.beam ? ` · alcance <b>${r.beam.reach.toFixed(1)}</b>` : ''} · cargas <b>${r.charges}</b> · broca <b>${r.drill ? `${r.drill.stage} giro ${Math.round(r.drill.spin * 100)}% vel ${Math.round(r.drill.speed * 100)}%` : '—'}</b>`,
   ];
   diamandisReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
 };

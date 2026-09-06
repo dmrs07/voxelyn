@@ -220,11 +220,22 @@ import {
 import {
   DRILL_TIP_AHEAD,
   DRILL_TIP_HEIGHT,
-  drawDrillLane,
-  drawDrillWake,
+  DrillPresentation,
+  chassisPoseAt,
+  drawDrillTelegraph,
+  drawGroundMarks,
+  drawImpactSparks,
+  drawSpinSparks,
+  drillDistanceAt,
+  drillGaitMs,
   drillLaneReach,
   drillPhaseAt,
-} from './drill-wake';
+  drillPoseFrame,
+  drillSpinPhase,
+  impactShake,
+  tickFraction,
+} from './drill-machine';
+import { drillSpeedFractionAt } from '@voxelyn/survival-sim';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -1931,6 +1942,11 @@ export class SurvivalRenderer {
   private readonly diamandisBeam = new DiamandisBeamPresentation();
   /** A salva de demolicao: as detonacoes recentes. Ver demolition-fx.ts. */
   private readonly demolition = new DemolitionPresentation();
+  /** A broca como maquina: marcas, impactos e a recuperacao (drill-machine.ts). */
+  private readonly drillMachine = new DrillPresentation();
+  /** O tick que o render viu por ultimo e quando: interpola o giro entre ticks. */
+  private drillTickSeen = -1;
+  private drillTickSeenMs = 0;
   /** Os atlas das pecas ja foram pedidos nesta sessao? (idempotente, mas e um laco por quadro) */
   private diamandisPartsRequested = false;
   /**
@@ -2165,6 +2181,7 @@ export class SurvivalRenderer {
     this.diamandis.reset();
     this.diamandisBeam.reset();
     this.demolition.reset();
+    this.drillMachine.reset();
     this.bossHealthBar.reset();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
@@ -2567,6 +2584,43 @@ export class SurvivalRenderer {
             tone: 'good',
           });
           break;
+        case 'boss_state': {
+          // A BROCA COMO MAQUINA (drill-machine.ts): o impacto no que ela nao
+          // come e UM solavanco forte de camera (pelo ajuste do jogador, como
+          // todo tremor), luz curta, fragmentos e poeira no ponto exato de
+          // contato; a derrapagem so levanta poeira; o jogador atingido e um
+          // solavanco curto. Tudo do evento, entao o parceiro do co-op ve o
+          // mesmo impacto no mesmo lugar.
+          for (const impact of this.drillMachine.ingest([ev], nowMs)) {
+            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+            const jolt = impactShake(impact);
+            if (!prefersReducedMotion()) this.shake = { power: jolt.power, until: nowMs + jolt.ms };
+            if (impact.kind === 'wall') {
+              this.addFlash(impact.x, impact.y, 3.2, 0.9, nowMs, 300);
+              this.particles.emitDrillImpact(
+                impact.x,
+                impact.y,
+                impact.dx,
+                impact.dy,
+                impact.intensity,
+                fxScale,
+              );
+            } else if (impact.kind === 'skid') {
+              this.particles.emitDrillImpact(
+                impact.x,
+                impact.y,
+                impact.dx,
+                impact.dy,
+                0.25,
+                fxScale * 0.6,
+              );
+            } else {
+              this.addFlash(impact.x, impact.y, 2, 0.7, nowMs, 180);
+              this.particles.hit(impact.x, impact.y, 'spark', 18, fxScale);
+            }
+          }
+          break;
+        }
         case 'beam_line': {
           // A PASSAGEM COM POTENCIA acende a sala: claroes ao longo da linha
           // (a luz que uma coluna de fogo joga nas paredes), faiscas no chao,
@@ -4260,6 +4314,7 @@ export class SurvivalRenderer {
       this.diamandis.reset();
       this.diamandisBeam.reset();
       this.demolition.reset();
+      this.drillMachine.reset();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -4364,7 +4419,7 @@ export class SurvivalRenderer {
       const headDark = b <= 0.05;
       if (headDark && enemy.archetype !== 'white_devourer') continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
-      const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
+      let presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // O DIAMANDIS EM FRENESI, fora do desenho: a fumaca nasce por segundo e
       // nao por quadro (o emissor tem bucket proprio), os espasmos sao um
       // deslocamento do CORPO (a sombra, a barra e o anel ficam no chao), e os
@@ -4391,47 +4446,110 @@ export class SurvivalRenderer {
       const beamOrigin = { x: enemy.x, y: enemy.y };
       const fireIntensity = isDiamandis ? this.diamandisBeam.fireIntensity(nowMs) : 0;
       const fireLine = fireIntensity > 0 ? this.diamandisBeam.lastFire : null;
-      // A BROCA (drill-wake.ts): no preparo, a faixa do corredor no chao; no
-      // avanco, o rasgo de ar na ponta — o cone abrindo para tras, os riscos,
-      // a poeira cuspida — e um tremor continuo e baixo. Tudo da acao.
+      // A BROCA COMO MAQUINA (drill-machine.ts). Tudo do relogio da acao e
+      // dos eventos dela: no preparo, o chao avisa (cascalho vibrando, rachas,
+      // chevrons apagados) e o chassi senta para tras como mola; na corrida,
+      // o quadro do andar vem da DISTANCIA (os pes nao deslizam), o nariz
+      // mergulha com a aceleracao, a poeira baixa e as pedras saem para tras
+      // e para os lados, e as duas esteiras de arrasto ficam no chao. A pose
+      // da broca (oito fases do atlas) vem da fase acumulada do giro — a
+      // mesma curva que o som le. O impacto e a recuperacao vem dos eventos.
       const drillPhase = isDiamandis ? drillPhaseAt(enemy.action, state.tick) : null;
-      if (drillPhase && enemy.action) {
-        const dir = enemy.action.direction;
-        const origin = { x: enemy.x, y: enemy.y };
+      let drillFrame: number | undefined;
+      let chassisPose = { squash: 0, pitch: 0, rattle: 0, spin: 0 };
+      if (isDiamandis) {
+        if (state.tick !== this.drillTickSeen) {
+          this.drillTickSeen = state.tick;
+          this.drillTickSeenMs = nowMs;
+        }
         const reduced = prefersReducedMotion();
-        if (drillPhase.kind === 'windup') {
-          const progress = drillPhase.progress;
-          const reach = drillLaneReach(state, origin, dir);
-          items.push({
-            depth: enemy.x + enemy.y - 0.5,
-            draw: () =>
-              drawDrillLane(ctx, toScreen, origin, dir, reach, progress, z, nowMs, reduced),
-          });
-        } else {
-          const tip = {
-            x: enemy.x + dir.x * DRILL_TIP_AHEAD,
-            y: enemy.y + dir.y * DRILL_TIP_AHEAD,
-          };
-          // Esfria no ultimo trecho: o avanco acaba, o ar volta a fechar.
-          const intensity = 1 - Math.max(0, (drillPhase.progress - 0.85) / 0.15);
-          const liftPx = heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z);
-          items.push({
-            depth: enemy.x + enemy.y + 0.3,
-            draw: () =>
-              drawDrillWake(ctx, toScreen, tip, dir, liftPx, intensity, z, nowMs, reduced),
-          });
-          this.particles.emitDrillWake(
-            tip.x,
-            tip.y,
-            dir.x,
-            dir.y,
-            nowMs,
-            (this.quality.maxFx / PRESETS.high.maxFx) * intensity,
-          );
-          if (!reduced && this.shake.until < nowMs + 40) {
-            this.shake = { power: 2, until: nowMs + 80 };
+        const tickF = state.tick + tickFraction(nowMs, this.drillTickSeenMs);
+        const impactAt = state.bossRuntime.drillImpactAt;
+        const action = drillPhase && enemy.action ? enemy.action : null;
+        chassisPose = chassisPoseAt(
+          action,
+          tickF,
+          impactAt,
+          this.drillMachine.recoveryAt(nowMs),
+          reduced,
+        );
+        if (drillPhase && enemy.action) {
+          const dir = enemy.action.direction;
+          const origin = { x: enemy.x, y: enemy.y };
+          const drillManifest = this.sprites.get(DIAMANDIS_PART_ATLASES[0])?.manifest;
+          const poses = drillManifest?.animations.special?.frames ?? 8;
+          drillFrame = drillPoseFrame(drillSpinPhase(enemy.action, tickF, impactAt), poses);
+          if (drillPhase.kind === 'windup') {
+            const progress = drillPhase.progress;
+            const reach = drillLaneReach(state, origin, dir);
+            const spin = chassisPose.spin;
+            items.push({
+              depth: enemy.x + enemy.y - 0.5,
+              draw: () =>
+                drawDrillTelegraph(
+                  ctx,
+                  toScreen,
+                  origin,
+                  dir,
+                  reach,
+                  progress,
+                  spin,
+                  z,
+                  nowMs,
+                  reduced,
+                ),
+            });
+            // O chassi no preparo e o de REPOUSO, comprimido pela pose: a
+            // pose de ataque do atlas e o solavanco, e ele ainda nao saiu.
+            presented = { ...presented, anim: 'idle' };
+          } else if (impactAt >= 0 && impactAt >= enemy.action.releaseAt) {
+            // Recuando depois do impacto: parado nos pes, esmagado pela pose.
+            presented = { ...presented, anim: 'idle' };
+          } else {
+            const k = state.tick - enemy.action.releaseAt;
+            const chassisManifest = this.sprites.spriteForArchetype('diamandis')?.manifest;
+            const walk = chassisManifest?.animations.walk;
+            const distance = drillDistanceAt(k);
+            presented = {
+              ...presented,
+              anim: 'walk',
+              elapsedMs: drillGaitMs(distance, walk?.frames ?? 6, walk?.fps ?? 10),
+            };
+            const speed = drillSpeedFractionAt(k);
+            this.particles.emitDrillDust(
+              enemy.x,
+              enemy.y,
+              dir.x,
+              dir.y,
+              speed,
+              nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx,
+            );
+            this.drillMachine.drag(enemy.x, enemy.y, dir, nowMs);
+            // O tremor CONTINUO da corrida e baixo e cresce com a velocidade;
+            // nunca cobre o solavanco de um impacto ja em curso.
+            if (!reduced && this.shake.until < nowMs + 40) {
+              this.shake = { power: 0.8 + 1.6 * speed, until: nowMs + 80 };
+            }
           }
         }
+        // As marcas no chao ficam depois de a acao acabar: um item so, no
+        // fundo da pilha (sao chao, nao corpo).
+        if (this.drillMachine.marks.length > 0) {
+          const marks = this.drillMachine.marks;
+          items.push({
+            depth: -1e9,
+            draw: () => drawGroundMarks(ctx, toScreen, marks, z, nowMs),
+          });
+        }
+        for (const impact of this.drillMachine.impacts) {
+          const liftPx = heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z);
+          items.push({
+            depth: impact.x + impact.y + 0.4,
+            draw: () => drawImpactSparks(ctx, toScreen, impact, liftPx, z, nowMs),
+          });
+        }
+        this.drillMachine.step(nowMs);
       }
       if (surveyPhase && beamDir) {
         const phase = surveyPhase;
@@ -4870,6 +4988,7 @@ export class SurvivalRenderer {
                 bodyX,
                 bodyDrawY,
                 spriteZoom,
+                drillFrame,
               )
             : [];
           const partLight = bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE);
@@ -4934,6 +5053,35 @@ export class SurvivalRenderer {
               bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
               bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
             );
+          // A POSE DO CHASSI da broca (drill-machine.ts): compressao, mergulho
+          // do nariz e chacoalho, em volta do PE — o sprite continua sendo o
+          // sprite, e a sombra e a barra ficam no chao. O mergulho e uma
+          // rotacao curta no sentido do rumo NA TELA (para cima/baixo o rumo
+          // nao tem lado, e ai so a compressao fala).
+          const posed =
+            isDiamandis &&
+            (chassisPose.squash > 0 || chassisPose.pitch !== 0 || chassisPose.rattle > 0);
+          if (posed) {
+            const [fx0, fy0] = toScreen(enemy.x, enemy.y);
+            const [fx1, fy1] = toScreen(enemy.x + presented.facingX, enemy.y + presented.facingY);
+            const len = Math.hypot(fx1 - fx0, fy1 - fy0) || 1;
+            const screenDirX = (fx1 - fx0) / len;
+            const seedR = ((nowMs / 30) | 0) * 7 + enemy.id;
+            const rattleX =
+              ((((seedR * 1103515245 + 12345) >>> 0) % 1000) / 1000 - 0.5) *
+              chassisPose.rattle *
+              spriteZoom;
+            const rattleY =
+              ((((seedR * 214013 + 2531011) >>> 0) % 1000) / 1000 - 0.5) *
+              chassisPose.rattle *
+              0.6 *
+              spriteZoom;
+            ctx.save();
+            ctx.translate(bodyX + rattleX, bodyDrawY + rattleY);
+            ctx.rotate(chassisPose.pitch * 0.085 * screenDirX);
+            ctx.scale(1 + chassisPose.squash * 0.45, 1 - chassisPose.squash);
+            ctx.translate(-bodyX, -bodyDrawY);
+          }
           drawParts(true);
           // Todo corpo que nao nada e CORTADO pela lamina: e a linha d'agua
           // que o jogador le para saber quanto a sala ja encheu.
@@ -4942,6 +5090,45 @@ export class SurvivalRenderer {
               ? drawCutByWaterline(ctx, waterLine, sx, enemy.radius * TILE_W * z, z, nowMs, paint)
               : paint(undefined);
           if (drew) drawParts(false);
+          if (posed) ctx.restore();
+          // As FAISCAS da ponta e do mancal: o unico branco da broca.
+          if (isDiamandis && chassisPose.spin > 0.2 && enemy.action?.kind === 'drill') {
+            const dir = enemy.action.direction;
+            const [tx, ty] = toScreen(
+              enemy.x + dir.x * DRILL_TIP_AHEAD,
+              enemy.y + dir.y * DRILL_TIP_AHEAD,
+            );
+            const tipPx: [number, number] = [
+              tx,
+              ty - heightToScreenPx(DRILL_TIP_HEIGHT, TILE_H, z),
+            ];
+            const chassisManifest = this.sprites.spriteForArchetype('diamandis')?.manifest;
+            const socket = chassisManifest
+              ? socketScreenPoint(
+                  chassisManifest,
+                  manifestDir(chassisManifest, presented.facingX, presented.facingY),
+                  'drill',
+                  bodyX,
+                  bodyDrawY,
+                  spriteZoom,
+                )
+              : null;
+            const bearingPx: [number, number] = socket
+              ? [socket.x, socket.y]
+              : [bodyX, bodyDrawY - 10 * spriteZoom];
+            const [dx0, dy0] = toScreen(enemy.x, enemy.y);
+            const dl = Math.hypot(tx - dx0, ty - dy0) || 1;
+            drawSpinSparks(
+              ctx,
+              tipPx,
+              bearingPx,
+              { x: (tx - dx0) / dl, y: (ty - dy0) / dl },
+              chassisPose.spin,
+              z,
+              nowMs,
+              prefersReducedMotion(),
+            );
+          }
           // A COLUNA do feixe, saindo da LENTE do mastro (o encaixe `mast`
           // mais a altura da lente). Sem o manifest do chassi ela sai do
           // centro do corpo, um pouco acima do pe.
@@ -7055,6 +7242,8 @@ export class SurvivalRenderer {
     footX: number,
     footY: number,
     zoom: number,
+    /** A pose da broca escolhida pelo giro (drill-machine.ts), quando ha uma. */
+    drillFrame?: number,
   ): DiamandisPartDraw[] {
     const chassis = this.sprites.spriteForArchetype('diamandis');
     if (!chassis) return [];
@@ -7075,6 +7264,7 @@ export class SurvivalRenderer {
       footX,
       footY,
       zoom,
+      drillFrame,
     });
   }
 

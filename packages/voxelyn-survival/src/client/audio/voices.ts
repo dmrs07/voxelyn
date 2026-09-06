@@ -164,8 +164,13 @@ export type VoiceId =
   | 'diamandisVoiceFault'
   | 'diamandisVoiceLost'
   | 'diamandisVoiceObstruction'
-  | 'diamandisDrillSpin'
-  | 'diamandisDrillImpact'
+  | 'diamandisDrillEngage'
+  | 'diamandisDrillBearing'
+  | 'diamandisDrillLock'
+  | 'diamandisDrillLaunch'
+  | 'diamandisDrillWall'
+  | 'diamandisDrillSkid'
+  | 'diamandisDrillStrike'
   | 'diamandisChargeArmed'
   | 'diamandisImplosion'
   | 'diamandisBeamScan'
@@ -510,8 +515,17 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   diamandisVoiceFault: { priority: 6, gain: 0.46, minIntervalMs: 400, spatial: true },
   diamandisVoiceLost: { priority: 6, gain: 0.42, minIntervalMs: 400, spatial: true },
   diamandisVoiceObstruction: { priority: 6, gain: 0.44, minIntervalMs: 400, spatial: true },
-  diamandisDrillSpin: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
-  diamandisDrillImpact: { priority: 9, gain: 0.7, minIntervalMs: 60, spatial: true },
+  // A BROCA COMO MAQUINA. O leito (diamandis-drill-bus.ts) e o motor; estas
+  // sao os transientes: a hidraulica engatando o alinhamento (windup), cada
+  // clique do mancal por oitante, a trava do rumo, o arranque grave, e os
+  // tres finais distintos — pedra, derrapagem, metal (o jogador).
+  diamandisDrillEngage: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
+  diamandisDrillBearing: { priority: 8, gain: 0.5, minIntervalMs: 40, spatial: true },
+  diamandisDrillLock: { priority: 9, gain: 0.6, minIntervalMs: 60, spatial: true },
+  diamandisDrillLaunch: { priority: 9, gain: 0.8, minIntervalMs: 60, spatial: true },
+  diamandisDrillWall: { priority: 9, gain: 0.85, minIntervalMs: 60, spatial: true },
+  diamandisDrillSkid: { priority: 8, gain: 0.55, minIntervalMs: 60, spatial: true },
+  diamandisDrillStrike: { priority: 9, gain: 0.8, minIntervalMs: 60, spatial: true },
   diamandisChargeArmed: { priority: 10, gain: 0.5, minIntervalMs: 90, spatial: true },
   diamandisImplosion: { priority: 9, gain: 0.75, minIntervalMs: 60, spatial: true },
   diamandisBeamScan: { priority: 10, gain: 0.45, minIntervalMs: 90, spatial: true },

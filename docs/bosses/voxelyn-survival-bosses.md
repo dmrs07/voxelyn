@@ -8,20 +8,20 @@ denso. A descida tinha estrutura mas não tinha **eventos**.
 
 Os dois inimigos aqui não são "mais conteúdo": cada um preenche uma lacuna diferente.
 
-| | Bispo do Veio | Corcel Fúngico |
-| --- | --- | --- |
-| Onde | Chefe do mapa final **ocupado pelo micélio** (`bossForBiome`) | Qualquer setor, ~1/3 das vezes |
-| O que ele pede | que você mude o **chão** | que você mude a sua **posição** |
-| Como se anuncia | fugindo quando se machuca | 1,3 s de telégrafo parado |
-| Silhueta | pilar vertical | o único bicho **horizontal** do jogo |
-| O que ele **é** (§2) | o órgão que fechava as feridas do Veio, falhando | o gesto de um homem que morreu sonhando (`AX-UNK-046`) |
+|                      | Bispo do Veio                                                 | Corcel Fúngico                                         |
+| -------------------- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| Onde                 | Chefe do mapa final **ocupado pelo micélio** (`bossForBiome`) | Qualquer setor, ~1/3 das vezes                         |
+| O que ele pede       | que você mude o **chão**                                      | que você mude a sua **posição**                        |
+| Como se anuncia      | fugindo quando se machuca                                     | 1,3 s de telégrafo parado                              |
+| Silhueta             | pilar vertical                                                | o único bicho **horizontal** do jogo                   |
+| O que ele **é** (§2) | o órgão que fechava as feridas do Veio, falhando              | o gesto de um homem que morreu sonhando (`AX-UNK-046`) |
 
 ## 2. Bispo — quem ele era antes de ser um chefe
 
 ### O buraco que esta lore tapa
 
-Mecanicamente o Bispo sempre esteve pronto. Narrativamente ele era *"uma criatura
-fúngica que se cura no fungo"* — uma frase que descreve o que ele **faz** e não diz
+Mecanicamente o Bispo sempre esteve pronto. Narrativamente ele era _"uma criatura
+fúngica que se cura no fungo"_ — uma frase que descreve o que ele **faz** e não diz
 nada sobre o que ele **é**. Num jogo cuja premissa inteira é que o Veio guarda o que
 morre nele, um chefe sem história era o único elemento do mapa que não participava
 da premissa.
@@ -52,8 +52,8 @@ Há alguns milhares de anos ele foi **encontrado** — e por gente que não esta
 minerando. Os objetos mais fundos do nicho não são minerais: são semente, grão e
 vasilhame de grão. Quem primeiro reconheceu o que aquilo era foram **pequenos
 agricultores**, e isso não é detalhe de cor. Uma comunidade que planta entende
-nativamente a regra que ele encarna, porque é a mesma regra que a mantém viva: *quem
-colhe mais do que nasce não colhe no ano seguinte.* Eles não precisaram deduzir a
+nativamente a regra que ele encarna, porque é a mesma regra que a mantém viva: _quem
+colhe mais do que nasce não colhe no ano seguinte._ Eles não precisaram deduzir a
 taxa. Eles já viviam dentro de uma.
 
 A extração veio depois, e nunca foi o problema. Picareta, um veio por vez, a parede
@@ -65,7 +65,7 @@ mais nada no ano seguinte.
 O jogo **já descreve o rito**, num documento escrito por gente que não sabia estar
 descrevendo um rito. `AX-UNK-045`, "Sobre o que o Bispo guardava": nichos escavados,
 objetos dispostos do menor ao maior, **nenhum deles ferramenta**, e a cobertura
-fúngica crescendo pelo desenho dos nichos — *cultivada*.
+fúngica crescendo pelo desenho dos nichos — _cultivada_.
 
 Não é um altar de oferendas. É uma **contabilidade**: uma amostra de cada coisa que
 foi tirada, devolvida ao lugar de onde saiu. A ferramenta não entra porque a
@@ -78,8 +78,8 @@ do grão até um objeto de fabricação da operação anterior. Alguém repôs a
 sem interrupção registrável, durante todo o período.
 
 As duas metades do pacto estão na mesma sala. A Aurix catalogou as duas e não leu
-nenhuma — `AX-EXE-034` proíbe descrever a estrutura, e a pergunta *"construída por
-quem?"* é recusada por não constar de formulário aprovado.
+nenhuma — `AX-EXE-034` proíbe descrever a estrutura, e a pergunta _"construída por
+quem?"_ é recusada por não constar de formulário aprovado.
 
 ### A ruptura
 
@@ -105,7 +105,7 @@ inteiramente errado sobre quem entra na sala.
 
 "Caiu em desgraça" é literal nos dois sentidos. Na ficção, o zelador do lugar virou a
 ANOMALIA TERMINAL do formulário — e `AX-EXE-039` autoriza o descarte com a frase que
-resume a inversão: *"Não patrulha. Não caça. Guarda."* Na mesa, o jogador **completa a
+resume a inversão: _"Não patrulha. Não caça. Guarda."_ Na mesa, o jogador **completa a
 queda**: para chegar ao objetivo ele queima o chão que mantém a coisa viva, ela
 replanta, ele queima de novo. A luta inteira é uma cauterização.
 
@@ -143,7 +143,7 @@ abertas de propósito.
   poderia perguntar foi carimbado.
 - **A forma de bispo é dele ou foi aprendida?** O que se lê como mitra e báculo pode
   ser o que ele sempre foi — ou o formato que séculos de devolução deixaram grudados
-  nele. A arte (§9) foi autorada como *arquitetura vestida* justamente para sustentar
+  nele. A arte (§9) foi autorada como _arquitetura vestida_ justamente para sustentar
   as duas leituras.
 - **Ele ainda entende alguma coisa?** Se entende, a luta deixa de ser uma luta e vira
   uma execução.
@@ -160,16 +160,16 @@ en). O gatilho é **entendimento do encontro**, nunca repetição: o Bispo apare
 máximo uma vez por run, então uma grade de abates como a do Corcel (3/6/10/15)
 transformaria a revelação em cinquenta descidas.
 
-| Gatilho | Documento | ID |
-| --- | --- | --- |
-| Primeiro abate | Ordem de contenção: a estrutura sob ele não deve ser descrita | `AX-EXE-034` |
-| **Ver a cura** de perto, com a linha livre | Medição de campo: o tecido fecha na velocidade do corte; o nosso é maior | `AX-ENG-028` |
-| **Sobreviver à Supernova** (estar dentro do disco e continuar de pé) | Incidente 40: a emissão não persegue ninguém — ela replanta, no raio da lavra | `AX-INC-040` |
-| Abate | Necropsia da estrutura: nichos, objetos por tamanho, fungo cultivado | `AX-UNK-045` |
-| Abate **+** ter visto a cura | Custo de datação: a série é contínua há cinco milênios, e começa em semente | `AX-PRC-025` |
-| Abate **+** ter sobrevivido à Supernova | Ordem de vocabulário: "sítio" é proibido porque um sítio suspende a lavra | `AX-EXE-047` |
-| Abate **+** as duas Descobertas | Não classificado: a regra que ninguém escreveu, e a ferida fechando com você dentro | `AX-UNK-057` |
-| Bispo **+** Guardião **+** Núcleo | Não classificado: duas contenções, uma viva e uma fabricada — a viva caiu primeiro | `AX-UNK-058` |
+| Gatilho                                                              | Documento                                                                           | ID           |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
+| Primeiro abate                                                       | Ordem de contenção: a estrutura sob ele não deve ser descrita                       | `AX-EXE-034` |
+| **Ver a cura** de perto, com a linha livre                           | Medição de campo: o tecido fecha na velocidade do corte; o nosso é maior            | `AX-ENG-028` |
+| **Sobreviver à Supernova** (estar dentro do disco e continuar de pé) | Incidente 40: a emissão não persegue ninguém — ela replanta, no raio da lavra       | `AX-INC-040` |
+| Abate                                                                | Necropsia da estrutura: nichos, objetos por tamanho, fungo cultivado                | `AX-UNK-045` |
+| Abate **+** ter visto a cura                                         | Custo de datação: a série é contínua há cinco milênios, e começa em semente         | `AX-PRC-025` |
+| Abate **+** ter sobrevivido à Supernova                              | Ordem de vocabulário: "sítio" é proibido porque um sítio suspende a lavra           | `AX-EXE-047` |
+| Abate **+** as duas Descobertas                                      | Não classificado: a regra que ninguém escreveu, e a ferida fechando com você dentro | `AX-UNK-057` |
+| Bispo **+** Guardião **+** Núcleo                                    | Não classificado: duas contenções, uma viva e uma fabricada — a viva caiu primeiro  | `AX-UNK-058` |
 
 As duas Descobertas são novas na simulação (`DISCOVERY_BISHOP_HEALED` e
 `DISCOVERY_BISHOP_NOVA_SURVIVED`, bits 14 e 15) e entram no hash autoritativo, daí o
@@ -190,8 +190,8 @@ pisa em `SURF_FUNGAL`. Isso é deliberadamente acima do que o tiro base sustenta
 cima do fungo ele não é difícil de matar, é **impossível de matar por atrito**.
 
 A cura é uma propriedade do **lugar**, não um recurso que ele gasta. Isso troca a
-pergunta da luta de *"quanto dano por segundo eu faço"* para *"de que chão eu o
-tiro"* — e usa fungo, calor e propagação que já existiam. Nenhuma mecânica nova.
+pergunta da luta de _"quanto dano por segundo eu faço"_ para _"de que chão eu o
+tiro"_ — e usa fungo, calor e propagação que já existiam. Nenhuma mecânica nova.
 
 ### O detalhe que é o encontro inteiro
 
@@ -245,8 +245,8 @@ eternamente para um tapete inalcançável. A regra atual mede o que importa:
    cuspe genérico do Spitter: um chefe do chão responde com o chão.
 2. **Ferido e fora do fungo**, ele tenta alcançar uma área viva; se não consegue
    **pisar** em fungo dentro de uma janela curta (`BISHOP_NOVA_SEEK_TICKS`, 4 s), a
-   Supernova sai — com fungo à vista ou não. A sequência *queimei, ele fugiu, não
-   chegou, plantou* continua sendo causa e efeito.
+   Supernova sai — com fungo à vista ou não. A sequência _queimei, ele fugiu, não
+   chegou, plantou_ continua sendo causa e efeito.
 
 O fungo é replantado somente no **release**, nunca no windup: o incêndio do jogador
 fica de pé até o último instante do aviso.
@@ -262,7 +262,7 @@ cinética do jogador — e o cliente desenhava a frente com a constante `ABILITY
 copiada. Com duas fontes de alcances diferentes, essa cópia prometeria **3,2 tiles
 onde o dano chega a 5,5**.
 
-A frente de partículas existe justamente para o jogador aprender o alcance *vendo*,
+A frente de partículas existe justamente para o jogador aprender o alcance _vendo_,
 sem número nem manual. Uma frente que mente sobre isso é pior do que nenhuma, então o
 raio passou a viajar no evento.
 
@@ -361,12 +361,12 @@ pnpm --filter @voxelyn/survival-sim test    # tests/bosses.test.ts, 17 casos
 Quatro mutações foram injetadas no código de produção para conferir que os testes
 falham quando deviam:
 
-| Mutação | Resultado |
-| --- | --- |
-| curar também em fungo aquecido | **pegou** |
-| não acender rastro nenhum | **pegou** |
-| bispo nunca recuar | **pegou** |
-| investida não parar na parede | **passou** ← teste ruim |
+| Mutação                        | Resultado               |
+| ------------------------------ | ----------------------- |
+| curar também em fungo aquecido | **pegou**               |
+| não acender rastro nenhum      | **pegou**               |
+| bispo nunca recuar             | **pegou**               |
+| investida não parar na parede  | **passou** ← teste ruim |
 
 A quarta expôs um teste que não provava a própria afirmação: `moveEntity` já recusa
 atravessar sólido, então um cavalo que raspasse na pedra pela janela inteira passava
@@ -377,8 +377,8 @@ tempo dela**, e é isso que o teste mede agora — em quantos ticks a ação mor
 
 `bishopHeal` é a única voz do jogo que **sobe** em frequência. Todo o resto do banco
 desce — tiro, impacto, morte, quebra — porque tudo o mais é alguma coisa terminando.
-Contra um vocabulário inteiro de quedas, um glissando ascendente lê como *"isto está
-voltando"* antes de o jogador saber o que é o som.
+Contra um vocabulário inteiro de quedas, um glissando ascendente lê como _"isto está
+voltando"_ antes de o jogador saber o que é o som.
 
 Prioridade 8 é alta para uma voz de dano-que-não-é-meu, e por um motivo estreito: ela
 não descreve um impacto, descreve que **os impactos não estão valendo**. Perdê-la no
@@ -422,7 +422,7 @@ não tem roxo; inventar um criaria uma cor que existe em um sprite do jogo intei
 ### A cura é desenhada por partícula, não por frame
 
 Um sprite de frames fixos **não sabe** o que é o chão debaixo dele. As raízes do atlas
-são identidade; quem avisa que a cura está acontecendo *agora* é a partícula
+são identidade; quem avisa que a cura está acontecendo _agora_ é a partícula
 `mycelium`, semeada pelo evento `heal`.
 
 Ela **sobe**. Todo o resto do sistema cai — brasa, entulho, caco, respingo — porque
@@ -462,7 +462,7 @@ Três correções que só apareceram olhando o resultado:
    óbvio e reproduzia exatamente o erro que a silhueta de fallback já tinha cometido:
    um retângulo claro e contínuo sobre quatro apoios lê como **tampo de mesa**, não
    como lombo. Placas discretas com vão entre elas devolvem a leitura de dorso — e
-   ainda batem com a referência, que descreve *shelf fungi*, cogumelos de prateleira.
+   ainda batem com a referência, que descreve _shelf fungi_, cogumelos de prateleira.
 
 E a crina fica **atrás** da cabeça, nunca por cima: coberta por ela, a cabeça sumia
 dentro do fogo e o bicho perdia o único ponto que diz para onde está virado.

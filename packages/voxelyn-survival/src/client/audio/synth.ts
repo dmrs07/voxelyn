@@ -1560,52 +1560,181 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       ],
       0.33,
     ),
-  // A broca: motor ganhando rotacao durante o windup inteiro (1,8 s).
-  // Dente de serra subindo com a quinta desafinada por cima — a mesma
-  // gramatica do motor da minigun, porque e a mesma familia de maquina.
-  diamandisDrillSpin: (ctx, out, t0, noise) => {
-    sustain(ctx, out, t0, {
-      type: 'sawtooth',
-      from: 55,
-      to: 210,
-      peak: 0.4,
-      attack: 1.4,
-      hold: 0.3,
-      release: 0.15,
-    });
-    sustain(ctx, out, t0, {
-      type: 'square',
-      from: 82,
-      to: 315,
-      peak: 0.1,
-      attack: 1.4,
-      hold: 0.3,
-      release: 0.15,
-      detune: 12,
-    });
-    burst(ctx, out, t0 + 0.3, noise, {
-      peak: 0.18,
-      decay: 1.5,
+  // A BROCA COMO MAQUINA (o motor e o leito; estes sao os transientes).
+  // O engate: a hidraulica do alinhamento — um sopro de valvula e o baque
+  // do sistema assumindo o mancal.
+  diamandisDrillEngage: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.28,
       type: 'bandpass',
-      from: 400,
-      to: 2400,
-      q: 1.3,
-      attack: 0.6,
+      from: 700,
+      to: 1800,
+      q: 1.6,
+      attack: 0.02,
+    });
+    tone(ctx, out, t0 + 0.05, {
+      type: 'square',
+      from: 140,
+      to: 70,
+      peak: 0.35,
+      decay: 0.12,
+      attack: 0.004,
+    });
+    tone(ctx, out, t0 + 0.05, {
+      type: 'sine',
+      from: 70,
+      to: 40,
+      peak: 0.45,
+      decay: 0.16,
+      attack: 0.004,
     });
   },
-  // Contato com o chao: subgrave e fragmentacao metalica.
-  diamandisDrillImpact: (ctx, out, t0, noise) => {
-    tone(ctx, out, t0, { type: 'sine', from: 90, to: 36, peak: 0.85, decay: 0.3, attack: 0.004 });
-    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.22, type: 'lowpass', from: 2400, to: 300 });
-    for (let i = 0; i < 4; i++) {
-      tone(ctx, out, t0 + 0.04 + i * 0.05, {
-        type: 'square',
-        from: 1900 - i * 210,
-        to: 1200,
-        peak: 0.12,
-        decay: 0.035,
+  // Um clique do mancal: metal seco, curto, com um resto de mola.
+  diamandisDrillBearing: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.45, decay: 0.05, type: 'highpass', from: 1800, q: 1 });
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 520,
+      to: 260,
+      peak: 0.3,
+      decay: 0.06,
+      attack: 0.002,
+    });
+    tone(ctx, out, t0 + 0.03, { type: 'triangle', from: 190, to: 150, peak: 0.18, decay: 0.09 });
+  },
+  // A trava do rumo: dois cliques pesados, o segundo mais grave, e o peso
+  // assentando por baixo.
+  diamandisDrillLock: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.06, type: 'highpass', from: 1400, q: 1 });
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 400,
+      to: 200,
+      peak: 0.35,
+      decay: 0.07,
+      attack: 0.002,
+    });
+    burst(ctx, out, t0 + 0.09, noise, {
+      peak: 0.5,
+      decay: 0.08,
+      type: 'lowpass',
+      from: 1600,
+      to: 500,
+    });
+    tone(ctx, out, t0 + 0.09, {
+      type: 'sine',
+      from: 110,
+      to: 55,
+      peak: 0.5,
+      decay: 0.2,
+      attack: 0.003,
+    });
+  },
+  // O ARRANQUE: subgrave curto e o corpo inteiro se deslocando — o peso
+  // saindo do lugar. Nada de laser.
+  diamandisDrillLaunch: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 60, to: 28, peak: 0.95, decay: 0.42, attack: 0.006 });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 90,
+      to: 45,
+      peak: 0.25,
+      decay: 0.3,
+      attack: 0.01,
+    });
+    burst(ctx, out, t0 + 0.01, noise, {
+      peak: 0.45,
+      decay: 0.3,
+      type: 'lowpass',
+      from: 900,
+      to: 200,
+    });
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.2,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 300,
+      to: 1200,
+      q: 1.2,
+      attack: 0.08,
+    });
+  },
+  // PEDRA: a batida no que a broca nao come. Grave seco, fragmentacao de
+  // rocha por cima, e o metal travando com um resto de raspagem.
+  diamandisDrillWall: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 95, to: 34, peak: 0.95, decay: 0.34, attack: 0.003 });
+    burst(ctx, out, t0, noise, { peak: 0.65, decay: 0.2, type: 'lowpass', from: 2600, to: 320 });
+    for (let i = 0; i < 5; i++) {
+      burst(ctx, out, t0 + 0.02 + i * 0.035, noise, {
+        peak: 0.28,
+        decay: 0.03,
+        type: 'bandpass',
+        from: 2400 - i * 300,
+        q: 6,
       });
     }
+    burst(ctx, out, t0 + 0.12, noise, {
+      peak: 0.22,
+      decay: 0.45,
+      type: 'bandpass',
+      from: 1400,
+      to: 500,
+      q: 2,
+      attack: 0.02,
+    });
+  },
+  // DERRAPAGEM: nenhum baque — os pes raspando ate parar e o metal
+  // assentando. E o "passou reto".
+  diamandisDrillSkid: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.45,
+      decay: 0.5,
+      type: 'lowpass',
+      from: 900,
+      to: 250,
+      attack: 0.02,
+    });
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.25,
+      decay: 0.4,
+      type: 'bandpass',
+      from: 1800,
+      to: 700,
+      q: 3,
+    });
+    tone(ctx, out, t0 + 0.3, { type: 'square', from: 220, to: 160, peak: 0.12, decay: 0.1 });
+    tone(ctx, out, t0 + 0.42, { type: 'sine', from: 80, to: 50, peak: 0.3, decay: 0.16 });
+  },
+  // O JOGADOR: transiente seco e uma continuacao METALICA — um zunido de
+  // chapa e o guincho da broca mordendo metal, distinto da pedra.
+  diamandisDrillStrike: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 120, to: 50, peak: 0.7, decay: 0.16, attack: 0.002 });
+    burst(ctx, out, t0, noise, { peak: 0.5, decay: 0.08, type: 'highpass', from: 2200, q: 1 });
+    tone(ctx, out, t0 + 0.02, {
+      type: 'square',
+      from: 1500,
+      to: 900,
+      peak: 0.22,
+      decay: 0.28,
+      detune: 14,
+    });
+    tone(ctx, out, t0 + 0.02, {
+      type: 'sawtooth',
+      from: 2250,
+      to: 1300,
+      peak: 0.12,
+      decay: 0.32,
+      detune: -9,
+    });
+    burst(ctx, out, t0 + 0.04, noise, {
+      peak: 0.2,
+      decay: 0.35,
+      type: 'bandpass',
+      from: 3200,
+      to: 1800,
+      q: 5,
+    });
   },
   // Tres bipes corporativos secos, ACELERANDO: as cargas armando.
   diamandisChargeArmed: (ctx, out, t0) => {

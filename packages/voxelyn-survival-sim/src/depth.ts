@@ -53,8 +53,7 @@ export const isRunFinalSector = (state: SurvivalState): boolean =>
 export const hasCoreInSector = (state: SurvivalState, sector: number): boolean =>
   runDepth(state).coreSectors.includes(sector);
 
-export const hasCoreHere = (state: SurvivalState): boolean =>
-  hasCoreInSector(state, state.sector);
+export const hasCoreHere = (state: SurvivalState): boolean => hasCoreInSector(state, state.sector);
 
 /** O Nucleo do setor N ja saiu do pedestal? */
 export const isCoreTaken = (state: SurvivalState, sector: number): boolean =>
@@ -76,12 +75,10 @@ export const clearCoreTaken = (state: SurvivalState, sector: number): void => {
 };
 
 /** Quantos Nucleos estao NA CARGA agora. */
-export const countCoresTaken = (state: SurvivalState): number =>
-  popcount(state.coresTakenMask);
+export const countCoresTaken = (state: SurvivalState): number => popcount(state.coresTakenMask);
 
 /** Quantos Nucleos esta run pode render, no maximo. */
-export const coresAvailable = (state: SurvivalState): number =>
-  runDepth(state).coreSectors.length;
+export const coresAvailable = (state: SurvivalState): number => runDepth(state).coreSectors.length;
 
 /**
  * O Nucleo MAIS FUNDO da run — o que sela o poco quando sai do pedestal.
@@ -143,8 +140,7 @@ export const markSectorBossDown = (state: SurvivalState, sector: number): void =
 };
 
 /** Ha dono neste setor? Um setor sem dono nunca bloqueia nada. */
-export const sectorHasBoss = (state: SurvivalState): boolean =>
-  state.sectorBoss.archetype !== null;
+export const sectorHasBoss = (state: SurvivalState): boolean => state.sectorBoss.archetype !== null;
 
 /**
  * O poco/portal deste setor aceita interacao?

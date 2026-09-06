@@ -142,7 +142,9 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
   },
   bishop: { nova: 'bishopNovaCharge' },
   diamandis: {
-    drill: 'diamandisDrillSpin',
+    // O preparo da broca e a hidraulica ENGATANDO o alinhamento; o giro que
+    // sobe e o leito (diamandis-drill-bus.ts), lendo o estado.
+    drill: 'diamandisDrillEngage',
     demolish: 'diamandisChargeArmed',
     beam: 'diamandisBeamScan',
   },
@@ -197,7 +199,9 @@ const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
   // mesmo golpe de massa, menor.
   guardian: { slam: 'guardianSlam', charge: 'guardianSlam', contact: 'guardianSlam' },
   diamandis: {
-    drill: 'diamandisDrillImpact',
+    // O release da broca e o ARRANQUE: o transiente grave do peso saindo do
+    // lugar. As batidas (pedra, derrapagem, jogador) sao `boss_state`.
+    drill: 'diamandisDrillLaunch',
     demolish: 'diamandisImplosion',
     beam: 'diamandisBeamLocked',
   },
@@ -256,7 +260,18 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
   },
   // O Diamandis: o frenesi (a fala do modulo perdido sai pela tabela de
   // falas; isto e a MAQUINA, nao a voz corporativa).
-  diamandis: { frenzy: 'diamandisFrenzy' },
+  diamandis: {
+    frenzy: 'diamandisFrenzy',
+    // A broca como maquina: o mancal clicando por oitante, a trava do rumo,
+    // e os tres finais — pedra (o que ela nao come), derrapagem (passou
+    // reto) e metal (o jogador). Sao finais DIFERENTES de proposito: quem
+    // esta sem olhar sabe o que aconteceu.
+    drill_bearing: 'diamandisDrillBearing',
+    drill_lock: 'diamandisDrillLock',
+    drill_impact: 'diamandisDrillWall',
+    drill_skid: 'diamandisDrillSkid',
+    drill_strike: 'diamandisDrillStrike',
+  },
 };
 
 /**
@@ -471,7 +486,13 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       if (!voice) return [];
       // A ressonancia cai com a camada: a nota de fora e a mais fraca, e e a
       // que o jogador consegue cortar a tempo.
-      const scale = ev.state === 'resonance' ? 0.55 + 0.45 * (ev.intensity ?? 1) : 1;
+      const scale =
+        ev.state === 'resonance'
+          ? 0.55 + 0.45 * (ev.intensity ?? 1)
+          : // A batida da broca pesa o que a velocidade pesava.
+            ev.state === 'drill_impact' || ev.state === 'drill_strike'
+            ? 0.6 + 0.4 * (ev.intensity ?? 1)
+            : 1;
       return [{ voice, x: ev.x, y: ev.y, scale }];
     }
 

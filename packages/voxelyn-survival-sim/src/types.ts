@@ -888,6 +888,17 @@ export type BossRuntime = {
    * Memoria de apresentacao, como as duas acima — fora do hash e do wire.
    */
   drillObstructedAt: number;
+  /**
+   * Tick em que a broca BATEU no que nao come (minerio, cristal, borda), ou
+   * -1. Entra no hash: dali a corrida vira recuo (`drillRecoilStepAt`) e a
+   * recuperacao longa — decide onde o chefe esta e quando volta a agir.
+   */
+  drillImpactAt: number;
+  /**
+   * Tick em que o chassi terminou de ALINHAR com o corredor nesta preparacao,
+   * ou -1. Memoria de apresentacao (um `drill_lock` por aviso), fora do hash.
+   */
+  drillLockedAt: number;
 };
 
 /**
@@ -990,6 +1001,16 @@ export type BossMoment =
   | 'dissonance'
   // Diamandis: a broca encontrou parede — "OBSTRUCAO", uma vez por passagem.
   | 'obstruction'
+  // Diamandis, a broca como MAQUINA (ver diamandis-drill.ts): o mancal cruzou
+  // um oitante enquanto o chassi alinha (um clique); o rumo TRAVOU; a ponta
+  // bateu no que nao come (`x,y` = ponto de contato, `dx,dy` = rumo,
+  // `intensity` = fracao da velocidade); a corrida passou reto e derrapou; a
+  // ponta acertou um jogador (`x,y` = o jogador).
+  | 'drill_bearing'
+  | 'drill_lock'
+  | 'drill_impact'
+  | 'drill_skid'
+  | 'drill_strike'
   // Diamandis: um modulo foi ARRANCADO e a maquina entrou em frenesi (ver
   // `DIAMANDIS_FRENZY_PER_MODULE`). `intensity` e a fracao de modulos
   // perdidos (1/3, 2/3, 1): e o que o reator, a barra e a camada de pressao
@@ -1899,6 +1920,9 @@ export type SemanticEvent =
       x: number;
       y: number;
       intensity?: number;
+      /** O rumo do momento, quando ele tem um (a broca do Diamandis). */
+      dx?: number;
+      dy?: number;
     }
   /**
    * A JANELA DE DANO abriu (`open`) ou fechou. E o "bata agora" sonoro: a

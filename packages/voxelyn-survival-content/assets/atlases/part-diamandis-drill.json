@@ -55,9 +55,9 @@
       "loop": false
     },
     "special": {
-      "frames": 4,
+      "frames": 8,
       "fps": 8,
-      "loop": false
+      "loop": true
     },
     "hit": {
       "frames": 2,
@@ -85,73 +85,73 @@
       "idle": 0,
       "attack": 4,
       "special": 8,
-      "hit": 12,
-      "loose": 14,
-      "carried": 18,
-      "floor": 22
+      "hit": 16,
+      "loose": 18,
+      "carried": 22,
+      "floor": 26
     },
     "dl": {
-      "idle": 23,
-      "attack": 27,
-      "special": 31,
-      "hit": 35,
-      "loose": 37,
-      "carried": 41,
-      "floor": 45
+      "idle": 27,
+      "attack": 31,
+      "special": 35,
+      "hit": 43,
+      "loose": 45,
+      "carried": 49,
+      "floor": 53
     },
     "ur": {
-      "idle": 46,
-      "attack": 50,
-      "special": 54,
-      "hit": 58,
-      "loose": 60,
-      "carried": 64,
-      "floor": 68
+      "idle": 54,
+      "attack": 58,
+      "special": 62,
+      "hit": 70,
+      "loose": 72,
+      "carried": 76,
+      "floor": 80
     },
     "ul": {
-      "idle": 69,
-      "attack": 73,
-      "special": 77,
-      "hit": 81,
-      "loose": 83,
-      "carried": 87,
-      "floor": 91
+      "idle": 81,
+      "attack": 85,
+      "special": 89,
+      "hit": 97,
+      "loose": 99,
+      "carried": 103,
+      "floor": 107
     },
     "r": {
-      "idle": 92,
-      "attack": 96,
-      "special": 100,
-      "hit": 104,
-      "loose": 106,
-      "carried": 110,
-      "floor": 114
+      "idle": 108,
+      "attack": 112,
+      "special": 116,
+      "hit": 124,
+      "loose": 126,
+      "carried": 130,
+      "floor": 134
     },
     "d": {
-      "idle": 115,
-      "attack": 119,
-      "special": 123,
-      "hit": 127,
-      "loose": 129,
-      "carried": 133,
-      "floor": 137
+      "idle": 135,
+      "attack": 139,
+      "special": 143,
+      "hit": 151,
+      "loose": 153,
+      "carried": 157,
+      "floor": 161
     },
     "l": {
-      "idle": 138,
-      "attack": 142,
-      "special": 146,
-      "hit": 150,
-      "loose": 152,
-      "carried": 156,
-      "floor": 160
+      "idle": 162,
+      "attack": 166,
+      "special": 170,
+      "hit": 178,
+      "loose": 180,
+      "carried": 184,
+      "floor": 188
     },
     "u": {
-      "idle": 161,
-      "attack": 165,
-      "special": 169,
-      "hit": 173,
-      "loose": 175,
-      "carried": 179,
-      "floor": 183
+      "idle": 189,
+      "attack": 193,
+      "special": 197,
+      "hit": 205,
+      "loose": 207,
+      "carried": 211,
+      "floor": 215
     }
   },
   "generation": {

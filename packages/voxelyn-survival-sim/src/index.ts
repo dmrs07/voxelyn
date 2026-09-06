@@ -19,6 +19,7 @@ export {
   nearestStandingPlayer,
 } from './run.js';
 export * from './leviathan.js';
+export * from './diamandis-drill.js';
 export {
   generateWorld,
   floodOpen,

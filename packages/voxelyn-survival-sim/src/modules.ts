@@ -184,7 +184,11 @@ const createModule = (id: ModuleId, tick: number): ActiveModule => {
 };
 
 /** Grants a module or refreshes the existing instance to its configured maximum. */
-export const grantOrRechargeModule = (extra: PlayerExtra, id: ModuleId, tick: number): ActiveModule => {
+export const grantOrRechargeModule = (
+  extra: PlayerExtra,
+  id: ModuleId,
+  tick: number,
+): ActiveModule => {
   const existing = activeModule(extra, id);
   const fresh = createModule(id, tick);
   if (!existing) {
@@ -223,7 +227,7 @@ export const consumeModuleCharge = (
    * desta funcao que decide alguma coisa (a ejecao visual, o retorno do tiro
    * comum), e ele continua saindo exatamente uma vez.
    */
-  quiet = false
+  quiet = false,
 ): boolean => {
   const index = extra.activeModules.findIndex((module) => module.id === id);
   if (index < 0) return false;
@@ -250,7 +254,7 @@ export const expireTimedModules = (
   extra: PlayerExtra,
   tick: number,
   slot: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   for (let i = extra.activeModules.length - 1; i >= 0; i--) {
     const module = extra.activeModules[i];
@@ -288,7 +292,7 @@ export const rollModuleChoice = (
   siteId: number,
   tier: 1 | 2 | 3,
   extra: PlayerExtra,
-  tick: number
+  tick: number,
 ): PendingModuleChoice['options'] => {
   const rng = new RNG((seed ^ Math.imul(siteId + 1, 0x9e3779b9)) >>> 0 || 1);
   const base = tierPool(tier);
@@ -297,14 +301,18 @@ export const rollModuleChoice = (
   const preferred = rotated.filter((id) => !isFull(extra, id, tick));
   const candidates = preferred.length >= 2 ? preferred : rotated;
 
-  const safe = candidates.find((id) => !MODULE_DEFINITIONS[id].tags.includes('volatile')) ?? candidates[0];
-  const companion = candidates.find((id) => {
-    if (id === safe) return false;
-    if (MODULE_DEFINITIONS[safe].tags.includes('volatile')) {
-      return !MODULE_DEFINITIONS[id].tags.includes('volatile');
-    }
-    return true;
-  }) ?? rotated.find((id) => id !== safe) ?? safe;
+  const safe =
+    candidates.find((id) => !MODULE_DEFINITIONS[id].tags.includes('volatile')) ?? candidates[0];
+  const companion =
+    candidates.find((id) => {
+      if (id === safe) return false;
+      if (MODULE_DEFINITIONS[safe].tags.includes('volatile')) {
+        return !MODULE_DEFINITIONS[id].tags.includes('volatile');
+      }
+      return true;
+    }) ??
+    rotated.find((id) => id !== safe) ??
+    safe;
 
   return [safe, companion];
 };
@@ -332,7 +340,7 @@ export const liveProjectileModules = <
 >(
   modules: T | undefined,
   extra: PlayerExtra | undefined,
-  tick: number
+  tick: number,
 ): T | undefined => {
   if (!modules) return undefined;
   // Sem o dono a vista (projetil hostil, ou parceiro cujas cargas so o servidor
@@ -342,7 +350,9 @@ export const liveProjectileModules = <
   // serpente verde): a marca caduca cobra a mesma honestidade das outras —
   // sem carga, o dreno nao proca, e a serpente estaria prometendo cura.
   const ids = ['piercing', 'ricochet', 'explosive', 'siphon'] as const;
-  const stale = ids.filter((id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick));
+  const stale = ids.filter(
+    (id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick),
+  );
   if (stale.length === 0) return modules;
   const live = { ...modules };
   for (const id of stale) delete live[id];

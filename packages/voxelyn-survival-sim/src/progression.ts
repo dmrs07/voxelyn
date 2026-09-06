@@ -699,9 +699,7 @@ export const SECTORS_BY_GENERATION: Readonly<Record<ProspectorGeneration, number
  * jogador de G-01 sempre terminou, e mante-la como marco faz a expansao ler
  * como "o mesmo Veio, mais fundo" em vez de um mapa novo.
  */
-export const coreSectorsForGeneration = (
-  generation: ProspectorGeneration,
-): readonly number[] => {
+export const coreSectorsForGeneration = (generation: ProspectorGeneration): readonly number[] => {
   switch (generation) {
     case 'G-04':
       return [3, 7];
@@ -734,13 +732,7 @@ export type RunDepthConfig = {
   coreSectors: readonly number[];
 };
 
-const KNOWN_GENERATIONS: readonly ProspectorGeneration[] = [
-  'G-00',
-  'G-01',
-  'G-02',
-  'G-03',
-  'G-04',
-];
+const KNOWN_GENERATIONS: readonly ProspectorGeneration[] = ['G-00', 'G-01', 'G-02', 'G-03', 'G-04'];
 
 export const isProspectorGeneration = (value: unknown): value is ProspectorGeneration =>
   typeof value === 'string' && (KNOWN_GENERATIONS as readonly string[]).includes(value);

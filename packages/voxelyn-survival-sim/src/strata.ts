@@ -24,7 +24,12 @@
 // setor N precisa ser conhecivel por um cliente que reconecta no meio da run e
 // reconstroi o mundo com `createRun({ sector: N })`, antes de qualquer tick.
 
-import { AQUIFER_PIPE_COUNT, DEFAULT_SECTOR_COUNT, MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
+import {
+  AQUIFER_PIPE_COUNT,
+  DEFAULT_SECTOR_COUNT,
+  MAX_LINEAGE_SECTORS,
+  MINER_PER_SECTOR,
+} from './constants.js';
 import type { EnemyArchetype } from './types.js';
 import type { WorldgenProfile } from './worldgen.js';
 
@@ -342,9 +347,7 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
  * traduz o que quiser em cima disto; a simulacao so responde qual posicao e.
  */
 export const sectorTitle = (runSeed: number, sector: number): string =>
-  LINEAGES[lineageOf(runSeed)][
-    Math.max(1, Math.min(MAX_LINEAGE_SECTORS, sector)) - 1
-  ].title;
+  LINEAGES[lineageOf(runSeed)][Math.max(1, Math.min(MAX_LINEAGE_SECTORS, sector)) - 1].title;
 
 /**
  * A INTENSIDADE de profundidade que os perfis de worldgen leem.
@@ -616,8 +619,7 @@ export const leylineGuaranteeSector = (runSeed: number): number | null => {
   for (let sector = 2; sector <= DEFAULT_SECTOR_COUNT; sector++) {
     const biome = sectorBiome(runSeed, sector);
     const natural =
-      biome.stratum === 'prismatic' ||
-      (biome.occupation === 'aurix' && biome.stratum !== 'ferric');
+      biome.stratum === 'prismatic' || (biome.occupation === 'aurix' && biome.stratum !== 'ferric');
     if (natural) return null;
     if (eligible === null && biome.stratum !== 'ferric') eligible = sector;
   }
@@ -669,33 +671,99 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
     mix =
       depth <= 1
         ? ['stalker', 'bruiser', 'stalker', 'spitter', 'bruiser', 'stalker', 'bomber', 'stalker']
-        : ['bruiser', 'stalker', 'bruiser', 'stalker', 'spitter', 'bomber', 'bruiser', 'stalker', 'bomber', 'stalker'];
+        : [
+            'bruiser',
+            'stalker',
+            'bruiser',
+            'stalker',
+            'spitter',
+            'bomber',
+            'bruiser',
+            'stalker',
+            'bomber',
+            'stalker',
+          ];
   } else if (biome.stratum === 'aquifer') {
     mix =
       depth <= 1
         ? ['spitter', 'stalker', 'spitter', 'stalker', 'bomber', 'spitter', 'stalker', 'bomber']
-        : ['spitter', 'stalker', 'spitter', 'bomber', 'stalker', 'spitter', 'bomber', 'bruiser', 'spitter', 'stalker'];
+        : [
+            'spitter',
+            'stalker',
+            'spitter',
+            'bomber',
+            'stalker',
+            'spitter',
+            'bomber',
+            'bruiser',
+            'spitter',
+            'stalker',
+          ];
   } else if (biome.stratum === 'sulfur') {
     // O bombardeiro daqui e o de ENXOFRE, nunca o de esporos: o Spore Bomber e
     // uma coisa micelial, e nao ha micelio nenhum produzindo esporo dentro de
     // uma fenda de gas. Mesma silhueta, quimica do lugar — e o cadaver dele
     // larga a nuvem que a fenda inteira ja ameaca acender.
-    mix = ['spitter', 'sulfur_bomber', 'bruiser', 'spitter', 'stalker', 'sulfur_bomber', 'bruiser', 'spitter', 'sulfur_bomber', 'stalker'];
+    mix = [
+      'spitter',
+      'sulfur_bomber',
+      'bruiser',
+      'spitter',
+      'stalker',
+      'sulfur_bomber',
+      'bruiser',
+      'spitter',
+      'sulfur_bomber',
+      'stalker',
+    ];
   } else if (biome.stratum === 'furnace') {
     // Corpos minerais e portadores: o que sobrevive ao calor. O bombardeiro,
     // pelo mesmo motivo da Fenda, e o de enxofre — numa caverna de magma a
     // nuvem verde de esporos era o sinal mais fora de lugar do jogo.
-    mix = ['bruiser', 'sulfur_bomber', 'bruiser', 'stalker', 'sulfur_bomber', 'bruiser', 'sulfur_bomber', 'bruiser', 'stalker', 'sulfur_bomber'];
+    mix = [
+      'bruiser',
+      'sulfur_bomber',
+      'bruiser',
+      'stalker',
+      'sulfur_bomber',
+      'bruiser',
+      'sulfur_bomber',
+      'bruiser',
+      'stalker',
+      'sulfur_bomber',
+    ];
   } else if (biome.stratum === 'silica') {
     // Emboscada: stalkers atras de paredes que qualquer tiro abre.
     mix = ['stalker', 'spitter', 'stalker', 'bruiser', 'stalker', 'spitter', 'bomber', 'stalker'];
   } else if (biome.stratum === 'glacial') {
     // Stalker e bruiser, como a tabela da spec: a cripta e silenciosa e dura.
-    mix = ['stalker', 'bruiser', 'stalker', 'bruiser', 'stalker', 'spitter', 'bruiser', 'stalker', 'bruiser', 'stalker'];
+    mix = [
+      'stalker',
+      'bruiser',
+      'stalker',
+      'bruiser',
+      'stalker',
+      'spitter',
+      'bruiser',
+      'stalker',
+      'bruiser',
+      'stalker',
+    ];
   } else if (biome.stratum === 'ferric') {
     // O chao de fabrica do Veio: corpos minerais pesados guardando o minerio
     // (a densidade de MINERS vem do minerCap do perfil, nao da mistura).
-    mix = ['bruiser', 'stalker', 'bruiser', 'spitter', 'bruiser', 'stalker', 'bomber', 'bruiser', 'stalker', 'bruiser'];
+    mix = [
+      'bruiser',
+      'stalker',
+      'bruiser',
+      'spitter',
+      'bruiser',
+      'stalker',
+      'bomber',
+      'bruiser',
+      'stalker',
+      'bruiser',
+    ];
   } else {
     // Basalto: a mistura historica por setor, intocada.
     mix =
@@ -703,7 +771,18 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
         ? ['stalker', 'stalker', 'spitter', 'stalker', 'bomber', 'spitter', 'stalker', 'bomber']
         : depth === 2
           ? ['stalker', 'spitter', 'bruiser', 'stalker', 'bomber', 'spitter', 'bruiser', 'stalker']
-          : ['stalker', 'stalker', 'spitter', 'bruiser', 'stalker', 'spitter', 'bomber', 'bruiser', 'bomber', 'stalker'];
+          : [
+              'stalker',
+              'stalker',
+              'spitter',
+              'bruiser',
+              'stalker',
+              'spitter',
+              'bomber',
+              'bruiser',
+              'bomber',
+              'stalker',
+            ];
   }
 
   if (biome.occupation === 'mycelial') {

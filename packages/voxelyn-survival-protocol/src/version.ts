@@ -921,7 +921,17 @@ export const PROTOCOL_VERSION = 32;
 //     (larga a acao em curso). O frenesi so conta a partir do tick seguinte
 //     ao arranque (`frenzyRipTick`/`frenzyRipCount`, no hash): duas maquinas
 //     com listas de inimigos em ordens diferentes chegam ao mesmo dano.
-export const SIMULATION_VERSION = 61;
+// 62: A BROCA DO DIAMANDIS COMO MAQUINA (ver diamandis-drill.ts na sim). O
+//     chassi GIRA ate o rumo durante o aviso em vez de virar de uma vez; a
+//     corrida tem perfil de velocidade (solavanco, aceleracao forte no
+//     primeiro terco, maximo no meio, derrapagem no fim — mesmo alcance
+//     total); alguns graus de correcao nos seis primeiros ticks; o dano e a
+//     CAPSULA da ponta, conferida depois do passo; bater no que ela nao come
+//     (minerio, cristal, borda) e IMPACTO: recuo de 8 ticks e 30 parada
+//     (`drillImpactAt`, no hash); passar reto custa 14 parada. Onde o chefe
+//     esta, quando fere e quando volta a agir mudaram: um replay de 61 nao
+//     bate.
+export const SIMULATION_VERSION = 62;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

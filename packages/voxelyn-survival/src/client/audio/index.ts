@@ -31,6 +31,13 @@ import { cuesForEvents, type Cue } from './cues';
 import { DevourerVortexBus } from './devourer-vortex-bus';
 import { FurnaceHeartBus } from './furnace-heart-bus';
 import { DiamandisFrenzyBus } from './diamandis-frenzy-bus';
+import {
+  DiamandisDrillBus,
+  drillBedInput,
+  emptyDrillMemory,
+  noteDrillMoment,
+  type DrillBedMemory,
+} from './diamandis-drill-bus';
 import { LungBreathBus } from './lung-breath-bus';
 import { MinigunBus } from './minigun-bus';
 import { CueMixer, NEAR_CUTOFF_HZ, distanceGain } from './mixer';
@@ -132,6 +139,10 @@ export class AudioDirector {
   private lungBus: LungBreathBus | null = null;
   private furnaceBus: FurnaceHeartBus | null = null;
   private frenzyBus: DiamandisFrenzyBus | null = null;
+  private drillBus: DiamandisDrillBus | null = null;
+  /** A memoria do leito da broca: a recuperacao que os eventos anunciam. */
+  private drillMemory: DrillBedMemory = emptyDrillMemory();
+  private lastTickSeen = 0;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
@@ -444,6 +455,8 @@ export class AudioDirector {
       this.furnaceBus.start();
       this.frenzyBus = new DiamandisFrenzyBus(ctx, bossLofi, this.noise);
       this.frenzyBus.start();
+      this.drillBus = new DiamandisDrillBus(ctx, bossLofi, this.noise);
+      this.drillBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
       this.musicBus.setVolume(this.musicVolume);
@@ -475,6 +488,15 @@ export class AudioDirector {
 
   /** Consome a leva de eventos autoritativos e dispara o que couber. */
   ingest(events: readonly SemanticEvent[], nowMs: number, state?: SurvivalState): void {
+    // A memoria do leito da broca vem dos EVENTOS (que viajam no wire), antes
+    // de qualquer portao de audio: quem liga o som no meio da recuperacao
+    // ouve o spin-down certo.
+    const tick = state?.tick ?? this.lastTickSeen;
+    for (const ev of events) {
+      if (ev.t === 'boss_state' && ev.archetype === 'diamandis') {
+        noteDrillMoment(this.drillMemory, ev.state, tick);
+      }
+    }
     if (!this.ready || this.muted || events.length === 0) return;
     const listener = this.listenerPosition(state);
     const cues = cuesForEvents(events, {
@@ -488,6 +510,7 @@ export class AudioDirector {
 
   /** Atualiza a ambiencia a partir do estado. Chamar uma vez por quadro. */
   update(state: SurvivalState, nowMs: number): void {
+    this.lastTickSeen = state.tick;
     if (!this.ready || this.muted) return;
     this.worldWidth = state.config.width;
 
@@ -637,6 +660,7 @@ export class AudioDirector {
     this.lungBus?.silence();
     this.furnaceBus?.silence();
     this.frenzyBus?.silence();
+    this.drillBus?.silence();
   }
 
   /**
@@ -679,7 +703,13 @@ export class AudioDirector {
     // entao o leito sobe no mesmo tick em que o dano sobe.
     if (boss?.archetype === 'diamandis') {
       this.frenzyBus?.set({ stacks: diamandisFrenzyStacks(state), presence });
-    } else this.frenzyBus?.silence();
+      // A broca como maquina: giro, velocidade e passagem do estado (e da
+      // memoria dos eventos, para a recuperacao) — ver diamandis-drill-bus.ts.
+      this.drillBus?.set(drillBedInput(state, boss, listener, this.drillMemory, presence));
+    } else {
+      this.frenzyBus?.silence();
+      this.drillBus?.silence();
+    }
   }
 
   /**
