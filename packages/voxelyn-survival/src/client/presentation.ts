@@ -13,7 +13,12 @@ import {
   type SurvivalState,
 } from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
-import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
+import {
+  ARCHETYPE_DIRECTIONS,
+  type EntityAnimState,
+  type LayeredPlayerAnimation,
+  type SpriteAnimationSelection,
+} from './sprites';
 
 /**
  * Camadas de rumo que uma entidade desenha ao mesmo tempo. As pernas seguem o
@@ -419,7 +424,15 @@ export class EntityPresentation {
     y: number,
     nowMs: number,
   ): { x: number; y: number } {
-    return this.facingHysteresis.resolve(entity.id * 2 + layer, x, y, nowMs);
+    // Um sprite de OITO rumos (o Diamandis) divide a tela em oito setores; o
+    // resto em quatro. A histerese e a mesma; a fatia e que muda.
+    return this.facingHysteresis.resolve(
+      entity.id * 2 + layer,
+      x,
+      y,
+      nowMs,
+      ARCHETYPE_DIRECTIONS[entity.archetype] ?? 4,
+    );
   }
 
   ingest(events: readonly SemanticEvent[], nowMs: number): void {

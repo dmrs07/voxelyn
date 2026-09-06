@@ -266,6 +266,13 @@ export class BossHealthBarPresentation {
         if (this.shown && this.shown.archetype === ev.archetype && !this.shown.death) {
           this.markPhase(nowMs);
         }
+      } else if (ev.t === 'boss_state' && ev.state === 'frenzy') {
+        // O FRENESI do Diamandis e uma virada como a fase: o acento atravessa a
+        // moldura uma vez e o nome intensifica. Sem efeito de tela inteira.
+        if (this.shown && this.shown.archetype === ev.archetype && !this.shown.death) {
+          this.shown.phaseAt = nowMs;
+          this.phaseEventAt = nowMs;
+        }
       } else if (ev.t === 'death') {
         if (this.shown && this.shown.archetype === ev.archetype) {
           this.deathEventArchetype = ev.archetype;

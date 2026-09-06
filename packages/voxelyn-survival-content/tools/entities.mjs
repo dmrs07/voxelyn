@@ -28,6 +28,12 @@ export const ANIM_ORDER = [
   'die',
   'fly',
   'burst',
+  // As POSES das pecas destacaveis (part-diamandis-*): solta no encaixe,
+  // pendurada no eletroima de um Coveiro, caida no chao. No fim da lista de
+  // proposito: nenhum atlas existente as tem, entao nenhum frameMap se move.
+  'loose',
+  'carried',
+  'floor',
 ];
 const DIRS = ['dr', 'dl', 'ur', 'ul'];
 const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
@@ -1513,6 +1519,8 @@ const undertakerModel = (anim, f) => {
   b.push(box(2.5, -1.5, 4.5 + idle - slam, 2.5, 3, 0.5, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
+/** O ponto de onde o eletroima do Coveiro segura a peca: a base do anel. */
+export const UNDERTAKER_SOCKETS = { magnet: { x: -5.25, y: 0, z: 4.3 } };
 const undertakerFrame = (dir, anim, f) =>
   renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
 
@@ -1560,18 +1568,40 @@ const undertakerFrame = (dir, anim, f) =>
 //   3. Os TRES MODULOS salientes — o que os Coveiros vem buscar, e por isso
 //      precisam parecer peças aparafusadas, e nao partes do corpo.
 // ---------------------------------------------------------------------------
-const diamandisModel = (anim, f) => {
+// O corpo e as PECAS sao atlas separados desde a reformulacao dos Coveiros:
+// as tres ferramentas sao arrancadas de verdade, e um sprite unico nao tem
+// como perder um pedaco. O CHASSI (`enemy-diamandis`) e o que fica sempre —
+// pernas, ventre, deck, torre, reator e os ENCAIXES vazios —, e cada
+// ferramenta e um `part-diamandis-*` autorado em volta do proprio encaixe,
+// em oito rumos como o chassi (um corpo em quatro debaixo de pecas em oito
+// discordaria dos encaixes nas diagonais). O gerador publica no manifest do
+// chassi ONDE cada peca se prende, por rumo (`sockets`); o cliente desenha a
+// peca com a ancora dela nesse ponto.
+//
+// Todas as pecas seguem o mesmo relogio do chassi (o respiro do idle, o
+// recuo do hit) porque sao autoradas em coordenadas ABSOLUTAS do modelo e so
+// depois trazidas para o encaixe: um encaixe estatico com uma peca que
+// respira junto do corpo.
+const DIAMANDIS_Z0 = 5.5;
+const diamandisZ = (anim, f) =>
+  DIAMANDIS_Z0 +
+  (anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0) -
+  (anim === 'hit' ? [1, 0][f % 2] : 0);
+
+/**
+ * Os ENCAIXES, em unidades de modelo (estaticos: sem o respiro). A ordem de
+ * `DIAMANDIS_PARTS` e a dos bits de modulo da simulacao (BOSS_MODULE_DRILL,
+ * TOWER, SCANNER = 0, 1, 2): a broca, o rack de demolicao, o mastro.
+ */
+export const DIAMANDIS_PARTS = ['drill', 'rack', 'mast'];
+export const DIAMANDIS_SOCKETS = {
+  drill: { x: 0, y: -3, z: DIAMANDIS_Z0 + 3.1 },
+  rack: { x: 0, y: 3.8, z: DIAMANDIS_Z0 + 12.2 },
+  mast: { x: 0, y: -0.2, z: DIAMANDIS_Z0 + 12.2 },
+};
+
+export const diamandisChassis = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
-  // `special` e a carga da broca: 1,8 s parado com a ponta girando. E o
-  // telegrafo mais longo do jogo e tem de PARECER longo — a broca avanca sobre
-  // o mancal sem que o chefe saia do lugar.
-  const wind = anim === 'special' ? Math.min(3, f) : 0;
-  const fire = anim === 'attack' ? [0, 2, 1, 0][f % 4] : 0;
-  const idle = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
-  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  // A broca gira SEMPRE, em todo quadro de toda animacao: uma ferramenta
-  // industrial que so gira quando ataca e uma arma disfarçada de ferramenta.
-  const spin = f % 4;
   const b = [];
 
   // PERNAS com vao. O primeiro desenho tinha quatro pastilhas coladas no chassi
@@ -1585,7 +1615,7 @@ const diamandisModel = (anim, f) => {
     }
   }
 
-  const z = 5.5 + idle - flinch;
+  const z = diamandisZ(anim, f);
   // Ventre: o volume mais estreito, para o corpo AFINAR na cintura em vez de
   // ser um bloco unico do chao ao topo.
   b.push(box(-3.5, -3.5, z, 7, 7, 4, 'rust'));
@@ -1604,57 +1634,178 @@ const diamandisModel = (anim, f) => {
   b.push(box(-2.6, -4.6, z + 0.4, 5.2, 1.4, 3.4, 'fire'));
   b.push(box(-1.6, -5, z + 1, 3.2, 0.8, 2.2, 'loot'));
 
-  // MODULO 1 — A BROCA. Cone de cinco degraus afinando ate a ponta, montado
-  // num mancal a frente do ventre e na altura dele: a broca do jogo abre um
-  // CORREDOR no chao, entao ela nao pode estar apontada para o horizonte.
-  const bit = -6 - wind - fire * 0.5;
-  b.push(box(-3, bit + 3, z + 0.6, 6, 3, 5, 'rust')); // mancal
-  b.push(box(-2.4, bit + 1.4, z + 0.6, 4.8, 2, 4.2, 'rockDeep'));
-  b.push(box(-1.9, bit - 0.2, z + 1.1, 3.8, 2, 3.2, 'bone'));
-  b.push(box(-1.4, bit - 1.8, z + 1.6, 2.8, 2, 2.2, 'bone'));
-  b.push(box(-0.9, bit - 3.2, z + 2.1, 1.8, 1.6, 1.2, 'bone'));
-  b.push(box(-0.4, bit - 4.4, z + 2.4, 0.8, 1.4, 0.6, 'bone'));
-  for (let i = 0; i < 4; i++) {
-    // Helicoide: um nub por degrau, girando um quarto de volta por quadro. E o
-    // giro que faz um cone virar broca — sem ele e um bico.
-    const a = ((spin + i) * Math.PI) / 2;
-    const r = 2.4 - i * 0.45;
-    b.push(
-      box(
-        Math.cos(a) * r - 0.3,
-        bit + 1.4 - i * 1.6,
-        z + 2.6 + Math.sin(a) * r - 0.3,
-        0.6,
-        1.2,
-        0.6,
-        'rust',
-      ),
-    );
-  }
-
-  // MODULO 2 — O RACK DE DEMOLICAO, acima do deck e para tras. Ele fica ACIMA
-  // da linha do corpo porque uma peça encaixada dentro da silhueta nao parece
-  // removivel, e a economia inteira dos Coveiros depende de o jogador olhar
-  // isto e pensar "aquilo sai". Sao TRES cilindros porque a salva tem tres
-  // cargas: quem contar o rack sabe quantos circulos vao nascer no chao.
-  for (let i = 0; i < 3; i++) {
-    const gone = anim === 'attack' && f >= 2 && i === 1;
-    if (gone) continue; // no disparo o do meio ja saiu: o rack conta a salva
-    b.push(box(-3.6 + i * 2.8, 2.6, z + 12.2, 1.8, 2.4, 4.5, 'loot'));
-    b.push(box(-3.8 + i * 2.8, 2.4, z + 16.7, 2.2, 2.8, 0.8, 'rust'));
-  }
-
-  // MODULO 3 — O MASTRO DE PROSPECCAO: a peça mais alta e a mais fina. Ele e o
-  // primeiro sistema a cair no colapso do reator, entao a fragilidade tem de
-  // estar na proporcao — um pino de 1,2 de lado contra um corpo de 9.
-  b.push(box(-0.6, -0.8, z + 12.2, 1.2, 1.2, 6, 'rust'));
-  b.push(box(-1.6, -1.4, z + 18.2, 3.2, 2.6, 1.8, 'rockDeep'));
-  // A lente varre no idle e ACENDE no feixe. Enquanto so varre e sensor —
-  // eletrica, fria; a potencia so aparece no release, e o atlas nao mente
-  // sobre isso: nem no `special` ela vira chama.
-  b.push(box(-1.1, -1.9, z + 18.8, 2.2, 0.8, 0.9, fire >= 2 ? 'loot' : 'electric'));
+  // OS ENCAIXES. O que fica quando a peca sai — e o que a peca cobre enquanto
+  // esta montada. Cada um e uma boca escura: o vazio de uma ferramenta que
+  // foi arrancada tem de se ler como falta, nao como parede lisa.
+  //
+  // Da broca: o MANCAL, fixo (a broca e que avanca sobre ele na carga), com a
+  // boca do eixo na face da frente.
+  b.push(box(-3, -3, z + 0.6, 6, 3, 5, 'rust'));
+  b.push(box(-1.2, -3.4, z + 2.3, 2.4, 0.6, 1.6, 'rockDeep'));
+  // Do rack: dois montantes atras da torre e tres pastilhas de fixacao no topo.
+  b.push(box(-3.6, 2.8, z + 8.2, 0.8, 1.8, 4, 'rockDeep'));
+  b.push(box(2.8, 2.8, z + 8.2, 0.8, 1.8, 4, 'rockDeep'));
+  for (let i = 0; i < 3; i++) b.push(box(-3.6 + i * 2.8, 2.6, z + 12.2, 1.8, 2.4, 0.4, 'rockDeep'));
+  // Do mastro: o anel da base no topo da torre.
+  b.push(box(-1, -1.2, z + 12.2, 2, 2, 0.4, 'rockDeep'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
+
+/** Uma peca MONTADA, em coordenadas absolutas do chassi (o mesmo relogio). */
+const diamandisPartBoxes = (part, anim, f) => {
+  const z = diamandisZ(anim, f);
+  const fire = anim === 'attack' ? [0, 2, 1, 0][f % 4] : 0;
+  const wind = anim === 'special' ? Math.min(3, f) : 0;
+  // A broca gira SEMPRE, em todo quadro de toda pose: uma ferramenta
+  // industrial que so gira quando ataca e uma arma disfarçada de ferramenta.
+  const spin = f % 4;
+  const b = [];
+  if (part === 'drill') {
+    // Cone de cinco degraus afinando ate a ponta, saindo do mancal a frente
+    // do ventre e na altura dele: a broca do jogo abre um CORREDOR no chao,
+    // entao ela nao pode estar apontada para o horizonte. Na carga (`special`)
+    // ela AVANCA sobre o mancal sem que o chefe saia do lugar — e o telegrafo
+    // mais longo do jogo e tem de PARECER longo.
+    const bit = -6 - wind - fire * 0.5;
+    b.push(box(-2.4, bit + 1.4, z + 0.6, 4.8, 2, 4.2, 'rockDeep'));
+    b.push(box(-1.9, bit - 0.2, z + 1.1, 3.8, 2, 3.2, 'bone'));
+    b.push(box(-1.4, bit - 1.8, z + 1.6, 2.8, 2, 2.2, 'bone'));
+    b.push(box(-0.9, bit - 3.2, z + 2.1, 1.8, 1.6, 1.2, 'bone'));
+    b.push(box(-0.4, bit - 4.4, z + 2.4, 0.8, 1.4, 0.6, 'bone'));
+    for (let i = 0; i < 4; i++) {
+      // Helicoide: um nub por degrau, girando um quarto de volta por quadro. E o
+      // giro que faz um cone virar broca — sem ele e um bico.
+      const a = ((spin + i) * Math.PI) / 2;
+      const r = 2.4 - i * 0.45;
+      b.push(
+        box(
+          Math.cos(a) * r - 0.3,
+          bit + 1.4 - i * 1.6,
+          z + 2.6 + Math.sin(a) * r - 0.3,
+          0.6,
+          1.2,
+          0.6,
+          'rust',
+        ),
+      );
+    }
+  } else if (part === 'rack') {
+    // TRES cilindros porque a salva tem tres cargas: quem contar o rack sabe
+    // quantos circulos vao nascer no chao. No disparo o do meio ja saiu.
+    for (let i = 0; i < 3; i++) {
+      const gone = anim === 'attack' && f >= 2 && i === 1;
+      if (gone) continue;
+      b.push(box(-3.6 + i * 2.8, 2.6, z + 12.2, 1.8, 2.4, 4.5, 'loot'));
+      b.push(box(-3.8 + i * 2.8, 2.4, z + 16.7, 2.2, 2.8, 0.8, 'rust'));
+    }
+  } else {
+    // O MASTRO: a peca mais alta e a mais fina — um pino de 1,2 de lado contra
+    // um corpo de 9. A lente varre no idle e ACENDE no feixe: enquanto so
+    // varre e sensor, fria; a potencia so aparece no release.
+    b.push(box(-0.6, -0.8, z + 12.2, 1.2, 1.2, 6, 'rust'));
+    b.push(box(-1.6, -1.4, z + 18.2, 3.2, 2.6, 1.8, 'rockDeep'));
+    b.push(box(-1.1, -1.9, z + 18.8, 2.2, 0.8, 0.9, fire >= 2 ? 'loot' : 'electric'));
+  }
+  return b;
+};
+
+const translateBoxes = (boxes, dx, dy, dz) =>
+  boxes.map((b) => ({ ...b, x: b.x + dx, y: b.y + dy, z: b.z + dz }));
+
+const boundsOfBoxes = (boxes) =>
+  boxes.reduce(
+    (acc, b) => ({
+      minX: Math.min(acc.minX, b.x),
+      maxX: Math.max(acc.maxX, b.x + b.w),
+      minY: Math.min(acc.minY, b.y),
+      maxY: Math.max(acc.maxY, b.y + b.d),
+      minZ: Math.min(acc.minZ, b.z),
+      maxZ: Math.max(acc.maxZ, b.z + b.h),
+    }),
+    {
+      minX: Infinity,
+      maxX: -Infinity,
+      minY: Infinity,
+      maxY: -Infinity,
+      minZ: Infinity,
+      maxZ: -Infinity,
+    },
+  );
+
+/**
+ * Uma peca no CHAO. As compridas (rack, mastro) deitam: o eixo vertical vira
+ * comprimento no chao e a espessura vira altura. A broca ja e comprida no
+ * chao — so pousa. Tudo centrado na propria ancora, que e onde o Coveiro caiu.
+ */
+const layFlat = (part, boxes) => {
+  const bb = boundsOfBoxes(boxes);
+  const cx = (bb.minX + bb.maxX) / 2;
+  if (part === 'drill') {
+    const cy = (bb.minY + bb.maxY) / 2;
+    return boxes.map((b) => ({ ...b, x: b.x - cx, y: b.y - cy, z: b.z - bb.minZ }));
+  }
+  const length = bb.maxZ - bb.minZ;
+  return boxes.map((b) => ({
+    x: b.x - cx,
+    y: b.z - bb.minZ - length / 2,
+    z: b.y - bb.minY,
+    w: b.w,
+    d: b.h,
+    h: b.d,
+    mat: b.mat,
+  }));
+};
+
+/**
+ * O modelo de uma peca por POSE, ja em volta do proprio encaixe (a ancora do
+ * atlas da peca E o encaixe):
+ *
+ *   montada   `idle`/`attack`/`special`/`hit`: o que a peca faz presa ao corpo.
+ *   loose     soltou da carcaca (exposed): afunda meio degrau, balanca e
+ *             faisca no encaixe — a OFERTA que um Coveiro vem buscar.
+ *   carried   pendurada no eletroima de um Coveiro: o topo da peca na ancora,
+ *             o corpo dela balancando abaixo.
+ *   floor     caida onde o carregador morreu.
+ */
+export const diamandisPartModel = (part, anim, f) => {
+  const s = DIAMANDIS_SOCKETS[part];
+  if (anim === 'loose') {
+    const sway = [0.3, 0.6, 0.3, 0][f % 4];
+    const b = translateBoxes(diamandisPartBoxes(part, 'idle', f), -s.x + sway, -s.y, -s.z - 0.6);
+    if (f % 2 === 1) b.push(box(-0.3, -0.3, -0.3, 0.6, 0.6, 0.6, 'electric'));
+    return b;
+  }
+  if (anim === 'carried') {
+    const raw = diamandisPartBoxes(part, 'idle', f);
+    const bb = boundsOfBoxes(raw);
+    const swing = [0, 0.5, 0, -0.5][f % 4];
+    return translateBoxes(
+      raw,
+      -(bb.minX + bb.maxX) / 2 + swing,
+      -(bb.minY + bb.maxY) / 2,
+      -bb.maxZ,
+    );
+  }
+  if (anim === 'floor') return layFlat(part, diamandisPartBoxes(part, 'idle', 0));
+  return translateBoxes(diamandisPartBoxes(part, anim, f), -s.x, -s.y, -s.z);
+};
+
+/**
+ * O Diamandis INTEIRO, montado: chassi mais as tres pecas. Nao vira atlas —
+ * e a referencia dos testes (a silhueta completa continua a de sempre) e do
+ * visualizador.
+ */
+export const diamandisModel = (anim, f) => [
+  ...diamandisChassis(anim, f),
+  ...DIAMANDIS_PARTS.flatMap((part) =>
+    translateBoxes(
+      diamandisPartModel(part, anim, f),
+      DIAMANDIS_SOCKETS[part].x,
+      DIAMANDIS_SOCKETS[part].y,
+      DIAMANDIS_SOCKETS[part].z,
+    ),
+  ),
+];
 
 // ---------------------------------------------------------------------------
 // enemy-white-devourer — o verme dos Sumidouros de Silica.
@@ -3248,8 +3399,31 @@ const magnetarchModel = (anim, f) => {
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 
+// O chassi sem as pecas cabe num quadro menor que o corpo inteiro de antes
+// (120x138): a broca saia dez unidades a frente e o mastro subia ate z=25.
+// Medido sobre as oito rotacoes com 2px de margem — ver tests/diamandis-parts.
+const DIAMANDIS_FRAME = { w: 88, h: 116, ax: 42, ay: 92 };
 const diamandisFrame = (dir, anim, f) =>
-  renderVoxels(diamandisModel(anim, f), DIR_INDEX[dir], 120, 138, 58, 114);
+  renderVoxels(
+    diamandisChassis(anim, f),
+    DIR_INDEX[dir],
+    DIAMANDIS_FRAME.w,
+    DIAMANDIS_FRAME.h,
+    DIAMANDIS_FRAME.ax,
+    DIAMANDIS_FRAME.ay,
+  );
+// Cada peca no proprio quadro, com a ancora NO ENCAIXE (`noFit`: o gerador
+// nao recentraliza). Os quadros sao os menores que enquadram as oito rotacoes
+// de todas as poses com 2px de margem.
+export const DIAMANDIS_PART_FRAMES = {
+  drill: { w: 128, h: 68, ax: 62, ay: 32 },
+  rack: { w: 60, h: 76, ax: 28, ay: 38 },
+  mast: { w: 56, h: 80, ax: 26, ay: 41 },
+};
+const diamandisPartFrame = (part) => (dir, anim, f) => {
+  const fr = DIAMANDIS_PART_FRAMES[part];
+  return renderVoxels(diamandisPartModel(part, anim, f), DIR_INDEX[dir], fr.w, fr.h, fr.ax, fr.ay);
+};
 const devourerFrame = (dir, anim, f) =>
   renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 152, 76, 104);
 const archcantorFrame = (dir, anim, f) =>
@@ -3729,22 +3903,27 @@ export const ENTITY_SPECS = [
     'voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves',
     1,
   ),
-  base(
-    'enemy-undertaker',
-    72,
-    88,
-    34,
-    78,
-    { w: 1, h: 1.5 },
-    { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 },
-    {
-      ...living,
-      special: { frames: 6, fps: 10, loop: false },
-    },
-    undertakerFrame,
-    'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens',
-    1,
-  ),
+  {
+    ...base(
+      'enemy-undertaker',
+      72,
+      88,
+      34,
+      78,
+      { w: 1, h: 1.5 },
+      { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 },
+      {
+        ...living,
+        special: { frames: 6, fps: 10, loop: false },
+      },
+      undertakerFrame,
+      'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens',
+      1,
+    ),
+    // O ELETROIMA: onde a peca arrancada do Diamandis fica pendurada
+    // (`part-diamandis-*`, pose `carried`) — a base do anel, ao lado esquerdo.
+    sockets: UNDERTAKER_SOCKETS,
+  },
   // Chefes. Todos nascem em `version: 1` — sao os primeiros pixels destes
   // atlases; ate agora estes oito arquetipos desenhavam pelo recuo do cliente.
   //
@@ -3754,21 +3933,66 @@ export const ENTITY_SPECS = [
   // congelamento, campo invertendo. Foi o que o Coveiro ensinou — apontar o
   // `special` para o golpe seguinte em vez de para o aviso em curso mostra o
   // membro errado se movendo na hora que decide a luta.
-  base(
-    'enemy-diamandis',
-    120,
-    138,
-    58,
-    114,
-    { w: 1.8, h: 2.4 },
-    { w: 2, h: 2, offsetX: 0, offsetY: 0 },
-    {
-      ...living,
-      special: { frames: 4, fps: 8, loop: false },
-    },
-    diamandisFrame,
-    'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon',
-    1,
+  // O CHASSI do Diamandis, em OITO rumos, com os ENCAIXES publicados. As
+  // ferramentas vivem em `part-diamandis-*` (abaixo). Oito e nao quatro pela
+  // regra das pecas: um corpo em quatro rumos debaixo de pecas em oito
+  // discordaria dos encaixes e das silhuetas nas diagonais — e a broca, que e
+  // a silhueta do chefe, saltaria de 90 em 90 graus enquanto o corredor dela
+  // corre a 45.
+  eightWay({
+    ...base(
+      'enemy-diamandis',
+      DIAMANDIS_FRAME.w,
+      DIAMANDIS_FRAME.h,
+      DIAMANDIS_FRAME.ax,
+      DIAMANDIS_FRAME.ay,
+      { w: 1.8, h: 2.4 },
+      { w: 2, h: 2, offsetX: 0, offsetY: 0 },
+      // Sem `special`: na carga da broca so a BROCA se move, e ela e uma peca
+      // (part-diamandis-drill tem o proprio `special`). O chassi cai no
+      // `attack`, que para ele e a mesma pose parada. Sao 32 quadros a menos
+      // em oito rumos — o que paga o dobro de rumos dentro do orcamento de boot.
+      living,
+      diamandisFrame,
+      'voxel-isometric walking industrial excavator boss chassis in eight facings, exposed ember reactor in the belly, empty drill bearing, rack posts and mast ring where the detachable tools mount, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon',
+      2,
+    ),
+    sockets: DIAMANDIS_SOCKETS,
+  }),
+  // AS PECAS. `noFit`: a ancora e o encaixe, e recentralizar os quadros a
+  // moveria. Sem `walk` (o chassi anda, a peca so respira com ele) e sem
+  // `die` (no abate as pecas que sobraram desabam com o chassi, nao sozinhas).
+  // So a broca tem `special`: e a unica que se move na carga.
+  ...DIAMANDIS_PARTS.map((part) =>
+    eightWay({
+      ...base(
+        `part-diamandis-${part}`,
+        DIAMANDIS_PART_FRAMES[part].w,
+        DIAMANDIS_PART_FRAMES[part].h,
+        DIAMANDIS_PART_FRAMES[part].ax,
+        DIAMANDIS_PART_FRAMES[part].ay,
+        { w: 0.8, h: 0.8 },
+        { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+        {
+          idle: { frames: 4, fps: 6, loop: true },
+          attack: { frames: 4, fps: 12, loop: false },
+          ...(part === 'drill' ? { special: { frames: 4, fps: 8, loop: false } } : {}),
+          hit: { frames: 2, fps: 12, loop: false },
+          loose: { frames: 4, fps: 6, loop: true },
+          carried: { frames: 4, fps: 6, loop: true },
+          floor: { frames: 1, fps: 1, loop: true },
+        },
+        diamandisPartFrame(part),
+        {
+          drill:
+            'voxel-isometric detachable advance drill head of an industrial excavator: five-step bone cone with a spinning helical rib, in eight facings, mounted, hanging loose, carried by an electromagnet and lying on the floor',
+          rack: 'voxel-isometric detachable three-canister demolition rack of an industrial excavator, brass canisters with rusted caps, in eight facings, mounted, hanging loose, carried by an electromagnet and lying on the floor',
+          mast: 'voxel-isometric detachable prospecting mast of an industrial excavator: thin rusted pole with a dark sensor head and a cold cyan lens, in eight facings, mounted, hanging loose, carried by an electromagnet and lying on the floor',
+        }[part],
+        1,
+      ),
+      noFit: true,
+    }),
   ),
   base(
     'enemy-white-devourer',

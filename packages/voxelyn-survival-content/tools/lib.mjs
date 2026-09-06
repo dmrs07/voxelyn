@@ -128,7 +128,10 @@ export const fillDiamond = (g, cx, cy, rx, ry, name) => {
 };
 
 export const line = (g, x0, y0, x1, y1, name) => {
-  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  x0 = Math.round(x0);
+  y0 = Math.round(y0);
+  x1 = Math.round(x1);
+  y1 = Math.round(y1);
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1;
@@ -140,8 +143,14 @@ export const line = (g, x0, y0, x1, y1, name) => {
     set(g, x, y, name);
     if (x === x1 && y === y1) break;
     const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; x += sx; }
-    if (e2 < dx) { err += dx; y += sy; }
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
   }
 };
 
@@ -156,7 +165,14 @@ export const thickLine = (g, x0, y0, x1, y1, width, name) => {
 export const facetEllipse = (g, cx, cy, rx, ry, base, light, shadow) => {
   fillEllipse(g, cx + 1, cy + 1, rx, ry, shadow);
   fillEllipse(g, cx, cy, rx, ry, base);
-  fillEllipse(g, cx - Math.max(1, Math.round(rx * 0.28)), cy - Math.max(1, Math.round(ry * 0.28)), Math.max(1, rx * 0.48), Math.max(1, ry * 0.38), light);
+  fillEllipse(
+    g,
+    cx - Math.max(1, Math.round(rx * 0.28)),
+    cy - Math.max(1, Math.round(ry * 0.28)),
+    Math.max(1, rx * 0.48),
+    Math.max(1, ry * 0.38),
+    light,
+  );
 };
 
 export const outlineWith = (g, name) => {
@@ -186,12 +202,17 @@ export const isEmpty = (g) => {
 };
 
 export const boundingBox = (g) => {
-  let minX = g.w, minY = g.h, maxX = -1, maxY = -1;
+  let minX = g.w,
+    minY = g.h,
+    maxX = -1,
+    maxY = -1;
   for (let y = 0; y < g.h; y++) {
     for (let x = 0; x < g.w; x++) {
       if (!filled(g, x, y)) continue;
-      minX = Math.min(minX, x); minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
     }
   }
   return maxX < 0 ? null : { minX, minY, maxX, maxY };
@@ -214,7 +235,8 @@ export const fitToMargin = (src, margin = 2) => {
 
   const safeWidth = src.w - margin * 2;
   const safeHeight = src.h - margin * 2;
-  if (safeWidth <= 0 || safeHeight <= 0) throw new Error(`margem ${margin} inválida para ${src.w}x${src.h}`);
+  if (safeWidth <= 0 || safeHeight <= 0)
+    throw new Error(`margem ${margin} inválida para ${src.w}x${src.h}`);
 
   const contentWidth = box.maxX - box.minX + 1;
   const contentHeight = box.maxY - box.minY + 1;
@@ -226,9 +248,11 @@ export const fitToMargin = (src, margin = 2) => {
   const out = grid(src.w, src.h);
 
   for (let y = 0; y < targetHeight; y++) {
-    const sourceY = box.minY + Math.min(contentHeight - 1, Math.floor((y * contentHeight) / targetHeight));
+    const sourceY =
+      box.minY + Math.min(contentHeight - 1, Math.floor((y * contentHeight) / targetHeight));
     for (let x = 0; x < targetWidth; x++) {
-      const sourceX = box.minX + Math.min(contentWidth - 1, Math.floor((x * contentWidth) / targetWidth));
+      const sourceX =
+        box.minX + Math.min(contentWidth - 1, Math.floor((x * contentWidth) / targetWidth));
       const sourceIndex = (sourceY * src.w + sourceX) * 4;
       if (src.buf[sourceIndex + 3] === 0) continue;
       const targetIndex = ((offsetY + y) * out.w + offsetX + x) * 4;
@@ -257,27 +281,40 @@ export const fitToMargin = (src, margin = 2) => {
  * LANCA em vez de reescalar: um modelo grande demais e um bug a corrigir no
  * modelo, nao algo a esconder encolhendo o sprite.
  */
-export const fitSpriteToMargin = (frames, margin = 2) => {
+/**
+ * O DESLOCAMENTO que `fitSpriteToMargin` aplica a um conjunto de quadros, sem
+ * aplica-lo. Exposto porque os ENCAIXES publicados no manifest (ver
+ * `spec.sockets` em generate.mjs) sao medidos nos quadros crus e precisam do
+ * mesmo dx/dy que os pixels receberam — senao a peca pousaria onde o corpo
+ * estava antes do enquadramento.
+ */
+export const fitShift = (frames, margin = 2) => {
   const boxes = frames.map(boundingBox).filter(Boolean);
-  if (boxes.length === 0) return frames;
+  if (boxes.length === 0) return { dx: 0, dy: 0 };
   const union = boxes.reduce((a, b) => ({
     minX: Math.min(a.minX, b.minX),
     minY: Math.min(a.minY, b.minY),
     maxX: Math.max(a.maxX, b.maxX),
     maxY: Math.max(a.maxY, b.maxY),
   }));
-
   const { w, h } = frames[0];
   const contentWidth = union.maxX - union.minX + 1;
   const contentHeight = union.maxY - union.minY + 1;
   if (contentWidth > w - margin * 2 || contentHeight > h - margin * 2) {
     throw new Error(
-      `conteudo ${contentWidth}x${contentHeight} nao cabe em ${w}x${h} com margem ${margin}`
+      `conteudo ${contentWidth}x${contentHeight} nao cabe em ${w}x${h} com margem ${margin}`,
     );
   }
+  return {
+    dx: margin + Math.floor((w - margin * 2 - contentWidth) / 2) - union.minX,
+    dy: h - margin - contentHeight - union.minY,
+  };
+};
 
-  const dx = margin + Math.floor((w - margin * 2 - contentWidth) / 2) - union.minX;
-  const dy = h - margin - contentHeight - union.minY;
+export const fitSpriteToMargin = (frames, margin = 2) => {
+  if (frames.length === 0) return frames;
+  const { w, h } = frames[0];
+  const { dx, dy } = fitShift(frames, margin);
   if (dx === 0 && dy === 0) return frames;
 
   return frames.map((src) => {

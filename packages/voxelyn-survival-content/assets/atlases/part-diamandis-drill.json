@@ -1,0 +1,162 @@
+{
+  "id": "part-diamandis-drill",
+  "version": 1,
+  "atlas": "part-diamandis-drill.png",
+  "normalAtlas": "part-diamandis-drill.normal.png",
+  "normalScale": 2,
+  "frameWidth": 128,
+  "frameHeight": 68,
+  "columns": 31,
+  "anchorX": 62,
+  "anchorY": 32,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.8,
+    "h": 0.8
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 8,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "loose": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "carried": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "floor": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4,
+      "special": 8,
+      "hit": 12,
+      "loose": 14,
+      "carried": 18,
+      "floor": 22
+    },
+    "dl": {
+      "idle": 23,
+      "attack": 27,
+      "special": 31,
+      "hit": 35,
+      "loose": 37,
+      "carried": 41,
+      "floor": 45
+    },
+    "ur": {
+      "idle": 46,
+      "attack": 50,
+      "special": 54,
+      "hit": 58,
+      "loose": 60,
+      "carried": 64,
+      "floor": 68
+    },
+    "ul": {
+      "idle": 69,
+      "attack": 73,
+      "special": 77,
+      "hit": 81,
+      "loose": 83,
+      "carried": 87,
+      "floor": 91
+    },
+    "r": {
+      "idle": 92,
+      "attack": 96,
+      "special": 100,
+      "hit": 104,
+      "loose": 106,
+      "carried": 110,
+      "floor": 114
+    },
+    "d": {
+      "idle": 115,
+      "attack": 119,
+      "special": 123,
+      "hit": 127,
+      "loose": 129,
+      "carried": 133,
+      "floor": 137
+    },
+    "l": {
+      "idle": 138,
+      "attack": 142,
+      "special": 146,
+      "hit": 150,
+      "loose": 152,
+      "carried": 156,
+      "floor": 160
+    },
+    "u": {
+      "idle": 161,
+      "attack": 165,
+      "special": 169,
+      "hit": 173,
+      "loose": 175,
+      "carried": 179,
+      "floor": 183
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric detachable advance drill head of an industrial excavator: five-step bone cone with a spinning helical rib, in eight facings, mounted, hanging loose, carried by an electromagnet and lying on the floor",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

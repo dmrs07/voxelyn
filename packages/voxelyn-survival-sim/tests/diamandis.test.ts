@@ -10,16 +10,26 @@
 //    resposta.
 // 3. O COLAPSO muda a luta, e nao so os numeros: uma arma DESLIGA.
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy } from '../src/entities';
+import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
+import {
+  ARCHETYPES,
+  damageEntity,
+  diamandisFrenzyMultiplier,
+  diamandisFrenzyStacks,
+  ripDiamandisModule,
+  spawnEnemy,
+} from '../src/entities';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import {
   DIAMANDIS_BEAM_WINDUP_TICKS,
   DIAMANDIS_DEMOLISH_CHARGES,
   DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  DIAMANDIS_DRILL_DAMAGE,
   DIAMANDIS_DRILL_TICKS,
   DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_RIP_STAGGER_TICKS,
+  UNDERTAKER_SLAM_DAMAGE,
   DIAMANDIS_MODULE_COUNT,
   DIAMANDIS_MODULE_EXPOSE_AT,
   DIAMANDIS_MODULE_ORE,
@@ -94,8 +104,9 @@ const awaitAction = (
 
 describe('Diamandis — onde ele mora', () => {
   it('e o chefe do mapa final marcado pela Cicatriz Aurix', () => {
-    expect(bossArchetypeForBiome({ stratum: 'ferric', occupation: 'aurix', lineage: 'industrial' }))
-      .toBe('diamandis');
+    expect(
+      bossArchetypeForBiome({ stratum: 'ferric', occupation: 'aurix', lineage: 'industrial' }),
+    ).toBe('diamandis');
     // E aparece de verdade numa run: a linhagem industrial termina em Aurix.
     let found = false;
     for (let seed = 1; seed <= 200 && !found; seed++) {
@@ -390,7 +401,9 @@ describe('Diamandis — os Coveiros e a escolha', () => {
     const oreBefore = state.stats.oreCollected;
     damageEntity(state, boss, boss.maxHp * 2, [], { kind: 'player_shot' });
     // Nenhum Coveiro trabalhou: os tres modulos continuam na carcaça.
-    expect(state.stats.oreCollected).toBe(oreBefore + DIAMANDIS_MODULE_COUNT * DIAMANDIS_MODULE_ORE);
+    expect(state.stats.oreCollected).toBe(
+      oreBefore + DIAMANDIS_MODULE_COUNT * DIAMANDIS_MODULE_ORE,
+    );
   });
 
   it('cada modulo levado embora e uma lasca a menos no abate', () => {
@@ -446,8 +459,9 @@ describe('Diamandis — a sucata chama, e a salva antecipa', () => {
       stepRun(state, [emptyCommand()]);
       state.player.hp = state.player.maxHp;
     }
-    expect(state.enemies.filter((e) => e.alive && e.archetype === 'undertaker').length)
-      .toBeLessThanOrEqual(DIAMANDIS_SALVAGE_CREW_CAP);
+    expect(
+      state.enemies.filter((e) => e.alive && e.archetype === 'undertaker').length,
+    ).toBeLessThanOrEqual(DIAMANDIS_SALVAGE_CREW_CAP);
   });
 
   it('a Salva de Demolicao cai NA FRENTE de quem corre, e em cima de quem para', () => {
@@ -481,5 +495,185 @@ describe('Diamandis — a sucata chama, e a salva antecipa', () => {
     const aimedAhead = marks.some((y) => y < Math.floor(moving.state.player.y));
     expect(before).toBeGreaterThan(0);
     expect(aimedAhead, 'a salva caiu atras de quem estava correndo').toBe(true);
+  });
+});
+
+describe('Diamandis — o frenesi', () => {
+  const lostBits = (n: number): number => (1 << n) - 1;
+
+  it('o multiplicador e 1 + 0,15 por modulo arrancado, com teto em 1,45', () => {
+    const { state } = duel(501, 8);
+    for (const [n, expected] of [
+      [0, 1],
+      [1, 1.15],
+      [2, 1.3],
+      [3, 1.45],
+    ] as Array<[number, number]>) {
+      state.bossRuntime.modulesLost = lostBits(n);
+      expect(diamandisFrenzyStacks(state)).toBe(n);
+      expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(expected, 9);
+    }
+    // Soltar NAO e frenesi: exposto sem arrancado continua em 1.
+    state.bossRuntime.modulesLost = 0;
+    state.bossRuntime.modulesExposed = lostBits(3);
+    expect(diamandisFrenzyMultiplier(state)).toBe(1);
+  });
+
+  it('o arranque tropeca o chefe, larga a acao em curso e anuncia o frenesi', () => {
+    const { state, boss } = duel(502, 8);
+    boss.action = {
+      kind: 'drill',
+      phase: 'windup',
+      startedAt: state.tick,
+      releaseAt: state.tick + 20,
+      endsAt: state.tick + 60,
+      direction: { x: -1, y: 0 },
+    };
+    const events: SemanticEvent[] = [];
+    expect(ripDiamandisModule(state, BOSS_MODULE_DRILL, boss, events)).toBe(true);
+    expect(state.bossRuntime.modulesLost & (1 << BOSS_MODULE_DRILL)).not.toBe(0);
+    expect(boss.action).toBeUndefined();
+    expect(boss.nextActionAt).toBeGreaterThanOrEqual(state.tick + DIAMANDIS_RIP_STAGGER_TICKS);
+    const kinds = events.map((e) => e.t);
+    expect(kinds).toContain('boss_module');
+    const frenzy = events.find((e) => e.t === 'boss_state');
+    expect(frenzy && frenzy.t === 'boss_state' && frenzy.state).toBe('frenzy');
+    expect(frenzy && frenzy.t === 'boss_state' && frenzy.intensity).toBeCloseTo(1 / 3, 9);
+    // Arrancar de novo o mesmo modulo nao faz nada.
+    expect(ripDiamandisModule(state, BOSS_MODULE_DRILL, boss, events)).toBe(false);
+  });
+
+  it('o arranque so conta a partir do tick seguinte', () => {
+    const { state, boss } = duel(503, 8);
+    ripDiamandisModule(state, BOSS_MODULE_DRILL, boss, []);
+    // Neste tick, o dano continua o de antes...
+    expect(diamandisFrenzyStacks(state)).toBe(0);
+    expect(diamandisFrenzyMultiplier(state)).toBe(1);
+    // ...e no proximo ja subiu.
+    state.tick += 1;
+    expect(diamandisFrenzyStacks(state)).toBe(1);
+    expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.15, 9);
+    // Dois arranques no mesmo tick: nenhum conta ainda; os dois contam depois.
+    ripDiamandisModule(state, BOSS_MODULE_TOWER, boss, []);
+    ripDiamandisModule(state, BOSS_MODULE_SCANNER, boss, []);
+    expect(diamandisFrenzyStacks(state)).toBe(1);
+    state.tick += 1;
+    expect(diamandisFrenzyStacks(state)).toBe(3);
+    expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.45, 9);
+  });
+
+  it('um golpe liberado no tick do arranque sai com o dano de antes, seja qual for a ordem', () => {
+    const contactDamage = ARCHETYPES.diamandis.contactDamage;
+    for (const bossFirst of [true, false]) {
+      const { state, boss, px, py } = duel(504, 1);
+      // O Coveiro engatado no modulo solto, com o eletroima a um tick do arranque.
+      state.bossRuntime.modulesExposed = 1 << BOSS_MODULE_DRILL;
+      const coveiro = spawnEnemy(state, 'undertaker', px + 2, py + 1, false);
+      coveiro.mood = BOSS_MODULE_DRILL + 1;
+      coveiro.action = {
+        kind: 'haul',
+        phase: 'windup',
+        startedAt: state.tick,
+        releaseAt: state.tick + 1,
+        endsAt: state.tick + 2,
+        direction: { x: -1, y: 0 },
+      };
+      // O chefe com um golpe de contato liberando no MESMO tick.
+      boss.action = {
+        kind: 'contact',
+        phase: 'windup',
+        startedAt: state.tick,
+        releaseAt: state.tick + 1,
+        endsAt: state.tick + 2,
+        direction: { x: -1, y: 0 },
+        target: state.player.id,
+      };
+      state.enemies = bossFirst ? [boss, coveiro] : [coveiro, boss];
+      const hpBefore = state.player.hp;
+      const events = stepRun(state, [emptyCommand()]).events;
+      expect(events.some((e) => e.t === 'boss_module' && e.state === 'detached')).toBe(true);
+      const dealt = hpBefore - state.player.hp;
+      expect(dealt, `ordem ${bossFirst ? 'chefe primeiro' : 'coveiro primeiro'}`).toBeCloseTo(
+        bossFirst ? contactDamage : 0,
+        6,
+      );
+      // Dentro do tick do arranque o frenesi ainda nao vale; no seguinte, sim.
+      expect(diamandisFrenzyMultiplier(state)).toBe(1);
+      state.tick += 1;
+      expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.15, 9);
+    }
+  });
+
+  it('em frenesi, a broca cobra 15% a mais por modulo', () => {
+    const { state, boss, px, py } = duel(505, 3);
+    state.bossRuntime.modulesLost = lostBits(2);
+    state.player.hp = 1000;
+    state.player.maxHp = 1000;
+    boss.action = {
+      kind: 'drill',
+      phase: 'release',
+      startedAt: state.tick - 1,
+      releaseAt: state.tick - 1,
+      endsAt: state.tick + DIAMANDIS_DRILL_TICKS,
+      direction: { x: -1, y: 0 },
+    };
+    boss.x = px + 1.2;
+    boss.y = py;
+    const before = state.player.hp;
+    let ticks = 0;
+    while (state.player.hp === before && ticks < 12) {
+      stepRun(state, [emptyCommand()]);
+      ticks++;
+    }
+    expect(before - state.player.hp).toBeCloseTo(DIAMANDIS_DRILL_DAMAGE * 1.3, 6);
+  });
+
+  it('os Coveiros nao escalam: a prensa deles continua a mesma', () => {
+    const { state } = duel(506, 8);
+    state.bossRuntime.modulesLost = lostBits(3);
+    expect(UNDERTAKER_SLAM_DAMAGE).toBe(26);
+    // O multiplicador e do chefe; nenhuma outra tabela o consulta.
+    expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.45, 9);
+  });
+});
+
+describe('Diamandis — o tropeco do arranque', () => {
+  it('meio segundo sem andar nem decidir; depois volta a perseguir', () => {
+    const state = createRun({ seed: 503 });
+    state.player.x = Math.floor(state.config.width / 2) + 0.5;
+    state.player.y = Math.floor(state.config.height / 2) + 0.5;
+    clearArena(state, 24);
+    state.enemies = [];
+    const boss = spawnEnemy(
+      state,
+      'diamandis',
+      Math.floor(state.player.x) + 6,
+      Math.floor(state.player.y),
+      false,
+    );
+    state.bossRuntime.awake = true;
+    // Fora do alcance da broca (9..20) e da demolicao (4..13)? A 6 tiles a
+    // demolicao entra — entao a arma e arrancada antes, e o feixe (<= 16)
+    // tambem: com as tres fora, o unico movimento possivel e a perseguicao.
+    state.bossRuntime.modulesExposed = 0b111;
+    const events: SemanticEvent[] = [];
+    for (let m = 0; m < 3; m++) ripDiamandisModule(state, m, boss, events);
+    expect(state.bossRuntime.staggerUntil).toBe(state.tick + DIAMANDIS_RIP_STAGGER_TICKS);
+    const x0 = boss.x;
+    const y0 = boss.y;
+    for (let i = 0; i < DIAMANDIS_RIP_STAGGER_TICKS; i++) stepRun(state, [emptyCommand()]);
+    expect(boss.x).toBe(x0);
+    expect(boss.y).toBe(y0);
+    expect(boss.action).toBeUndefined();
+    // Passado o tropeco, ele anda de novo.
+    for (let i = 0; i < 20; i++) stepRun(state, [emptyCommand()]);
+    expect(Math.hypot(boss.x - x0, boss.y - y0)).toBeGreaterThan(0.2);
+  });
+
+  it('o tropeco entra no hash da simulacao', () => {
+    const a = createRun({ seed: 504 });
+    const b = createRun({ seed: 504 });
+    b.bossRuntime.staggerUntil = 77;
+    expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
   });
 });

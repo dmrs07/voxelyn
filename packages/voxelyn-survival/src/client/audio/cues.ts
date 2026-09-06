@@ -254,6 +254,9 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
     // entao e a voz do cristal — a mesma da ressonancia — e soa no cristal.
     choir_call: 'archcantorResonance',
   },
+  // O Diamandis: o frenesi (a fala do modulo perdido sai pela tabela de
+  // falas; isto e a MAQUINA, nao a voz corporativa).
+  diamandis: { frenzy: 'diamandisFrenzy' },
 };
 
 /**

@@ -915,7 +915,13 @@ export const PROTOCOL_VERSION = 32;
 //     matava em 19 s e o Diluvio saia aos 13 — antes do primeiro mergulho —,
 //     entao a primeira fase nunca acontecia. `hp`/`maxHp` viajam no snapshot
 //     e no hash: um replay de 59 nao bate.
-export const SIMULATION_VERSION = 60;
+// 61: O FRENESI DO DIAMANDIS. Cada modulo ARRANCADO por um Coveiro soma 15% a
+//     todo dano que o chefe autora (broca, salva, feixe, contato), teto 1,45,
+//     permanente pela luta; o arranque tambem o faz TROPECAR por 10 ticks
+//     (larga a acao em curso). O frenesi so conta a partir do tick seguinte
+//     ao arranque (`frenzyRipTick`/`frenzyRipCount`, no hash): duas maquinas
+//     com listas de inimigos em ordens diferentes chegam ao mesmo dano.
+export const SIMULATION_VERSION = 61;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

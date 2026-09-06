@@ -490,6 +490,10 @@ export class GameRoom {
         : null,
       bossAwake: this.state.bossRuntime.awake,
       bossPhases: this.state.bossRuntime.phasesFired,
+      bossModules: {
+        exposed: this.state.bossRuntime.modulesExposed,
+        lost: this.state.bossRuntime.modulesLost,
+      },
       // As marcas pendentes, espelhadas do estado autoritativo. Poucos bytes e
       // quase sempre listas vazias — elas so existem durante a janela de aviso,
       // e e exatamente nessa janela que uma reconexao precisa delas.

@@ -1,20 +1,24 @@
 {
   "id": "enemy-diamandis",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-diamandis.png",
   "normalAtlas": "enemy-diamandis.normal.png",
   "normalScale": 2,
-  "frameWidth": 120,
-  "frameHeight": 138,
-  "columns": 34,
-  "anchorX": 58,
-  "anchorY": 114,
-  "directions": 4,
+  "frameWidth": 88,
+  "frameHeight": 116,
+  "columns": 42,
+  "anchorX": 42,
+  "anchorY": 92,
+  "directions": 8,
   "authoredDirs": [
     "dr",
     "dl",
     "ur",
-    "ul"
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
   ],
   "flipPairs": {},
   "hitbox": {
@@ -34,8 +38,6 @@
     "#2e3a4d",
     "#46566e",
     "#6e4a33",
-    "#7ab8ff",
-    "#7b8ba3",
     "#8a7154",
     "#b8a98f",
     "#d5cdba",
@@ -69,11 +71,6 @@
       "frames": 5,
       "fps": 10,
       "loop": false
-    },
-    "special": {
-      "frames": 4,
-      "fps": 8,
-      "loop": false
     }
   },
   "frameMap": {
@@ -81,38 +78,200 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "special": 14,
-      "hit": 18,
-      "die": 20
+      "hit": 14,
+      "die": 16
     },
     "dl": {
-      "idle": 25,
-      "walk": 29,
-      "attack": 35,
-      "special": 39,
-      "hit": 43,
-      "die": 45
+      "idle": 21,
+      "walk": 25,
+      "attack": 31,
+      "hit": 35,
+      "die": 37
     },
     "ur": {
-      "idle": 50,
-      "walk": 54,
-      "attack": 60,
-      "special": 64,
-      "hit": 68,
-      "die": 70
+      "idle": 42,
+      "walk": 46,
+      "attack": 52,
+      "hit": 56,
+      "die": 58
     },
     "ul": {
-      "idle": 75,
-      "walk": 79,
-      "attack": 85,
-      "special": 89,
-      "hit": 93,
-      "die": 95
+      "idle": 63,
+      "walk": 67,
+      "attack": 73,
+      "hit": 77,
+      "die": 79
+    },
+    "r": {
+      "idle": 84,
+      "walk": 88,
+      "attack": 94,
+      "hit": 98,
+      "die": 100
+    },
+    "d": {
+      "idle": 105,
+      "walk": 109,
+      "attack": 115,
+      "hit": 119,
+      "die": 121
+    },
+    "l": {
+      "idle": 126,
+      "walk": 130,
+      "attack": 136,
+      "hit": 140,
+      "die": 142
+    },
+    "u": {
+      "idle": 147,
+      "walk": 151,
+      "attack": 157,
+      "hit": 161,
+      "die": 163
+    }
+  },
+  "sockets": {
+    "dr": {
+      "drill": {
+        "x": 56,
+        "y": 65,
+        "depth": 6
+      },
+      "rack": {
+        "x": 29,
+        "y": 15,
+        "depth": -7.6
+      },
+      "mast": {
+        "x": 45,
+        "y": 23,
+        "depth": 0.4
+      }
+    },
+    "dl": {
+      "drill": {
+        "x": 30,
+        "y": 66,
+        "depth": 6
+      },
+      "rack": {
+        "x": 57,
+        "y": 16,
+        "depth": -7.6
+      },
+      "mast": {
+        "x": 41,
+        "y": 24,
+        "depth": 0.4
+      }
+    },
+    "ur": {
+      "drill": {
+        "x": 54,
+        "y": 52,
+        "depth": -6
+      },
+      "rack": {
+        "x": 27,
+        "y": 29,
+        "depth": 7.6
+      },
+      "mast": {
+        "x": 43,
+        "y": 21,
+        "depth": -0.4
+      }
+    },
+    "ul": {
+      "drill": {
+        "x": 28,
+        "y": 53,
+        "depth": -6
+      },
+      "rack": {
+        "x": 55,
+        "y": 30,
+        "depth": 7.6
+      },
+      "mast": {
+        "x": 39,
+        "y": 22,
+        "depth": -0.4
+      }
+    },
+    "r": {
+      "drill": {
+        "x": 60,
+        "y": 58,
+        "depth": 0
+      },
+      "rack": {
+        "x": 22,
+        "y": 21,
+        "depth": 0
+      },
+      "mast": {
+        "x": 45,
+        "y": 21,
+        "depth": 0
+      }
+    },
+    "d": {
+      "drill": {
+        "x": 43,
+        "y": 68,
+        "depth": 8.485
+      },
+      "rack": {
+        "x": 43,
+        "y": 12,
+        "depth": -10.748
+      },
+      "mast": {
+        "x": 43,
+        "y": 23,
+        "depth": 0.566
+      }
+    },
+    "l": {
+      "drill": {
+        "x": 24,
+        "y": 59,
+        "depth": 0
+      },
+      "rack": {
+        "x": 62,
+        "y": 23,
+        "depth": 0
+      },
+      "mast": {
+        "x": 39,
+        "y": 23,
+        "depth": 0
+      }
+    },
+    "u": {
+      "drill": {
+        "x": 41,
+        "y": 49,
+        "depth": -8.485
+      },
+      "rack": {
+        "x": 41,
+        "y": 32,
+        "depth": 10.748
+      },
+      "mast": {
+        "x": 41,
+        "y": 21,
+        "depth": -0.566
+      }
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon",
+    "prompt": "voxel-isometric walking industrial excavator boss chassis in eight facings, exposed ember reactor in the belly, empty drill bearing, rack posts and mast ring where the detachable tools mount, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon",
     "seedOrRef": "deterministic-code-v2"
   }
 }

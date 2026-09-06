@@ -507,3 +507,32 @@ describe('o catalogo dos chefes e coerente', () => {
     }
   });
 });
+
+describe('Diamandis: o frenesi e uma voz propria, e nao rouba o telegrafo', () => {
+  it('cada peca arrancada dispara o estalo do rele, mais forte quanto mais pecas fora', () => {
+    const one = cuesForEvent(
+      { t: 'boss_state', archetype: 'diamandis', state: 'frenzy', x: 1, y: 1, intensity: 1 / 3 },
+      ctx,
+    );
+    const three = cuesForEvent(
+      { t: 'boss_state', archetype: 'diamandis', state: 'frenzy', x: 1, y: 1, intensity: 1 },
+      ctx,
+    );
+    expect(one[0].voice).toBe('diamandisFrenzy');
+    expect(three[0].voice).toBe('diamandisFrenzy');
+    expect(VOICE_RENDERERS.diamandisFrenzy).toBeDefined();
+    // Nao e espacial: e o corpo do chefe mudando de regime, um aviso para a
+    // sala inteira — como a entrada dele.
+    expect(VOICE_SPECS.diamandisFrenzy.spatial).toBe(false);
+  });
+
+  it('fica abaixo do windup das armas que continuam funcionando', () => {
+    // O frenesi anuncia que o proximo golpe vai doer mais; ele nao pode calar o
+    // aviso do proprio golpe.
+    const drill = cuesForEvent(windup('diamandis', 'drill'), ctx);
+    expect(drill.length).toBeGreaterThan(0);
+    expect(VOICE_SPECS.diamandisFrenzy.priority).toBeLessThanOrEqual(
+      VOICE_SPECS[drill[0].voice].priority,
+    );
+  });
+});

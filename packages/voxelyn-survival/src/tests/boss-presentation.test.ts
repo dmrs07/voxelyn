@@ -47,10 +47,8 @@ import {
 } from '@voxelyn/survival-sim';
 import { SURFACE_FALLBACK, SURFACE_KIND_INDEX } from '../client/render';
 import {
-  applyBossModuleMark,
   bossModuleNameKey,
   bossModulePresentation,
-  type BossModuleMark,
   type BossModuleState,
 } from '../client/boss-module-presentation';
 import { t } from '../client/i18n';
@@ -105,10 +103,25 @@ describe('toda superficie tem tile', () => {
   // explicitamente, `?? 0` mandava a materia desconhecida desenhar como CHAO
   // NU — e `draw` devolvia `true`, entao nem a cor de recuo aparecia.
   const ALL_SURFACES = [
-    SURF_NONE, SURF_FUNGAL, SURF_BIOFLUID, SURF_GAS, SURF_FIRE, SURF_SCORCHED,
-    SURF_SPORES, SURF_FUNGAL_HEATED, SURF_WATER, SURF_EMBER, SURF_ICE,
-    SURF_RAIL, SURF_RAIL_V, SURF_SILT, SURF_GLASS,
-    SURF_ICE_CRACKED, SURF_ICE_FRACTURED, SURF_ICE_CRITICAL, SURF_DEEP_WATER,
+    SURF_NONE,
+    SURF_FUNGAL,
+    SURF_BIOFLUID,
+    SURF_GAS,
+    SURF_FIRE,
+    SURF_SCORCHED,
+    SURF_SPORES,
+    SURF_FUNGAL_HEATED,
+    SURF_WATER,
+    SURF_EMBER,
+    SURF_ICE,
+    SURF_RAIL,
+    SURF_RAIL_V,
+    SURF_SILT,
+    SURF_GLASS,
+    SURF_ICE_CRACKED,
+    SURF_ICE_FRACTURED,
+    SURF_ICE_CRITICAL,
+    SURF_DEEP_WATER,
   ];
 
   it('mapeia cada SURF_* para um tipo que existe no atlas', () => {
@@ -148,7 +161,13 @@ describe('toda superficie tem tile', () => {
       const n = Number.parseInt(hex.slice(1), 16);
       return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
     };
-    const ladder = [SURF_ICE, SURF_ICE_CRACKED, SURF_ICE_FRACTURED, SURF_ICE_CRITICAL, SURF_DEEP_WATER];
+    const ladder = [
+      SURF_ICE,
+      SURF_ICE_CRACKED,
+      SURF_ICE_FRACTURED,
+      SURF_ICE_CRITICAL,
+      SURF_DEEP_WATER,
+    ];
     for (let k = 1; k < ladder.length; k++) {
       expect(luminance(ladder[k]), `degrau ${k}`).toBeLessThan(luminance(ladder[k - 1]));
     }
@@ -168,18 +187,9 @@ describe('os quatro estados de boss_module', () => {
     expect(new Set(keys).size).toBe(4);
   });
 
-  it('so marca o chao onde ha mesmo uma peca', () => {
-    expect(bossModulePresentation('exposed').marks).toBe(true);
-    expect(bossModulePresentation('dropped').marks).toBe(true);
-    // A peca viaja com o Coveiro; marcar o ponto do arranco apontaria o jogador
-    // para onde ela NAO esta mais.
-    expect(bossModulePresentation('detached').marks).toBe(false);
-    expect(bossModulePresentation('lost').marks).toBe(false);
-  });
-
   it('perder avisa por mais tempo do que ganhar', () => {
     expect(bossModulePresentation('lost').toastMs).toBeGreaterThan(
-      bossModulePresentation('exposed').toastMs
+      bossModulePresentation('exposed').toastMs,
     );
   });
 
@@ -191,37 +201,6 @@ describe('os quatro estados de boss_module', () => {
     expect(t(bossModuleNameKey(99))).not.toBe('');
   });
 });
-
-describe('a marca de peca segue a peca', () => {
-  const marks = (): Map<number, BossModuleMark> => new Map();
-
-  it('uma peca que troca de mao tres vezes deixa UMA marca', () => {
-    const m = marks();
-    applyBossModuleMark(m, { module: 0, x: 5, y: 5, state: 'exposed' }, 0);
-    applyBossModuleMark(m, { module: 0, x: 5, y: 5, state: 'detached' }, 100);
-    applyBossModuleMark(m, { module: 0, x: 20, y: 9, state: 'dropped' }, 200);
-    expect(m.size).toBe(1);
-    expect(m.get(0)?.x).toBe(20);
-    expect(m.get(0)?.y).toBe(9);
-  });
-
-  it('some de vez quando a peca sai do mapa', () => {
-    const m = marks();
-    applyBossModuleMark(m, { module: 2, x: 3, y: 3, state: 'exposed' }, 0);
-    applyBossModuleMark(m, { module: 2, x: 40, y: 1, state: 'lost' }, 500);
-    expect(m.size).toBe(0);
-  });
-
-  it('as tres pecas convivem, cada uma no proprio lugar', () => {
-    const m = marks();
-    applyBossModuleMark(m, { module: 0, x: 1, y: 1, state: 'exposed' }, 0);
-    applyBossModuleMark(m, { module: 1, x: 2, y: 2, state: 'exposed' }, 0);
-    applyBossModuleMark(m, { module: 2, x: 3, y: 3, state: 'dropped' }, 0);
-    expect(m.size).toBe(3);
-    expect([...m.values()].map((v) => v.x)).toEqual([1, 2, 3]);
-  });
-});
-
 
 describe('o Devorador de boca aberta troca de silhueta', () => {
   // A janela de dano do encontro inteiro e um HUMOR, nao uma acao: preso ele
@@ -236,8 +215,15 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     stunnedUntil: 0,
   });
   const base = {
-    anim: 'idle', animStartMs: 0, lastX: 0, lastY: 0, lastHp: 100,
-    hitUntilMs: 0, movingUntilMs: 0, moveFacingX: 1, moveFacingY: 0,
+    anim: 'idle',
+    animStartMs: 0,
+    lastX: 0,
+    lastY: 0,
+    lastHp: 100,
+    hitUntilMs: 0,
+    movingUntilMs: 0,
+    moveFacingX: 1,
+    moveFacingY: 0,
   };
 
   /**
@@ -246,8 +232,7 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
    * Os dois numeros sao autoritativos e ja viajam no snapshot — a pose sai do
    * MESMO `mawOpenedAt` de que saem o alcance da sucao e a areia engolida.
    */
-  const room = (tick: number, mawOpenedAt = 0) =>
-    ({ tick, bossRuntime: { mawOpenedAt } }) as never;
+  const room = (tick: number, mawOpenedAt = 0) => ({ tick, bossRuntime: { mawOpenedAt } }) as never;
 
   /** Quantos ticks a abertura leva, pela mesma conta que a pose usa. */
   const OPEN = DEVOURER_MAW_SPOOL_TICKS * (DEVOURER_MAW_BITE_RADIUS / DEVOURER_MAW_RADIUS);
@@ -303,7 +288,7 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     expect(at(t0).elapsedMs).toBeLessThan(1000 / TICK_HZ);
     expect(at(t0 + 4).elapsedMs - at(t0).elapsedMs, 'o relogio da boca nao avancou').toBeCloseTo(
       200,
-      6
+      6,
     );
     expect(at(t0 + 10).elapsedMs - at(t0).elapsedMs).toBeCloseTo(500, 6);
   });

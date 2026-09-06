@@ -106,6 +106,36 @@
       "die": 103
     }
   },
+  "sockets": {
+    "dr": {
+      "magnet": {
+        "x": 57,
+        "y": 49,
+        "depth": -10.5
+      }
+    },
+    "dl": {
+      "magnet": {
+        "x": 55,
+        "y": 71,
+        "depth": 10.5
+      }
+    },
+    "ur": {
+      "magnet": {
+        "x": 13,
+        "y": 48,
+        "depth": -10.5
+      }
+    },
+    "ul": {
+      "magnet": {
+        "x": 11,
+        "y": 70,
+        "depth": 10.5
+      }
+    }
+  },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
     "prompt": "voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens",

@@ -135,6 +135,8 @@ amarrotada lo-fi dos chefes: é interface). Reconexão não toca nada.
   e desvanecendo em 560 ms. A barra nunca fica verde.
 - **Fase**: mesmo HP; varredura do acento nas linhas de cima e de baixo da
   moldura (700 ms); nome intensificado. Sem divisórias que revelem thresholds.
+  O **frenesi** do Diamandis (`boss_state: 'frenzy'`, um por peça arrancada)
+  reutiliza a mesma varredura — uma por acúmulo, nunca um efeito de tela.
 - **Corpo inalvejável** (Leviatã com exposição < 0,5, Devorador enterrado): a
   moldura perde brilho e um véu escuro do acento cobre a vida, com uma linha
   tracejada de "lâmina". Nada escreve "IMUNE"; armadura não é mostrada.
@@ -188,6 +190,11 @@ pequeno, dano grande, rajada (um golpe por tick), cura, transição de fase,
 ocultar/submergir, fora da câmera, morte. Mais: reconnect simulado (o
 presenter esquece e reentra no HP atual), menos movimento e língua.
 
+Na arena do Diamandis há também o painel **Diamandis** (`arena-diamandis-debug.ts`):
+os oito rumos do chassi, soltar/arrancar (com um Coveiro carregador de verdade),
+abater o carregador, frenesi máximo e colapso do reator, com a leitura de cada
+peça, do multiplicador e do tropeço.
+
 Todos os painéis de ferramenta da arena obedecem a um só interruptor, o botão
 **ferramentas** no canto superior direito. Em tela de toque (ou janela com
 menos de 900 px) começam escondidos: no celular eles cobriam a sala e roubavam
@@ -216,6 +223,11 @@ inspeção: no jogo só o chefe ativo aparece.
 - `src/tests/arena-bossbar-debug.test.ts` — os cenários contra uma run real
   (`createArenaRun`), a galeria em todos os cenários e viewports.
 - `src/client/audio/boss-cues.test.ts` — o `boss_awake` do Diamandis leva a
-  voz da barra (`bossBarMetal`) junto do boot e da fala.
+  voz da barra (`bossBarMetal`) junto do boot e da fala; o `frenzy` tem voz
+  própria, abaixo do windup das armas.
+- `src/tests/diamandis-body.test.ts` — o corpo composto do Diamandis: peças,
+  encaixes, ordem por rumo, frenesi (tint, espasmos, relógio), peça caída.
+- `src/tests/arena-diamandis-debug.test.ts` — os cenários do painel do
+  Diamandis contra uma run real: rumos, soltar, arrancar, abater, frenesi.
 
 Capturas em `docs/media/boss-health-bar/`.

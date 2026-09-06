@@ -952,6 +952,24 @@ export const DIAMANDIS_MODULE_COUNT = 3;
 export const DIAMANDIS_MODULE_EXPOSE_AT: readonly number[] = [0.78, 0.55, 0.3];
 /** Lascas por modulo preservado. Vale um veio inteiro: e uma decisao, nao um troco. */
 export const DIAMANDIS_MODULE_ORE = 16;
+/**
+ * O FRENESI. Cada modulo ARRANCADO (nunca o apenas solto: soltar e o
+ * telegrafo, a oportunidade do jogador) soma 15% a todo dano que o proprio
+ * Diamandis autora — broca, salva, feixe enquanto houver, contato —, ate
+ * 1,45 com os tres fora. E o contrapeso da escolha dos Coveiros: deixar
+ * trabalhar tira armas dele, mas o que sobra bate mais forte. Nunca escala
+ * os Coveiros nem os perigos do chao. Permanente pela luta: recuperar a peca
+ * devolve o minerio, nao a arma nem a calma.
+ */
+export const DIAMANDIS_FRENZY_PER_MODULE = 0.15;
+export const DIAMANDIS_FRENZY_CAP = 1.45;
+/**
+ * O TROPECO do arranque: 0,5 s em que o chefe nao decide nada e larga a acao
+ * em curso. E a transicao legivel antes dos golpes mais fortes — e o que
+ * garante que nenhum golpe ja liberado no tick do arranque saia com o
+ * multiplicador novo.
+ */
+export const DIAMANDIS_RIP_STAGGER_TICKS = 10;
 /** Ate onde um Coveiro NOTA um modulo solto — bem alem do aggro dele. */
 export const UNDERTAKER_SALVAGE_RANGE = 20;
 /** Distancia em que ele consegue engatar o eletroima na carcaca. */
