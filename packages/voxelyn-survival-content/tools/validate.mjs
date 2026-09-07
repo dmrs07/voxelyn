@@ -146,6 +146,7 @@ export const ON_DEMAND_ATLASES = new Set([
   'part-diamandis-drill',
   'part-diamandis-rack',
   'part-diamandis-mast',
+  'part-diamandis-arm',
 ]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;

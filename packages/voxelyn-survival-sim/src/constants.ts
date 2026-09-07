@@ -806,7 +806,12 @@ export const GUARDIAN_STRAIN_INTERVAL_TICKS = 40;
  * gaiola e todo tiro em acerto garantido. O tamanho mora no sprite e no
  * ESTRAGO que ele deixa, nunca no raio de colisao.
  */
-export const DIAMANDIS_HP = 880;
+/**
+ * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta agora tem quatro
+ * atos e nao tres: as tres ferramentas mais o corpo que sobra quando elas
+ * acabam. 880 fechava antes de o quarto ato existir.
+ */
+export const DIAMANDIS_HP = 1400;
 export const DIAMANDIS_SPEED = 1.5;
 export const DIAMANDIS_RADIUS = 0.9;
 
@@ -977,6 +982,48 @@ export const DIAMANDIS_MODULE_ORE = 16;
  */
 export const DIAMANDIS_FRENZY_PER_MODULE = 0.15;
 export const DIAMANDIS_FRENZY_CAP = 1.45;
+/**
+ * Quanto o chassi ACELERA por braco liberado, como fracao da velocidade base.
+ *
+ * Uma escavadeira carregando tres ferramentas anda no passo de quem carrega
+ * tres ferramentas. Sem elas ela e so chassi e motor: 1,5 -> 1,95 -> 2,4 ->
+ * 2,85 tiles/s. O Prospector faz 4,6, entao a fuga continua existindo nos
+ * quatro degraus — o que muda e o preco de errar o espacamento. Nao poder
+ * fugir seria outro jogo; ter de MERECER a fuga e este.
+ */
+export const DIAMANDIS_FRENZY_SPEED_PER_MODULE = 0.3;
+
+/**
+ * OS BRACOS MANIPULADORES. Sao tres, e sempre foram tres: um por ferramenta.
+ *
+ * E a razao de esta maquina nunca ter socado ninguem com as tres ferramentas
+ * no lugar — os bracos estao OCUPADOS operando broca, rack e mastro. Arrancar
+ * uma ferramenta nao tira uma arma do chefe; ela LIBERA a mao que a segurava.
+ * Com os tres encaixes vazios ele nao tem mais obra para fazer, e o que sobra
+ * de uma escavadeira sem ferramentas e um corpo de tres toneladas com tres
+ * bracos livres.
+ *
+ * O golpe fica mais rapido e mais pesado a cada braco: o aviso encurta
+ * (`_WINDUP_TICKS` menos `_WINDUP_PER_ARM` por braco extra), a cadencia aperta
+ * e o dano sobe — e ainda passa pelo multiplicador do frenesi, que sobe pelos
+ * mesmos arranques. E de proposito que o ultimo ato seja o mais perigoso: e o
+ * ato em que o jogador escolheu desarmar a maquina.
+ */
+//
+// Os numeros tem um piso obrigatorio: o soco de UM braco ja tem de doer mais
+// que o esbarrao do corpo que ele substitui (`contactDamage`, 28). Na primeira
+// medicao ele doia menos — 20,7 contra 28 —, e liberar uma mao deixava o chefe
+// mais fraco de perto, que e o contrario do que arrancar uma ferramenta
+// significa. O piso vale no numero CRU, e nao no que o frenesi faz com ele:
+// invariante que depende de outro sistema estar ligado nao e invariante.
+export const DIAMANDIS_PUMMEL_DAMAGE = 30;
+export const DIAMANDIS_PUMMEL_DAMAGE_PER_ARM = 8;
+export const DIAMANDIS_PUMMEL_WINDUP_TICKS = 14;
+export const DIAMANDIS_PUMMEL_WINDUP_PER_ARM = 3;
+export const DIAMANDIS_PUMMEL_COOLDOWN_TICKS = 20;
+export const DIAMANDIS_PUMMEL_COOLDOWN_PER_ARM = 4;
+/** O quanto o braco estendido alcanca alem dos dois corpos, em tiles. */
+export const DIAMANDIS_PUMMEL_REACH = 0.55;
 /**
  * O TROPECO do arranque: 0,5 s em que o chefe nao decide nada e larga a acao
  * em curso. E a transicao legivel antes dos golpes mais fortes — e o que

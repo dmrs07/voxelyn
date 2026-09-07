@@ -941,7 +941,18 @@ export const PROTOCOL_VERSION = 32;
 //     os corpos se encostam, em vez de vibrar dentro do Prospector a 0,03
 //     tile. Quando o chefe fere e quanto ele anda mudaram: um replay de 62 nao
 //     bate.
-export const SIMULATION_VERSION = 63;
+// 64: OS BRACOS DO DIAMANDIS, e a luta que passa a ter QUATRO atos. Os tres
+//     bracos manipuladores sempre existiram e sempre estiveram ocupados — um
+//     por ferramenta —, e e por isso que a maquina nunca socou ninguem de
+//     posse das tres. Arrancar uma ferramenta LIBERA a mao que a segurava: o
+//     `pummel` (soco) so existe com braco livre, e por braco ele encurta o
+//     aviso, aperta a cadencia e pesa mais (18/24/30, ainda vezes o frenesi).
+//     O chassi tambem ANDA MAIS a cada braco (+30% da base por modulo: 1,5 ->
+//     2,85), entao o ultimo ato fecha distancia — contra 4,6 do Prospector, a
+//     fuga continua possivel e passa a ser merecida. `DIAMANDIS_HP` 880 ->
+//     1400 para o quarto ato caber. Dano, alcance e velocidade do chefe
+//     mudaram: um replay de 63 nao bate.
+export const SIMULATION_VERSION = 64;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

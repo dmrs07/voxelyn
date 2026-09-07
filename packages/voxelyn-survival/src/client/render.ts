@@ -184,7 +184,9 @@ import {
   type Tint,
 } from './sprites';
 import {
+  DIAMANDIS_ARM_ATLAS,
   composeDiamandisParts,
+  pummelArmFrame,
   diamandisPartAtlas,
   DiamandisPresentation,
   floorPieceLift,
@@ -235,7 +237,11 @@ import {
   impactShake,
   tickFraction,
 } from './drill-machine';
-import { drillSpeedFractionAt } from '@voxelyn/survival-sim';
+import {
+  DIAMANDIS_PUMMEL_REACH,
+  DIAMANDIS_RADIUS,
+  drillSpeedFractionAt,
+} from '@voxelyn/survival-sim';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -2420,6 +2426,25 @@ export class SurvivalRenderer {
           );
           break;
         case 'boss_attack':
+          // O SOCO chegando: a garra bate a frente do chassi, e nao no centro
+          // dele. Peso pelo numero de bracos (`intensity`), que e o mesmo
+          // numero que decide o dano — quem apanha ve o golpe do tamanho que
+          // ele cobra.
+          if (ev.archetype === 'diamandis' && ev.ability === 'pummel') {
+            const power = ev.intensity ?? 1;
+            const dx = ev.dx ?? 0;
+            const dy = ev.dy ?? 0;
+            const hx = ev.x + dx * (DIAMANDIS_RADIUS + DIAMANDIS_PUMMEL_REACH);
+            const hy = ev.y + dy * (DIAMANDIS_RADIUS + DIAMANDIS_PUMMEL_REACH);
+            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+            this.addFlash(hx, hy, 2.2 + power, 0.7 + 0.3 * power, nowMs, 200);
+            this.particles.hit(hx, hy, 'debris', 20 + 16 * power, fxScale);
+            this.particles.hit(hx, hy, 'spark', 12 + 12 * power, fxScale);
+            if (!prefersReducedMotion()) {
+              this.shake = { power: 4 + 5 * power, until: nowMs + 220 };
+            }
+            break;
+          }
           if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
             // O CONGELAMENTO: a coroa de estilhacos abrindo em volta dela, com
             // o alcance REAL da habilidade — e o clarao frio curto do lago
@@ -4601,6 +4626,9 @@ export class SurvivalRenderer {
         if (!this.diamandisPartsRequested) {
           this.diamandisPartsRequested = true;
           for (const id of DIAMANDIS_PART_ATLASES) this.sprites.requestPart(id);
+          // O BRACO vem junto: e a mao das tres ferramentas, e aparece no
+          // primeiro quadro em que o chefe existe (fechada no encaixe).
+          this.sprites.requestPart(DIAMANDIS_ARM_ATLAS);
         }
         if (frenzyStacks > 0) {
           this.particles.emitMalfunctionSmoke(
@@ -4999,6 +5027,7 @@ export class SurvivalRenderer {
                 bodyDrawY,
                 spriteZoom,
                 drillFrame,
+                pummelArmFrame(enemy.action, state.tick),
               )
             : [];
           const partLight = bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE);
@@ -7254,6 +7283,8 @@ export class SurvivalRenderer {
     zoom: number,
     /** A pose da broca escolhida pelo giro (drill-machine.ts), quando ha uma. */
     drillFrame?: number,
+    /** O quadro do SOCO, quando ha um em curso (ver `pummelArmFrame`). */
+    pummelFrame?: number,
   ): DiamandisPartDraw[] {
     const chassis = this.sprites.spriteForArchetype('diamandis');
     if (!chassis) return [];
@@ -7275,6 +7306,8 @@ export class SurvivalRenderer {
       footY,
       zoom,
       drillFrame,
+      arm: this.sprites.get(DIAMANDIS_ARM_ATLAS)?.manifest ?? null,
+      pummelFrame,
     });
   }
 

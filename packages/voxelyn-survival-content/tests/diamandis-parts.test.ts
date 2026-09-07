@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 // @ts-expect-error - ferramenta JS sem tipos
 import { DIRS8, projectModelPoint, renderVoxels } from '../tools/voxel.mjs';
 import {
+  DIAMANDIS_ARM_SOCKETS,
   DIAMANDIS_PARTS,
   DIAMANDIS_SOCKETS,
   ENTITY_SPECS,
@@ -100,7 +101,12 @@ describe('o Diamandis em pecas', () => {
     for (const id of PART_IDS) expect(specOf(id).noFit).toBe(true);
     // E o chassi publica um encaixe por peca, na ordem dos bits de modulo.
     const chassis = specOf('enemy-diamandis');
-    expect(Object.keys(chassis.sockets ?? {})).toEqual(DIAMANDIS_PARTS);
+    // As tres ferramentas MAIS os tres bracos: o braco tem encaixe proprio no
+    // deck, e nao o da peca que opera — ver DIAMANDIS_ARM_SOCKETS.
+    expect(Object.keys(chassis.sockets ?? {})).toEqual([
+      ...DIAMANDIS_PARTS,
+      ...DIAMANDIS_ARM_SOCKETS,
+    ]);
     expect(Object.keys(UNDERTAKER_SOCKETS)).toEqual(['magnet']);
   });
 

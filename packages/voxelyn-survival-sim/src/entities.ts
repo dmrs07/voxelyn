@@ -180,6 +180,14 @@ import {
   DIAMANDIS_BEAM_DAMAGE,
   DIAMANDIS_BEAM_LENGTH,
   DIAMANDIS_BEAM_MIN_RANGE,
+  DIAMANDIS_FRENZY_SPEED_PER_MODULE,
+  DIAMANDIS_PUMMEL_COOLDOWN_PER_ARM,
+  DIAMANDIS_PUMMEL_COOLDOWN_TICKS,
+  DIAMANDIS_PUMMEL_DAMAGE,
+  DIAMANDIS_PUMMEL_DAMAGE_PER_ARM,
+  DIAMANDIS_PUMMEL_REACH,
+  DIAMANDIS_PUMMEL_WINDUP_PER_ARM,
+  DIAMANDIS_PUMMEL_WINDUP_TICKS,
   DIAMANDIS_BEAM_STEP,
   DIAMANDIS_BEAM_WINDUP_TICKS,
   DIAMANDIS_DEMOLISH_CHARGES,
@@ -1459,6 +1467,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
     case 'drill':
     case 'demolish':
     case 'beam':
+    case 'pummel':
     case 'freeze':
     case 'massive_shock':
       return action;
@@ -1895,6 +1904,18 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1) * frenzy, events, {
         kind: 'enemy_contact',
         archetype: enemy.archetype as EnemyArchetype,
+        elite: enemy.elite,
+      });
+    }
+  } else if (action.kind === 'pummel' && target) {
+    // O braco alcanca alem dos dois corpos, e e conferido no RELEASE: sair do
+    // alcance durante o aviso e a resposta inteira do golpe.
+    const arms = diamandisFreeArms(state);
+    if (distTo(enemy, target) < enemy.radius + target.radius + DIAMANDIS_PUMMEL_REACH) {
+      const profile = diamandisPummelProfile(Math.max(1, arms));
+      damageEntity(state, target, profile.damage * diamandisFrenzyMultiplier(state), events, {
+        kind: 'enemy_contact',
+        archetype: 'diamandis',
         elite: enemy.elite,
       });
     }
@@ -7039,6 +7060,40 @@ export const diamandisFrenzyMultiplier = (state: SurvivalState): number =>
   Math.min(DIAMANDIS_FRENZY_CAP, 1 + DIAMANDIS_FRENZY_PER_MODULE * diamandisFrenzyStacks(state));
 
 /**
+ * Quantos BRACOS MANIPULADORES estao livres, 0..3.
+ *
+ * E o mesmo numero dos modulos arrancados, lido pelo outro lado: cada
+ * ferramenta que sai devolve a mao que a segurava. Existe com nome proprio
+ * porque decide outra coisa — nao o dano de tudo (isso e o frenesi), e sim se
+ * o chefe TEM um soco e com que peso ele cai.
+ */
+export const diamandisFreeArms = (state: SurvivalState): number => diamandisFrenzyStacks(state);
+
+/**
+ * O quanto o chassi anda mais rapido por braco liberado. Sem ferramentas para
+ * carregar e operar, a maquina e so motor — e e isso que fecha a distancia no
+ * ultimo ato.
+ */
+export const diamandisFrenzySpeedMultiplier = (state: SurvivalState): number =>
+  1 + DIAMANDIS_FRENZY_SPEED_PER_MODULE * diamandisFreeArms(state);
+
+/** O que o soco cobra, quanto ele demora a sair e de quanto em quanto, por bracos. */
+export const diamandisPummelProfile = (
+  arms: number,
+): { damage: number; windup: number; cooldown: number } => {
+  const n = Math.max(1, Math.min(DIAMANDIS_MODULE_COUNT, Math.floor(arms)));
+  const extra = n - 1;
+  return {
+    damage: DIAMANDIS_PUMMEL_DAMAGE + DIAMANDIS_PUMMEL_DAMAGE_PER_ARM * extra,
+    windup: Math.max(4, DIAMANDIS_PUMMEL_WINDUP_TICKS - DIAMANDIS_PUMMEL_WINDUP_PER_ARM * extra),
+    cooldown: Math.max(
+      10,
+      DIAMANDIS_PUMMEL_COOLDOWN_TICKS - DIAMANDIS_PUMMEL_COOLDOWN_PER_ARM * extra,
+    ),
+  };
+};
+
+/**
  * O ARRANQUE de um modulo — o unico caminho pelo qual `modulesLost` ganha um
  * bit. Usado pelo release do `haul` do Coveiro e pela Arena.
  *
@@ -7747,7 +7802,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       def.speed *
       (enemy.elite ? 1.12 : 1) *
       surfaceSpeedMul(state, enemy) *
-      (enemy.archetype === 'scoriac' && enemy.mood === SCORIAC_HOT ? SCORIAC_HOT_SPEED_SCALE : 1);
+      (enemy.archetype === 'scoriac' && enemy.mood === SCORIAC_HOT ? SCORIAC_HOT_SPEED_SCALE : 1) *
+      // O Diamandis ANDA MAIS por ferramenta perdida: ver
+      // `DIAMANDIS_FRENZY_SPEED_PER_MODULE`. Nao e furia, e peso — a maquina
+      // desarmada e a mesma maquina sem a carga que ela empurrava.
+      (enemy.archetype === 'diamandis' ? diamandisFrenzySpeedMultiplier(state) : 1);
 
     if (aggro && player) {
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
@@ -8031,6 +8090,34 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
             player.id,
           );
           continue;
+        }
+        // O SOCO, a quarta faixa: a mais perto de todas, e a unica que nao usa
+        // ferramenta nenhuma. So existe com braco LIVRE — com as tres montadas
+        // as tres maos estao ocupadas, e o chefe nao tem com que bater (o
+        // esbarrao do corpo, no ramo generico, continua sendo o que sobra).
+        //
+        // Divide o relogio com o contato porque E contato: sem isto o chefe
+        // socaria e esbarraria no mesmo tick, cobrando duas vezes pela mesma
+        // mao. Com braco livre o soco vence — ele alcanca mais longe e pesa
+        // mais —, e entre um soco e outro nao ha esbarrao nenhum.
+        const arms = diamandisFreeArms(state);
+        if (arms > 0 && state.tick >= enemy.contactReadyAt) {
+          const profile = diamandisPummelProfile(arms);
+          if (dist < enemy.radius + player.radius + DIAMANDIS_PUMMEL_REACH) {
+            enemy.contactReadyAt = state.tick + profile.windup + profile.cooldown;
+            startAction(
+              state,
+              enemy,
+              'pummel',
+              toward,
+              profile.windup,
+              6,
+              events,
+              player.id,
+              arms / DIAMANDIS_MODULE_COUNT,
+            );
+            continue;
+          }
         }
       }
 

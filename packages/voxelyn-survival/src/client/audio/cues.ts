@@ -75,6 +75,7 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   contact: 'telegraphCharge',
   charge: 'telegraphCharge',
   detonate: 'telegraphDetonate',
+  pummel: 'telegraphSlam',
   slam: 'telegraphSlam',
   // O eletroima do Coveiro usa a voz do ARREMESSO, e nao a do golpe: as duas
   // acoes dizem "sai da linha", e o que vem depois do zumbido nao e um corpo
@@ -147,6 +148,7 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
     drill: 'diamandisDrillEngage',
     demolish: 'diamandisChargeArmed',
     beam: 'diamandisBeamScan',
+    pummel: 'diamandisPummelRaise',
   },
   white_devourer: { erupt: 'devourerEmergeWarning' },
   archcantor: { song: 'archcantorPhrase' },
@@ -180,6 +182,7 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   drill: 'telegraphCharge',
   demolish: 'telegraphDetonate',
   beam: 'telegraphHurl',
+  pummel: 'telegraphSlam',
   erupt: 'telegraphCharge',
   maw: null,
   song: 'telegraphPulse',
@@ -204,6 +207,7 @@ const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
     drill: 'diamandisDrillLaunch',
     demolish: 'diamandisImplosion',
     beam: 'diamandisBeamLocked',
+    pummel: 'diamandisPummelHit',
   },
   white_devourer: { erupt: 'devourerEmerge' },
   // O canto e decidido por intensidade (acorde ou tritono) — ver abaixo.

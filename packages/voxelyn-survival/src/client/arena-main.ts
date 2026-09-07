@@ -357,6 +357,7 @@ const DIAMANDIS_SCENARIO_LABELS: Record<DiamandisScenario, string> = {
   drill: 'avanço da broca',
   drillWall: 'broca contra veio',
   drillMiss: 'broca errando',
+  pummel: 'desarmado: o soco',
 };
 for (const scenario of DIAMANDIS_SCENARIOS) {
   const button = document.createElement('button');

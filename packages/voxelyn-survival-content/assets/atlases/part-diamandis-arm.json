@@ -1,0 +1,109 @@
+{
+  "id": "part-diamandis-arm",
+  "version": 1,
+  "atlas": "part-diamandis-arm.png",
+  "normalAtlas": "part-diamandis-arm.normal.png",
+  "normalScale": 2,
+  "frameWidth": 56,
+  "frameHeight": 44,
+  "columns": 56,
+  "anchorX": 26,
+  "anchorY": 11,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.5,
+    "h": 0.5
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true
+    },
+    "special": {
+      "frames": 2,
+      "fps": 3,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 14,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 1,
+      "special": 5
+    },
+    "dl": {
+      "idle": 7,
+      "attack": 8,
+      "special": 12
+    },
+    "ur": {
+      "idle": 14,
+      "attack": 15,
+      "special": 19
+    },
+    "ul": {
+      "idle": 21,
+      "attack": 22,
+      "special": 26
+    },
+    "r": {
+      "idle": 28,
+      "attack": 29,
+      "special": 33
+    },
+    "d": {
+      "idle": 35,
+      "attack": 36,
+      "special": 40
+    },
+    "l": {
+      "idle": 42,
+      "attack": 43,
+      "special": 47
+    },
+    "u": {
+      "idle": 49,
+      "attack": 50,
+      "special": 54
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric heavy manipulator arm of an industrial excavator in eight facings: pivot, forearm and a two-jaw clamp, closed while it grips a mounted tool, open and idle once the tool is torn off, and swinging in a short slam",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

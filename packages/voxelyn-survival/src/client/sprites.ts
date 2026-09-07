@@ -47,6 +47,8 @@ import diamandisManifest from '@voxelyn/survival-content/assets/atlases/enemy-di
 import diamandisDrillManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.json';
 import diamandisRackManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.json';
 import diamandisMastManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.json';
+import diamandisArmManifest from '@voxelyn/survival-content/assets/atlases/part-diamandis-arm.json';
+import { DIAMANDIS_ARM_ATLAS } from './diamandis-body';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
@@ -119,6 +121,7 @@ import diamandisUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamand
 import diamandisDrillUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.png?url';
 import diamandisRackUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.png?url';
 import diamandisMastUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.png?url';
+import diamandisArmUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-arm.png?url';
 import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
 import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.png?url';
 import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
@@ -154,6 +157,7 @@ import enemyDiamandisNormalUrl from '@voxelyn/survival-content/assets/atlases/en
 import partDiamandisDrillNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.normal.png?url';
 import partDiamandisRackNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.normal.png?url';
 import partDiamandisMastNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.normal.png?url';
+import partDiamandisArmNormalUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-arm.normal.png?url';
 import enemyFrostQueenNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.normal.png?url';
 import enemyFrostWraithNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.normal.png?url';
 import enemyFungalHorseNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.normal.png?url';
@@ -199,6 +203,7 @@ const NORMAL_URLS: Record<string, string> = {
   'part-diamandis-drill.normal.png': partDiamandisDrillNormalUrl,
   'part-diamandis-rack.normal.png': partDiamandisRackNormalUrl,
   'part-diamandis-mast.normal.png': partDiamandisMastNormalUrl,
+  'part-diamandis-arm.normal.png': partDiamandisArmNormalUrl,
   'enemy-frost-queen.normal.png': enemyFrostQueenNormalUrl,
   'enemy-frost-wraith.normal.png': enemyFrostWraithNormalUrl,
   'enemy-fungal-horse.normal.png': enemyFungalHorseNormalUrl,
@@ -626,7 +631,10 @@ export const DIAMANDIS_PART_ATLASES: readonly string[] = [
   'part-diamandis-rack',
   'part-diamandis-mast',
 ];
-export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set(DIAMANDIS_PART_ATLASES);
+export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
+  ...DIAMANDIS_PART_ATLASES,
+  DIAMANDIS_ARM_ATLAS,
+]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
   'part-diamandis-drill': {
     manifest: diamandisDrillManifest as unknown as SpriteManifestEntry,
@@ -639,6 +647,10 @@ const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string 
   'part-diamandis-mast': {
     manifest: diamandisMastManifest as unknown as SpriteManifestEntry,
     url: diamandisMastUrl,
+  },
+  'part-diamandis-arm': {
+    manifest: diamandisArmManifest as unknown as SpriteManifestEntry,
+    url: diamandisArmUrl,
   },
 };
 

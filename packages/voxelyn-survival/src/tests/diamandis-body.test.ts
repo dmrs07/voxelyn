@@ -45,6 +45,7 @@ import {
   reactorIntensity,
   RIP_JOLT_MS,
   socketScreenPoint,
+  DIAMANDIS_ARM_ATLAS,
 } from '../client/diamandis-body';
 import {
   ARCHETYPE_DIRECTIONS,
@@ -433,6 +434,9 @@ describe('os atlas sob demanda batem com o orcamento do validador', () => {
     expect(match).not.toBeNull();
     const ids = [...match![1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
     expect(ids).toEqual([...ON_DEMAND_ATLASES].sort());
-    expect(ids).toEqual([...DIAMANDIS_PART_ATLASES].sort());
+    // Sob demanda sao as tres FERRAMENTAS mais o BRACO. O braco nao esta em
+    // `DIAMANDIS_PART_ATLASES` porque aquela lista e indexada por modulo da
+    // simulacao, e ele nao e um modulo — nao solta, nao e carregado, nao cai.
+    expect(ids).toEqual([...DIAMANDIS_PART_ATLASES, DIAMANDIS_ARM_ATLAS].sort());
   });
 });

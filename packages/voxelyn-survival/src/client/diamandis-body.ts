@@ -51,6 +51,21 @@ export const diamandisPartAtlas = (module: number): string | null => {
   return name ? `part-diamandis-${name}` : null;
 };
 
+/**
+ * O atlas do BRACO MANIPULADOR — um so para os tres. Nao entra em
+ * `DIAMANDIS_PART_NAMES` porque nao e um modulo: nao solta, nao e carregado
+ * por Coveiro e nao cai no chao. Ele so segura, larga e soca.
+ */
+export const DIAMANDIS_ARM_ATLAS = 'part-diamandis-arm';
+
+/**
+ * O encaixe do BRACO que serve cada modulo. Nao e o encaixe da ferramenta: o
+ * rack e o mastro montam no TOPO da torre, e um braco nascendo la lia como
+ * entulho no teto. Os bracos ficam presos ao deck — frente, direita, esquerda
+ * — e dali alcancam a ferramenta que operam.
+ */
+export const DIAMANDIS_ARM_SOCKETS: readonly string[] = ['armFront', 'armRight', 'armLeft'];
+
 export type DiamandisPartState = 'mounted' | 'loose' | 'gone';
 
 /** O estado de uma peca a partir dos dois bitmasks autoritativos. */
@@ -188,6 +203,38 @@ export type ComposeArgs = {
    * inicio e fim, e por isso nao pode vir do relogio da pose.
    */
   drillFrame?: number;
+  /** O atlas do BRACO MANIPULADOR; `null` enquanto nao carregou. */
+  arm?: SpriteManifestEntry | null;
+  /**
+   * O quadro do SOCO, quando ha um em curso (ver `pummelArmFrame`). Sem ele os
+   * bracos livres ficam parados em `special` — a mao vazia, aberta.
+   */
+  pummelFrame?: number;
+};
+
+/** Quantos quadros tem o soco do braco. */
+export const ARM_SWING_FRAMES = 4;
+
+/**
+ * O quadro do braco durante um SOCO, pelo relogio da acao autoritativa.
+ *
+ * Os dois primeiros quadros sao o aviso (o braco arma para tras) e ocupam o
+ * windup inteiro, seja ele de 8 ou de 14 ticks — o soco de tres bracos avisa
+ * menos tempo, e nao com menos quadros. Os dois ultimos sao a descida, e caem
+ * no release: e o instante em que a simulacao cobra o dano.
+ */
+export const pummelArmFrame = (
+  action: { kind: string; startedAt: number; releaseAt: number; endsAt: number } | undefined,
+  tick: number,
+): number | undefined => {
+  if (!action || action.kind !== 'pummel') return undefined;
+  if (tick < action.releaseAt) {
+    const span = Math.max(1, action.releaseAt - action.startedAt);
+    return (tick - action.startedAt) / span < 0.55 ? 0 : 1;
+  }
+  const span = Math.max(1, action.endsAt - action.releaseAt);
+  const after = (tick - action.releaseAt) / span;
+  return after < 0.5 ? 2 : 3;
 };
 
 /**
@@ -236,6 +283,44 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
       depth: socket.depth,
     });
   }
+  // OS BRACOS: um por encaixe, porque e a mao que segura aquela ferramenta.
+  //
+  // Compartilham o encaixe com ela e entram um fio MAIS FUNDO (o `-0.01` no
+  // depth), entao com a ferramenta montada o que se ve e a garra fechada em
+  // volta dela. Arrancada a ferramenta, o que sobra no encaixe e a mao — e e
+  // por isso que os bracos parecem "nascer" sem nunca terem sido acrescentados.
+  if (args.arm) {
+    const manifest = args.arm;
+    for (let module = 0; module < DIAMANDIS_PART_NAMES.length; module++) {
+      const socket = socketScreenPoint(
+        args.chassis,
+        dir,
+        DIAMANDIS_ARM_SOCKETS[module],
+        args.footX,
+        args.footY,
+        args.zoom,
+      );
+      if (!socket) continue;
+      const free = (args.lost & (1 << module)) !== 0;
+      // Mao ocupada: fechada na ferramenta. Mao livre: aberta, e capaz de socar.
+      const anim = !free ? 'idle' : args.pummelFrame !== undefined ? 'attack' : 'special';
+      const frame =
+        free && args.pummelFrame !== undefined
+          ? args.pummelFrame
+          : frameAtTime(manifest, anim, args.nowMs + module * 211);
+      out.push({
+        module,
+        atlas: DIAMANDIS_ARM_ATLAS,
+        anim,
+        frame,
+        x: socket.x,
+        y: socket.y,
+        behind: socket.depth < 0,
+        depth: socket.depth,
+      });
+    }
+  }
+
   out.sort((a, b) => (a.behind !== b.behind ? (a.behind ? -1 : 1) : a.depth - b.depth));
   return out;
 };

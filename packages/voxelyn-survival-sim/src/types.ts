@@ -507,6 +507,11 @@ export type EntityActionKind =
   | 'demolish'
   /** Feixe de prospeccao: varredura inofensiva, depois potencia na mesma linha. */
   | 'beam'
+  /**
+   * SOCO dos bracos manipuladores do Diamandis. So existe com braco livre —
+   * cada ferramenta arrancada devolve a mao que a segurava.
+   */
+  | 'pummel'
   /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
   | 'erupt'
   /**
@@ -932,6 +937,8 @@ export type BossAbility =
   | 'drill'
   | 'demolish'
   | 'beam'
+  // Diamandis: o que sobra quando as ferramentas acabam.
+  | 'pummel'
   // Devorador Branco.
   | 'erupt'
   | 'maw'

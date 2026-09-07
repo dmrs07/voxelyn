@@ -550,6 +550,62 @@ Medido depois, no mesmo cenário: **25 contatos** e **700 de dano** nos mesmos
 e martela. A seis e a doze tiles as três ferramentas continuam saindo (salva,
 feixe, broca) e o corpo entra quando o alvo encosta.
 
+### Os braços, e a luta em QUATRO atos (`SIMULATION_VERSION` 64)
+
+O Diamandis tem **três braços manipuladores**, e sempre teve — um por
+ferramenta. É essa a razão de a máquina nunca ter socado ninguém com as três no
+lugar: as três mãos estão **ocupadas** operando broca, rack e mastro. O que um
+Coveiro arranca não é uma arma do chefe; é a **ocupação de uma das mãos**.
+
+Isso transforma o encontro numa escolha, e não numa descida linear de números:
+desarmar a máquina remove uma ferramenta e **liberta um braço**.
+
+| Braços livres | Ferramentas         | O que ele faz de perto | Golpe    | Velocidade |
+| ------------- | ------------------- | ---------------------- | -------- | ---------- |
+| 0             | broca, salva, feixe | esbarrão do corpo      | 28       | 1,50       |
+| 1             | salva, feixe        | **soco**               | 34,5     | 1,95       |
+| 2             | feixe               | soco mais rápido       | 49,4     | 2,40       |
+| 3             | nenhuma             | soco, e só             | **66,7** | **2,85**   |
+
+- **O soco** (`pummel`) só existe com braço livre e divide o relógio com o
+  esbarrão — nunca os dois no mesmo tick. Por braço ele encurta o aviso (14 →
+  11 → 8 ticks), aperta a cadência (20 → 16 → 12) e pesa mais (30 → 38 → 46,
+  ainda vezes o frenesi). O braço estendido alcança 0,55 tile além dos dois
+  corpos, e o alcance é conferido no **release**: sair durante o aviso é a
+  resposta inteira do golpe.
+- **A velocidade** sobe 30% da base por braço: sem ferramentas para carregar, a
+  escavadeira é só chassi e motor. Contra os 4,6 do Prospector a fuga continua
+  existindo nos quatro degraus — o que muda é o preço de errar o espaçamento.
+  Não poder fugir seria outro jogo; ter de **merecer** a fuga é este.
+- **A vida** vai a 1400 (era 880): o quarto ato não existia quando 880 foi
+  escolhido.
+
+Um piso obrigatório: o soco de **um** braço já tem de doer mais que o esbarrão
+que ele substitui. Na primeira medição doía menos (20,7 contra 28) — libertar
+uma mão deixava o chefe mais fraco de perto, o contrário do que arrancar uma
+ferramenta significa. O piso vale no número cru, e não no que o frenesi faz com
+ele: invariante que depende de outro sistema estar ligado não é invariante.
+
+**O braço, do lado de quem vê** (`part-diamandis-arm`, sob demanda): um atlas
+para os três, desenhado num encaixe próprio do deck — frente, direita e
+esquerda. Dividir o encaixe com a ferramenta foi a primeira tentativa e não
+funcionou: o rack e o mastro montam no **topo** da torre, e os braços deles
+nasciam no teto, lendo como entulho em cima da máquina. Três poses contam a
+história inteira: `idle` a garra **fechada** enquanto opera, `special` a mão
+**aberta e vazia** depois do arranque, `attack` a descida em quatro quadros. O
+chassi não mudou de quadro nenhum — os braços são peça, como as ferramentas.
+
+![braços e soco](../media/diamandis/31-bracos-e-soco.png)
+
+![poses do braço](../media/diamandis/32-braco-poses.png)
+
+**No áudio**: `diamandisPummelRaise` é o servo hidráulico levantando o braço (o
+aviso), e `diamandisPummelHit` é a chapa chegando — subgrave de massa mais três
+parciais metálicos. Não é a broca na pedra: ali quem se machuca é a rocha, aqui
+quem se machuca também é a máquina.
+
+Cenário da arena: **desarmado: o soco**.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

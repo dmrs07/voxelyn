@@ -164,6 +164,8 @@ export type VoiceId =
   | 'diamandisVoiceFault'
   | 'diamandisVoiceLost'
   | 'diamandisVoiceObstruction'
+  | 'diamandisPummelRaise'
+  | 'diamandisPummelHit'
   | 'diamandisDrillEngage'
   | 'diamandisDrillBearing'
   | 'diamandisDrillLock'
@@ -519,6 +521,11 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // sao os transientes: a hidraulica engatando o alinhamento (windup), cada
   // clique do mancal por oitante, a trava do rumo, o arranque grave, e os
   // tres finais distintos — pedra, derrapagem, metal (o jogador).
+  // O SOCO: o servo levantando o braco avisa, e a chapa que desce cobra. O
+  // aviso e curto (o de tres bracos dura 0,4 s) e por isso e mais agudo que
+  // qualquer leito do chefe — nao pode ser confundido com a broca girando.
+  diamandisPummelRaise: { priority: 10, gain: 0.5, minIntervalMs: 60, spatial: true },
+  diamandisPummelHit: { priority: 9, gain: 0.8, minIntervalMs: 50, spatial: true },
   diamandisDrillEngage: { priority: 10, gain: 0.55, minIntervalMs: 90, spatial: true },
   diamandisDrillBearing: { priority: 8, gain: 0.5, minIntervalMs: 40, spatial: true },
   diamandisDrillLock: { priority: 9, gain: 0.6, minIntervalMs: 60, spatial: true },
