@@ -291,11 +291,40 @@ histerese de rumo do cliente foi generalizada para N setores em `facing.ts`). Ca
 módulo é um atlas próprio, também em oito rumos: `part-diamandis-drill`,
 `part-diamandis-rack` (a torre de demolição) e `part-diamandis-mast` (a lente do
 scanner). O gerador publica no manifest do chassi os **encaixes** de cada peça por
-rumo — `sockets[dir][peça] = {x, y, depth}` — e o cliente monta o corpo em
+rumo — `sockets[dir][peça] = {x, y, depth, behind}` — e o cliente monta o corpo em
 `diamandis-body.ts`: a peça entra na tela no pé do sprite mais o deslocamento do
-encaixe, e `depth` (o x + y do modelo rotacionado) diz se ela entra antes ou depois
-do chassi. Um teste do pacote reconstrói o modelo inteiro a partir do chassi mais as
-peças montadas: a soma é o Diamandis antigo, voxel a voxel.
+encaixe, `depth` (o x + y do modelo rotacionado) ordena as peças **entre si**, e
+`behind` diz se ela entra antes ou depois do chassi. Um teste do pacote reconstrói o
+modelo inteiro a partir do chassi mais as peças montadas: a soma é o Diamandis
+antigo, voxel a voxel.
+
+**Por que `behind` é um campo e não um `depth < 0`.** O rasterizador ordena voxels
+por `(x + y)` e **desempata por `z`**; o `depth` do encaixe só reproduz a primeira
+metade. Para uma peça montada no alto da máquina o `x + y` é quase nulo — o mastro
+fica em −0,40 e o rack em −7,60 — e o sinal do resto decidia o lado. Resultado
+medido: em `ur`, `ul` e `u` a torre passava por cima do **mastro**, e em `dr`, `dl` e
+`d` por cima do **rack**, nos 24 quadros de cada rumo. Nada do chassi fica acima
+deles; nada do chassi podia cobri-los.
+
+Agora quem decide é o gerador, que tem o modelo: encaixes de **coroa** (`crown`)
+nunca entram atrás, e um `x + y` empatado em zero vai para trás em vez de para a
+frente (era a broca em `r` e `l`). Um teste de conteúdo cobra isso contra a
+**verdade do rasterizador** — desenha chassi e peça juntos num só `renderVoxels`,
+onde a oclusão sai certa por construção, e exige que o `behind` publicado seja o
+melhor dos dois lados, peça a peça e rumo a rumo. De 40 pares (peça × rumo), 31
+estavam certos antes e 38 estão certos agora.
+
+![antes, depois e a verdade do rasterizador em ur, ul, u, dr e d](../media/diamandis/33-topologia-antes-depois.png)
+
+Nas linhas `ur`, `ul` e `u` o poste do mastro aparece cortado na primeira coluna e
+inteiro na segunda; em `dr` são os montantes do rack. A terceira coluna é o
+rasterizador, e a segunda passou a bater com ela.
+
+O resíduo conhecido são os dois braços de frente (`d`): o **ombro** deles mora
+dentro do deck, então nenhum lado acerta o ombro e o punho ao mesmo tempo. A
+diferença medida é de sombreado nas bordas e não de oclusão — as duas composições
+são indistinguíveis a olho —, e o teste registra o par como exceção nomeada em vez
+de fingir que não existe.
 
 Os três atlas de peça são **sob demanda** (o mesmo mecanismo dos módulos do
 Prospector): são os sprites mais caros do pacote e só quem encontra o chefe paga por

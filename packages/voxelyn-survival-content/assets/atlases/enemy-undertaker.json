@@ -111,28 +111,32 @@
       "magnet": {
         "x": 57,
         "y": 49,
-        "depth": -10.5
+        "depth": -10.5,
+        "behind": true
       }
     },
     "dl": {
       "magnet": {
         "x": 55,
         "y": 71,
-        "depth": 10.5
+        "depth": 10.5,
+        "behind": false
       }
     },
     "ur": {
       "magnet": {
         "x": 13,
         "y": 48,
-        "depth": -10.5
+        "depth": -10.5,
+        "behind": true
       }
     },
     "ul": {
       "magnet": {
         "x": 11,
         "y": 70,
-        "depth": 10.5
+        "depth": 10.5,
+        "behind": false
       }
     }
   },

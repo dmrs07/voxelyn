@@ -125,7 +125,19 @@ export const MACHINERY_SPEEDUP_PER_STACK = 0.25;
 export const machineryClock = (elapsedMs: number, stacks: number): number =>
   elapsedMs * (1 + MACHINERY_SPEEDUP_PER_STACK * Math.max(0, stacks));
 
-export type SocketPoint = { x: number; y: number; depth: number };
+export type SocketPoint = { x: number; y: number; depth: number; behind: boolean };
+
+/**
+ * A peca entra ANTES do corpo?
+ *
+ * Quem sabe e o gerador, que tem o modelo: ele publica `behind` por rumo. O
+ * `depth < 0` daqui e so o recuo para um manifest antigo, e e justamente a
+ * regra insuficiente que o campo veio substituir — ela ordena por `x + y` e
+ * ignora o `z`, entao manda para tras do corpo qualquer peca montada no alto
+ * dele (era o mastro do Diamandis atras da torre em `ur`, `ul` e `u`).
+ */
+const socketBehind = (socket: { depth?: number; behind?: boolean }): boolean =>
+  socket.behind ?? (socket.depth ?? 0) < 0;
 
 /**
  * Onde um encaixe cai na TELA, a partir do pe do sprite.
@@ -149,6 +161,7 @@ export const socketScreenPoint = (
       x: footX + (own.x - manifest.anchorX) * zoom,
       y: footY + (own.y - manifest.anchorY) * zoom,
       depth: own.depth ?? 0,
+      behind: socketBehind(own),
     };
   }
   const source = manifest.flipPairs[dir];
@@ -158,6 +171,7 @@ export const socketScreenPoint = (
     x: footX - (mirrored.x - manifest.anchorX) * zoom,
     y: footY + (mirrored.y - manifest.anchorY) * zoom,
     depth: mirrored.depth ?? 0,
+    behind: socketBehind(mirrored),
   };
 };
 
@@ -278,7 +292,7 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
       frame: spun ? (args.drillFrame as number) : frameAtTime(manifest, anim, clock),
       x: socket.x,
       y: socket.y,
-      behind: socket.depth < 0,
+      behind: socket.behind,
       depth: socket.depth,
     });
   }
@@ -320,7 +334,7 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
         frame,
         x: socket.x,
         y: socket.y,
-        behind: socket.depth < 0,
+        behind: socket.behind,
         depth: socket.depth,
       });
     }

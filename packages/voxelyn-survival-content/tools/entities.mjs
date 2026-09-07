@@ -1596,8 +1596,18 @@ const diamandisZ = (anim, f) =>
 export const DIAMANDIS_PARTS = ['drill', 'rack', 'mast'];
 export const DIAMANDIS_SOCKETS = {
   drill: { x: 0, y: -3, z: DIAMANDIS_Z0 + 3.1 },
-  rack: { x: 0, y: 3.8, z: DIAMANDIS_Z0 + 12.2 },
-  mast: { x: 0, y: -0.2, z: DIAMANDIS_Z0 + 12.2 },
+  // `crown`: monta no ALTO da maquina — nada do chassi fica acima —, entao
+  // nada do chassi pode cobrir a peca, em rumo nenhum.
+  //
+  // Sem esta marca a ordem sai da profundidade `x + y` do encaixe, e para quem
+  // mora no topo da torre esse numero e quase zero: o rack fica a -7,60 e o
+  // mastro a -0,40 em metade dos rumos, e os dois iam para TRAS do chassi. A
+  // torre entao passava por cima deles. Medido no comparador contra o
+  // rasterizador (que ordena por `x + y` e desempata por `z`, e por isso
+  // acerta): o rack errado em `dr`, `dl` e `d`, o mastro errado em `ur`, `ul`
+  // e `u` — 24 de 24 quadros em cada rumo, ate 417 px de peca engolida.
+  rack: { x: 0, y: 3.8, z: DIAMANDIS_Z0 + 12.2, crown: true },
+  mast: { x: 0, y: -0.2, z: DIAMANDIS_Z0 + 12.2, crown: true },
   // OS DOIS BRACOS, um em cada LADO — e so nos lados.
   //
   // A primeira versao tinha tres, um por ferramenta, com o terceiro na frente
