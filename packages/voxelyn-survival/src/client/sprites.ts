@@ -1401,16 +1401,19 @@ export class SpriteBank {
    *
    * A troca acontece AQUI, e nao no renderer: o cliente continua pedindo
    * `downed`/`burst` do `white_devourer` como sempre pediu, e quem sabe que o
-   * quadro mora noutro lugar e o banco. Se o atlas da cratera ainda nao chegou,
-   * cai no do arquetipo — que nao tem a pose e desenha nada, o mesmo que
-   * acontecia com qualquer atlas em voo.
+   * quadro mora noutro lugar e o banco.
+   *
+   * Com desvio declarado e atlas ausente, devolve `null` — e NAO o atlas do
+   * arquetipo. Cair no do arquetipo parece o recuo generoso e e o contrario:
+   * `drawLoadedFrame` troca animacao que nao existe por `idle` em silencio e
+   * devolve sucesso, entao o `!drew` do renderer nunca roda e a janela de dano
+   * do encontro apareceria como o verme de sempre passeando pelo chao. Os
+   * chefes sao nao criticos por politica (ver `REQUIRED_ATLAS_IDS`): a promessa
+   * para eles e a silhueta de voxel, e e ela que tem de aparecer.
    */
   spriteForAnimation(archetype: string, animation: string): Loaded | null {
     const override = ANIM_ATLAS_OVERRIDE[archetype]?.[animation];
-    if (override) {
-      const loaded = this.get(override);
-      if (loaded) return loaded;
-    }
+    if (override) return this.get(override);
     return this.spriteForArchetype(archetype);
   }
 
