@@ -2615,8 +2615,50 @@ const devourerCoilModel = (k) => {
   return b;
 };
 
+/**
+ * O QUADRO do anel, e a ancora com que ele e RASTERIZADO — que nao e a ancora
+ * que o manifest declara. Ver logo abaixo.
+ *
+ * 70 e nao 64 de largura: nos quatro rumos NOVOS o anel projeta mais para os
+ * lados (conteudo 64 contra os 60 dos rumos antigos), e a validacao ainda cobra
+ * 2 px de margem — um pixel de anel cortado, numa fila de dez, aparece como um
+ * degrau no meio do corpo. 66 foi medido e recusado pelo proprio gerador
+ * ("conteudo 64x52 nao cabe em 66x58 com margem 2").
+ *
+ * A ALTURA NAO MUDA, e nao por economia: o anel desce os mesmos 11 px abaixo da
+ * origem nos oito rumos, e esse numero e a LINHA DA AREIA que o cliente
+ * compartilha com a cabeca (`DEVOURER_BELOW_ANCHOR_PX`, provado em
+ * `devourer-spine.test.ts`). Mexer nele desalinharia o corte do mergulho.
+ *
+ * Exportado porque a ancora do spec DEPENDE deste par — ver o teste em
+ * `tests/devourer-coil.test.ts`.
+ */
+export const DEVOURER_COIL_FRAME = { w: 70, h: 58, ax: 34, ay: 49 };
+
+/**
+ * A ancora AQUI e a de rasterizacao; a do spec e ela mais o deslocamento do
+ * enquadramento. Nao sao o mesmo numero, e confundi-los ja custou um pixel.
+ *
+ * `renderVoxels` poe a origem do modelo — que neste modelo e o CENTRO do tubo,
+ * ao nivel do chao — exatamente na ancora que recebe. Depois disso
+ * `fitSpriteToMargin` recentraliza a uniao de TODOS os quadros no frame, e a
+ * ancora publicada tem de acompanhar esse deslocamento.
+ *
+ * O deslocamento depende da uniao, entao ele MUDA quando se acrescenta rumo ou
+ * se mexe na largura: com quatro rumos em 64 px ele era -2 e a ancora publicada
+ * era 32 - 2 = 30; com oito rumos em 70 px ele e -1, e a ancora e 34 - 1 = 33.
+ * Manter o 32 - 2 de antes deslocaria a fila inteira de dez aneis um pixel para
+ * fora da linha da cabeca, em todos os rumos.
+ */
 const devourerCoilFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(devourerCoilModel(f)), DIR_INDEX[dir], 64, 58, 32, 49);
+  renderVoxels(
+    quarterTurn(devourerCoilModel(f)),
+    DIR_INDEX[dir],
+    DEVOURER_COIL_FRAME.w,
+    DEVOURER_COIL_FRAME.h,
+    DEVOURER_COIL_FRAME.ax,
+    DEVOURER_COIL_FRAME.ay,
+  );
 
 // ---------------------------------------------------------------------------
 // part-devourer-brood — as MINHOQUINHAS: a ninhada do Devorador.
@@ -4238,20 +4280,29 @@ export const ENTITY_SPECS = [
   // instantes: o cliente pede o quadro `k` por indice. A cadencia declarada
   // existe so porque o contrato de atlas exige uma, e nenhum caminho de desenho
   // a consulta.
-  base(
-    'part-white-devourer-coil',
-    64,
-    58,
-    30,
-    47,
-    { w: 0.64, h: 0.64 },
-    { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 },
-    {
-      idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
-    },
-    devourerCoilFrame,
-    'voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip',
-    1,
+  //
+  // OITO RUMOS, como a cabeca — e eles ficaram para tras quando ela passou a
+  // oito. O defeito era visivel em jogo: num salto diagonal a cabeca mostrava o
+  // rumo certo e os dez aneis atras dela caiam no mais proximo dos quatro, entao
+  // o corpo TORCIA atras da cabeca em metade dos saltos. Metade e literal: os
+  // quatro rumos que faltavam (`r`/`d`/`l`/`u`) sao exatamente as diagonais do
+  // mundo, que e por onde o Devorador salta.
+  eightWay(
+    base(
+      'part-white-devourer-coil',
+      70,
+      58,
+      33,
+      47,
+      { w: 0.64, h: 0.64 },
+      { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 },
+      {
+        idle: { frames: DEVOURER_COIL_RANKS, fps: 1, loop: true },
+      },
+      devourerCoilFrame,
+      'voxel-isometric single body ring of a pale silica worm boss in eight facings, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip',
+      2,
+    ),
   ),
   // A NINHADA do Devorador: uma linha de bloquinhos, tres variantes x seis
   // fases num slot so. `part-` e nao `enemy-` pela mesma razao do anel de

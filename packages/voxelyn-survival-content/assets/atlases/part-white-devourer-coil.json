@@ -1,20 +1,24 @@
 {
   "id": "part-white-devourer-coil",
-  "version": 1,
+  "version": 2,
   "atlas": "part-white-devourer-coil.png",
   "normalAtlas": "part-white-devourer-coil.normal.png",
   "normalScale": 2,
-  "frameWidth": 64,
+  "frameWidth": 70,
   "frameHeight": 58,
   "columns": 40,
-  "anchorX": 30,
+  "anchorX": 33,
   "anchorY": 47,
-  "directions": 4,
+  "directions": 8,
   "authoredDirs": [
     "dr",
     "dl",
     "ur",
-    "ul"
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
   ],
   "flipPairs": {},
   "hitbox": {
@@ -31,6 +35,7 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#3d2a22",
     "#6e4a33",
     "#8a7154",
     "#b8a98f",
@@ -56,11 +61,23 @@
     },
     "ul": {
       "idle": 30
+    },
+    "r": {
+      "idle": 40
+    },
+    "d": {
+      "idle": 50
+    },
+    "l": {
+      "idle": 60
+    },
+    "u": {
+      "idle": 70
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric single body ring of a pale silica worm boss, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip",
+    "prompt": "voxel-isometric single body ring of a pale silica worm boss in eight facings, tapering plated tube segment with a bone lateral crest and a dark joint groove, ten thickness ranks from thick neck to thin tail tip",
     "seedOrRef": "deterministic-code-v2"
   }
 }

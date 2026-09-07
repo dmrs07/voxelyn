@@ -893,6 +893,57 @@ E a resposta some rápido: o arco só existe durante a erupção, pouco mais de 
 segundo. O painel **guarda** a última resposta até o pedido seguinte, senão nem
 quem clica e olha, nem uma captura automatizada, chegam a tempo.
 
+### Os ANÉIS do corpo também em oito rumos
+
+O primeiro passo deu oito rumos à **cabeça** e deixou o anel do corpo
+(`part-white-devourer-coil`) nos quatro de antes. O defeito aparece em jogo e não
+no JSON: num salto diagonal a cabeça mostra o rumo certo e os **dez anéis**
+pendurados no rastro caem no vizinho mais próximo dos quatro autorados — o corpo
+**torce** atrás da cabeça. E era em metade dos saltos, porque os quatro rumos que
+faltavam (`r`/`d`/`l`/`u`) são exatamente as diagonais do mundo, que é por onde
+ele salta (a tabela acima: 4/4 diagonais).
+
+| | quadro | rumos | quadros | custo |
+| --- | --- | --- | --- | --- |
+| *antes* | *64×58* | *4* | *40* | *0,57 MiB* |
+| `part-white-devourer-coil` | 70×58 | **8** | 80 | **1,24 MiB** |
+
+O boot subiu de 165.453.984 para **166.159.264** bytes — **+705.280**, com
+1.612.896 de folga no teto. Barato porque o anel é um quadro minúsculo: dobrar os
+rumos de uma peça de 70×58 custa uma fração do que custaria na cabeça.
+
+Três medidas guiaram o quadro novo, e nenhuma foi escolha de gosto:
+
+- **70 de largura, não 64.** Nos quatro rumos novos o anel projeta mais para os
+  lados (conteúdo 64 contra os 60 dos rumos antigos) e a validação ainda cobra 2
+  px de margem. 66 foi medido e **recusado pelo próprio gerador** (`conteudo
+  64x52 nao cabe em 66x58 com margem 2`). Um pixel de anel cortado, numa fila de
+  dez, lê como um degrau no meio do corpo.
+- **A altura não mudou.** O anel desce os mesmos **11 px** abaixo da origem nos
+  oito rumos, e esse número é a **linha da areia** que o cliente compartilha com
+  a cabeça (`DEVOURER_BELOW_ANCHOR_PX`). Mexer nele desalinharia o corte do
+  mergulho.
+- **A âncora publicada foi de 30 para 33**, e não para 32 como a conta ingênua
+  daria. Há **duas** âncoras aqui: a de rasterização, que `renderVoxels` recebe,
+  e a publicada no manifest — e entre uma e outra passa `fitSpriteToMargin`, que
+  recentraliza a **união de todos os quadros** dentro do frame. Esse deslocamento
+  sai da união, então ele **muda quando se acrescenta rumo**: era `-2` com quatro
+  rumos em 64 px, é `-1` com oito em 70 px. Carregar o número antigo põe a fila
+  inteira de dez anéis **um pixel fora** da linha da cabeça, em todos os rumos, e
+  nada mais reclama — foi o que a primeira versão desta mudança fez.
+
+No cliente **não houve mudança**: `drawLoadedFrame` escolhe entre oito e quatro
+setores lendo o `directions` do manifest **carregado**, e a direção de cada anel
+já era a tangente contínua do rastro (`spine-trail.ts`), não um rumo
+pré-quantizado. Passar o atlas a oito rumos foi o bastante.
+
+As duas provas que fecham isso não repetem números do JSON. Em
+`devourer-spine.test.ts`, a do rumo passa pelo **mesmo seletor** que o desenho
+usa e cobra que cabeça e anel cheguem à mesma letra nas oito voltas — com o
+manifest antigo ela falha em `(1, 1)`, `dl` contra `d`. Em
+`tests/devourer-coil.test.ts`, a da âncora **recalcula o deslocamento** a partir
+dos quadros crus e cobra a igualdade — com o 32 ela falha.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |
