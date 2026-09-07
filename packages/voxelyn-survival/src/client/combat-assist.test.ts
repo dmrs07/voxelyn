@@ -61,6 +61,7 @@ const enemy = (x: number, y: number, over: Partial<Entity> = {}): Entity => ({
   elite: false,
   nextActionAt: 0,
   contactReadyAt: 0,
+  beamReadyAt: 0,
   rangedReadyAt: 0,
   stunnedUntil: 0,
   alertedUntil: 0,
@@ -192,7 +193,7 @@ describe('validade de alvo (as regras do capstone)', () => {
             endsAt: DEVOURER_ERUPT_WINDUP_TICKS + 6,
             direction: { x: 1, y: 0 },
           },
-        })
+        }),
       );
     };
     // O tick em que a rampa cruza o limiar: afundamento = 1 - progresso.

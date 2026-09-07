@@ -73,6 +73,7 @@ const enemy = (id: number, archetype: string, hp: number, maxHp = hp): Entity =>
     elite: false,
     nextActionAt: 0,
     contactReadyAt: 0,
+    beamReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
     alertedUntil: 0,

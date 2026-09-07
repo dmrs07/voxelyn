@@ -494,7 +494,7 @@ export const applyDiamandisScenario = (
       const aim = placePlayerAhead(state, boss, 6);
       state.bossRuntime.staggerUntil = 0;
       state.bossRuntime.awake = true;
-      boss.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+      boss.beamReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
       startAction(
         state,
         boss,

@@ -710,6 +710,7 @@ export class NetClient {
           elite: snap.elite,
           nextActionAt: 0,
           contactReadyAt: 0,
+          beamReadyAt: 0,
           rangedReadyAt: 0,
           stunnedUntil: snap.stunnedUntil ?? 0,
           facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },

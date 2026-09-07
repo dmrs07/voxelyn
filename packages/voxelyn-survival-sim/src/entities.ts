@@ -179,6 +179,7 @@ import {
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
   DIAMANDIS_BEAM_DAMAGE,
   DIAMANDIS_BEAM_LENGTH,
+  DIAMANDIS_BEAM_MIN_RANGE,
   DIAMANDIS_BEAM_STEP,
   DIAMANDIS_BEAM_WINDUP_TICKS,
   DIAMANDIS_DEMOLISH_CHARGES,
@@ -1271,6 +1272,7 @@ export const spawnEnemy = (
     elite,
     nextActionAt: 0,
     contactReadyAt: 0,
+    beamReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
     alertedUntil: 0,
@@ -7751,6 +7753,20 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
       dirX = toward.x;
       dirY = toward.y;
+      // O DIAMANDIS PLANTA, e nao dança em cima do alvo.
+      //
+      // Ele perseguia sem distancia de parada, e medido isso nao era "chegar
+      // perto": a distancia estabilizava em 0,03 tile — o chassi de 0,9 de raio
+      // DENTRO do Prospector — oscilando entre 0,03 e 0,05 a cada tick. E o
+      // mesmo defeito que o Devorador teve (ver DEVOURER_STALK_RANGE), com uma
+      // diferenca de temperamento: um verme espreita em orbita, uma maquina de
+      // mineracao para e martela. Ela fecha ate os corpos se ENCOSTAREM e ali
+      // fica, que e de onde o golpe de contato alcanca (`contactRange` mede
+      // 0,18 alem disto).
+      if (enemy.archetype === 'diamandis' && dist <= enemy.radius + player.radius) {
+        dirX = 0;
+        dirY = 0;
+      }
       if (enemy.archetype === 'guardian') {
         const steer = guardianSteering(state, enemy, player.x, player.y, events);
         dirX = steer.x;
@@ -7922,11 +7938,19 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       //
       //   longe  -> broca: fixa o rumo e atravessa a arena;
       //   medio  -> demolicao: marca o chao e implode;
-      //   perto  -> feixe: varre a linha e depois a energiza.
+      //   perto  -> feixe: varre a linha e depois a energiza;
+      //   colado -> CORPO: nenhuma ferramenta, o chassi (ramo generico, abaixo).
       //
       // A ordem da checagem e do mais longe para o mais perto porque as faixas
       // se sobrepoem de proposito: na borda, quem manda e o golpe que cobre o
       // espaco maior, e nunca uma escolha que dependa da ordem de leitura.
+      //
+      // A quarta faixa e a que nao esta aqui, e ela custou um defeito: o corpo
+      // e decidido DEPOIS das ferramentas, entao qualquer ferramenta que cubra
+      // ate zero o apaga. O feixe cobria 0..16 e ainda cobrava o relogio do
+      // contato (`contactReadyAt`) — resultado medido, zero socos em 400 ticks
+      // com o chefe em cima do alvo. Cada ferramenta tem relogio proprio e piso
+      // proprio justamente para a ultima faixa continuar existindo.
       if (enemy.archetype === 'diamandis') {
         const reactorDown = (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0;
         const cadence = reactorDown ? DIAMANDIS_REACTOR_CADENCE_SCALE : 1;
@@ -7990,11 +8014,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         if (
           !reactorDown &&
           hasModule(state, BOSS_MODULE_SCANNER) &&
-          state.tick >= enemy.contactReadyAt &&
+          state.tick >= enemy.beamReadyAt &&
+          dist >= DIAMANDIS_BEAM_MIN_RANGE &&
           dist <= DIAMANDIS_BEAM_LENGTH &&
           hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
         ) {
-          enemy.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+          enemy.beamReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
           startAction(
             state,
             enemy,

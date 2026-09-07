@@ -591,6 +591,16 @@ export type Entity = {
   nextActionAt: number;
   contactReadyAt: number;
   rangedReadyAt: number;
+  /**
+   * Ate quando o FEIXE do Diamandis esta recarregando.
+   *
+   * Relogio proprio, e nao emprestado: o feixe usava `contactReadyAt`, que e o
+   * do CORPO, e como ele e decidido antes do corpo o chefe rearmava o relogio
+   * do soco a cada varredura — e nunca socava. Cada ferramenta tem o seu
+   * (`nextActionAt` a broca, `rangedReadyAt` a salva), e o do corpo volta a
+   * ser so do corpo.
+   */
+  beamReadyAt: number;
   stunnedUntil: number;
   /**
    * Ate quando este inimigo continua caçando por ter LEVADO DANO.

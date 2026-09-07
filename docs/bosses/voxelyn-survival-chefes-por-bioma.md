@@ -521,6 +521,35 @@ Cenários da arena: **avanço da broca** (escolhe o rumo com sala; os cenários 
 decidem a direção), **broca contra veio** (impacto), **broca errando** (derrapagem).
 Capturas `18-broca-…` a `29-broca-…` em `docs/media/diamandis/`.
 
+### O corpo, quando o alvo encosta (`SIMULATION_VERSION` 63)
+
+As três ferramentas são escolhidas por distância, e a quarta faixa é a que não
+tem ferramenta nenhuma: **coladinho, ele usa o chassi**. Essa faixa não existia.
+
+O defeito, medido antes de qualquer mudança: com o chefe parado em cima do
+Prospector, **zero golpes de contato em 400 ticks** (20 s) e 78 de dano no
+total — e a distância estabilizava em **0,03 tile**, oscilando entre 0,03 e 0,05
+a cada tick, com o chassi de 0,9 de raio _dentro_ do corpo do alvo. Duas causas
+somadas:
+
+- **O feixe comia a faixa do corpo.** Ele cobria `0..16` sem piso e cobrava
+  `contactReadyAt` — que é o relógio do **golpe de contato**. Como as
+  ferramentas são decididas antes do corpo, cada varredura rearmava o relógio do
+  soco, e o soco nunca saía. É o mesmo defeito que a broca já teve contra a
+  salva ("faixa que só existe no comentário não é faixa"), agora contra o corpo.
+- **Ele perseguia sem distância de parada**, exatamente como o Devorador antes
+  de `DEVOURER_STALK_RANGE` — com uma diferença de temperamento: um verme
+  espreita em órbita, uma máquina de mineração para e martela.
+
+A correção: o feixe ganha **relógio próprio** (`beamReadyAt`) e **piso**
+(`DIAMANDIS_BEAM_MIN_RANGE` = 3, acima dos 1,42 que o corpo alcança), e o chassi
+**planta** quando os corpos se encostam em vez de entrar no alvo.
+
+Medido depois, no mesmo cenário: **25 contatos** e **700 de dano** nos mesmos
+20 s, com a distância cravada em 1,17 e variação abaixo de 0,02 tile — ele para
+e martela. A seis e a doze tiles as três ferramentas continuam saindo (salva,
+feixe, broca) e o corpo entra quando o alvo encosta.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

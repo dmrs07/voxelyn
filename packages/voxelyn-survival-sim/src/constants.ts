@@ -852,6 +852,20 @@ export const DIAMANDIS_DEMOLISH_WINDUP_TICKS = 34;
 export const DIAMANDIS_DEMOLISH_COOLDOWN_TICKS = 150;
 export const DIAMANDIS_DEMOLISH_RANGE = 13;
 export const DIAMANDIS_DEMOLISH_MIN_RANGE = 4;
+/**
+ * O feixe tambem tem PISO, e pelo mesmo motivo que a broca e a salva tem.
+ *
+ * Sem ele o feixe cobria 0..16 — e como as tres ferramentas sao lidas antes do
+ * corpo, ele engolia a faixa do CORPO inteira: medido, o chefe parado em cima
+ * do Prospector nao dava um unico golpe de contato em 400 ticks. E o mesmo
+ * defeito que a broca ja teve contra a salva, e a mesma cura: faixa que so
+ * existe no comentario nao e faixa.
+ *
+ * Tres tiles deixam a mao livre para o corpo (que alcanca 1,42) e ainda uma
+ * folga de aproximacao — de dentro dela a maquina nao varre linha nenhuma,
+ * ela ENCOSTA.
+ */
+export const DIAMANDIS_BEAM_MIN_RANGE = 3;
 export const DIAMANDIS_DEMOLISH_CHARGES = 3;
 export const DIAMANDIS_DEMOLISH_RADIUS = 2.6;
 /** Quanto as duas cargas laterais se afastam da central, em tiles. */

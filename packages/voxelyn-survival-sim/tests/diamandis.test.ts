@@ -28,6 +28,9 @@ import {
   DIAMANDIS_DRILL_DAMAGE,
   DIAMANDIS_DRILL_TICKS,
   DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_BEAM_MIN_RANGE,
+  DIAMANDIS_RADIUS,
+  PLAYER_RADIUS,
   DIAMANDIS_RIP_STAGGER_TICKS,
   UNDERTAKER_SLAM_DAMAGE,
   DIAMANDIS_MODULE_COUNT,
@@ -49,6 +52,7 @@ import {
   BOSS_MODULE_TOWER,
   BOSS_PHASE_REACTOR,
   DISCOVERY_DIAMANDIS_CORRIDOR,
+  type Entity,
   type SemanticEvent,
   type SurvivalState,
 } from '../src/types';
@@ -634,6 +638,79 @@ describe('Diamandis — o frenesi', () => {
     expect(UNDERTAKER_SLAM_DAMAGE).toBe(26);
     // O multiplicador e do chefe; nenhuma outra tabela o consulta.
     expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.45, 9);
+  });
+});
+
+describe('Diamandis — o corpo, quando o alvo encosta', () => {
+  /** Roda `ticks` e devolve as acoes que o chefe comecou e o dano que saiu. */
+  const spar = (state: SurvivalState, boss: Entity, ticks: number) => {
+    const actions: Record<string, number> = {};
+    const dists: number[] = [];
+    let damage = 0;
+    let hp = state.player.hp;
+    for (let t = 0; t < ticks; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id) {
+          actions[ev.action] = (actions[ev.action] ?? 0) + 1;
+        }
+      }
+      if (state.player.hp < hp) {
+        damage += hp - state.player.hp;
+        hp = state.player.hp;
+      }
+      dists.push(Math.hypot(boss.x - state.player.x, boss.y - state.player.y));
+    }
+    return { actions, damage, dists };
+  };
+
+  it('colado, ele SOCA — o feixe nao come mais a faixa do corpo', () => {
+    // O defeito: o feixe cobria 0..16 e cobrava `contactReadyAt`, o relogio do
+    // golpe de contato. Como as tres ferramentas sao decididas antes do corpo,
+    // ele rearmava esse relogio a cada varredura — medido, ZERO contatos em
+    // 400 ticks com o chefe em cima do alvo, e 78 de dano em vinte segundos.
+    const { state, boss } = duel(601, 2);
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    const { actions, damage } = spar(state, boss, 400);
+    expect(actions.contact ?? 0, 'o chefe nao encostou a mao no alvo').toBeGreaterThan(10);
+    expect(actions.beam ?? 0, 'varreu linha com o alvo colado no chassi').toBe(0);
+    // O corpo cobra de verdade: 28 por golpe, um golpe a cada 16 ticks.
+    expect(damage).toBeGreaterThan(300);
+  });
+
+  it('o feixe tem PISO: dentro dele a maquina encosta, fora ela varre', () => {
+    const inside = duel(602, 2);
+    expect(spar(inside.state, inside.boss, 120).actions.beam ?? 0).toBe(0);
+    // Logo depois do piso ele volta a ser a ferramenta de perto.
+    const outside = duel(603, DIAMANDIS_BEAM_MIN_RANGE + 1);
+    expect(spar(outside.state, outside.boss, 120).actions.beam ?? 0).toBeGreaterThan(0);
+    expect(DIAMANDIS_BEAM_MIN_RANGE).toBeGreaterThan(DIAMANDIS_RADIUS + PLAYER_RADIUS + 0.18);
+  });
+
+  it('o relogio do feixe e dele: uma varredura nao adia o proximo soco', () => {
+    const { state, boss } = duel(604, 2);
+    boss.beamReadyAt = state.tick + 500;
+    boss.contactReadyAt = 0;
+    // Com o feixe descarregado o corpo continua cobrando no ritmo dele.
+    expect(spar(state, boss, 60).actions.contact ?? 0).toBeGreaterThan(1);
+  });
+
+  it('ele PLANTA quando os corpos encostam, em vez de vibrar dentro do alvo', () => {
+    // Antes: a distancia estabilizava em 0,03 e oscilava entre 0,03 e 0,05 a
+    // cada tick — o chassi de 0,9 de raio dentro do Prospector.
+    const { state, boss } = duel(605, 3);
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    const { dists } = spar(state, boss, 200);
+    const settled = dists.slice(-40);
+    const touching = DIAMANDIS_RADIUS + PLAYER_RADIUS;
+    for (const d of settled) {
+      expect(d, 'o chefe entrou no corpo do alvo').toBeGreaterThan(touching - 0.12);
+      expect(d, 'parou longe demais para alcancar').toBeLessThan(touching + 0.3);
+    }
+    // E fica PARADO: nada de tremer meio decimo para cada lado por tick.
+    const spread = Math.max(...settled) - Math.min(...settled);
+    expect(spread, 'continuou dançando no lugar').toBeLessThan(0.02);
   });
 });
 

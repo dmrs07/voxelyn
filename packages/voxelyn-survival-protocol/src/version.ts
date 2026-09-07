@@ -931,7 +931,17 @@ export const PROTOCOL_VERSION = 32;
 //     (`drillImpactAt`, no hash); passar reto custa 14 parada. Onde o chefe
 //     esta, quando fere e quando volta a agir mudaram: um replay de 61 nao
 //     bate.
-export const SIMULATION_VERSION = 62;
+// 63: O CORPO DO DIAMANDIS VOLTA A EXISTIR. O feixe usava `contactReadyAt` —
+//     o relogio do golpe de contato — e cobria 0..16 sem piso; como as tres
+//     ferramentas sao decididas antes do corpo, ele rearmava esse relogio a
+//     cada varredura e o chefe NUNCA socava (medido: zero contatos em 400
+//     ticks parado em cima do alvo, 78 de dano em 20 s). Agora o feixe tem
+//     relogio proprio (`beamReadyAt`) e piso (`DIAMANDIS_BEAM_MIN_RANGE` = 3),
+//     e o corpo tem de volta a faixa de 0..3. Ele tambem para de fechar quando
+//     os corpos se encostam, em vez de vibrar dentro do Prospector a 0,03
+//     tile. Quando o chefe fere e quanto ele anda mudaram: um replay de 62 nao
+//     bate.
+export const SIMULATION_VERSION = 63;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
