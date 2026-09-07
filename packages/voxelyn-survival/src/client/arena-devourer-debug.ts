@@ -143,9 +143,6 @@ export const applyDevourerScenario = (
     const len = Math.hypot(raw.x, raw.y) || 1;
     const ux = raw.x / len;
     const uy = raw.y / len;
-    // O Prospector vai para o rumo pedido, o mais longe que a sala permitir: e
-    // dele que sai a mira da queda, e um alvo colado daria um arco curto demais
-    // para ler o rumo.
     // O chefe vai para o CENTRO da sala antes de tudo. Sem isto, o rumo pedido
     // pode simplesmente nao ter sala pela frente — e o que se leria seria a
     // geometria da arena, e nao a decisao do bicho.
@@ -154,6 +151,9 @@ export const applyDevourerScenario = (
       boss.x = center.x;
       boss.y = center.y;
     }
+    // O Prospector vai para o rumo pedido, o mais longe que a sala permitir: e
+    // dele que sai a mira da queda, e um alvo colado daria um arco curto demais
+    // para ler o rumo.
     let placed = false;
     for (const d of HOP_RANGE) {
       const px = boss.x + ux * d;
