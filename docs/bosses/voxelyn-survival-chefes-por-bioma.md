@@ -845,6 +845,54 @@ sozinha: `ARCHETYPE_DIRECTIONS` é derivado do próprio atlas. O visualizador de
 (`sprites.html`) ganhou os quatro rumos que faltavam no seletor — sem eles não dava
 para inspecionar nem este atlas nem o do Diamandis.
 
+### O cenário de arena dos SALTOS, e o que ele mediu
+
+Os oito rumos só valem se o encontro produzir os oito. Quatro deles — `r`, `d`,
+`l`, `u` — são, no espaço do mundo, as **diagonais**; os outros quatro são os
+eixos. Se o arco do Devorador nascesse sempre alinhado a um eixo, metade do
+atlas novo seria peso morto.
+
+O painel (`arena-devourer-debug.ts`) tem um botão por rumo. Ele **não escreve o
+arco**: põe o Prospector naquele rumo em volta do chefe, devolve a areia (o
+vidro é o que recusa a emergência), recentra o chefe para o rumo pedido ter sala
+pela frente, e manda decidir agora. Quem escolhe a queda continua sendo
+`devourerSurfacingSpot`. A leitura mostra **pedido → saiu**, o vetor do arco, e
+se ele é ortogonal ou diagonal.
+
+Medido, os oito pedidos numa passagem:
+
+| pedido | saiu | arco | |
+| --- | --- | --- | --- |
+| dr | dr | (9, 0) | ortogonal |
+| dl | dl | (0, 11) | ortogonal |
+| ur | ur | (0, −10) | ortogonal |
+| ul | ul | (−10, 0) | ortogonal |
+| **r** | **r** | **(7, −7)** | **diagonal** |
+| **d** | **d** | **(7, 7)** | **diagonal** |
+| **l** | **l** | **(−7, 7)** | **diagonal** |
+| **u** | **u** | **(−4, −4)** | **diagonal** |
+
+**8/8 rumos, 4/4 diagonais** — os quatro quadros novos saem de arcos que não
+correm num eixo. O painel acumula essa conta enquanto está aberto, então ela
+também aparece numa sessão de jogo normal.
+
+![o painel dos saltos](../media/devourer/36-painel-saltos.png)
+
+Duas coisas que a primeira versão errava, e que valem ficar escritas porque
+qualquer uma faria o painel mentir:
+
+- **Ler o arco cedo demais.** Logo depois do clique o arco em curso ainda é o do
+  pedido anterior, e quatro dos oito botões pareciam devolver o rumo errado. Por
+  isso o painel guarda o tick do pedido e só conta arco nascido depois dele.
+- **Desistir em silêncio.** Se o rumo pedido não tinha sala à frente, o cenário
+  não fazia nada e o painel seguia mostrando a resposta anterior — o que parecia
+  defeito do chefe e era do cenário. Daí o recentramento e a faixa de distâncias
+  até 3 tiles.
+
+E a resposta some rápido: o arco só existe durante a erupção, pouco mais de um
+segundo. O painel **guarda** a última resposta até o pedido seguinte, senão nem
+quem clica e olha, nem uma captura automatizada, chegam a tempo.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |

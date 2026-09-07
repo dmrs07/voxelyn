@@ -211,6 +211,7 @@
         margin-bottom: 6px;
       }
       #leviathan-panel,
+      #devourer-panel,
       #diamandis-panel {
         position: fixed;
         left: calc(10px + var(--safe-area-inset-left));
@@ -225,18 +226,22 @@
         z-index: 6;
       }
       #leviathan-panel b,
+      #devourer-panel b,
       #diamandis-panel b {
         color: #9fd8ff;
         font-weight: 600;
       }
       #leviathan-panel .safe,
+      #devourer-panel .safe,
       #diamandis-panel .safe {
         color: #8ff0c8;
       }
       #leviathan-panel .danger,
+      #devourer-panel .danger,
       #diamandis-panel .danger {
         color: #ff9a7a;
       }
+      #devourer-readout,
       #diamandis-readout {
         margin-bottom: 6px;
       }
@@ -247,12 +252,14 @@
         margin-bottom: 6px;
       }
       #leviathan-buttons,
+      #devourer-buttons,
       #diamandis-buttons {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
       }
       #leviathan-buttons button,
+      #devourer-buttons button,
       #diamandis-buttons button {
         font: inherit;
         font-size: 10px;
@@ -264,6 +271,7 @@
         cursor: pointer;
       }
       #leviathan-buttons button:hover,
+      #devourer-buttons button:hover,
       #diamandis-buttons button:hover {
         background: #1f2532;
       }
@@ -549,6 +557,14 @@
     <div id="diamandis-panel" class="hidden">
       <div id="diamandis-readout"></div>
       <div id="diamandis-buttons"></div>
+    </div>
+    <!-- O PAINEL DO DEVORADOR (arena-devourer-debug.ts): os oito rumos de
+         SALTO, e a conta de quantos deles ja sairam. Quatro so nascem de arcos
+         nao ortogonais — sao exatamente os quadros que o atlas de oito rumos
+         acrescentou. -->
+    <div id="devourer-panel" class="hidden">
+      <div id="devourer-readout"></div>
+      <div id="devourer-buttons"></div>
     </div>
     <!-- O PAINEL DA BARRA DE CHEFE (arena-bossbar-debug.ts): cenarios sobre a
          luta corrente, a leitura exata do que a barra le, os alternadores de
