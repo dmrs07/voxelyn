@@ -1,0 +1,79 @@
+{
+  "id": "part-white-devourer-maw",
+  "version": 1,
+  "atlas": "part-white-devourer-maw.png",
+  "normalAtlas": "part-white-devourer-maw.normal.png",
+  "normalScale": 2,
+  "frameWidth": 156,
+  "frameHeight": 106,
+  "columns": 24,
+  "anchorX": 76,
+  "anchorY": 57,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 3.1,
+    "h": 1.7
+  },
+  "footprint": {
+    "w": 2.8,
+    "h": 2.2,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "downed": {
+      "frames": 6,
+      "fps": 11,
+      "loop": true
+    },
+    "burst": {
+      "frames": 6,
+      "fps": 6.25,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "downed": 0,
+      "burst": 6
+    },
+    "dl": {
+      "downed": 12,
+      "burst": 18
+    },
+    "ur": {
+      "downed": 24,
+      "burst": 30
+    },
+    "ul": {
+      "downed": 36,
+      "burst": 42
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric wide ground-level crater of a worm mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

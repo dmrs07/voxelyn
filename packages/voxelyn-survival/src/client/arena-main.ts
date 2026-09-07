@@ -56,6 +56,13 @@ import {
   type DiamandisScenario,
 } from './arena-diamandis-debug';
 import {
+  DEVOURER_SCENARIOS,
+  applyDevourerScenario,
+  devourerReadout,
+  resetDevourerReadout,
+  type DevourerScenario,
+} from './arena-devourer-debug';
+import {
   BOSS_BAR_SCENARIOS,
   BossBarGallery,
   BossBarScenarioDriver,
@@ -128,6 +135,9 @@ const leviathanButtons = document.getElementById('leviathan-buttons') as HTMLDiv
 const diamandisPanel = document.getElementById('diamandis-panel') as HTMLDivElement;
 const diamandisReadoutEl = document.getElementById('diamandis-readout') as HTMLDivElement;
 const diamandisButtons = document.getElementById('diamandis-buttons') as HTMLDivElement;
+const devourerPanel = document.getElementById('devourer-panel') as HTMLDivElement;
+const devourerReadoutEl = document.getElementById('devourer-readout') as HTMLDivElement;
+const devourerButtons = document.getElementById('devourer-buttons') as HTMLDivElement;
 const bossBarPanel = document.getElementById('bossbar-panel') as HTMLDivElement;
 const bossBarReadoutEl = document.getElementById('bossbar-readout') as HTMLDivElement;
 const bossBarButtons = document.getElementById('bossbar-buttons') as HTMLDivElement;
@@ -402,6 +412,73 @@ const updateDiamandisPanel = (state: SurvivalState, nowMs: number): void => {
     `feixe <b>${r.beam ? `${r.beam.phase === 'survey' ? 'levantamento' : 'passagem'} ${Math.round(r.beam.progress * 100)}%` : '—'}</b>${r.beam ? ` · alcance <b>${r.beam.reach.toFixed(1)}</b>` : ''} · cargas <b>${r.charges}</b> · broca <b>${r.drill ? `${r.drill.stage} giro ${Math.round(r.drill.spin * 100)}% vel ${Math.round(r.drill.speed * 100)}%` : '—'}</b>`,
   ];
   diamandisReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
+};
+// ---------------------------------------------------------------------------
+// O painel do DEVORADOR (arena-devourer-debug.ts): os oito rumos de salto.
+//
+// O que ele mede: quatro dos oito quadros do corpo so aparecem em arcos NAO
+// ORTOGONAIS. Sem uma forma de pedir cada rumo e ver o que a simulacao produz,
+// a metade nova do atlas seria fe.
+// ---------------------------------------------------------------------------
+const DEVOURER_SCENARIO_LABELS: Record<DevourerScenario, string> = {
+  hopDR: 'salto +x (dr)',
+  hopDL: 'salto +y (dl)',
+  hopUR: 'salto −y (ur)',
+  hopUL: 'salto −x (ul)',
+  hopR: 'salto ↗ (r)',
+  hopD: 'salto ↘ (d)',
+  hopL: 'salto ↙ (l)',
+  hopU: 'salto ↖ (u)',
+  maw: 'boca aberta',
+  burrow: 'submerso',
+  reset: 'reiniciar',
+};
+for (const scenario of DEVOURER_SCENARIOS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = DEVOURER_SCENARIO_LABELS[scenario];
+  button.dataset.scenario = scenario;
+  button.addEventListener('click', () => {
+    if (!activeFrostState) return;
+    const events = applyDevourerScenario(activeFrostState, scenario);
+    if (events.length > 0) activeFrostEvents?.(events);
+  });
+  devourerButtons.appendChild(button);
+}
+const DEVOURER_MOOD_LABELS: Record<string, string> = {
+  burrowed: 'submerso',
+  surfaced: 'à superfície',
+  airborne: 'no ar',
+  maw: 'boca aberta',
+  unknown: '—',
+};
+const DEVOURER_READOUT_INTERVAL_MS = 100;
+let devourerReadoutAt = -1;
+const updateDevourerPanel = (state: SurvivalState, nowMs: number): void => {
+  if (devourerReadoutAt >= 0 && nowMs - devourerReadoutAt < DEVOURER_READOUT_INTERVAL_MS) return;
+  devourerReadoutAt = nowMs;
+  const r = devourerReadout(state);
+  if (!r) {
+    devourerReadoutEl.innerHTML = '<div>sem Devorador em campo</div>';
+    return;
+  }
+  const arc = r.arc
+    ? `<b class="${r.arc.orthogonal ? '' : 'safe'}">${r.arc.dir}</b> (${r.arc.dx.toFixed(1)}, ${r.arc.dy.toFixed(1)}) ${r.arc.orthogonal ? 'ortogonal' : '<b class="safe">diagonal</b>'}`
+    : '—';
+  const pedido = r.asked
+    ? `pedido <b>${r.asked}</b> → ${r.arc ? `saiu <b>${r.arc.dir}</b>` : '<span style="opacity:.7">aguardando</span>'}`
+    : '';
+  const rows: string[] = [
+    `vida <b>${Math.round(r.hpFraction * 100)}%</b> · <b>${DEVOURER_MOOD_LABELS[r.mood] ?? r.mood}</b> · rumo <b>${r.facing}</b>`,
+    ...(pedido ? [pedido] : []),
+    `arco ${arc}`,
+    `saltos restantes <b>${r.leapsLeft}</b>${r.mawTicks !== null ? ` · boca <b>${r.mawTicks}</b> ticks` : ''}`,
+    // A prova acumulada: os quatro rumos diagonais so podem ter vindo de arcos
+    // que nao correm num eixo.
+    `rumos vistos <b>${r.seen.length}/8</b> · diagonais <b class="${r.seenDiagonal > 0 ? 'safe' : 'danger'}">${r.seenDiagonal}/4</b>`,
+    `<span style="opacity:.7">${r.seen.join(' ') || '—'}</span>`,
+  ];
+  devourerReadoutEl.innerHTML = rows.map((l) => `<div>${l}</div>`).join('');
 };
 // ---------------------------------------------------------------------------
 // O painel da barra de chefe (arena-bossbar-debug.ts): cenarios sobre a luta
@@ -718,6 +795,7 @@ const runArena = (conditions: ArenaConditions): void => {
   frostPanel.classList.toggle('hidden', conditions.boss !== 'frost_queen');
   leviathanPanel.classList.toggle('hidden', conditions.boss !== 'sheet_leviathan');
   diamandisPanel.classList.toggle('hidden', conditions.boss !== 'diamandis');
+  devourerPanel.classList.toggle('hidden', conditions.boss !== 'white_devourer');
   bossBarPanel.classList.remove('hidden');
   bossBarDriver.reset();
   bossBarReadoutAt = -1;
@@ -725,6 +803,8 @@ const runArena = (conditions: ArenaConditions): void => {
   frostReadoutAt = -1;
   leviathanReadoutAt = -1;
   diamandisReadoutAt = -1;
+  devourerReadoutAt = -1;
+  resetDevourerReadout();
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
@@ -837,6 +917,7 @@ const runArena = (conditions: ArenaConditions): void => {
     }
     if (conditions.boss === 'sheet_leviathan') updateLeviathanPanel(state, now);
     if (conditions.boss === 'diamandis') updateDiamandisPanel(state, now);
+    if (conditions.boss === 'white_devourer') updateDevourerPanel(state, now);
     updateBossBarPanel(state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
@@ -892,6 +973,7 @@ btnReconfigure.addEventListener('click', () => {
   frostPanel.classList.add('hidden');
   leviathanPanel.classList.add('hidden');
   diamandisPanel.classList.add('hidden');
+  devourerPanel.classList.add('hidden');
   bossBarPanel.classList.add('hidden');
   activeFrostState = null;
   activeFrostEvents = null;

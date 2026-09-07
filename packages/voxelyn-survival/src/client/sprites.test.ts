@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deriveAnim, gunHeatTint, recoilScreenOffset } from './sprites';
+import {
+  ANIM_ATLAS_OVERRIDE,
+  DEVOURER_MAW_ATLAS,
+  SpriteBank,
+  deriveAnim,
+  gunHeatTint,
+  recoilScreenOffset,
+} from './sprites';
 
 /** `rgb(r, g, b)` -> [r, g, b], para comparar a rampa sem depender do formato. */
 const channels = (color: string): [number, number, number] => {
@@ -109,5 +116,43 @@ describe('recoilScreenOffset', () => {
     const zero = recoilScreenOffset(1, 0, -1, 2);
     expect(Math.hypot(zero.x, zero.y)).toBe(0);
     expect(recoilScreenOffset(1, 0, 2, 2)).toEqual(recoilScreenOffset(1, 0, 1, 2));
+  });
+});
+
+describe('o desvio de atlas por animacao', () => {
+  // Um banco em que SO o corpo carregou: e o estado real de quem entra na arena
+  // do Devorador antes de os atlas nao criticos assentarem, e tambem o de quem
+  // teve a requisicao da cratera falhando.
+  const bancoSoComOCorpo = (): SpriteBank => {
+    const banco = new SpriteBank();
+    const corpo = { manifest: { id: 'enemy-white-devourer' }, ready: true };
+    (banco as unknown as { get: (id: string) => unknown }).get = (id: string) =>
+      id === 'enemy-white-devourer' ? corpo : null;
+    return banco;
+  };
+
+  it('sem a cratera carregada, NAO cai no atlas do corpo', () => {
+    // O recuo generoso seria devolver o atlas do arquetipo — e ele mente:
+    // `drawLoadedFrame` troca a animacao ausente por `idle` em silencio e
+    // devolve sucesso, entao o `!drew` do renderer nunca roda e a unica janela
+    // de dano do encontro apareceria como o verme de sempre passeando pelo
+    // chao. Chefe sem atlas tem de cair na silhueta de voxel, que e a promessa
+    // de `REQUIRED_ATLAS_IDS` para tudo o que nao e critico.
+    const banco = bancoSoComOCorpo();
+    expect(banco.spriteForAnimation('white_devourer', 'downed')).toBeNull();
+    expect(banco.spriteForAnimation('white_devourer', 'burst')).toBeNull();
+  });
+
+  it('as poses sem desvio continuam vindo do atlas do arquetipo', () => {
+    const banco = bancoSoComOCorpo();
+    expect(banco.spriteForAnimation('white_devourer', 'idle')).not.toBeNull();
+    expect(banco.spriteForAnimation('white_devourer', 'walk')).not.toBeNull();
+  });
+
+  it('a tabela cobre exatamente as duas poses de chao', () => {
+    expect(ANIM_ATLAS_OVERRIDE.white_devourer).toEqual({
+      downed: DEVOURER_MAW_ATLAS,
+      burst: DEVOURER_MAW_ATLAS,
+    });
   });
 });

@@ -28,6 +28,7 @@ import {
   devourerHeadLiftPx,
   devourerSubmergence,
   DEVOURER_BELOW_ANCHOR_PX,
+  DEVOURER_HEAD_ABOVE_ANCHOR_PX,
   DEVOURER_DIVE_TICKS,
   DEVOURER_HEAD_GONE_AT,
   DEVOURER_HIDDEN_PX,
@@ -35,7 +36,13 @@ import {
   type SpineNode,
 } from './devourer-spine';
 
-const head = (x: number, y: number, liftPx = 0, dirX = 1, dirY = 0) => ({ x, y, liftPx, dirX, dirY });
+const head = (x: number, y: number, liftPx = 0, dirX = 1, dirY = 0) => ({
+  x,
+  y,
+  liftPx,
+  dirX,
+  dirY,
+});
 
 /** Anda a cabeca em linha reta, um passo de cada vez, e devolve o corpo final. */
 /**
@@ -49,7 +56,7 @@ const walk = (
   spines: DevourerSpines,
   steps: number,
   step = 0.1,
-  lift: (travelled: number) => number = () => 0
+  lift: (travelled: number) => number = () => 0,
 ) => {
   let last;
   for (let i = 0; i <= steps; i++) {
@@ -114,14 +121,14 @@ describe('coluna do Devorador — o mergulho', () => {
     // A cabeca acabou de pousar (p = 1, altura 0); os aneis leem o arco que ela
     // percorreu ha meio segundo.
     expect(body[0].liftPx, 'o primeiro anel desceu junto com a cabeca').toBeLessThan(
-      body[DEVOURER_SEGMENTS - 1].liftPx
+      body[DEVOURER_SEGMENTS - 1].liftPx,
     );
     expect(body[DEVOURER_SEGMENTS - 1].liftPx, 'a cauda nao ficou no ar').toBeGreaterThan(10);
   });
 
   it('enterrado e sumido, o corpo inteiro esta abaixo da linha da areia', () => {
     const body = walk(new DevourerSpines(), 60, 0.1, () =>
-      devourerHeadLiftPx(DEVOURER_BURROWED, 0, 1)
+      devourerHeadLiftPx(DEVOURER_BURROWED, 0, 1),
     );
     for (const node of body) expect(node.liftPx).toBe(-DEVOURER_HIDDEN_PX);
   });
@@ -144,7 +151,7 @@ describe('coluna do Devorador — a altura da cabeca', () => {
   it('enterrado e de boca aberta ele esta ABAIXO do chao', () => {
     expect(devourerHeadLiftPx(DEVOURER_BURROWED, 0, 1)).toBeLessThan(0);
     expect(
-      devourerHeadLiftPx(DEVOURER_MAW, 0, devourerSubmergence(DEVOURER_MAW, null, null))
+      devourerHeadLiftPx(DEVOURER_MAW, 0, devourerSubmergence(DEVOURER_MAW, null, null)),
     ).toBeLessThan(0);
   });
 
@@ -205,24 +212,24 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
     const fimDoWindup = devourerHeadLiftPx(
       DEVOURER_BURROWED,
       0,
-      devourerSubmergence(DEVOURER_BURROWED, 99, 1)
+      devourerSubmergence(DEVOURER_BURROWED, 99, 1),
     );
     const inicioDoArco = devourerHeadLiftPx(
       DEVOURER_AIRBORNE,
       0,
-      devourerSubmergence(DEVOURER_AIRBORNE, 99, null)
+      devourerSubmergence(DEVOURER_AIRBORNE, 99, null),
     );
     expect(inicioDoArco).toBeCloseTo(fimDoWindup, 9);
 
     const fimDoArco = devourerHeadLiftPx(
       DEVOURER_AIRBORNE,
       0,
-      devourerSubmergence(DEVOURER_AIRBORNE, 99, null)
+      devourerSubmergence(DEVOURER_AIRBORNE, 99, null),
     );
     const inicioDaDescida = devourerHeadLiftPx(
       DEVOURER_BURROWED,
       0,
-      devourerSubmergence(DEVOURER_BURROWED, 0, null)
+      devourerSubmergence(DEVOURER_BURROWED, 0, null),
     );
     expect(inicioDaDescida).toBeCloseTo(fimDoArco, 9);
   });
@@ -230,15 +237,29 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
   it('a linha da areia bate com o que o atlas do anel declara', () => {
     // `DEVOURER_BELOW_ANCHOR_PX` e onde o recorte passa, e ele vale para os
     // dois sprites: o anel chega la pelo manifesto (`altura - ancora`) e a
-    // cabeca por medida dos quadros vivos, porque o quadro dela tem 48 px
-    // abaixo da ancora e 37 deles sao folga da pose de boca aberta.
+    // cabeca por uma LINHA DE CHAO escolhida — nao pela extensao do desenho,
+    // que nas diagonais de tras desce 21.
     //
-    // Esta prova prende a metade que da para prender. A outra, a da cabeca, esta
-    // escrita na constante junto com a medida — e foi o defeito que ela evita
-    // que apareceu na captura: cortando pelo tamanho do quadro, o verme subia
-    // inteiro e de pe, desenhado por cima do chao a frente dele.
+    // Esta prova prende a metade que da para prender. A outra esta escrita na
+    // constante junto com a medida — e foi o defeito que ela evita que apareceu
+    // na captura: cortando pelo tamanho do quadro, o verme subia inteiro e de
+    // pe, desenhado por cima do chao a frente dele.
     const anel = coilManifest as unknown as { frameHeight: number; anchorY: number };
     expect(anel.frameHeight - anel.anchorY).toBe(DEVOURER_BELOW_ANCHOR_PX);
+  });
+
+  it('a altura util da cabeca bate com a ancora que o atlas dela declara', () => {
+    // A prova que FALTAVA, e a falta custou: quando a cratera da boca saiu para
+    // o atlas dela, o quadro da cabeca encolheu, a ancora foi de 104 para 95 e
+    // `DEVOURER_HEAD_ABOVE_ANCHOR_PX` ficou para tras mentindo por 9 px. A
+    // suite inteira passou verde — nada ligava a constante ao manifesto.
+    //
+    // Nove pixels nao sao decoracao: `devourerHeadShows` e quem decide se ainda
+    // ha cabeca acima da areia, e `DEVOURER_HEAD_GONE_AT` sai dela para a mira
+    // de `combat-assist`. Superestimar mantem a mira presa a um corpo que o
+    // recorte ja engoliu.
+    const cabeca = devourerManifest as unknown as { anchorY: number };
+    expect(DEVOURER_HEAD_ABOVE_ANCHOR_PX).toBe(cabeca.anchorY);
   });
 
   it('a cabeca some do recorte MUITO antes de o afundamento chegar a 1', () => {
@@ -260,10 +281,18 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
 
   it('o limiar da mira e o CONSERVADOR dos dois zooms', () => {
     // A mira nao tem zoom, entao ela usa o limiar do zoom em que a cabeca some
-    // primeiro. A prova cobra a direcao do erro: no limiar, o zoom largo ja
-    // escondeu e o estreito ainda mostra — nunca o contrario, que seria a mira
-    // grudando em areia lisa.
-    const lift = devourerHeadLiftPx(DEVOURER_BURROWED, 0, DEVOURER_HEAD_GONE_AT);
+    // primeiro. A prova cobra a direcao do erro: passado o limiar, o zoom largo
+    // ja escondeu e o estreito ainda mostra — nunca o contrario, que seria a
+    // mira grudando em areia lisa.
+    //
+    // A sonda fica um fio DEPOIS do limiar, e nao em cima dele: `HEAD_GONE_AT` e
+    // a raiz exata de `lift * 2 + (acima + abaixo) = 0`, e em cima da raiz o
+    // resultado e zero mais o residuo do ponto flutuante — o sinal ali nao
+    // significa nada. Medir na raiz ja deu um falso vermelho quando o quadro da
+    // cabeca encolheu: 106/190 deixa `-95 * sub` em -52,99999999999999 e a soma
+    // vira +1,4e-14. O teste irmao acima ja provava os dois lados com o mesmo
+    // ±0,001; este passa a provar a ORDEM dos dois zooms, que e o que ele quer.
+    const lift = devourerHeadLiftPx(DEVOURER_BURROWED, 0, DEVOURER_HEAD_GONE_AT + 0.001);
     expect(devourerHeadShows(lift, 2, 1), 'zoom largo ja escondeu').toBe(false);
     expect(devourerHeadShows(lift, 1.6, 1), 'zoom estreito ainda mostra').toBe(true);
   });
@@ -293,7 +322,7 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
       for (const m of manifestos) {
         expect(
           DEVOURER_HIDDEN_PX * z,
-          `zoom ${z}, quadro de ${m.frameHeight}`
+          `zoom ${z}, quadro de ${m.frameHeight}`,
         ).toBeGreaterThanOrEqual(m.frameHeight * spriteZoom);
       }
     }
@@ -307,7 +336,7 @@ describe('coluna do Devorador — a memoria', () => {
     const body = spines.follow(1, head(80, 80), 3000);
     for (const node of body) {
       expect(Math.hypot(node.x - 80, node.y - 80), `posto ${node.rank}`).toBeLessThan(
-        DEVOURER_HEAD_OFFSET + DEVOURER_SEGMENTS * DEVOURER_SEGMENT_GAP + 1
+        DEVOURER_HEAD_OFFSET + DEVOURER_SEGMENTS * DEVOURER_SEGMENT_GAP + 1,
       );
     }
   });

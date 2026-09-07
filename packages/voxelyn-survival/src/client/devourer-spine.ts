@@ -136,11 +136,16 @@ export const DEVOURER_SUBMERGED_PX = 11;
  * intervalo era uma lombada passeando pela areia.
  *
  * O numero e medido e nao escolhido: para nao sobrar um pixel, a ancora tem de
- * afundar a altura inteira do quadro. A cabeca mede 152 px de quadro contra 58
- * do anel, entao e ela quem manda; e como o desenho multiplica por `z` enquanto
- * o sprite escala por `spriteZoom`, o pior caso e o zoom estreito (z = 1,6 com
- * `spriteZoom` = 1): 152 / 1,6 = 95. `hidden-depth` guarda essa conta contra os
- * dois manifestos.
+ * afundar a altura inteira do quadro. A cabeca e quem manda, e como o desenho
+ * multiplica por `z` enquanto o sprite escala por `spriteZoom`, o pior caso e o
+ * zoom estreito (z = 1,6 com `spriteZoom` = 1): com o quadro de 152 que a
+ * cabeca tinha antes de a cratera sair para o atlas dela, 152 / 1,6 dava
+ * exatamente 95.
+ *
+ * O quadro encolheu para 122 e o minimo caiu para 77. O 95 fica: afundar mais
+ * do que o necessario nao mostra pixel nenhum a mais, e mexer aqui mudaria a
+ * rampa do mergulho sem nada pedir. `hidden-depth` continua guardando a
+ * promessa contra os dois manifestos de verdade.
  *
  * O que isso CUSTA esta dito de proposito: enterrado ele tem 12% de armadura, e
  * enquanto estiver sumido ele nao e alvo de mira nenhuma (ver `hasVisibleBody`
@@ -154,11 +159,10 @@ export const DEVOURER_HIDDEN_PX = 95;
  * Quanto o CORPO VIVO desce abaixo da propria ancora, em pixels de atlas.
  *
  * E onde a linha da areia passa: afundado `d`, o que fica visivel e o que esta
- * acima de `ancora + isto`. O numero e medido nos quadros, e nao no tamanho do
- * quadro — e a diferenca importa, porque o quadro da cabeca tem 48 px abaixo da
- * ancora e quase todos sao FOLGA. Quem os ocupa e a pose de boca aberta (a
- * cratera desce 40), e ela e autorada para ficar no chao; as poses vivas
- * (parado, andando, atacando, apanhando, morrendo) descem no maximo 11.
+ * acima de `ancora + isto`. E uma LINHA DE CHAO escolhida, e nao a extensao
+ * maxima do desenho: as poses vivas chegam a descer 21 px abaixo da ancora nas
+ * diagonais de tras, e sempre chegaram. O que este numero diz e onde o bicho
+ * ENCOSTA no chao, e e por isso que ele bate com o anel.
  *
  * Cortar pelo tamanho do quadro punha a linha 37 px baixa demais, e o resultado
  * era um verme desenhado por cima do chao a frente dele — de pe, boiando, em vez
@@ -176,8 +180,16 @@ export const DEVOURER_BELOW_ANCHOR_PX = 11;
  * E o `anchorY` do atlas dela. Junto com `DEVOURER_BELOW_ANCHOR_PX` fecha a
  * altura util do sprite — o pedaco que o recorte tem de engolir para nao sobrar
  * um pixel.
+ *
+ * Valia 104 enquanto a cratera da boca morava no mesmo atlas e o quadro tinha
+ * de caber ela. Com a separacao (ver `devourerFrame` no gerador) o quadro da
+ * cabeca encolheu e a ancora subiu para 95. Nada avisou: nenhum teste ligava
+ * esta constante ao manifest, e o numero passou a mentir por 9 px — o bastante
+ * para `devourerHeadShows` dizer que a cabeca ainda aparece depois de o recorte
+ * ja te-la engolido, e para a mira de `combat-assist` seguir mirando o que nao
+ * esta na tela. Agora ha teste.
  */
-export const DEVOURER_HEAD_ABOVE_ANCHOR_PX = 104;
+export const DEVOURER_HEAD_ABOVE_ANCHOR_PX = 95;
 
 /**
  * A cabeca ainda mostra algum pixel acima da areia?

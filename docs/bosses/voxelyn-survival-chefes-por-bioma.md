@@ -798,6 +798,101 @@ matéria nova ficava literalmente **invisível**, que é o pior defeito possíve
 em que o chão é a mecânica. Agora um índice ausente cai na cor, como o comentário do
 `SURFACE_FALLBACK` sempre prometeu.
 
+### O corpo em OITO rumos, e a cratera em atlas próprio
+
+O Devorador passou a ter oito rumos, como o chassi do Diamandis e como as peças do
+Leviatã. O que destravou isso não foi orçamento novo — foi **um quadro errado**.
+
+Um atlas tem **um** tamanho de quadro para todas as poses. O corpo do verme (cabeça e
+colar; o resto são os anéis pendurados no rastro) ocupa **92×114**. A cratera da boca
+(`downed`/`burst`) ocupa **148×99** — larga e baixa, porque é um buraco no chão visto
+de cima. Com as duas no mesmo atlas, o quadro tinha de caber a cratera: **156×152**, e
+os 100 quadros que eram só o verme pagavam a largura dela. Dobrar os rumos custaria
+**+13,6 MiB** contra **0,98 MiB** de folga no teto de boot.
+
+Separados, cada um tem o quadro do que ele é:
+
+| | quadro | rumos | quadros | custo |
+| --- | --- | --- | --- | --- |
+| `enemy-white-devourer` (corpo) | 100×122 | **8** | 200 | 9,31 MiB |
+| `part-white-devourer-maw` (cratera) | 156×106 | 4 | 48 | 3,03 MiB |
+| **total** | | | | **12,34 MiB** |
+| *antes, num atlas só* | *156×152* | *4* | *148* | *13,57 MiB* |
+
+Ou seja: os oito rumos saíram **1,23 MiB mais baratos** que os quatro de antes. O boot
+caiu de 166.746.272 para 165.453.984 bytes.
+
+![o corpo do Devorador nos oito rumos](../media/devourer/34-corpo-oito-rumos.png)
+
+![a cratera da boca nos quatro rumos: abertura e espasmo](../media/devourer/35-cratera-quatro-rumos.png)
+
+**A cratera fica em quatro rumos de propósito.** Em oito ela sozinha custaria +2,9 MiB
+e estouraria a folga — e ela é um buraco no chão visto de cima, cujo rumo lê fraco. O
+corpo, que o jogador vê andando, atacando e virando, é quem leva os oito.
+
+**A troca de atlas acontece no banco, não no renderer** (`ANIM_ATLAS_OVERRIDE` em
+`sprites.ts`). O cliente continua pedindo `downed` e `burst` do `white_devourer` como
+sempre pediu; quem sabe que aquele quadro mora noutro lugar é o `SpriteBank`. A âncora
+`x` da cratera é a mesma de antes (76), então ela cai no mesmo ponto da tela.
+
+O risco fino da separação é que os dois atlas têm **contagens de rumo diferentes**.
+Quem escolhe o quadro lê `directions` do manifest **carregado**, e não do arquétipo —
+se algum dia passasse a usar `ARCHETYPE_DIRECTIONS` (agora 8 para o Devorador), a
+cratera receberia um rumo que ela não tem e sumiria da tela. Há teste para isso.
+
+Com `directions: 8` no manifest, a histerese de oito setores (`facing.ts`) liga
+sozinha: `ARCHETYPE_DIRECTIONS` é derivado do próprio atlas. O visualizador de sprites
+(`sprites.html`) ganhou os quatro rumos que faltavam no seletor — sem eles não dava
+para inspecionar nem este atlas nem o do Diamandis.
+
+### O cenário de arena dos SALTOS, e o que ele mediu
+
+Os oito rumos só valem se o encontro produzir os oito. Quatro deles — `r`, `d`,
+`l`, `u` — são, no espaço do mundo, as **diagonais**; os outros quatro são os
+eixos. Se o arco do Devorador nascesse sempre alinhado a um eixo, metade do
+atlas novo seria peso morto.
+
+O painel (`arena-devourer-debug.ts`) tem um botão por rumo. Ele **não escreve o
+arco**: põe o Prospector naquele rumo em volta do chefe, devolve a areia (o
+vidro é o que recusa a emergência), recentra o chefe para o rumo pedido ter sala
+pela frente, e manda decidir agora. Quem escolhe a queda continua sendo
+`devourerSurfacingSpot`. A leitura mostra **pedido → saiu**, o vetor do arco, e
+se ele é ortogonal ou diagonal.
+
+Medido, os oito pedidos numa passagem:
+
+| pedido | saiu | arco | |
+| --- | --- | --- | --- |
+| dr | dr | (9, 0) | ortogonal |
+| dl | dl | (0, 11) | ortogonal |
+| ur | ur | (0, −10) | ortogonal |
+| ul | ul | (−10, 0) | ortogonal |
+| **r** | **r** | **(7, −7)** | **diagonal** |
+| **d** | **d** | **(7, 7)** | **diagonal** |
+| **l** | **l** | **(−7, 7)** | **diagonal** |
+| **u** | **u** | **(−4, −4)** | **diagonal** |
+
+**8/8 rumos, 4/4 diagonais** — os quatro quadros novos saem de arcos que não
+correm num eixo. O painel acumula essa conta enquanto está aberto, então ela
+também aparece numa sessão de jogo normal.
+
+![o painel dos saltos](../media/devourer/36-painel-saltos.png)
+
+Duas coisas que a primeira versão errava, e que valem ficar escritas porque
+qualquer uma faria o painel mentir:
+
+- **Ler o arco cedo demais.** Logo depois do clique o arco em curso ainda é o do
+  pedido anterior, e quatro dos oito botões pareciam devolver o rumo errado. Por
+  isso o painel guarda o tick do pedido e só conta arco nascido depois dele.
+- **Desistir em silêncio.** Se o rumo pedido não tinha sala à frente, o cenário
+  não fazia nada e o painel seguia mostrando a resposta anterior — o que parecia
+  defeito do chefe e era do cenário. Daí o recentramento e a faixa de distâncias
+  até 3 tiles.
+
+E a resposta some rápido: o arco só existe durante a erupção, pouco mais de um
+segundo. O painel **guarda** a última resposta até o pedido seguinte, senão nem
+quem clica e olha, nem uma captura automatizada, chegam a tempo.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |
