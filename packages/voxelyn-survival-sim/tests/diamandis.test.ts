@@ -16,7 +16,7 @@ import {
   damageEntity,
   diamandisFrenzyMultiplier,
   diamandisFrenzyStacks,
-  diamandisFreeArms,
+  diamandisPummelStage,
   diamandisFrenzySpeedMultiplier,
   diamandisPummelProfile,
   ripDiamandisModule,
@@ -721,18 +721,18 @@ describe('Diamandis — o corpo, quando o alvo encosta', () => {
   });
 });
 
-describe('Diamandis — os bracos, e o que sobra sem ferramenta', () => {
-  it('braco livre e ferramenta arrancada: as tres montadas nao socam', () => {
+describe('Diamandis — o soco, e os quatro degraus dele', () => {
+  it('o degrau do soco E o numero de ferramentas arrancadas', () => {
     const { state } = duel(701, 8);
-    expect(diamandisFreeArms(state)).toBe(0);
+    expect(diamandisPummelStage(state)).toBe(0);
     for (let n = 1; n <= DIAMANDIS_MODULE_COUNT; n++) {
       state.bossRuntime.modulesLost = (1 << n) - 1;
       state.tick += 1;
-      expect(diamandisFreeArms(state)).toBe(n);
+      expect(diamandisPummelStage(state)).toBe(n);
     }
   });
 
-  it('com as tres ferramentas no lugar ele NAO tem soco — so o esbarrao do corpo', () => {
+  it('com as tres ferramentas no lugar ele NAO soca — so esbarra com o corpo', () => {
     const { state, boss } = duel(702, 2);
     state.player.hp = 100000;
     state.player.maxHp = 100000;
@@ -743,28 +743,28 @@ describe('Diamandis — os bracos, e o que sobra sem ferramenta', () => {
       }
     }
     expect(kinds).toContain('contact');
-    expect(kinds, 'socou com as tres maos ocupadas').not.toContain('pummel');
+    expect(kinds, 'socou com as tres ferramentas ainda montadas').not.toContain('pummel');
   });
 
-  it('cada braco liberado encurta o aviso, aperta a cadencia e pesa mais', () => {
+  it('cada degrau encurta o aviso, aperta a cadencia e pesa mais', () => {
     let last = diamandisPummelProfile(1);
-    // Um braco ja tem de doer mais que o esbarrao do corpo que ele substitui.
+    // O primeiro degrau ja tem de doer mais que o esbarrao que ele substitui.
     expect(last.damage).toBeGreaterThan(ARCHETYPES.diamandis.contactDamage);
-    for (let arms = 2; arms <= DIAMANDIS_MODULE_COUNT; arms++) {
-      const p = diamandisPummelProfile(arms);
-      expect(p.damage, `bracos ${arms}`).toBeGreaterThan(last.damage);
-      expect(p.windup, `bracos ${arms}`).toBeLessThan(last.windup);
-      expect(p.cooldown, `bracos ${arms}`).toBeLessThan(last.cooldown);
+    for (let stage = 2; stage <= DIAMANDIS_MODULE_COUNT; stage++) {
+      const p = diamandisPummelProfile(stage);
+      expect(p.damage, `degrau ${stage}`).toBeGreaterThan(last.damage);
+      expect(p.windup, `degrau ${stage}`).toBeLessThan(last.windup);
+      expect(p.cooldown, `degrau ${stage}`).toBeLessThan(last.cooldown);
       last = p;
     }
-    // Nunca some o aviso: mesmo com tres maos o golpe e telegrafado.
+    // Nunca some o aviso: mesmo no ultimo degrau o golpe e telegrafado.
     expect(diamandisPummelProfile(DIAMANDIS_MODULE_COUNT).windup).toBeGreaterThanOrEqual(4);
-    // Fora da faixa ele nao inventa braco nem estoura o teto.
+    // Fora da faixa ele nao inventa degrau nem estoura o teto.
     expect(diamandisPummelProfile(0)).toEqual(diamandisPummelProfile(1));
     expect(diamandisPummelProfile(9)).toEqual(diamandisPummelProfile(DIAMANDIS_MODULE_COUNT));
   });
 
-  it('desarmado ele SOCA, e o soco alcanca alem do corpo', () => {
+  it('desarmado ele SOCA, e o punho alcanca alem do corpo', () => {
     const { state, boss } = duel(703, 2);
     state.bossRuntime.modulesLost = (1 << DIAMANDIS_MODULE_COUNT) - 1;
     state.tick += 1;

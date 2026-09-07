@@ -582,9 +582,9 @@ export const applyDiamandisScenario = (
       break;
     }
     case 'pummel': {
-      // A MAQUINA DESARMADA: as tres ferramentas fora, os tres bracos livres e
-      // o Prospector colado. E o ultimo ato do encontro — o unico em que o
-      // chefe nao tem obra nenhuma para fazer e so lhe resta bater.
+      // A MAQUINA DESARMADA: as tres ferramentas fora e o Prospector colado. E
+      // o ultimo ato do encontro — o unico em que o chefe nao tem obra nenhuma
+      // para fazer e so lhe restam as duas maos.
       for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
         const bit = 1 << m;
         if ((state.bossRuntime.modulesLost & bit) !== 0) continue;

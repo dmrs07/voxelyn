@@ -1598,20 +1598,21 @@ export const DIAMANDIS_SOCKETS = {
   drill: { x: 0, y: -3, z: DIAMANDIS_Z0 + 3.1 },
   rack: { x: 0, y: 3.8, z: DIAMANDIS_Z0 + 12.2 },
   mast: { x: 0, y: -0.2, z: DIAMANDIS_Z0 + 12.2 },
-  // OS TRES BRACOS. Nao dividem o encaixe com a ferramenta que operam, e a
-  // primeira versao dividia: com o rack e o mastro montados no TOPO da torre,
-  // os bracos deles nasciam no teto e liam como entulho em cima da maquina, e
-  // nao como bracos. Eles ficam onde bracos de escavadeira ficam — presos ao
-  // deck, um em cada lado e um na frente, junto do mancal —, e dali ALCANCAM a
-  // ferramenta que servem. E o que uma maquina de verdade faz: o manipulador
-  // nao mora na peca, ele estende ate ela.
-  armFront: { x: 0, y: -4.2, z: DIAMANDIS_Z0 + 5.4 },
-  armRight: { x: 4.3, y: 0.6, z: DIAMANDIS_Z0 + 5.4 },
-  armLeft: { x: -4.3, y: 0.6, z: DIAMANDIS_Z0 + 5.4 },
+  // OS DOIS BRACOS, um em cada LADO — e so nos lados.
+  //
+  // A primeira versao tinha tres, um por ferramenta, com o terceiro na frente
+  // e a mao fechada em volta da peca que operava. Lia errado de duas maneiras:
+  // um braco no meio da frente nao e um braco, e um ombro que nasce onde a
+  // ferramenta esta montada faz a ferramenta parecer parte do braco. Aqui eles
+  // sao o que um robo humanoide tem: dois ombros nas laterais do deck, na
+  // altura do peito, simetricos, e as ferramentas nao passam perto deles. A
+  // broca, o rack e o mastro sao MONTAGENS do chassi; os bracos sao os bracos.
+  armLeft: { x: -5.8, y: -1.6, z: DIAMANDIS_Z0 + 6.6 },
+  armRight: { x: 5.8, y: -1.6, z: DIAMANDIS_Z0 + 6.6 },
 };
 
-/** O encaixe do BRACO que serve cada modulo (broca, rack, mastro). */
-export const DIAMANDIS_ARM_SOCKETS = ['armFront', 'armRight', 'armLeft'];
+/** Os encaixes dos dois bracos, esquerdo e direito. Nao ha um terceiro. */
+export const DIAMANDIS_ARM_SOCKETS = ['armLeft', 'armRight'];
 
 export const diamandisChassis = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
@@ -1790,48 +1791,68 @@ const layFlat = (part, boxes) => {
 };
 
 /**
- * O quanto o BRACO esta estendido neste quadro, -1 (armado) a +1 (batendo).
+ * A POSE do braco neste quadro: `reach` e o quanto o punho avanca A FRENTE do
+ * ombro, `rise` o quanto ele sobe. Duas grandezas, e nao um so eixo de balanco,
+ * por uma razao de projecao: em isometrica o que anda para tras anda para
+ * DENTRO do corpo, e um aviso que esconde o punho atras do chassi nao e um
+ * aviso. Entao este braco nunca arma para tras. Ele arma para CIMA e um pouco a
+ * frente — o punho junto do peito, onde da para segui-lo —, e o golpe DESCE e
+ * sai. E o gesto de quem bate com o peso do proprio braco, e as duas pontas
+ * ficam fora da silhueta.
  *
- * `idle` e a mao OCUPADA: recolhida no encaixe, segurando a ferramenta — e por
- * isso que ela quase nao aparece enquanto a ferramenta esta montada, e nem
- * precisa. `special` e a mao LIVRE, aberta e pendendo um pouco a frente: e o
- * quadro que conta que ali havia uma ferramenta e nao ha mais. `attack` e o
- * soco, e o peso dele esta no salto do quadro 1 para o 2.
+ * `idle` e o repouso: reach e rise em zero, o braco pendurado reto ao lado do
+ * corpo, como o de qualquer humanoide parado. E a pose enquanto a maquina ainda
+ * tem ferramenta para matar com — os bracos existem desde o primeiro segundo,
+ * so nao sao a ameaca ainda. `special` e a GUARDA: um quadro so, punho meio
+ * erguido e a frente. Segurada, e nao balancando: o que se move entre um soco e
+ * outro e o chassi (os espasmos do frenesi), e uma guarda respirando por cima
+ * disso viraria ruido.
  */
-const diamandisArmSwing = (anim, f) => {
-  if (anim === 'attack') return [-0.85, -1, 1, 0.4][f % 4];
-  if (anim === 'special') return [0.16, 0.24, 0.16, 0.08][f % 4];
-  return -0.14;
+const diamandisArmPose = (anim, f) => {
+  if (anim === 'attack') {
+    return [
+      { reach: 1.2, rise: 1.9 }, // 0 armando: o punho sobe a frente do peito
+      { reach: 1.5, rise: 2.7 }, // 1 armado: no alto — o aviso inteiro
+      { reach: 2.8, rise: 0.1 }, // 2 IMPACTO: desce e sai da silhueta
+      { reach: 1.3, rise: 0.7 }, // 3 recolhendo
+    ][f % 4];
+  }
+  if (anim === 'special') return { reach: 1, rise: 1 };
+  return { reach: 0, rise: 0 };
 };
 
 /**
- * UM BRACO MANIPULADOR, em volta do proprio encaixe.
+ * UM BRACO, em volta do proprio ombro. Sao dois, um por lado, e e o mesmo
+ * modelo nos dois: ombro, braco, cotovelo, antebraco e punho — a cadeia de um
+ * humanoide, e nao um manipulador de servico agarrado a uma peca.
  *
- * Sao tres, um por ferramenta, e e o mesmo modelo nos tres: manipuladores de
- * serie numa maquina de serie. Por dividirem o encaixe com a ferramenta que
- * seguram, ficam ATRAS dela enquanto ela esta montada — o que se ve e uma
- * garra fechada no aro. Quando o Coveiro leva a ferramenta, o que sobra ali e
- * a mao, aberta, sem nada para fazer.
+ * O ombro fica parado no encaixe; o que se move e o COTOVELO, e o punho anda
+ * com ele, sempre pela frente.
  */
 export const diamandisArmModel = (anim, f) => {
-  const s = diamandisArmSwing(anim, f);
-  // O alcance e curto de proposito: o braco e um manipulador de servico, nao
-  // um chicote — e cada unidade a mais custa quadro no atlas sob demanda.
-  const reach = s * 1.7;
-  const lift = s < 0 ? -s * 1.1 : -s * 0.8;
-  // A garra ABRE quando larga a ferramenta: fechada segurando, aberta livre.
-  const open = anim === 'idle' ? 0 : 0.55;
+  const { reach, rise } = diamandisArmPose(anim, f);
+  // O cotovelo faz menos da metade do caminho do punho.
+  const fistY = -reach;
+  const midY = fistY * 0.45;
+  const midZ = rise * 0.45;
+  const up = rise * 0.1;
   const b = [];
-  // Pivo: a junta presa no chassi, no proprio encaixe.
-  b.push(box(-1.3, -0.4, -1, 2.6, 2.2, 2.2, 'rockDeep'));
-  // Antebraco, o segmento que gira.
-  b.push(box(-1, -1.5 - reach * 0.5, -2.6 + lift * 0.9, 2, 2, 2.4, 'rust'));
-  // A GARRA: duas pastilhas que se abrem quando a mao esta vazia.
-  for (const side of [-1, 1]) {
-    b.push(
-      box(side * (0.45 + open) - 0.45, -2.3 - reach, -3.6 + lift * 1.3, 0.9, 1.6, 1.7, 'rockDeep'),
-    );
-  }
+  // Ombro: a junta presa a lateral do deck, no proprio encaixe. E o volume mais
+  // GROSSO da cadeia de proposito — a primeira versao tinha um ombro fino e o
+  // braco inteiro sumia dentro da silhueta do chassi.
+  b.push(box(-1.3, -1.3, -1.1 + up, 2.6, 2.6, 2.2, 'rockDeep'));
+  // Braco, do ombro ao cotovelo.
+  b.push(box(-1, -1 + midY * 0.5, -2.6 + up + midZ * 0.5, 2, 2, 1.6, 'rust'));
+  // Cotovelo: o no que marca onde o braco dobra.
+  b.push(box(-1.15, -1.15 + midY, -3.3 + midZ, 2.3, 2.3, 0.8, 'rockDeep'));
+  // Antebraco, do cotovelo ao punho. Cai um fio A FRENTE do ombro: um braco
+  // pesado nao pende no eixo do corpo, e em projecao isometrica e esse meio
+  // voxel de frente que tira o braco de dentro da silhueta do chassi.
+  b.push(box(-0.9, -1.3 + (midY + fistY) * 0.5, -4.4 + (midZ + rise) * 0.5, 1.8, 1.8, 1.3, 'rust'));
+  // PUNHO: um bloco fechado, e o mais CLARO da cadeia. Nao ha garra, porque nao
+  // ha nada para segurar — esta maquina bate com a mao fechada, e e o punho que
+  // o jogador tem de conseguir seguir durante o aviso.
+  b.push(box(-1.25, -1.8 + fistY, -5.5 + rise, 2.5, 2.5, 1.4, 'bone'));
   return b;
 };
 
@@ -3495,7 +3516,7 @@ const diamandisFrame = (dir, anim, f) =>
 // nao recentraliza). Os quadros sao os menores que enquadram as oito rotacoes
 // de todas as poses com 2px de margem.
 /** O quadro do braco: pequeno, porque um manipulador e pequeno. */
-export const DIAMANDIS_ARM_FRAME = { w: 56, h: 44, ax: 26, ay: 11 };
+export const DIAMANDIS_ARM_FRAME = { w: 58, h: 50, ax: 27, ay: 12 };
 const diamandisArmFrame = (dir, anim, f) =>
   renderVoxels(
     diamandisArmModel(anim, f),
@@ -4089,13 +4110,14 @@ export const ENTITY_SPECS = [
       noFit: true,
     }),
   ),
-  // O BRACO MANIPULADOR: um so atlas para os tres, desenhado no encaixe de
-  // cada ferramenta — e a mao que a segura. Sob demanda junto com as pecas,
-  // pelo mesmo motivo: so quem encontra o chefe paga por ele.
+  // O BRACO: um so atlas para os dois lados, desenhado no ombro de cada um.
+  // Sob demanda junto com as pecas, pelo mesmo motivo: so quem encontra o
+  // chefe paga por ele.
   //
-  // Tres poses, e cada uma diz uma coisa sobre a ferramenta daquele encaixe:
-  // `idle` a mao fechada em volta dela, `special` a mao vazia e aberta depois
-  // do arranque, `attack` o soco que so existe quando ela esta vazia.
+  // Tres poses, e nenhuma delas fala de ferramenta: `idle` o braco pendurado
+  // ao lado do corpo enquanto a maquina ainda trabalha com o que tem montado,
+  // `special` a guarda de quem ja perdeu ferramenta e vai bater com as maos, e
+  // `attack` o soco.
   eightWay({
     ...base(
       'part-diamandis-arm',
@@ -4107,11 +4129,11 @@ export const ENTITY_SPECS = [
       { w: 1, h: 1, offsetX: 0, offsetY: 0 },
       {
         idle: { frames: 1, fps: 1, loop: true },
-        special: { frames: 2, fps: 3, loop: true },
+        special: { frames: 1, fps: 1, loop: true },
         attack: { frames: 4, fps: 14, loop: false },
       },
       diamandisArmFrame,
-      'voxel-isometric heavy manipulator arm of an industrial excavator in eight facings: pivot, forearm and a two-jaw clamp, closed while it grips a mounted tool, open and idle once the tool is torn off, and swinging in a short slam',
+      'voxel-isometric humanoid robot arm of a heavy industrial machine in eight facings: ball shoulder, upper arm, blocky elbow joint, forearm and a closed fist, hanging straight at the side of the body, raised into a guard, and swinging a short overhand punch',
       1,
     ),
     noFit: true,

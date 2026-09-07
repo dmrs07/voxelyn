@@ -25,6 +25,7 @@ import chassisJson from '@voxelyn/survival-content/assets/atlases/enemy-diamandi
 import drillJson from '@voxelyn/survival-content/assets/atlases/part-diamandis-drill.json';
 import rackJson from '@voxelyn/survival-content/assets/atlases/part-diamandis-rack.json';
 import mastJson from '@voxelyn/survival-content/assets/atlases/part-diamandis-mast.json';
+import armJson from '@voxelyn/survival-content/assets/atlases/part-diamandis-arm.json';
 import undertakerJson from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
 import {
   composeDiamandisParts,
@@ -46,6 +47,8 @@ import {
   RIP_JOLT_MS,
   socketScreenPoint,
   DIAMANDIS_ARM_ATLAS,
+  DIAMANDIS_ARM_SOCKETS,
+  pummelArmFrame,
 } from '../client/diamandis-body';
 import {
   ARCHETYPE_DIRECTIONS,
@@ -438,5 +441,59 @@ describe('os atlas sob demanda batem com o orcamento do validador', () => {
     // `DIAMANDIS_PART_ATLASES` porque aquela lista e indexada por modulo da
     // simulacao, e ele nao e um modulo — nao solta, nao e carregado, nao cai.
     expect(ids).toEqual([...DIAMANDIS_PART_ATLASES, DIAMANDIS_ARM_ATLAS].sort());
+  });
+});
+
+describe('os bracos: dois, laterais, e sempre no corpo', () => {
+  const arm = armJson as unknown as SpriteManifestEntry;
+  const arms = (over: Partial<Parameters<typeof composeDiamandisParts>[0]> = {}) =>
+    compose({ arm, ...over }).filter((p) => p.atlas === DIAMANDIS_ARM_ATLAS);
+
+  it('sao DOIS encaixes, esquerdo e direito, e nao um por ferramenta', () => {
+    expect(DIAMANDIS_ARM_SOCKETS).toEqual(['armLeft', 'armRight']);
+    expect(DIAMANDIS_ARM_SOCKETS.length).toBeLessThan(DIAMANDIS_PART_NAMES.length);
+  });
+
+  it('desenhados com a maquina INTEIRA, e nao so depois de perder ferramenta', () => {
+    // A versao anterior fazia o braco "nascer" com o arranque, um por
+    // ferramenta. Um humanoide nao ganha bracos no meio da luta: eles estao la
+    // desde o primeiro quadro, so pendurados ao lado do corpo.
+    const draws = arms({ lost: 0 });
+    expect(draws.length).toBe(2);
+    for (const d of draws) expect(d.anim).toBe('idle');
+  });
+
+  it('nao acrescenta braco a cada ferramenta arrancada — continuam dois', () => {
+    for (let lost = 0; lost < 1 << DIAMANDIS_PART_NAMES.length; lost++) {
+      expect(arms({ lost }).length, `lost=${lost}`).toBe(2);
+    }
+  });
+
+  it('perdida a primeira ferramenta eles sobem para a GUARDA, e socam juntos', () => {
+    for (const d of arms({ lost: 1 })) expect(d.anim).toBe('special');
+    const punching = arms({ lost: 1, pummelFrame: 2 });
+    expect(punching.map((d) => d.anim)).toEqual(['attack', 'attack']);
+    // Os dois lados no MESMO quadro: bracos de uma mesma maquina se movem
+    // juntos, e um defasado leria como avaria.
+    expect(punching[0].frame).toBe(punching[1].frame);
+    expect(punching[0].frame).toBe(2);
+  });
+
+  it('nenhum braco ocupa um indice de modulo', () => {
+    // O campo `module` e o indice da simulacao no resto da lista; um braco nao
+    // e um modulo, e nao pode passar por um.
+    for (const d of arms({ lost: 7 })) expect(d.module).toBeLessThan(0);
+  });
+
+  it('o soco avisa em dois quadros e desce em dois, seja o aviso curto ou longo', () => {
+    for (const windup of [8, 14]) {
+      const action = { kind: 'pummel', startedAt: 0, releaseAt: windup, endsAt: windup + 6 };
+      const seen = new Set<number>();
+      for (let t = 0; t < action.endsAt; t++) seen.add(pummelArmFrame(action, t) as number);
+      expect([...seen].sort(), `windup ${windup}`).toEqual([0, 1, 2, 3]);
+    }
+    expect(pummelArmFrame({ kind: 'contact', startedAt: 0, releaseAt: 4, endsAt: 8 }, 2)).toBe(
+      undefined,
+    );
   });
 });

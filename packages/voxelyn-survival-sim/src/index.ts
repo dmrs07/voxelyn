@@ -109,7 +109,7 @@ export {
   damageEntity,
   diamandisFrenzyStacks,
   diamandisFrenzyMultiplier,
-  diamandisFreeArms,
+  diamandisPummelStage,
   diamandisFrenzySpeedMultiplier,
   diamandisPummelProfile,
   ripDiamandisModule,

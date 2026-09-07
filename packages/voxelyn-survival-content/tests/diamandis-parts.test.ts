@@ -101,13 +101,37 @@ describe('o Diamandis em pecas', () => {
     for (const id of PART_IDS) expect(specOf(id).noFit).toBe(true);
     // E o chassi publica um encaixe por peca, na ordem dos bits de modulo.
     const chassis = specOf('enemy-diamandis');
-    // As tres ferramentas MAIS os tres bracos: o braco tem encaixe proprio no
-    // deck, e nao o da peca que opera — ver DIAMANDIS_ARM_SOCKETS.
+    // As tres ferramentas MAIS os dois ombros. Os bracos nao dividem encaixe
+    // com ferramenta nenhuma: sao dois, laterais e fixos — ver
+    // DIAMANDIS_ARM_SOCKETS.
     expect(Object.keys(chassis.sockets ?? {})).toEqual([
       ...DIAMANDIS_PARTS,
       ...DIAMANDIS_ARM_SOCKETS,
     ]);
     expect(Object.keys(UNDERTAKER_SOCKETS)).toEqual(['magnet']);
+  });
+
+  it('os bracos sao DOIS, um em cada lado, e simetricos', () => {
+    // A primeira versao tinha tres, com um na frente do corpo; um braco no meio
+    // da frente nao le como braco, le como ferramenta. Aqui a regra e a de um
+    // humanoide: dois ombros, mesmo y, mesmo z, x oposto.
+    expect(DIAMANDIS_ARM_SOCKETS).toEqual(['armLeft', 'armRight']);
+    const left = DIAMANDIS_SOCKETS.armLeft;
+    const right = DIAMANDIS_SOCKETS.armRight;
+    expect(left.x).toBe(-right.x);
+    expect(Math.abs(left.x)).toBeGreaterThan(0);
+    expect(left.y).toBe(right.y);
+    expect(left.z).toBe(right.z);
+    // E nenhum deles mora onde uma ferramenta mora: o braco nao opera a peca.
+    for (const part of DIAMANDIS_PARTS as string[]) {
+      const tool = DIAMANDIS_SOCKETS[part];
+      for (const arm of [left, right]) {
+        expect(
+          Math.hypot(tool.x - arm.x, tool.y - arm.y, tool.z - arm.z),
+          `${part} x braco`,
+        ).toBeGreaterThan(2);
+      }
+    }
   });
 
   it('montada, a peca no encaixe reconstroi a silhueta completa', () => {

@@ -4,11 +4,11 @@
   "atlas": "part-diamandis-arm.png",
   "normalAtlas": "part-diamandis-arm.normal.png",
   "normalScale": 2,
-  "frameWidth": 56,
-  "frameHeight": 44,
-  "columns": 56,
-  "anchorX": 26,
-  "anchorY": 11,
+  "frameWidth": 58,
+  "frameHeight": 50,
+  "columns": 48,
+  "anchorX": 27,
+  "anchorY": 12,
   "directions": 8,
   "authoredDirs": [
     "dr",
@@ -36,6 +36,7 @@
     "#0b0e14",
     "#1d2430",
     "#2e3a4d",
+    "#3d2a22",
     "#46566e",
     "#6e4a33",
     "#8a7154",
@@ -49,8 +50,8 @@
       "loop": true
     },
     "special": {
-      "frames": 2,
-      "fps": 3,
+      "frames": 1,
+      "fps": 1,
       "loop": true
     },
     "attack": {
@@ -66,44 +67,44 @@
       "special": 5
     },
     "dl": {
-      "idle": 7,
-      "attack": 8,
-      "special": 12
+      "idle": 6,
+      "attack": 7,
+      "special": 11
     },
     "ur": {
-      "idle": 14,
-      "attack": 15,
-      "special": 19
+      "idle": 12,
+      "attack": 13,
+      "special": 17
     },
     "ul": {
-      "idle": 21,
-      "attack": 22,
-      "special": 26
+      "idle": 18,
+      "attack": 19,
+      "special": 23
     },
     "r": {
-      "idle": 28,
-      "attack": 29,
-      "special": 33
+      "idle": 24,
+      "attack": 25,
+      "special": 29
     },
     "d": {
-      "idle": 35,
-      "attack": 36,
-      "special": 40
+      "idle": 30,
+      "attack": 31,
+      "special": 35
     },
     "l": {
+      "idle": 36,
+      "attack": 37,
+      "special": 41
+    },
+    "u": {
       "idle": 42,
       "attack": 43,
       "special": 47
-    },
-    "u": {
-      "idle": 49,
-      "attack": 50,
-      "special": 54
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric heavy manipulator arm of an industrial excavator in eight facings: pivot, forearm and a two-jaw clamp, closed while it grips a mounted tool, open and idle once the tool is torn off, and swinging in a short slam",
+    "prompt": "voxel-isometric humanoid robot arm of a heavy industrial machine in eight facings: ball shoulder, upper arm, blocky elbow joint, forearm and a closed fist, hanging straight at the side of the body, raised into a guard, and swinging a short overhand punch",
     "seedOrRef": "deterministic-code-v2"
   }
 }
