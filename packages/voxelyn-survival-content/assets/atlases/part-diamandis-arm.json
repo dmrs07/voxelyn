@@ -1,0 +1,110 @@
+{
+  "id": "part-diamandis-arm",
+  "version": 1,
+  "atlas": "part-diamandis-arm.png",
+  "normalAtlas": "part-diamandis-arm.normal.png",
+  "normalScale": 2,
+  "frameWidth": 58,
+  "frameHeight": 50,
+  "columns": 48,
+  "anchorX": 27,
+  "anchorY": 12,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.5,
+    "h": 0.5
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true
+    },
+    "special": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 14,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 1,
+      "special": 5
+    },
+    "dl": {
+      "idle": 6,
+      "attack": 7,
+      "special": 11
+    },
+    "ur": {
+      "idle": 12,
+      "attack": 13,
+      "special": 17
+    },
+    "ul": {
+      "idle": 18,
+      "attack": 19,
+      "special": 23
+    },
+    "r": {
+      "idle": 24,
+      "attack": 25,
+      "special": 29
+    },
+    "d": {
+      "idle": 30,
+      "attack": 31,
+      "special": 35
+    },
+    "l": {
+      "idle": 36,
+      "attack": 37,
+      "special": 41
+    },
+    "u": {
+      "idle": 42,
+      "attack": 43,
+      "special": 47
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric humanoid robot arm of a heavy industrial machine in eight facings: ball shoulder, upper arm, blocky elbow joint, forearm and a closed fist, hanging straight at the side of the body, raised into a guard, and swinging a short overhand punch",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

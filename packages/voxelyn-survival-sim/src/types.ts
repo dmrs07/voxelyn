@@ -507,6 +507,11 @@ export type EntityActionKind =
   | 'demolish'
   /** Feixe de prospeccao: varredura inofensiva, depois potencia na mesma linha. */
   | 'beam'
+  /**
+   * SOCO dos bracos manipuladores do Diamandis. So existe com braco livre —
+   * cada ferramenta arrancada devolve a mao que a segurava.
+   */
+  | 'pummel'
   /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
   | 'erupt'
   /**
@@ -591,6 +596,16 @@ export type Entity = {
   nextActionAt: number;
   contactReadyAt: number;
   rangedReadyAt: number;
+  /**
+   * Ate quando o FEIXE do Diamandis esta recarregando.
+   *
+   * Relogio proprio, e nao emprestado: o feixe usava `contactReadyAt`, que e o
+   * do CORPO, e como ele e decidido antes do corpo o chefe rearmava o relogio
+   * do soco a cada varredura — e nunca socava. Cada ferramenta tem o seu
+   * (`nextActionAt` a broca, `rangedReadyAt` a salva), e o do corpo volta a
+   * ser so do corpo.
+   */
+  beamReadyAt: number;
   stunnedUntil: number;
   /**
    * Ate quando este inimigo continua caçando por ter LEVADO DANO.
@@ -922,6 +937,8 @@ export type BossAbility =
   | 'drill'
   | 'demolish'
   | 'beam'
+  // Diamandis: o que sobra quando as ferramentas acabam.
+  | 'pummel'
   // Devorador Branco.
   | 'erupt'
   | 'maw'
@@ -1011,6 +1028,14 @@ export type BossMoment =
   | 'drill_impact'
   | 'drill_skid'
   | 'drill_strike'
+  // Diamandis: o SOCO ACERTOU. Separado de `boss_attack` de proposito, pela
+  // mesma regra da broca: `boss_attack` e o golpe SAINDO (o braco desce), e o
+  // alcance do soco so e conferido no release — sair da faixa durante o aviso
+  // e a resposta inteira. Emitir a batida no `boss_attack` daria clarao,
+  // estilhaco, tremor e a chapa chegando em cima de uma esquiva limpa, que e
+  // exatamente o contrario do que a esquiva significa. `x,y` = o alvo,
+  // `dx,dy` = o rumo, `intensity` = o degrau do soco (1/3, 2/3, 1).
+  | 'pummel_hit'
   // Diamandis: um modulo foi ARRANCADO e a maquina entrou em frenesi (ver
   // `DIAMANDIS_FRENZY_PER_MODULE`). `intensity` e a fracao de modulos
   // perdidos (1/3, 2/3, 1): e o que o reator, a barra e a camada de pressao

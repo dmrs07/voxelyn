@@ -65,7 +65,8 @@ export type DiamandisScenario =
   | 'demolish'
   | 'drill'
   | 'drillWall'
-  | 'drillMiss';
+  | 'drillMiss'
+  | 'pummel';
 
 /** Os cenarios, na ordem do painel. Os rotulos vivem em `arena-main.ts`. */
 export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
@@ -91,6 +92,7 @@ export const DIAMANDIS_SCENARIOS: readonly DiamandisScenario[] = [
   'drill',
   'drillWall',
   'drillMiss',
+  'pummel',
 ];
 
 /**
@@ -494,7 +496,7 @@ export const applyDiamandisScenario = (
       const aim = placePlayerAhead(state, boss, 6);
       state.bossRuntime.staggerUntil = 0;
       state.bossRuntime.awake = true;
-      boss.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+      boss.beamReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
       startAction(
         state,
         boss,
@@ -576,6 +578,29 @@ export const applyDiamandisScenario = (
       } else if (scenario === 'drillMiss') {
         state.player.x += side3(aim).x;
         state.player.y += side3(aim).y;
+      }
+      break;
+    }
+    case 'pummel': {
+      // A MAQUINA DESARMADA: as tres ferramentas fora e o Prospector colado. E
+      // o ultimo ato do encontro — o unico em que o chefe nao tem obra nenhuma
+      // para fazer e so lhe restam as duas maos.
+      for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+        const bit = 1 << m;
+        if ((state.bossRuntime.modulesLost & bit) !== 0) continue;
+        if ((state.bossRuntime.modulesExposed & bit) === 0) {
+          state.bossRuntime.modulesExposed |= bit;
+          events.push({ t: 'boss_module', x: boss.x, y: boss.y, module: m, state: 'exposed' });
+        }
+        ripDiamandisModule(state, m, boss, events);
+      }
+      state.bossRuntime.staggerUntil = 0;
+      state.bossRuntime.awake = true;
+      boss.contactReadyAt = 0;
+      const cell = openCellNear(state, boss.x, boss.y, 2);
+      if (cell) {
+        state.player.x = cell.x + 0.5;
+        state.player.y = cell.y + 0.5;
       }
       break;
     }

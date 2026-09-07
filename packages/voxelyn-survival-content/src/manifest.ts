@@ -200,6 +200,7 @@ export const CHARACTER_SPRITE_IDS = [
   'part-diamandis-drill',
   'part-diamandis-rack',
   'part-diamandis-mast',
+  'part-diamandis-arm',
   'enemy-lung-matrix',
   'enemy-furnace-heart',
   'enemy-frost-queen',

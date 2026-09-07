@@ -278,6 +278,7 @@ const makePlayer = (slot: number, x: number, y: number, tuning: PlayerTuning): E
   elite: false,
   nextActionAt: 0,
   contactReadyAt: 0,
+  beamReadyAt: 0,
   rangedReadyAt: 0,
   stunnedUntil: 0,
   alertedUntil: 0,

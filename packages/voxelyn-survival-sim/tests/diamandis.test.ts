@@ -16,6 +16,9 @@ import {
   damageEntity,
   diamandisFrenzyMultiplier,
   diamandisFrenzyStacks,
+  diamandisPummelStage,
+  diamandisFrenzySpeedMultiplier,
+  diamandisPummelProfile,
   ripDiamandisModule,
   spawnEnemy,
 } from '../src/entities';
@@ -28,6 +31,13 @@ import {
   DIAMANDIS_DRILL_DAMAGE,
   DIAMANDIS_DRILL_TICKS,
   DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_BEAM_MIN_RANGE,
+  DIAMANDIS_FRENZY_CAP,
+  DIAMANDIS_PUMMEL_REACH,
+  DIAMANDIS_RADIUS,
+  DIAMANDIS_SPEED,
+  PLAYER_HP,
+  PLAYER_RADIUS,
   DIAMANDIS_RIP_STAGGER_TICKS,
   UNDERTAKER_SLAM_DAMAGE,
   DIAMANDIS_MODULE_COUNT,
@@ -49,6 +59,7 @@ import {
   BOSS_MODULE_TOWER,
   BOSS_PHASE_REACTOR,
   DISCOVERY_DIAMANDIS_CORRIDOR,
+  type Entity,
   type SemanticEvent,
   type SurvivalState,
 } from '../src/types';
@@ -634,6 +645,227 @@ describe('Diamandis — o frenesi', () => {
     expect(UNDERTAKER_SLAM_DAMAGE).toBe(26);
     // O multiplicador e do chefe; nenhuma outra tabela o consulta.
     expect(diamandisFrenzyMultiplier(state)).toBeCloseTo(1.45, 9);
+  });
+});
+
+describe('Diamandis — o corpo, quando o alvo encosta', () => {
+  /** Roda `ticks` e devolve as acoes que o chefe comecou e o dano que saiu. */
+  const spar = (state: SurvivalState, boss: Entity, ticks: number) => {
+    const actions: Record<string, number> = {};
+    const dists: number[] = [];
+    let damage = 0;
+    let hp = state.player.hp;
+    for (let t = 0; t < ticks; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id) {
+          actions[ev.action] = (actions[ev.action] ?? 0) + 1;
+        }
+      }
+      if (state.player.hp < hp) {
+        damage += hp - state.player.hp;
+        hp = state.player.hp;
+      }
+      dists.push(Math.hypot(boss.x - state.player.x, boss.y - state.player.y));
+    }
+    return { actions, damage, dists };
+  };
+
+  it('colado, ele SOCA — o feixe nao come mais a faixa do corpo', () => {
+    // O defeito: o feixe cobria 0..16 e cobrava `contactReadyAt`, o relogio do
+    // golpe de contato. Como as tres ferramentas sao decididas antes do corpo,
+    // ele rearmava esse relogio a cada varredura — medido, ZERO contatos em
+    // 400 ticks com o chefe em cima do alvo, e 78 de dano em vinte segundos.
+    const { state, boss } = duel(601, 2);
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    const { actions, damage } = spar(state, boss, 400);
+    expect(actions.contact ?? 0, 'o chefe nao encostou a mao no alvo').toBeGreaterThan(10);
+    expect(actions.beam ?? 0, 'varreu linha com o alvo colado no chassi').toBe(0);
+    // O corpo cobra de verdade: 28 por golpe, um golpe a cada 16 ticks.
+    expect(damage).toBeGreaterThan(300);
+  });
+
+  it('o feixe tem PISO: dentro dele a maquina encosta, fora ela varre', () => {
+    const inside = duel(602, 2);
+    expect(spar(inside.state, inside.boss, 120).actions.beam ?? 0).toBe(0);
+    // Logo depois do piso ele volta a ser a ferramenta de perto.
+    const outside = duel(603, DIAMANDIS_BEAM_MIN_RANGE + 1);
+    expect(spar(outside.state, outside.boss, 120).actions.beam ?? 0).toBeGreaterThan(0);
+    expect(DIAMANDIS_BEAM_MIN_RANGE).toBeGreaterThan(DIAMANDIS_RADIUS + PLAYER_RADIUS + 0.18);
+  });
+
+  it('o relogio do feixe e dele: uma varredura nao adia o proximo soco', () => {
+    const { state, boss } = duel(604, 2);
+    boss.beamReadyAt = state.tick + 500;
+    boss.contactReadyAt = 0;
+    // Com o feixe descarregado o corpo continua cobrando no ritmo dele.
+    expect(spar(state, boss, 60).actions.contact ?? 0).toBeGreaterThan(1);
+  });
+
+  it('ele PLANTA quando os corpos encostam, em vez de vibrar dentro do alvo', () => {
+    // Antes: a distancia estabilizava em 0,03 e oscilava entre 0,03 e 0,05 a
+    // cada tick — o chassi de 0,9 de raio dentro do Prospector.
+    const { state, boss } = duel(605, 3);
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    const { dists } = spar(state, boss, 200);
+    const settled = dists.slice(-40);
+    const touching = DIAMANDIS_RADIUS + PLAYER_RADIUS;
+    for (const d of settled) {
+      expect(d, 'o chefe entrou no corpo do alvo').toBeGreaterThan(touching - 0.12);
+      expect(d, 'parou longe demais para alcancar').toBeLessThan(touching + 0.3);
+    }
+    // E fica PARADO: nada de tremer meio decimo para cada lado por tick.
+    const spread = Math.max(...settled) - Math.min(...settled);
+    expect(spread, 'continuou dançando no lugar').toBeLessThan(0.02);
+  });
+});
+
+describe('Diamandis — o soco, e os quatro degraus dele', () => {
+  it('o degrau do soco E o numero de ferramentas arrancadas', () => {
+    const { state } = duel(701, 8);
+    expect(diamandisPummelStage(state)).toBe(0);
+    for (let n = 1; n <= DIAMANDIS_MODULE_COUNT; n++) {
+      state.bossRuntime.modulesLost = (1 << n) - 1;
+      state.tick += 1;
+      expect(diamandisPummelStage(state)).toBe(n);
+    }
+  });
+
+  it('com as tres ferramentas no lugar ele NAO soca — so esbarra com o corpo', () => {
+    const { state, boss } = duel(702, 2);
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    const kinds: string[] = [];
+    for (let t = 0; t < 200; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id) kinds.push(ev.action);
+      }
+    }
+    expect(kinds).toContain('contact');
+    expect(kinds, 'socou com as tres ferramentas ainda montadas').not.toContain('pummel');
+  });
+
+  it('cada degrau encurta o aviso, aperta a cadencia e pesa mais', () => {
+    let last = diamandisPummelProfile(1);
+    // O primeiro degrau ja tem de doer mais que o esbarrao que ele substitui.
+    expect(last.damage).toBeGreaterThan(ARCHETYPES.diamandis.contactDamage);
+    for (let stage = 2; stage <= DIAMANDIS_MODULE_COUNT; stage++) {
+      const p = diamandisPummelProfile(stage);
+      expect(p.damage, `degrau ${stage}`).toBeGreaterThan(last.damage);
+      expect(p.windup, `degrau ${stage}`).toBeLessThan(last.windup);
+      expect(p.cooldown, `degrau ${stage}`).toBeLessThan(last.cooldown);
+      last = p;
+    }
+    // Nunca some o aviso: mesmo no ultimo degrau o golpe e telegrafado.
+    expect(diamandisPummelProfile(DIAMANDIS_MODULE_COUNT).windup).toBeGreaterThanOrEqual(4);
+    // Fora da faixa ele nao inventa degrau nem estoura o teto.
+    expect(diamandisPummelProfile(0)).toEqual(diamandisPummelProfile(1));
+    expect(diamandisPummelProfile(9)).toEqual(diamandisPummelProfile(DIAMANDIS_MODULE_COUNT));
+  });
+
+  it('desarmado ele SOCA, e o punho alcanca alem do corpo', () => {
+    const { state, boss } = duel(703, 2);
+    state.bossRuntime.modulesLost = (1 << DIAMANDIS_MODULE_COUNT) - 1;
+    state.tick += 1;
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    let pummels = 0;
+    let damage = 0;
+    let hp = state.player.hp;
+    for (let t = 0; t < 200; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'pummel') pummels++;
+      }
+      if (state.player.hp < hp) {
+        damage += hp - state.player.hp;
+        hp = state.player.hp;
+      }
+    }
+    expect(pummels).toBeGreaterThan(4);
+    // Um golpe do ultimo ato tira mais de metade de uma barra cheia.
+    const blow = diamandisPummelProfile(DIAMANDIS_MODULE_COUNT).damage * DIAMANDIS_FRENZY_CAP;
+    expect(blow).toBeGreaterThan(PLAYER_HP * 0.5);
+    expect(damage).toBeGreaterThan(0);
+    // O braco estendido alcanca alem dos dois corpos.
+    expect(DIAMANDIS_PUMMEL_REACH).toBeGreaterThan(0);
+  });
+
+  it('o soco e o esbarrao dividem o relogio: nunca os dois no mesmo tick', () => {
+    const { state, boss } = duel(704, 2);
+    state.bossRuntime.modulesLost = (1 << DIAMANDIS_MODULE_COUNT) - 1;
+    state.tick += 1;
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    for (let t = 0; t < 200; t++) {
+      const started = stepRun(state, [emptyCommand()])
+        .events.filter((ev) => ev.t === 'action_start' && ev.entity === boss.id)
+        .map((ev) => (ev.t === 'action_start' ? ev.action : ''));
+      expect(started.filter((k) => k === 'contact' || k === 'pummel').length).toBeLessThan(2);
+    }
+  });
+
+  it('a BATIDA so existe quando o soco pega — esquivar apaga a apresentacao', () => {
+    // `boss_attack` sai no release de todo golpe de chefe: e o braco DESCENDO,
+    // e ele desce igual num acerto e numa esquiva. Quem conta que a chapa
+    // chegou e `boss_state: 'pummel_hit'`, e ele tem de sumir junto com o dano
+    // quando o jogador sai da faixa durante o aviso. Sem esta separacao, quem
+    // escapa leva clarao, estilhaco, tremor e o som do impacto de graca.
+    const { state, boss } = duel(706, 2);
+    state.bossRuntime.modulesLost = (1 << DIAMANDIS_MODULE_COUNT) - 1;
+    state.tick += 1;
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    let swings = 0;
+    let hits = 0;
+    let damaged = 0;
+    let hp = state.player.hp;
+    let fled = false;
+    for (let t = 0; t < 260; t++) {
+      // Na metade da luta o alvo passa a estar SEMPRE fora do alcance no
+      // instante do release: dali em diante nenhuma batida pode nascer.
+      if (t === 130) fled = true;
+      if (fled) {
+        state.player.x = boss.x + 30;
+        state.player.y = boss.y + 30;
+      }
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_attack' && ev.ability === 'pummel') swings++;
+        if (ev.t === 'boss_state' && ev.state === 'pummel_hit') {
+          hits++;
+          expect(fled, 'batida depois da esquiva').toBe(false);
+          // A batida aponta para o ALVO, e nao para o centro do chassi: o
+          // cliente desenha o clarao onde o evento manda.
+          expect(Math.hypot(ev.x - state.player.x, ev.y - state.player.y)).toBeLessThan(1);
+          expect(ev.intensity).toBeCloseTo(1);
+        }
+      }
+      if (state.player.hp < hp) {
+        damaged++;
+        hp = state.player.hp;
+      }
+    }
+    expect(swings, 'nenhum soco saiu').toBeGreaterThan(0);
+    expect(hits, 'nenhuma batida na primeira metade').toBeGreaterThan(0);
+    // Uma batida por golpe que cobrou dano, nem uma a mais.
+    expect(hits).toBe(damaged);
+    expect(hits).toBeLessThan(swings);
+  });
+
+  it('sem ferramenta para carregar ele ANDA MAIS — e mesmo assim da para fugir', () => {
+    const { state } = duel(705, 8);
+    let last = 0;
+    for (let n = 0; n <= DIAMANDIS_MODULE_COUNT; n++) {
+      state.bossRuntime.modulesLost = (1 << n) - 1;
+      state.tick += 1;
+      const speed = DIAMANDIS_SPEED * diamandisFrenzySpeedMultiplier(state);
+      expect(speed, `bracos ${n}`).toBeGreaterThan(last);
+      // A fuga continua existindo nos quatro degraus: e o preco de errar o
+      // espacamento que muda, e nao a possibilidade de sair.
+      expect(speed, `bracos ${n}`).toBeLessThan(PLAYER_SPEED);
+      last = speed;
+    }
+    expect(last).toBeGreaterThan(DIAMANDIS_SPEED * 1.5);
   });
 });
 

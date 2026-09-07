@@ -806,7 +806,12 @@ export const GUARDIAN_STRAIN_INTERVAL_TICKS = 40;
  * gaiola e todo tiro em acerto garantido. O tamanho mora no sprite e no
  * ESTRAGO que ele deixa, nunca no raio de colisao.
  */
-export const DIAMANDIS_HP = 880;
+/**
+ * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta agora tem quatro
+ * atos e nao tres: as tres ferramentas mais o corpo que sobra quando elas
+ * acabam. 880 fechava antes de o quarto ato existir.
+ */
+export const DIAMANDIS_HP = 1400;
 export const DIAMANDIS_SPEED = 1.5;
 export const DIAMANDIS_RADIUS = 0.9;
 
@@ -852,6 +857,20 @@ export const DIAMANDIS_DEMOLISH_WINDUP_TICKS = 34;
 export const DIAMANDIS_DEMOLISH_COOLDOWN_TICKS = 150;
 export const DIAMANDIS_DEMOLISH_RANGE = 13;
 export const DIAMANDIS_DEMOLISH_MIN_RANGE = 4;
+/**
+ * O feixe tambem tem PISO, e pelo mesmo motivo que a broca e a salva tem.
+ *
+ * Sem ele o feixe cobria 0..16 — e como as tres ferramentas sao lidas antes do
+ * corpo, ele engolia a faixa do CORPO inteira: medido, o chefe parado em cima
+ * do Prospector nao dava um unico golpe de contato em 400 ticks. E o mesmo
+ * defeito que a broca ja teve contra a salva, e a mesma cura: faixa que so
+ * existe no comentario nao e faixa.
+ *
+ * Tres tiles deixam a mao livre para o corpo (que alcanca 1,42) e ainda uma
+ * folga de aproximacao — de dentro dela a maquina nao varre linha nenhuma,
+ * ela ENCOSTA.
+ */
+export const DIAMANDIS_BEAM_MIN_RANGE = 3;
 export const DIAMANDIS_DEMOLISH_CHARGES = 3;
 export const DIAMANDIS_DEMOLISH_RADIUS = 2.6;
 /** Quanto as duas cargas laterais se afastam da central, em tiles. */
@@ -963,6 +982,52 @@ export const DIAMANDIS_MODULE_ORE = 16;
  */
 export const DIAMANDIS_FRENZY_PER_MODULE = 0.15;
 export const DIAMANDIS_FRENZY_CAP = 1.45;
+/**
+ * Quanto o chassi ACELERA por ferramenta arrancada, como fracao da velocidade
+ * base.
+ *
+ * Uma escavadeira carregando tres ferramentas anda no passo de quem carrega
+ * tres ferramentas. Sem elas ela e so chassi e motor: 1,5 -> 1,95 -> 2,4 ->
+ * 2,85 tiles/s. O Prospector faz 4,6, entao a fuga continua existindo nos
+ * quatro degraus — o que muda e o preco de errar o espacamento. Nao poder
+ * fugir seria outro jogo; ter de MERECER a fuga e este.
+ */
+export const DIAMANDIS_FRENZY_SPEED_PER_MODULE = 0.3;
+
+/**
+ * O SOCO, e os quatro degraus dele.
+ *
+ * Esta maquina tem dois bracos, um de cada lado, desde o primeiro segundo do
+ * encontro — e um humanoide industrial, nao um aranha de ferramentas. O que
+ * muda com o encontro nao e quantos bracos ela tem, e sim QUANTO DA LUTA cabe
+ * a eles. Com a broca, o rack e o mastro montados, o trabalho de matar e das
+ * ferramentas: de perto ela so empurra com o corpo (`contactDamage`), e os
+ * bracos ficam ao lado. Cada ferramenta arrancada devolve atencao e torque as
+ * maos; com os tres encaixes vazios, o que sobra de uma escavadeira sem
+ * ferramentas e um corpo de tres toneladas que so sabe socar.
+ *
+ * O `_STAGE` de cada constante e esse degrau — quantas ferramentas ja sairam —
+ * e nao uma contagem de bracos. A cada degrau o aviso encurta, a cadencia
+ * aperta e o dano sobe, e o golpe ainda passa pelo multiplicador do frenesi,
+ * que sobe pelos mesmos arranques. E de proposito que o ultimo ato seja o mais
+ * perigoso: e o ato em que o jogador escolheu desarmar a maquina.
+ */
+//
+// Os numeros tem um piso obrigatorio: o soco do PRIMEIRO degrau ja tem de doer
+// mais que o esbarrao do corpo que ele substitui (`contactDamage`, 28). Na
+// primeira medicao ele doia menos — 20,7 contra 28 —, e arrancar a primeira
+// ferramenta deixava o chefe mais fraco de perto, que e o contrario do que
+// arrancar uma ferramenta significa. O piso vale no numero CRU, e nao no que o
+// frenesi faz com ele: invariante que depende de outro sistema estar ligado
+// nao e invariante.
+export const DIAMANDIS_PUMMEL_DAMAGE = 30;
+export const DIAMANDIS_PUMMEL_DAMAGE_PER_STAGE = 8;
+export const DIAMANDIS_PUMMEL_WINDUP_TICKS = 14;
+export const DIAMANDIS_PUMMEL_WINDUP_PER_STAGE = 3;
+export const DIAMANDIS_PUMMEL_COOLDOWN_TICKS = 20;
+export const DIAMANDIS_PUMMEL_COOLDOWN_PER_STAGE = 4;
+/** O quanto o braco estendido alcanca alem dos dois corpos, em tiles. */
+export const DIAMANDIS_PUMMEL_REACH = 0.55;
 /**
  * O TROPECO do arranque: 0,5 s em que o chefe nao decide nada e larga a acao
  * em curso. E a transicao legivel antes dos golpes mais fortes — e o que

@@ -521,6 +521,124 @@ Cenários da arena: **avanço da broca** (escolhe o rumo com sala; os cenários 
 decidem a direção), **broca contra veio** (impacto), **broca errando** (derrapagem).
 Capturas `18-broca-…` a `29-broca-…` em `docs/media/diamandis/`.
 
+### O corpo, quando o alvo encosta (`SIMULATION_VERSION` 63)
+
+As três ferramentas são escolhidas por distância, e a quarta faixa é a que não
+tem ferramenta nenhuma: **coladinho, ele usa o chassi**. Essa faixa não existia.
+
+O defeito, medido antes de qualquer mudança: com o chefe parado em cima do
+Prospector, **zero golpes de contato em 400 ticks** (20 s) e 78 de dano no
+total — e a distância estabilizava em **0,03 tile**, oscilando entre 0,03 e 0,05
+a cada tick, com o chassi de 0,9 de raio _dentro_ do corpo do alvo. Duas causas
+somadas:
+
+- **O feixe comia a faixa do corpo.** Ele cobria `0..16` sem piso e cobrava
+  `contactReadyAt` — que é o relógio do **golpe de contato**. Como as
+  ferramentas são decididas antes do corpo, cada varredura rearmava o relógio do
+  soco, e o soco nunca saía. É o mesmo defeito que a broca já teve contra a
+  salva ("faixa que só existe no comentário não é faixa"), agora contra o corpo.
+- **Ele perseguia sem distância de parada**, exatamente como o Devorador antes
+  de `DEVOURER_STALK_RANGE` — com uma diferença de temperamento: um verme
+  espreita em órbita, uma máquina de mineração para e martela.
+
+A correção: o feixe ganha **relógio próprio** (`beamReadyAt`) e **piso**
+(`DIAMANDIS_BEAM_MIN_RANGE` = 3, acima dos 1,42 que o corpo alcança), e o chassi
+**planta** quando os corpos se encostam em vez de entrar no alvo.
+
+Medido depois, no mesmo cenário: **25 contatos** e **700 de dano** nos mesmos
+20 s, com a distância cravada em 1,17 e variação abaixo de 0,02 tile — ele para
+e martela. A seis e a doze tiles as três ferramentas continuam saindo (salva,
+feixe, broca) e o corpo entra quando o alvo encosta.
+
+### Os braços, e a luta em QUATRO atos (`SIMULATION_VERSION` 64)
+
+O Diamandis tem **dois braços**, um de cada lado, desde o primeiro segundo do
+encontro. Ele é um humanoide industrial: ombros nas laterais do deck, na altura
+do peito, e nada de manipulador agarrado a uma peça. A broca, a salva e o feixe
+são **montagens do chassi** — não são o que as mãos dele seguram.
+
+O que muda com o encontro não é quantos braços ele tem; é **quanto da luta cabe
+a eles**. Com as três ferramentas montadas, o trabalho de matar é delas: de
+perto ele só empurra com o corpo, e os braços ficam ao lado. Cada ferramenta
+arrancada devolve atenção e torque às mãos. Com os três encaixes vazios, o que
+sobra de uma escavadeira sem ferramentas é um corpo de três toneladas que só
+sabe socar.
+
+| Ferramentas fora | Ainda montadas      | O que ele faz de perto | Golpe    | Velocidade |
+| ---------------- | ------------------- | ---------------------- | -------- | ---------- |
+| 0                | broca, salva, feixe | esbarrão do corpo      | 28       | 1,50       |
+| 1                | salva, feixe        | **soco**               | 34,5     | 1,95       |
+| 2                | feixe               | soco mais rápido       | 49,4     | 2,40       |
+| 3                | nenhuma             | soco, e só             | **66,7** | **2,85**   |
+
+- **O soco** (`pummel`) só existe a partir do primeiro degrau e divide o relógio
+  com o esbarrão — nunca os dois no mesmo tick. Por degrau ele encurta o aviso
+  (14 → 11 → 8 ticks), aperta a cadência (20 → 16 → 12) e pesa mais (30 → 38 →
+  46, ainda vezes o frenesi). O braço estendido alcança 0,55 tile além dos dois
+  corpos, e o alcance é conferido no **release**: sair durante o aviso é a
+  resposta inteira do golpe.
+- **A velocidade** sobe 30% da base por ferramenta arrancada: sem nada para
+  carregar, a escavadeira é só chassi e motor. Contra os 4,6 do Prospector a
+  fuga continua existindo nos quatro degraus — o que muda é o preço de errar o
+  espaçamento. Não poder fugir seria outro jogo; ter de **merecer** a fuga é
+  este.
+- **A vida** vai a 1400 (era 880): o quarto ato não existia quando 880 foi
+  escolhido.
+
+Um piso obrigatório: o soco do **primeiro** degrau já tem de doer mais que o
+esbarrão que ele substitui. Na primeira medição doía menos (20,7 contra 28) — e
+arrancar a primeira ferramenta deixava o chefe mais fraco de perto, o contrário
+do que arrancar uma ferramenta significa. O piso vale no número cru, e não no
+que o frenesi faz com ele: invariante que depende de outro sistema estar ligado
+não é invariante.
+
+**O braço, do lado de quem vê** (`part-diamandis-arm`, sob demanda): um atlas
+para os dois lados, desenhado no ombro de cada um — `armLeft` e `armRight`,
+mesmo `y`, mesmo `z`, `x` oposto. A primeira versão tinha **três**, um por
+ferramenta, com o terceiro na frente do corpo e a mão fechada em volta da peça
+que operava; lia errado de duas maneiras. Um braço no meio da frente não lê como
+braço, e um ombro que nasce onde a ferramenta está montada faz a ferramenta
+parecer parte do braço. A cadeia agora é a de um humanoide: ombro, braço,
+cotovelo, antebraço e punho fechado — não há garra, porque não há nada para
+segurar.
+
+Três poses, e nenhuma delas fala de ferramenta: `idle` o braço **pendurado reto
+ao lado do corpo** enquanto a máquina ainda trabalha com o que tem montado,
+`special` a **guarda** de quem já perdeu ferramenta e vai bater com as mãos (um
+quadro só, segurada — o que se move entre um soco e outro é o chassi), e
+`attack` o soco em quatro quadros.
+
+O soco **nunca arma para trás**, e isso é projeção e não gosto: em isométrica o
+que anda para trás anda para **dentro** do corpo, e um aviso que esconde o punho
+atrás do chassi não é um aviso. A primeira versão armava para trás e o punho
+sumia justamente no quadro que o jogador precisa ler. Aqui o braço arma para
+**cima e um pouco à frente** — o punho junto do peito, seguível — e o golpe
+**desce e sai**: as duas pontas ficam fora da silhueta. O punho é a peça mais
+clara da cadeia pelo mesmo motivo. Os dois lados dividem o mesmo relógio de
+propósito: braços de uma mesma máquina se movem juntos, e um defasado leria como
+avaria. O chassi não mudou de quadro nenhum.
+
+![os braços e o soco: guarda, armar, impacto](../media/diamandis/31-bracos-e-soco.png)
+
+![as poses do braço em três rumos: montado, guarda e os quatro quadros do soco](../media/diamandis/32-braco-poses.png)
+
+**A batida é um evento separado do golpe.** `boss_attack` é o braço **descendo**,
+e ele desce igual quando o soco pega e quando o jogador sai da faixa durante o
+aviso — o alcance só é conferido no release. Então o clarão, o estilhaço, o
+tremor e o som moram num `boss_state: 'pummel_hit'` que só nasce quando o dano
+nasce, com o ponto **no alvo** e o degrau em `intensity`. É a mesma separação que
+a broca já fazia com `drill_strike`, e sem ela quem escapa leva a apresentação
+inteira de ter apanhado — que é exatamente o contrário do que a esquiva
+significa.
+
+**No áudio**: `diamandisPummelRaise` é o servo hidráulico levantando o braço (o
+aviso), e `diamandisPummelHit` é a chapa chegando — subgrave de massa mais três
+parciais metálicos, escalado pelo degrau, porque o soco do primeiro não pode
+soar como o do último. Não é a broca na pedra: ali quem se machuca é a rocha,
+aqui quem se machuca também é a máquina.
+
+Cenário da arena: **desarmado: o soco**.
+
 ## Devorador Branco — o chão é que decide
 
 O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda

@@ -75,6 +75,7 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   contact: 'telegraphCharge',
   charge: 'telegraphCharge',
   detonate: 'telegraphDetonate',
+  pummel: 'telegraphSlam',
   slam: 'telegraphSlam',
   // O eletroima do Coveiro usa a voz do ARREMESSO, e nao a do golpe: as duas
   // acoes dizem "sai da linha", e o que vem depois do zumbido nao e um corpo
@@ -147,6 +148,7 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
     drill: 'diamandisDrillEngage',
     demolish: 'diamandisChargeArmed',
     beam: 'diamandisBeamScan',
+    pummel: 'diamandisPummelRaise',
   },
   white_devourer: { erupt: 'devourerEmergeWarning' },
   archcantor: { song: 'archcantorPhrase' },
@@ -180,6 +182,7 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   drill: 'telegraphCharge',
   demolish: 'telegraphDetonate',
   beam: 'telegraphHurl',
+  pummel: 'telegraphSlam',
   erupt: 'telegraphCharge',
   maw: null,
   song: 'telegraphPulse',
@@ -271,6 +274,11 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
     drill_impact: 'diamandisDrillWall',
     drill_skid: 'diamandisDrillSkid',
     drill_strike: 'diamandisDrillStrike',
+    // A chapa chegando. Mora aqui pela MESMA regra da broca declarada acima: o
+    // `boss_attack` do soco e o braco descendo, e ele desce igual quando o
+    // jogador escapa. Um som de impacto em cima de uma esquiva limpa e a pior
+    // mentira que o audio pode contar.
+    pummel_hit: 'diamandisPummelHit',
   },
 };
 
@@ -489,8 +497,10 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       const scale =
         ev.state === 'resonance'
           ? 0.55 + 0.45 * (ev.intensity ?? 1)
-          : // A batida da broca pesa o que a velocidade pesava.
-            ev.state === 'drill_impact' || ev.state === 'drill_strike'
+          : // A batida da broca pesa o que a velocidade pesava, e a do soco o
+            // degrau que ele cobra: o soco do primeiro degrau nao pode soar
+            // como o do ultimo, porque nao cobra como ele.
+            ev.state === 'drill_impact' || ev.state === 'drill_strike' || ev.state === 'pummel_hit'
             ? 0.6 + 0.4 * (ev.intensity ?? 1)
             : 1;
       return [{ voice, x: ev.x, y: ev.y, scale }];

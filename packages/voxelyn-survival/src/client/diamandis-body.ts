@@ -51,6 +51,20 @@ export const diamandisPartAtlas = (module: number): string | null => {
   return name ? `part-diamandis-${name}` : null;
 };
 
+/**
+ * O atlas do BRACO — um so para os dois lados. Nao entra em
+ * `DIAMANDIS_PART_NAMES` porque nao e um modulo: nao solta, nao e carregado
+ * por Coveiro e nao cai no chao. Ele nunca sai do corpo.
+ */
+export const DIAMANDIS_ARM_ATLAS = 'part-diamandis-arm';
+
+/**
+ * Os dois OMBROS, um em cada lado do deck. Nao tem relacao com os encaixes das
+ * ferramentas: a broca, o rack e o mastro sao montagens do chassi, e os bracos
+ * sao os bracos de um humanoide — dois, laterais, simetricos, sempre ali.
+ */
+export const DIAMANDIS_ARM_SOCKETS: readonly string[] = ['armLeft', 'armRight'];
+
 export type DiamandisPartState = 'mounted' | 'loose' | 'gone';
 
 /** O estado de uma peca a partir dos dois bitmasks autoritativos. */
@@ -188,6 +202,38 @@ export type ComposeArgs = {
    * inicio e fim, e por isso nao pode vir do relogio da pose.
    */
   drillFrame?: number;
+  /** O atlas do BRACO; `null` enquanto nao carregou. */
+  arm?: SpriteManifestEntry | null;
+  /**
+   * O quadro do SOCO, quando ha um em curso (ver `pummelArmFrame`). Sem ele os
+   * bracos ficam na guarda (`special`) enquanto o chefe ja luta com as maos.
+   */
+  pummelFrame?: number;
+};
+
+/** Quantos quadros tem o soco do braco. */
+export const ARM_SWING_FRAMES = 4;
+
+/**
+ * O quadro do braco durante um SOCO, pelo relogio da acao autoritativa.
+ *
+ * Os dois primeiros quadros sao o aviso (o punho arma para tras e para cima) e
+ * ocupam o windup inteiro, seja ele de 8 ou de 14 ticks — o soco do ultimo
+ * degrau avisa menos TEMPO, e nao com menos quadros. Os dois ultimos sao a
+ * descida, e caem no release: e o instante em que a simulacao cobra o dano.
+ */
+export const pummelArmFrame = (
+  action: { kind: string; startedAt: number; releaseAt: number; endsAt: number } | undefined,
+  tick: number,
+): number | undefined => {
+  if (!action || action.kind !== 'pummel') return undefined;
+  if (tick < action.releaseAt) {
+    const span = Math.max(1, action.releaseAt - action.startedAt);
+    return (tick - action.startedAt) / span < 0.55 ? 0 : 1;
+  }
+  const span = Math.max(1, action.endsAt - action.releaseAt);
+  const after = (tick - action.releaseAt) / span;
+  return after < 0.5 ? 2 : 3;
 };
 
 /**
@@ -236,6 +282,50 @@ export const composeDiamandisParts = (args: ComposeArgs): DiamandisPartDraw[] =>
       depth: socket.depth,
     });
   }
+  // OS BRACOS: dois, um por ombro, e sempre desenhados. Nao nascem e nao caem
+  // — o que muda neles e a POSTURA.
+  //
+  // Com ferramenta montada eles pendem retos ao lado do corpo (`idle`): a
+  // maquina esta ocupada matando com a broca, o rack e o mastro, e de perto ela
+  // empurra com o corpo. A partir da primeira ferramenta arrancada a luta passa
+  // para as maos, e os bracos sobem para a guarda (`special`) ou descem o soco
+  // (`attack`, no relogio da acao autoritativa).
+  //
+  // Os dois lados dividem o mesmo relogio de guarda de proposito: bracos de uma
+  // mesma maquina se movem juntos, e um defasado leria como avaria.
+  if (args.arm) {
+    const manifest = args.arm;
+    const fighting = args.lost !== 0;
+    const anim = !fighting ? 'idle' : args.pummelFrame !== undefined ? 'attack' : 'special';
+    const frame =
+      fighting && args.pummelFrame !== undefined
+        ? args.pummelFrame
+        : frameAtTime(manifest, anim, args.nowMs);
+    for (let i = 0; i < DIAMANDIS_ARM_SOCKETS.length; i++) {
+      const socket = socketScreenPoint(
+        args.chassis,
+        dir,
+        DIAMANDIS_ARM_SOCKETS[i],
+        args.footX,
+        args.footY,
+        args.zoom,
+      );
+      if (!socket) continue;
+      out.push({
+        // Negativo: um braco NAO e um modulo, e este campo e o indice de
+        // modulo em todo o resto da lista.
+        module: -1 - i,
+        atlas: DIAMANDIS_ARM_ATLAS,
+        anim,
+        frame,
+        x: socket.x,
+        y: socket.y,
+        behind: socket.depth < 0,
+        depth: socket.depth,
+      });
+    }
+  }
+
   out.sort((a, b) => (a.behind !== b.behind ? (a.behind ? -1 : 1) : a.depth - b.depth));
   return out;
 };

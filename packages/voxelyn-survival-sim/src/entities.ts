@@ -179,6 +179,15 @@ import {
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
   DIAMANDIS_BEAM_DAMAGE,
   DIAMANDIS_BEAM_LENGTH,
+  DIAMANDIS_BEAM_MIN_RANGE,
+  DIAMANDIS_FRENZY_SPEED_PER_MODULE,
+  DIAMANDIS_PUMMEL_COOLDOWN_PER_STAGE,
+  DIAMANDIS_PUMMEL_COOLDOWN_TICKS,
+  DIAMANDIS_PUMMEL_DAMAGE,
+  DIAMANDIS_PUMMEL_DAMAGE_PER_STAGE,
+  DIAMANDIS_PUMMEL_REACH,
+  DIAMANDIS_PUMMEL_WINDUP_PER_STAGE,
+  DIAMANDIS_PUMMEL_WINDUP_TICKS,
   DIAMANDIS_BEAM_STEP,
   DIAMANDIS_BEAM_WINDUP_TICKS,
   DIAMANDIS_DEMOLISH_CHARGES,
@@ -1271,6 +1280,7 @@ export const spawnEnemy = (
     elite,
     nextActionAt: 0,
     contactReadyAt: 0,
+    beamReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
     alertedUntil: 0,
@@ -1457,6 +1467,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
     case 'drill':
     case 'demolish':
     case 'beam':
+    case 'pummel':
     case 'freeze':
     case 'massive_shock':
       return action;
@@ -1894,6 +1905,34 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
         kind: 'enemy_contact',
         archetype: enemy.archetype as EnemyArchetype,
         elite: enemy.elite,
+      });
+    }
+  } else if (action.kind === 'pummel' && target) {
+    // O braco alcanca alem dos dois corpos, e e conferido no RELEASE: sair do
+    // alcance durante o aviso e a resposta inteira do golpe.
+    const stage = diamandisPummelStage(state);
+    if (distTo(enemy, target) < enemy.radius + target.radius + DIAMANDIS_PUMMEL_REACH) {
+      const profile = diamandisPummelProfile(Math.max(1, stage));
+      damageEntity(state, target, profile.damage * diamandisFrenzyMultiplier(state), events, {
+        kind: 'enemy_contact',
+        archetype: 'diamandis',
+        elite: enemy.elite,
+      });
+      // A BATIDA, e so quando ela existe. O `boss_attack` que ja saiu no topo
+      // deste release e o golpe DESCENDO — ele sai igual num acerto e numa
+      // esquiva, porque o braco desce nos dois casos. Pendurar o clarao, o
+      // estilhaco e o tremor nele daria ao jogador que escapou a apresentacao
+      // inteira de ter apanhado. E a mesma separacao que a broca ja faz com
+      // `drill_strike`.
+      events.push({
+        t: 'boss_state',
+        archetype: 'diamandis',
+        state: 'pummel_hit',
+        x: target.x,
+        y: target.y,
+        dx: action.direction.x,
+        dy: action.direction.y,
+        intensity: Math.max(1, stage) / DIAMANDIS_MODULE_COUNT,
       });
     }
   } else if (action.kind === 'hurl') {
@@ -7037,6 +7076,40 @@ export const diamandisFrenzyMultiplier = (state: SurvivalState): number =>
   Math.min(DIAMANDIS_FRENZY_CAP, 1 + DIAMANDIS_FRENZY_PER_MODULE * diamandisFrenzyStacks(state));
 
 /**
+ * O DEGRAU DO SOCO, 0..3: quantas ferramentas ja foram arrancadas.
+ *
+ * E o mesmo numero dos modulos perdidos, lido pelo outro lado. Existe com nome
+ * proprio porque decide outra coisa — nao o dano de tudo (isso e o frenesi), e
+ * sim se o chefe ja LUTA COM AS MAOS e com que peso elas caem. Zero e a
+ * maquina inteira, que mata com as ferramentas e so empurra de perto.
+ */
+export const diamandisPummelStage = (state: SurvivalState): number => diamandisFrenzyStacks(state);
+
+/**
+ * O quanto o chassi anda mais rapido por ferramenta arrancada. Sem nada para
+ * carregar e operar, a maquina e so motor — e e isso que fecha a distancia no
+ * ultimo ato.
+ */
+export const diamandisFrenzySpeedMultiplier = (state: SurvivalState): number =>
+  1 + DIAMANDIS_FRENZY_SPEED_PER_MODULE * diamandisPummelStage(state);
+
+/** O que o soco cobra, quanto ele demora a sair e de quanto em quanto, por degrau. */
+export const diamandisPummelProfile = (
+  stage: number,
+): { damage: number; windup: number; cooldown: number } => {
+  const n = Math.max(1, Math.min(DIAMANDIS_MODULE_COUNT, Math.floor(stage)));
+  const extra = n - 1;
+  return {
+    damage: DIAMANDIS_PUMMEL_DAMAGE + DIAMANDIS_PUMMEL_DAMAGE_PER_STAGE * extra,
+    windup: Math.max(4, DIAMANDIS_PUMMEL_WINDUP_TICKS - DIAMANDIS_PUMMEL_WINDUP_PER_STAGE * extra),
+    cooldown: Math.max(
+      10,
+      DIAMANDIS_PUMMEL_COOLDOWN_TICKS - DIAMANDIS_PUMMEL_COOLDOWN_PER_STAGE * extra,
+    ),
+  };
+};
+
+/**
  * O ARRANQUE de um modulo — o unico caminho pelo qual `modulesLost` ganha um
  * bit. Usado pelo release do `haul` do Coveiro e pela Arena.
  *
@@ -7745,12 +7818,30 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       def.speed *
       (enemy.elite ? 1.12 : 1) *
       surfaceSpeedMul(state, enemy) *
-      (enemy.archetype === 'scoriac' && enemy.mood === SCORIAC_HOT ? SCORIAC_HOT_SPEED_SCALE : 1);
+      (enemy.archetype === 'scoriac' && enemy.mood === SCORIAC_HOT ? SCORIAC_HOT_SPEED_SCALE : 1) *
+      // O Diamandis ANDA MAIS por ferramenta perdida: ver
+      // `DIAMANDIS_FRENZY_SPEED_PER_MODULE`. Nao e furia, e peso — a maquina
+      // desarmada e a mesma maquina sem a carga que ela empurrava.
+      (enemy.archetype === 'diamandis' ? diamandisFrenzySpeedMultiplier(state) : 1);
 
     if (aggro && player) {
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
       dirX = toward.x;
       dirY = toward.y;
+      // O DIAMANDIS PLANTA, e nao dança em cima do alvo.
+      //
+      // Ele perseguia sem distancia de parada, e medido isso nao era "chegar
+      // perto": a distancia estabilizava em 0,03 tile — o chassi de 0,9 de raio
+      // DENTRO do Prospector — oscilando entre 0,03 e 0,05 a cada tick. E o
+      // mesmo defeito que o Devorador teve (ver DEVOURER_STALK_RANGE), com uma
+      // diferenca de temperamento: um verme espreita em orbita, uma maquina de
+      // mineracao para e martela. Ela fecha ate os corpos se ENCOSTAREM e ali
+      // fica, que e de onde o golpe de contato alcanca (`contactRange` mede
+      // 0,18 alem disto).
+      if (enemy.archetype === 'diamandis' && dist <= enemy.radius + player.radius) {
+        dirX = 0;
+        dirY = 0;
+      }
       if (enemy.archetype === 'guardian') {
         const steer = guardianSteering(state, enemy, player.x, player.y, events);
         dirX = steer.x;
@@ -7922,11 +8013,19 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       //
       //   longe  -> broca: fixa o rumo e atravessa a arena;
       //   medio  -> demolicao: marca o chao e implode;
-      //   perto  -> feixe: varre a linha e depois a energiza.
+      //   perto  -> feixe: varre a linha e depois a energiza;
+      //   colado -> CORPO: nenhuma ferramenta, o chassi (ramo generico, abaixo).
       //
       // A ordem da checagem e do mais longe para o mais perto porque as faixas
       // se sobrepoem de proposito: na borda, quem manda e o golpe que cobre o
       // espaco maior, e nunca uma escolha que dependa da ordem de leitura.
+      //
+      // A quarta faixa e a que nao esta aqui, e ela custou um defeito: o corpo
+      // e decidido DEPOIS das ferramentas, entao qualquer ferramenta que cubra
+      // ate zero o apaga. O feixe cobria 0..16 e ainda cobrava o relogio do
+      // contato (`contactReadyAt`) — resultado medido, zero socos em 400 ticks
+      // com o chefe em cima do alvo. Cada ferramenta tem relogio proprio e piso
+      // proprio justamente para a ultima faixa continuar existindo.
       if (enemy.archetype === 'diamandis') {
         const reactorDown = (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0;
         const cadence = reactorDown ? DIAMANDIS_REACTOR_CADENCE_SCALE : 1;
@@ -7990,11 +8089,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         if (
           !reactorDown &&
           hasModule(state, BOSS_MODULE_SCANNER) &&
-          state.tick >= enemy.contactReadyAt &&
+          state.tick >= enemy.beamReadyAt &&
+          dist >= DIAMANDIS_BEAM_MIN_RANGE &&
           dist <= DIAMANDIS_BEAM_LENGTH &&
           hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
         ) {
-          enemy.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+          enemy.beamReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
           startAction(
             state,
             enemy,
@@ -8006,6 +8106,34 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
             player.id,
           );
           continue;
+        }
+        // O SOCO, a quarta faixa: a mais perto de todas, e a unica que nao usa
+        // ferramenta nenhuma. So existe a partir do PRIMEIRO degrau — com as
+        // tres ferramentas montadas o trabalho de matar e delas, e de perto o
+        // que o chefe faz e empurrar com o corpo (o ramo generico acima).
+        //
+        // Divide o relogio com o contato porque E contato: sem isto o chefe
+        // socaria e esbarraria no mesmo tick, cobrando duas vezes pelo mesmo
+        // encostao. Do primeiro degrau em diante o soco vence — ele alcanca
+        // mais longe e pesa mais —, e entre um soco e outro nao ha esbarrao.
+        const stage = diamandisPummelStage(state);
+        if (stage > 0 && state.tick >= enemy.contactReadyAt) {
+          const profile = diamandisPummelProfile(stage);
+          if (dist < enemy.radius + player.radius + DIAMANDIS_PUMMEL_REACH) {
+            enemy.contactReadyAt = state.tick + profile.windup + profile.cooldown;
+            startAction(
+              state,
+              enemy,
+              'pummel',
+              toward,
+              profile.windup,
+              6,
+              events,
+              player.id,
+              stage / DIAMANDIS_MODULE_COUNT,
+            );
+            continue;
+          }
         }
       }
 

@@ -282,6 +282,7 @@ const fixtureFor = (archetype: string): GalleryFixture => {
     elite: false,
     nextActionAt: 0,
     contactReadyAt: 0,
+    beamReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
     alertedUntil: 0,
