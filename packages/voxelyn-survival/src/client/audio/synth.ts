@@ -1563,58 +1563,6 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // A BROCA COMO MAQUINA (o motor e o leito; estes sao os transientes).
   // O engate: a hidraulica do alinhamento — um sopro de valvula e o baque
   // do sistema assumindo o mancal.
-  // O BRACO SUBINDO: servo hidraulico sob carga. Uma serra que sobe depressa
-  // com um sopro pneumatico por cima — curto, porque o aviso do soco de tres
-  // bracos dura 0,4 s e ele tem de caber inteiro ali dentro.
-  diamandisPummelRaise: (ctx, out, t0, noise) => {
-    sustain(ctx, out, t0, {
-      type: 'sawtooth',
-      from: 150,
-      to: 430,
-      peak: 0.24,
-      attack: 0.16,
-      hold: 0.06,
-      release: 0.08,
-    });
-    burst(ctx, out, t0, noise, {
-      peak: 0.2,
-      decay: 0.26,
-      type: 'highpass',
-      from: 900,
-      to: 2600,
-      attack: 0.1,
-    });
-  },
-  // O SOCO chegando: massa primeiro, chapa depois. O subgrave e o peso do
-  // braco; o corpo metalico em cima e a carcaca reclamando de ter batido —
-  // nao e a broca na pedra (aquilo e rocha), aqui quem se machuca tambem e a
-  // maquina.
-  diamandisPummelHit: (ctx, out, t0, noise) => {
-    tone(ctx, out, t0, { type: 'sine', from: 130, to: 34, peak: 0.95, decay: 0.34, attack: 0.003 });
-    burst(ctx, out, t0, noise, { peak: 0.55, decay: 0.16, type: 'lowpass', from: 3200, to: 260 });
-    for (const [hz, gain] of [
-      [232, 0.16],
-      [349, 0.12],
-      [521, 0.08],
-    ] as const) {
-      tone(ctx, out, t0 + 0.008, {
-        type: 'triangle',
-        from: hz,
-        to: hz * 0.97,
-        peak: gain,
-        decay: 0.4,
-        attack: 0.002,
-      });
-    }
-    burst(ctx, out, t0 + 0.05, noise, {
-      peak: 0.18,
-      decay: 0.3,
-      type: 'bandpass',
-      from: 1800,
-      to: 700,
-      q: 1.6,
-    });
-  },
   diamandisDrillEngage: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, {
       peak: 0.3,
@@ -1786,6 +1734,58 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       from: 3200,
       to: 1800,
       q: 5,
+    });
+  },
+  // O BRACO SUBINDO: servo hidraulico sob carga. Uma serra que sobe depressa
+  // com um sopro pneumatico por cima — curto, porque o aviso do soco do ultimo
+  // degrau dura 0,4 s e ele tem de caber inteiro ali dentro.
+  diamandisPummelRaise: (ctx, out, t0, noise) => {
+    sustain(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 150,
+      to: 430,
+      peak: 0.24,
+      attack: 0.16,
+      hold: 0.06,
+      release: 0.08,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.2,
+      decay: 0.26,
+      type: 'highpass',
+      from: 900,
+      to: 2600,
+      attack: 0.1,
+    });
+  },
+  // O SOCO chegando: massa primeiro, chapa depois. O subgrave e o peso do
+  // braco; o corpo metalico em cima e a carcaca reclamando de ter batido —
+  // nao e a broca na pedra (aquilo e rocha), aqui quem se machuca tambem e a
+  // maquina.
+  diamandisPummelHit: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 130, to: 34, peak: 0.95, decay: 0.34, attack: 0.003 });
+    burst(ctx, out, t0, noise, { peak: 0.55, decay: 0.16, type: 'lowpass', from: 3200, to: 260 });
+    for (const [hz, gain] of [
+      [232, 0.16],
+      [349, 0.12],
+      [521, 0.08],
+    ] as const) {
+      tone(ctx, out, t0 + 0.008, {
+        type: 'triangle',
+        from: hz,
+        to: hz * 0.97,
+        peak: gain,
+        decay: 0.4,
+        attack: 0.002,
+      });
+    }
+    burst(ctx, out, t0 + 0.05, noise, {
+      peak: 0.18,
+      decay: 0.3,
+      type: 'bandpass',
+      from: 1800,
+      to: 700,
+      q: 1.6,
     });
   },
   // Tres bipes corporativos secos, ACELERANDO: as cargas armando.

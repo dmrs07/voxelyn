@@ -1028,6 +1028,14 @@ export type BossMoment =
   | 'drill_impact'
   | 'drill_skid'
   | 'drill_strike'
+  // Diamandis: o SOCO ACERTOU. Separado de `boss_attack` de proposito, pela
+  // mesma regra da broca: `boss_attack` e o golpe SAINDO (o braco desce), e o
+  // alcance do soco so e conferido no release — sair da faixa durante o aviso
+  // e a resposta inteira. Emitir a batida no `boss_attack` daria clarao,
+  // estilhaco, tremor e a chapa chegando em cima de uma esquiva limpa, que e
+  // exatamente o contrario do que a esquiva significa. `x,y` = o alvo,
+  // `dx,dy` = o rumo, `intensity` = o degrau do soco (1/3, 2/3, 1).
+  | 'pummel_hit'
   // Diamandis: um modulo foi ARRANCADO e a maquina entrou em frenesi (ver
   // `DIAMANDIS_FRENZY_PER_MODULE`). `intensity` e a fracao de modulos
   // perdidos (1/3, 2/3, 1): e o que o reator, a barra e a camada de pressao

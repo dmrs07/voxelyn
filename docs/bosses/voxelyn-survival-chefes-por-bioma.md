@@ -622,10 +622,20 @@ avaria. O chassi não mudou de quadro nenhum.
 
 ![as poses do braço em três rumos: montado, guarda e os quatro quadros do soco](../media/diamandis/32-braco-poses.png)
 
+**A batida é um evento separado do golpe.** `boss_attack` é o braço **descendo**,
+e ele desce igual quando o soco pega e quando o jogador sai da faixa durante o
+aviso — o alcance só é conferido no release. Então o clarão, o estilhaço, o
+tremor e o som moram num `boss_state: 'pummel_hit'` que só nasce quando o dano
+nasce, com o ponto **no alvo** e o degrau em `intensity`. É a mesma separação que
+a broca já fazia com `drill_strike`, e sem ela quem escapa leva a apresentação
+inteira de ter apanhado — que é exatamente o contrário do que a esquiva
+significa.
+
 **No áudio**: `diamandisPummelRaise` é o servo hidráulico levantando o braço (o
 aviso), e `diamandisPummelHit` é a chapa chegando — subgrave de massa mais três
-parciais metálicos. Não é a broca na pedra: ali quem se machuca é a rocha, aqui
-quem se machuca também é a máquina.
+parciais metálicos, escalado pelo degrau, porque o soco do primeiro não pode
+soar como o do último. Não é a broca na pedra: ali quem se machuca é a rocha,
+aqui quem se machuca também é a máquina.
 
 Cenário da arena: **desarmado: o soco**.
 

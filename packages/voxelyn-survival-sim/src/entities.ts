@@ -1918,6 +1918,22 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
         archetype: 'diamandis',
         elite: enemy.elite,
       });
+      // A BATIDA, e so quando ela existe. O `boss_attack` que ja saiu no topo
+      // deste release e o golpe DESCENDO — ele sai igual num acerto e numa
+      // esquiva, porque o braco desce nos dois casos. Pendurar o clarao, o
+      // estilhaco e o tremor nele daria ao jogador que escapou a apresentacao
+      // inteira de ter apanhado. E a mesma separacao que a broca ja faz com
+      // `drill_strike`.
+      events.push({
+        t: 'boss_state',
+        archetype: 'diamandis',
+        state: 'pummel_hit',
+        x: target.x,
+        y: target.y,
+        dx: action.direction.x,
+        dy: action.direction.y,
+        intensity: Math.max(1, stage) / DIAMANDIS_MODULE_COUNT,
+      });
     }
   } else if (action.kind === 'hurl') {
     if (target) {

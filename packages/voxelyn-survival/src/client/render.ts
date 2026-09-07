@@ -237,11 +237,7 @@ import {
   impactShake,
   tickFraction,
 } from './drill-machine';
-import {
-  DIAMANDIS_PUMMEL_REACH,
-  DIAMANDIS_RADIUS,
-  drillSpeedFractionAt,
-} from '@voxelyn/survival-sim';
+import { drillSpeedFractionAt } from '@voxelyn/survival-sim';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -2426,25 +2422,6 @@ export class SurvivalRenderer {
           );
           break;
         case 'boss_attack':
-          // O SOCO chegando: a garra bate a frente do chassi, e nao no centro
-          // dele. Peso pelo numero de bracos (`intensity`), que e o mesmo
-          // numero que decide o dano — quem apanha ve o golpe do tamanho que
-          // ele cobra.
-          if (ev.archetype === 'diamandis' && ev.ability === 'pummel') {
-            const power = ev.intensity ?? 1;
-            const dx = ev.dx ?? 0;
-            const dy = ev.dy ?? 0;
-            const hx = ev.x + dx * (DIAMANDIS_RADIUS + DIAMANDIS_PUMMEL_REACH);
-            const hy = ev.y + dy * (DIAMANDIS_RADIUS + DIAMANDIS_PUMMEL_REACH);
-            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
-            this.addFlash(hx, hy, 2.2 + power, 0.7 + 0.3 * power, nowMs, 200);
-            this.particles.hit(hx, hy, 'debris', 20 + 16 * power, fxScale);
-            this.particles.hit(hx, hy, 'spark', 12 + 12 * power, fxScale);
-            if (!prefersReducedMotion()) {
-              this.shake = { power: 4 + 5 * power, until: nowMs + 220 };
-            }
-            break;
-          }
           if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
             // O CONGELAMENTO: a coroa de estilhacos abrindo em volta dela, com
             // o alcance REAL da habilidade — e o clarao frio curto do lago
@@ -2642,6 +2619,22 @@ export class SurvivalRenderer {
             } else {
               this.addFlash(impact.x, impact.y, 2, 0.7, nowMs, 180);
               this.particles.hit(impact.x, impact.y, 'spark', 18, fxScale);
+            }
+          }
+          // O SOCO QUE ACERTOU. Vem por aqui, e nao pelo `boss_attack`, porque
+          // o `boss_attack` e o braco DESCENDO — ele sai igual quando o golpe
+          // pega e quando o jogador sai da faixa a tempo. O evento traz o ponto
+          // no ALVO (nada de reconstruir o alcance daqui) e o degrau do soco em
+          // `intensity`, que e o mesmo numero que decide o dano: quem apanha ve
+          // o golpe do tamanho que ele cobra.
+          if (ev.archetype === 'diamandis' && ev.state === 'pummel_hit') {
+            const power = ev.intensity ?? 1;
+            const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+            this.addFlash(ev.x, ev.y, 2.2 + power, 0.7 + 0.3 * power, nowMs, 200);
+            this.particles.hit(ev.x, ev.y, 'debris', 20 + 16 * power, fxScale);
+            this.particles.hit(ev.x, ev.y, 'spark', 12 + 12 * power, fxScale);
+            if (!prefersReducedMotion()) {
+              this.shake = { power: 4 + 5 * power, until: nowMs + 220 };
             }
           }
           break;

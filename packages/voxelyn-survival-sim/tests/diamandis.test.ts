@@ -805,6 +805,53 @@ describe('Diamandis — o soco, e os quatro degraus dele', () => {
     }
   });
 
+  it('a BATIDA so existe quando o soco pega — esquivar apaga a apresentacao', () => {
+    // `boss_attack` sai no release de todo golpe de chefe: e o braco DESCENDO,
+    // e ele desce igual num acerto e numa esquiva. Quem conta que a chapa
+    // chegou e `boss_state: 'pummel_hit'`, e ele tem de sumir junto com o dano
+    // quando o jogador sai da faixa durante o aviso. Sem esta separacao, quem
+    // escapa leva clarao, estilhaco, tremor e o som do impacto de graca.
+    const { state, boss } = duel(706, 2);
+    state.bossRuntime.modulesLost = (1 << DIAMANDIS_MODULE_COUNT) - 1;
+    state.tick += 1;
+    state.player.hp = 100000;
+    state.player.maxHp = 100000;
+    let swings = 0;
+    let hits = 0;
+    let damaged = 0;
+    let hp = state.player.hp;
+    let fled = false;
+    for (let t = 0; t < 260; t++) {
+      // Na metade da luta o alvo passa a estar SEMPRE fora do alcance no
+      // instante do release: dali em diante nenhuma batida pode nascer.
+      if (t === 130) fled = true;
+      if (fled) {
+        state.player.x = boss.x + 30;
+        state.player.y = boss.y + 30;
+      }
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_attack' && ev.ability === 'pummel') swings++;
+        if (ev.t === 'boss_state' && ev.state === 'pummel_hit') {
+          hits++;
+          expect(fled, 'batida depois da esquiva').toBe(false);
+          // A batida aponta para o ALVO, e nao para o centro do chassi: o
+          // cliente desenha o clarao onde o evento manda.
+          expect(Math.hypot(ev.x - state.player.x, ev.y - state.player.y)).toBeLessThan(1);
+          expect(ev.intensity).toBeCloseTo(1);
+        }
+      }
+      if (state.player.hp < hp) {
+        damaged++;
+        hp = state.player.hp;
+      }
+    }
+    expect(swings, 'nenhum soco saiu').toBeGreaterThan(0);
+    expect(hits, 'nenhuma batida na primeira metade').toBeGreaterThan(0);
+    // Uma batida por golpe que cobrou dano, nem uma a mais.
+    expect(hits).toBe(damaged);
+    expect(hits).toBeLessThan(swings);
+  });
+
   it('sem ferramenta para carregar ele ANDA MAIS — e mesmo assim da para fugir', () => {
     const { state } = duel(705, 8);
     let last = 0;

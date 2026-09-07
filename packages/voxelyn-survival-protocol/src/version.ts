@@ -217,7 +217,19 @@
 //     ramo generico de ataque para as tres acoes e desenharia o chefe inteiro
 //     de pe enquanto a sim o tem submerso e intocavel; cliente novo contra
 //     servidor antigo nunca receberia a marca nem o `medium`.
-export const PROTOCOL_VERSION = 32;
+// 33: O SOCO DO DIAMANDIS entra no wire. Uma acao nova no enum
+//     (`pummel`, que viaja em `ActionSnapshot.kind`), a mesma chave em
+//     `BossAbility` (`boss_windup`/`boss_attack`) e um `BossMoment` novo,
+//     `pummel_hit` — a batida, separada do golpe descendo pela mesma regra
+//     que a broca ja seguia. Cliente antigo contra servidor novo recebe as
+//     tres como valores desconhecidos: nenhum aviso sonoro, nenhum braco
+//     armando e nenhuma batida, num golpe que tira 66,7 com 0,4 s de aviso —
+//     o silencio exatamente onde a resposta do jogador mora. Cliente novo
+//     contra servidor antigo nunca recebe nenhuma delas e desenha os bracos
+//     parados enquanto apanha. E o mesmo caso da entrada 18 (`leap`) e da 32
+//     (`probe`/`dive`/`emerge`), e o bump transforma os dois em recusa no
+//     handshake.
+export const PROTOCOL_VERSION = 33;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -941,17 +953,19 @@ export const PROTOCOL_VERSION = 32;
 //     os corpos se encostam, em vez de vibrar dentro do Prospector a 0,03
 //     tile. Quando o chefe fere e quanto ele anda mudaram: um replay de 62 nao
 //     bate.
-// 64: OS BRACOS DO DIAMANDIS, e a luta que passa a ter QUATRO atos. Os tres
-//     bracos manipuladores sempre existiram e sempre estiveram ocupados — um
-//     por ferramenta —, e e por isso que a maquina nunca socou ninguem de
-//     posse das tres. Arrancar uma ferramenta LIBERA a mao que a segurava: o
-//     `pummel` (soco) so existe com braco livre, e por braco ele encurta o
-//     aviso, aperta a cadencia e pesa mais (18/24/30, ainda vezes o frenesi).
-//     O chassi tambem ANDA MAIS a cada braco (+30% da base por modulo: 1,5 ->
-//     2,85), entao o ultimo ato fecha distancia — contra 4,6 do Prospector, a
-//     fuga continua possivel e passa a ser merecida. `DIAMANDIS_HP` 880 ->
-//     1400 para o quarto ato caber. Dano, alcance e velocidade do chefe
-//     mudaram: um replay de 63 nao bate.
+// 64: O SOCO DO DIAMANDIS, e a luta que passa a ter QUATRO atos. A maquina
+//     tem dois bracos, um de cada lado, desde o primeiro segundo — o que muda
+//     com o encontro nao e quantos ela tem, e sim QUANTO DA LUTA cabe a eles.
+//     Com as tres ferramentas montadas o trabalho de matar e delas e de perto
+//     ele so empurra com o corpo; cada ferramenta arrancada e um DEGRAU
+//     (`diamandisPummelStage`, 0..3) que devolve a briga as maos. O `pummel`
+//     so existe do primeiro degrau em diante, e por degrau encurta o aviso
+//     (14 -> 11 -> 8 ticks), aperta a cadencia (20 -> 16 -> 12) e pesa mais
+//     (30 -> 38 -> 46, ainda vezes o frenesi). O chassi tambem ANDA MAIS por
+//     degrau (+30% da base: 1,5 -> 2,85), entao o ultimo ato fecha distancia —
+//     contra 4,6 do Prospector, a fuga continua possivel e passa a ser
+//     merecida. `DIAMANDIS_HP` 880 -> 1400 para o quarto ato caber. Dano,
+//     alcance e velocidade do chefe mudaram: um replay de 63 nao bate.
 export const SIMULATION_VERSION = 64;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
