@@ -188,6 +188,12 @@ export const CHARACTER_SPRITE_IDS = [
   // nenhuma para eles, e a colisao continua sendo so a da cabeca. Os quadros
   // sao POSTOS na fila, do mais grosso ao mais fino, e nao instantes.
   'part-white-devourer-coil',
+  // A CRATERA DA BOCA do Devorador. `part-` pela mesma razao — nao anda nem
+  // morre —, e atlas separado porque o QUADRO e outro: a cratera e larga e
+  // baixa, o verme e alto e estreito, e enquanto os dois dividiam um atlas todo
+  // quadro do corpo pagava a largura da cratera. Separa-los foi o que coube os
+  // oito rumos do corpo dentro do orcamento de boot.
+  'part-white-devourer-maw',
   // A NINHADA do Devorador. Mesmo prefixo e mesma razao: nao e um bicho com
   // repertorio, e uma peca com variantes. Os quadros sao (variante x fase) e o
   // cliente escolhe os dois eixos — a variante pelo id do filhote, a fase pelo

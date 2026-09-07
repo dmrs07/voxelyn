@@ -51,6 +51,7 @@ import diamandisArmManifest from '@voxelyn/survival-content/assets/atlases/part-
 import { DIAMANDIS_ARM_ATLAS } from './diamandis-body';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import devourerCoilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
+import devourerMawManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-maw.json';
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
 import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
@@ -124,6 +125,7 @@ import diamandisMastUrl from '@voxelyn/survival-content/assets/atlases/part-diam
 import diamandisArmUrl from '@voxelyn/survival-content/assets/atlases/part-diamandis-arm.png?url';
 import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
 import devourerCoilUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.png?url';
+import devourerMawUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-maw.png?url';
 import broodUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.png?url';
 import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
 import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
@@ -179,6 +181,7 @@ import enemySulfurBomberNormalUrl from '@voxelyn/survival-content/assets/atlases
 import enemyUndertakerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.normal.png?url';
 import enemyWhiteDevourerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.normal.png?url';
 import partWhiteDevourerCoilNormalUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.normal.png?url';
+import partWhiteDevourerMawNormalUrl from '@voxelyn/survival-content/assets/atlases/part-white-devourer-maw.normal.png?url';
 import partDevourerBroodNormalUrl from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.normal.png?url';
 import layerPlayerProspectorGunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.normal.png?url';
 import layerPlayerProspectorLowerNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.normal.png?url';
@@ -225,6 +228,7 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
   'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
   'part-white-devourer-coil.normal.png': partWhiteDevourerCoilNormalUrl,
+  'part-white-devourer-maw.normal.png': partWhiteDevourerMawNormalUrl,
   'part-devourer-brood.normal.png': partDevourerBroodNormalUrl,
   'layer-player-prospector-gun.normal.png': layerPlayerProspectorGunNormalUrl,
   'layer-player-prospector-lower.normal.png': layerPlayerProspectorLowerNormalUrl,
@@ -603,6 +607,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: diamandisManifest as unknown as SpriteManifestEntry, url: diamandisUrl },
   { manifest: devourerManifest as unknown as SpriteManifestEntry, url: devourerUrl },
   { manifest: devourerCoilManifest as unknown as SpriteManifestEntry, url: devourerCoilUrl },
+  { manifest: devourerMawManifest as unknown as SpriteManifestEntry, url: devourerMawUrl },
   { manifest: broodManifest as unknown as SpriteManifestEntry, url: broodUrl },
   { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
   { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
@@ -673,6 +678,21 @@ const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string 
  * que existe um bicho a mais no jogo.
  */
 export const DEVOURER_COIL_ATLAS = 'part-white-devourer-coil';
+
+/** O atlas da CRATERA da boca — as duas poses de chao do Devorador. */
+export const DEVOURER_MAW_ATLAS = 'part-white-devourer-maw';
+
+/**
+ * Poses cujo quadro mora em OUTRO atlas, por arquetipo.
+ *
+ * Existe uma entrada so, e ela paga os oito rumos do Devorador: ver
+ * `spriteForAnimation`. Nao e um mecanismo de proposito geral esperando uso —
+ * e a resposta a um caso em que duas poses do mesmo bicho tem geometrias
+ * incompativeis e o contrato de atlas so admite um quadro por sprite.
+ */
+export const ANIM_ATLAS_OVERRIDE: Record<string, Record<string, string>> = {
+  white_devourer: { downed: DEVOURER_MAW_ATLAS, burst: DEVOURER_MAW_ATLAS },
+};
 
 /**
  * O atlas da NINHADA do Devorador.
@@ -1370,6 +1390,30 @@ export class SpriteBank {
     return id ? this.get(id) : null;
   }
 
+  /**
+   * O atlas deste arquetipo NESTA pose.
+   *
+   * Quase sempre e o do arquetipo e ponto. A excecao e o Devorador: a cratera
+   * da boca (`downed`/`burst`) tem atlas proprio porque o quadro dela e outro —
+   * larga e baixa, contra o quadro alto do verme (ver `devourerFrame` no
+   * gerador). Enquanto os dois moravam no mesmo atlas, todo quadro do corpo
+   * pagava a largura da cratera, e era isso que impedia os oito rumos.
+   *
+   * A troca acontece AQUI, e nao no renderer: o cliente continua pedindo
+   * `downed`/`burst` do `white_devourer` como sempre pediu, e quem sabe que o
+   * quadro mora noutro lugar e o banco. Se o atlas da cratera ainda nao chegou,
+   * cai no do arquetipo — que nao tem a pose e desenha nada, o mesmo que
+   * acontecia com qualquer atlas em voo.
+   */
+  spriteForAnimation(archetype: string, animation: string): Loaded | null {
+    const override = ANIM_ATLAS_OVERRIDE[archetype]?.[animation];
+    if (override) {
+      const loaded = this.get(override);
+      if (loaded) return loaded;
+    }
+    return this.spriteForArchetype(archetype);
+  }
+
   drawEntity(
     ctx: CanvasRenderingContext2D,
     archetype: string,
@@ -1398,7 +1442,7 @@ export class SpriteBank {
     }
 
     if (typeof animation !== 'string') animation = animation.upper.animation;
-    const loaded = this.spriteForArchetype(archetype);
+    const loaded = this.spriteForAnimation(archetype, animation);
     if (!loaded) return false;
     this.drawLoadedFrame(
       ctx,

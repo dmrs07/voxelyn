@@ -3546,8 +3546,22 @@ const diamandisPartFrame = (part) => (dir, anim, f) => {
   const fr = DIAMANDIS_PART_FRAMES[part];
   return renderVoxels(diamandisPartModel(part, anim, f), DIR_INDEX[dir], fr.w, fr.h, fr.ax, fr.ay);
 };
+// O DEVORADOR EM DOIS ATLAS, e a razao e o tamanho do quadro.
+//
+// O corpo do verme (cabeca e colar — o resto sao os aneis do rastro) ocupa
+// 92x114. A CRATERA DA BOCA (`downed`/`burst`) ocupa 148x99: larga e baixa,
+// porque e um buraco no chao visto de cima. Num atlas so, o quadro tem de caber
+// a cratera — e os 100 quadros que sao apenas o verme pagavam por ela. Medido:
+// 156x152 por quadro, 13,57 MiB de boot em quatro rumos.
+//
+// Separados, cada um tem o quadro do que ele e, e e isso que paga os OITO
+// RUMOS: corpo em oito a 100x122 mais cratera em quatro a 156x106 dao 12,34
+// MiB — menos que os quatro rumos de antes.
 const devourerFrame = (dir, anim, f) =>
-  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 152, 76, 104);
+  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 100, 122, 48, 95);
+// A cratera guarda o x da ancora antiga (76): ela cai no mesmo ponto da tela.
+const devourerMawFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 156, 106, 76, 57);
 const archcantorFrame = (dir, anim, f) =>
   renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
 // O quadro da cabeca e o menor que enquadra as quatro rotacoes com 2px de
@@ -4148,20 +4162,51 @@ export const ENTITY_SPECS = [
     ),
     noFit: true,
   }),
+  // O CORPO do Devorador, em OITO rumos. As poses de chao (a cratera da boca)
+  // moraram aqui ate a separacao — ver `devourerFrame` para o porque e para a
+  // conta. Sem elas, o quadro deste atlas e o do verme e mais nada.
+  eightWay(
+    base(
+      'enemy-white-devourer',
+      100,
+      122,
+      48,
+      95,
+      { w: 3.1, h: 1.7 },
+      { w: 2.8, h: 2.2, offsetX: 0, offsetY: 0 },
+      {
+        ...living,
+        special: { frames: 4, fps: 10, loop: false },
+      },
+      devourerFrame,
+      'voxel-isometric pale silica worm boss in eight facings, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks',
+      4,
+    ),
+  ),
+  // A CRATERA DA BOCA. Atlas proprio, e `part-` e nao `enemy-` pela mesma razao
+  // do anel de corpo: a validacao cobra de todo `enemy-` o conjunto de uma
+  // criatura, e uma cratera nao anda nem morre.
+  //
+  // QUATRO rumos, enquanto o corpo tem oito, e isto e escolha e nao descuido.
+  // Ela e um buraco no chao visto de cima: o rumo dela le fraco, e cada rumo a
+  // mais custa 0,76 MiB de boot num quadro deste tamanho. O corpo — que o
+  // jogador ve andando, atacando e virando — leva os oito.
+  //
+  // Os nomes dos slots seguem os do contrato de criatura de proposito: o
+  // cliente escolhe `downed`/`burst` e o banco troca o ATLAS por baixo, sem
+  // traduzir nome nenhum (ver ANIM_ATLAS_OVERRIDE em sprites.ts).
   base(
-    'enemy-white-devourer',
+    'part-white-devourer-maw',
     156,
-    152,
+    106,
     76,
-    104,
+    57,
     { w: 3.1, h: 1.7 },
     { w: 2.8, h: 2.2, offsetX: 0, offsetY: 0 },
     {
-      ...living,
-      special: { frames: 4, fps: 10, loop: false },
       // `downed` e a BOCA ABERTA, e nao a morte: o Devorador e o unico inimigo
-      // que usa este slot em vida. O nome do slot ja existia no contrato de atlas
-      // e significa exatamente isto — "no chao, vulneravel".
+      // que usa este slot em vida. O nome do slot ja existia no contrato de
+      // atlas e significa exatamente isto — "no chao, vulneravel".
       //
       // Seis quadros a 11 fps, e nao quatro a 5. A 5 fps a pose respirava, e
       // respirar e calmo; o ciclo de 0,55 s com seis fases desalinhadas le como
@@ -4180,9 +4225,9 @@ export const ENTITY_SPECS = [
       // A duracao e derivada: ver DEVOURER_MAW_OPEN_FRAMES.
       burst: { frames: DEVOURER_MAW_OPEN_FRAMES, fps: 6.25, loop: false },
     },
-    devourerFrame,
-    'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor',
-    3,
+    devourerMawFrame,
+    'voxel-isometric wide ground-level crater of a worm mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor',
+    1,
   ),
   // O CORPO do Devorador, uma peca por quadro. Nao e uma criatura e nao entra
   // em `ARCHETYPE_SPRITE`: a simulacao nao tem entidade nenhuma para ele — os

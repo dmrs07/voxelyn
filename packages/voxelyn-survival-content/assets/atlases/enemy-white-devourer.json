@@ -1,20 +1,24 @@
 {
   "id": "enemy-white-devourer",
-  "version": 3,
+  "version": 4,
   "atlas": "enemy-white-devourer.png",
   "normalAtlas": "enemy-white-devourer.normal.png",
   "normalScale": 2,
-  "frameWidth": 156,
-  "frameHeight": 152,
-  "columns": 25,
-  "anchorX": 76,
-  "anchorY": 104,
-  "directions": 4,
+  "frameWidth": 100,
+  "frameHeight": 122,
+  "columns": 40,
+  "anchorX": 48,
+  "anchorY": 95,
+  "directions": 8,
   "authoredDirs": [
     "dr",
     "dl",
     "ur",
-    "ul"
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
   ],
   "flipPairs": {},
   "hitbox": {
@@ -71,16 +75,6 @@
       "frames": 4,
       "fps": 10,
       "loop": false
-    },
-    "downed": {
-      "frames": 6,
-      "fps": 11,
-      "loop": true
-    },
-    "burst": {
-      "frames": 6,
-      "fps": 6.25,
-      "loop": false
     }
   },
   "frameMap": {
@@ -90,44 +84,68 @@
       "attack": 10,
       "special": 14,
       "hit": 18,
-      "downed": 20,
-      "die": 26,
-      "burst": 31
+      "die": 20
     },
     "dl": {
-      "idle": 37,
-      "walk": 41,
-      "attack": 47,
-      "special": 51,
-      "hit": 55,
-      "downed": 57,
-      "die": 63,
-      "burst": 68
+      "idle": 25,
+      "walk": 29,
+      "attack": 35,
+      "special": 39,
+      "hit": 43,
+      "die": 45
     },
     "ur": {
-      "idle": 74,
-      "walk": 78,
-      "attack": 84,
-      "special": 88,
-      "hit": 92,
-      "downed": 94,
-      "die": 100,
-      "burst": 105
+      "idle": 50,
+      "walk": 54,
+      "attack": 60,
+      "special": 64,
+      "hit": 68,
+      "die": 70
     },
     "ul": {
-      "idle": 111,
-      "walk": 115,
-      "attack": 121,
-      "special": 125,
-      "hit": 129,
-      "downed": 131,
-      "die": 137,
-      "burst": 142
+      "idle": 75,
+      "walk": 79,
+      "attack": 85,
+      "special": 89,
+      "hit": 93,
+      "die": 95
+    },
+    "r": {
+      "idle": 100,
+      "walk": 104,
+      "attack": 110,
+      "special": 114,
+      "hit": 118,
+      "die": 120
+    },
+    "d": {
+      "idle": 125,
+      "walk": 129,
+      "attack": 135,
+      "special": 139,
+      "hit": 143,
+      "die": 145
+    },
+    "l": {
+      "idle": 150,
+      "walk": 154,
+      "attack": 160,
+      "special": 164,
+      "hit": 168,
+      "die": 170
+    },
+    "u": {
+      "idle": 175,
+      "walk": 179,
+      "attack": 185,
+      "special": 189,
+      "hit": 193,
+      "die": 195
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; maw pose is a wide ground-level crater of a mouth — five torn mandible plates peeled outward and lying back on the sand, raw red flesh exposed beneath them, two staggered rings of uneven bone teeth set in a dilating gum, tissue strands across the aperture and a dark gullet sinking into the floor",
+    "prompt": "voxel-isometric pale silica worm boss in eight facings, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks",
     "seedOrRef": "deterministic-code-v2"
   }
 }

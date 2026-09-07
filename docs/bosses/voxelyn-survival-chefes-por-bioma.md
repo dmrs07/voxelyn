@@ -798,6 +798,53 @@ matéria nova ficava literalmente **invisível**, que é o pior defeito possíve
 em que o chão é a mecânica. Agora um índice ausente cai na cor, como o comentário do
 `SURFACE_FALLBACK` sempre prometeu.
 
+### O corpo em OITO rumos, e a cratera em atlas próprio
+
+O Devorador passou a ter oito rumos, como o chassi do Diamandis e como as peças do
+Leviatã. O que destravou isso não foi orçamento novo — foi **um quadro errado**.
+
+Um atlas tem **um** tamanho de quadro para todas as poses. O corpo do verme (cabeça e
+colar; o resto são os anéis pendurados no rastro) ocupa **92×114**. A cratera da boca
+(`downed`/`burst`) ocupa **148×99** — larga e baixa, porque é um buraco no chão visto
+de cima. Com as duas no mesmo atlas, o quadro tinha de caber a cratera: **156×152**, e
+os 100 quadros que eram só o verme pagavam a largura dela. Dobrar os rumos custaria
+**+13,6 MiB** contra **0,98 MiB** de folga no teto de boot.
+
+Separados, cada um tem o quadro do que ele é:
+
+| | quadro | rumos | quadros | custo |
+| --- | --- | --- | --- | --- |
+| `enemy-white-devourer` (corpo) | 100×122 | **8** | 200 | 9,31 MiB |
+| `part-white-devourer-maw` (cratera) | 156×106 | 4 | 48 | 3,03 MiB |
+| **total** | | | | **12,34 MiB** |
+| *antes, num atlas só* | *156×152* | *4* | *148* | *13,57 MiB* |
+
+Ou seja: os oito rumos saíram **1,23 MiB mais baratos** que os quatro de antes. O boot
+caiu de 166.746.272 para 165.453.984 bytes.
+
+![o corpo do Devorador nos oito rumos](../media/devourer/34-corpo-oito-rumos.png)
+
+![a cratera da boca nos quatro rumos: abertura e espasmo](../media/devourer/35-cratera-quatro-rumos.png)
+
+**A cratera fica em quatro rumos de propósito.** Em oito ela sozinha custaria +2,9 MiB
+e estouraria a folga — e ela é um buraco no chão visto de cima, cujo rumo lê fraco. O
+corpo, que o jogador vê andando, atacando e virando, é quem leva os oito.
+
+**A troca de atlas acontece no banco, não no renderer** (`ANIM_ATLAS_OVERRIDE` em
+`sprites.ts`). O cliente continua pedindo `downed` e `burst` do `white_devourer` como
+sempre pediu; quem sabe que aquele quadro mora noutro lugar é o `SpriteBank`. A âncora
+`x` da cratera é a mesma de antes (76), então ela cai no mesmo ponto da tela.
+
+O risco fino da separação é que os dois atlas têm **contagens de rumo diferentes**.
+Quem escolhe o quadro lê `directions` do manifest **carregado**, e não do arquétipo —
+se algum dia passasse a usar `ARCHETYPE_DIRECTIONS` (agora 8 para o Devorador), a
+cratera receberia um rumo que ela não tem e sumiria da tela. Há teste para isso.
+
+Com `directions: 8` no manifest, a histerese de oito setores (`facing.ts`) liga
+sozinha: `ARCHETYPE_DIRECTIONS` é derivado do próprio atlas. O visualizador de sprites
+(`sprites.html`) ganhou os quatro rumos que faltavam no seletor — sem eles não dava
+para inspecionar nem este atlas nem o do Diamandis.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |

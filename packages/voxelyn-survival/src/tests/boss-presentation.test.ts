@@ -31,9 +31,15 @@ import {
   SURF_WATER,
 } from '@voxelyn/survival-sim';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
-import { ARCHETYPE_SPRITE, DEVOURER_BROOD_ATLAS } from '../client/sprites';
+import {
+  ANIM_ATLAS_OVERRIDE,
+  ARCHETYPE_SPRITE,
+  DEVOURER_BROOD_ATLAS,
+  DEVOURER_MAW_ATLAS,
+} from '../client/sprites';
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
+import devourerMawManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-maw.json';
 import { EntityPresentation } from '../client/presentation';
 import {
   DEVOURER_AIRBORNE,
@@ -322,31 +328,56 @@ describe('o Devorador de boca aberta troca de silhueta', () => {
     expect(reopened.elapsedMs).toBe(0);
   });
 
-  it('o atlas tem a ABERTURA, nas quatro direcoes', () => {
-    // O mesmo contrato que a pose de boca aberta ja tinha: sem o slot, o
-    // cliente cai em `idle` calado — o corpo deitado passeando pelo chao no
-    // lugar da unica janela de dano do encontro.
-    const m = devourerManifest as unknown as {
+  it('as duas poses de chao existem, nas quatro direcoes da cratera', () => {
+    // O mesmo contrato de sempre: sem os slots, o cliente cai em `idle` calado
+    // — o corpo deitado passeando pelo chao no lugar da unica janela de dano do
+    // encontro. O que mudou foi ONDE eles moram: a cratera ganhou atlas proprio
+    // quando o corpo passou a oito rumos, porque o quadro dela (larga e baixa)
+    // e o oposto do quadro do verme e os dois nao cabem num so.
+    const m = devourerMawManifest as unknown as {
       animations: Record<string, { frames: number }>;
       frameMap: Record<string, Record<string, number>>;
+      directions: number;
     };
     expect(m.animations.burst?.frames).toBeGreaterThan(1);
+    expect(m.animations.downed?.frames).toBeGreaterThan(0);
     for (const dir of ['dr', 'dl', 'ur', 'ul']) {
       expect(m.frameMap[dir].burst, `direcao ${dir} sem a abertura`).toBeTypeOf('number');
+      expect(m.frameMap[dir].downed, `direcao ${dir} sem a pose`).toBeTypeOf('number');
     }
   });
 
-  it('o atlas realmente tem a pose, e ela e a mais ALTA do bicho', () => {
-    // O contrato com o gerador: `downed` existe e e uma pose de pe. Se alguem
-    // regerar o atlas sem ela, o cliente cai em `idle` calado — que e como o
-    // defeito original se pareceria de novo.
+  it('o corpo NAO carrega mais as poses de chao — e por isso tem oito rumos', () => {
     const m = devourerManifest as unknown as {
       animations: Record<string, { frames: number }>;
-      frameMap: Record<string, Record<string, number>>;
+      directions: number;
     };
-    expect(m.animations.downed?.frames).toBeGreaterThan(0);
-    for (const dir of ['dr', 'dl', 'ur', 'ul']) {
-      expect(m.frameMap[dir].downed, `direcao ${dir} sem a pose`).toBeTypeOf('number');
-    }
+    expect(m.directions).toBe(8);
+    expect(m.animations.downed).toBeUndefined();
+    expect(m.animations.burst).toBeUndefined();
+  });
+
+  it('os dois atlas tem contagens de rumo DIFERENTES, e cada um resolve pelo seu', () => {
+    // O risco fino da separacao: o corpo declara oito rumos e a cratera quatro.
+    // Quem escolhe o quadro e `drawLoadedFrame`, que le `directions` do manifest
+    // CARREGADO — nao do arquetipo. Se algum dia ele passasse a usar
+    // `ARCHETYPE_DIRECTIONS` (agora 8 para o Devorador), a cratera receberia um
+    // rumo que ela nao tem (`r`, `d`, `l`, `u`) e sumiria da tela.
+    const corpo = devourerManifest as unknown as { directions: number };
+    const cratera = devourerMawManifest as unknown as {
+      directions: number;
+      frameMap: Record<string, unknown>;
+    };
+    expect(corpo.directions).toBe(8);
+    expect(cratera.directions).toBe(4);
+    expect(Object.keys(cratera.frameMap).sort()).toEqual(['dl', 'dr', 'ul', 'ur']);
+  });
+
+  it('o desvio de atlas leva as duas poses para a cratera', () => {
+    // A ponta que fecha o contrato: o renderer continua pedindo `downed` e
+    // `burst` do `white_devourer`, e quem sabe que o quadro mora noutro atlas e
+    // o banco. Sem esta tabela as duas poses sumiriam da tela.
+    expect(ANIM_ATLAS_OVERRIDE.white_devourer?.downed).toBe(DEVOURER_MAW_ATLAS);
+    expect(ANIM_ATLAS_OVERRIDE.white_devourer?.burst).toBe(DEVOURER_MAW_ATLAS);
   });
 });
