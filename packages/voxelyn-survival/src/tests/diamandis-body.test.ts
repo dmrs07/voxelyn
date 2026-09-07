@@ -174,6 +174,7 @@ describe('o chassi de oito rumos', () => {
       x: 100 + (socket.x - chassis.anchorX) * 2,
       y: 200 + (socket.y - chassis.anchorY) * 2,
       depth: socket.depth,
+      behind: socket.behind,
     });
     expect(socketScreenPoint(chassis, 'dr', 'nope', 0, 0, 1)).toBeNull();
     expect(socketScreenPoint(chassis, 'zz', 'drill', 0, 0, 1)).toBeNull();
@@ -214,27 +215,42 @@ describe('a composicao em volta do chassi', () => {
     expect(drawn.map((p) => p.module).sort()).toEqual([0, 2]);
   });
 
-  it('de frente (dr), a broca fica na frente do chassi e o rack atras', () => {
+  it('de frente (dr), a broca fica na frente do chassi — e o rack tambem', () => {
+    // O rack ja esteve marcado como ATRAS aqui, e este teste travava isso. Era
+    // o defeito: ele monta no alto da torre, nada do chassi fica acima dele, e
+    // mesmo assim a torre o cobria. Medido contra o rasterizador em `dr`: 445
+    // px de erro desenhando na frente contra 6946 desenhando atras.
     const drawn = compose({ facingX: 1, facingY: 0 });
     const drill = drawn.find((p) => p.module === BOSS_MODULE_DRILL)!;
     const rack = drawn.find((p) => p.module === BOSS_MODULE_TOWER)!;
     expect(drill.behind).toBe(false);
-    expect(rack.behind).toBe(true);
-    // A lista ja vem em ordem: as de tras primeiro.
-    expect(drawn.indexOf(rack)).toBeLessThan(drawn.indexOf(drill));
+    expect(rack.behind).toBe(false);
+    // A lista ja vem em ordem: as de tras primeiro, depois por profundidade.
+    const behinds = drawn.filter((p) => p.behind);
+    const fronts = drawn.filter((p) => !p.behind);
+    for (const b of behinds)
+      for (const f of fronts) expect(drawn.indexOf(b)).toBeLessThan(drawn.indexOf(f));
   });
 
-  it('de costas (ul), inverte: a broca vai para tras e o rack para a frente', () => {
+  it('de costas (ul), a broca vai para tras; o rack continua na frente', () => {
+    // So a BROCA troca de lado com o rumo — ela mora na altura do ventre, e o
+    // corpo passa mesmo na frente dela quando o chefe da as costas. O que esta
+    // no alto nao troca: nao ha rumo em que a torre fique por cima do rack.
     const drawn = compose({ facingX: -1, facingY: 0 });
     expect(drawn.find((p) => p.module === BOSS_MODULE_DRILL)!.behind).toBe(true);
     expect(drawn.find((p) => p.module === BOSS_MODULE_TOWER)!.behind).toBe(false);
   });
 
-  it('a ordem vem do manifest: atras e profundidade negativa, em todo rumo', () => {
+  it('a ordem vem do manifest, e o manifest e a autoridade em todo rumo', () => {
+    // Antes esta asserçao era `behind === depth < 0` — a regra que o gerador
+    // acabou de substituir. Ela ordena por `x + y` e ignora o `z`, entao manda
+    // para tras do corpo qualquer peca montada no alto dele. O que o cliente
+    // deve garantir e OUTRA coisa: que ele copia o lado publicado, sem
+    // recalcular nada.
     for (const [dir, [fx, fy]] of Object.entries(FACING8)) {
       for (const p of compose({ facingX: fx, facingY: fy })) {
         const socket = chassis.sockets![dir][DIAMANDIS_PART_NAMES[p.module]];
-        expect(p.behind, `${dir}.${p.module}`).toBe(socket.depth! < 0);
+        expect(p.behind, `${dir}.${p.module}`).toBe(socket.behind);
       }
     }
   });
@@ -495,5 +511,38 @@ describe('os bracos: dois, laterais, e sempre no corpo', () => {
     expect(pummelArmFrame({ kind: 'contact', startedAt: 0, releaseAt: 4, endsAt: 8 }, 2)).toBe(
       undefined,
     );
+  });
+});
+
+describe('a ordem das pecas em volta do chassi', () => {
+  it('o lado vem do manifest, e nao de um `depth < 0` recalculado', () => {
+    // O `depth` ordena as pecas ENTRE SI; quem decide o lado e o gerador, que
+    // tem o modelo. Um manifest onde os dois discordam prova que o cliente le o
+    // campo publicado — e nao deduz de novo a regra que estava errada.
+    const teimoso: SpriteManifestEntry = {
+      ...chassis,
+      sockets: { dr: { mast: { x: 10, y: 10, depth: -5, behind: false } } },
+    };
+    expect(socketScreenPoint(teimoso, 'dr', 'mast', 0, 0, 1)?.behind).toBe(false);
+  });
+
+  it('sem `behind` no manifest, o recuo continua sendo o sinal do `depth`', () => {
+    const antigo: SpriteManifestEntry = {
+      ...chassis,
+      sockets: { dr: { a: { x: 0, y: 0, depth: -1 }, b: { x: 0, y: 0, depth: 1 } } },
+    };
+    expect(socketScreenPoint(antigo, 'dr', 'a', 0, 0, 1)?.behind).toBe(true);
+    expect(socketScreenPoint(antigo, 'dr', 'b', 0, 0, 1)?.behind).toBe(false);
+  });
+
+  it('o mastro e o rack NUNCA entram atras do chassi, em rumo nenhum', () => {
+    // O defeito relatado: em `ur` o mastro sumia atras da torre. Os dois montam
+    // no alto da maquina, entao nada do chassi pode cobri-los — e o `depth`
+    // deles e quase zero, o que fazia o sinal do resto decidir.
+    for (const dir of Object.keys(chassis.sockets ?? {})) {
+      for (const name of ['mast', 'rack']) {
+        expect(chassis.sockets?.[dir]?.[name]?.behind, `${name} em ${dir}`).toBe(false);
+      }
+    }
   });
 });

@@ -119,6 +119,13 @@ const wantsNormalMap = (spec) => !spec.id.startsWith('fx-');
  * pixels do quadro FINAL, por rumo autorado: a mesma rotacao e projecao dos
  * voxels, a ancora declarada, e o deslocamento do enquadramento.
  */
+/**
+ * Abaixo disto, a profundidade de um encaixe e um EMPATE e nao um lado: o
+ * arredondamento a tres casas ja produz `0` e `-0`, que se comportam de
+ * maneiras diferentes num `< 0`.
+ */
+const SOCKET_DEPTH_EPS = 0.001;
+
 const socketsFor = (spec, shift) => {
   const out = {};
   for (const dir of spec.authoredDirs) {
@@ -126,11 +133,24 @@ const socketsFor = (spec, shift) => {
     out[dir] = {};
     for (const [name, point] of Object.entries(spec.sockets)) {
       const { sx, sy } = projectModelPoint(point.x, point.y, point.z, dirIndex);
+      const depth = Math.round(modelDepth(point.x, point.y, dirIndex) * 1000) / 1000;
       out[dir][name] = {
         x: Math.round(spec.anchorX + sx + shift.dx),
         y: Math.round(spec.anchorY + sy + shift.dy),
-        // Ordem de desenho em relacao ao chassi (ver `modelDepth`).
-        depth: Math.round(modelDepth(point.x, point.y, dirIndex) * 1000) / 1000,
+        // Profundidade em tiles: ordena as pecas ENTRE SI (ver `modelDepth`).
+        depth,
+        // A peca entra ANTES do corpo. Decidido aqui, e nao com um `depth < 0`
+        // no cliente, por duas razoes que o `depth` sozinho nao cobre:
+        //
+        // 1. Encaixe de COROA (`crown`): monta no alto da maquina, nada do
+        //    corpo fica acima, logo nada do corpo o cobre. O `depth` dele e
+        //    quase zero e o sinal do resto o mandava para tras — era o mastro
+        //    do Diamandis sumindo atras da torre em `ur`.
+        // 2. EMPATE: `x + y` igual a zero nao quer dizer "na frente". O
+        //    rasterizador desempata por `z`, e uma peca na altura do ventre
+        //    perde para o corpo. Empate vai para tras — foi o que a medicao
+        //    apontou para a broca em `r` e `l`.
+        behind: point.crown === true ? false : depth < SOCKET_DEPTH_EPS,
       };
     }
   }

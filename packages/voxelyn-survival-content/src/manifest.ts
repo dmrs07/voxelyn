@@ -16,10 +16,22 @@ export type SpriteFootprint = {
 
 /**
  * Um ENCAIXE: onde uma peca destacavel se prende ao corpo, em pixels do
- * quadro, e a profundidade dela em relacao ao centro do corpo naquele rumo
- * (positivo = mais perto da camera, entao a peca e desenhada DEPOIS do corpo).
+ * quadro, e em que ORDEM ela entra em relacao ao corpo naquele rumo.
+ *
+ * `depth` e a profundidade em tiles em relacao ao centro do corpo (positivo =
+ * mais perto da camera). Serve para ordenar as pecas ENTRE SI.
+ *
+ * `behind` e a decisao ja tomada: a peca entra antes do corpo. Existe como
+ * campo proprio porque `depth < 0` NAO responde a pergunta sozinho. O
+ * rasterizador ordena voxels por `(x + y)` e desempata por `z`; `depth` so
+ * reproduz a primeira metade. Uma peca montada no TOPO do corpo tem `x + y`
+ * quase nulo e cai do lado errado por causa do sinal do resto — o corpo passa
+ * por cima de uma peca que nada do corpo alcanca. Medido no Diamandis: o
+ * mastro e o rack (ambos no alto da torre) ficavam atras do chassi em quatro
+ * dos oito rumos. Quem sabe a resposta e o gerador, que tem o modelo; o
+ * cliente le, e nao deduz.
  */
-export type SpriteSocket = { x: number; y: number; depth?: number };
+export type SpriteSocket = { x: number; y: number; depth?: number; behind?: boolean };
 
 export type SpriteManifestEntry = {
   id: string;

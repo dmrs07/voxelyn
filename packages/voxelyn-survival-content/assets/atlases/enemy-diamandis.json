@@ -136,216 +136,256 @@
       "drill": {
         "x": 56,
         "y": 65,
-        "depth": 6
+        "depth": 6,
+        "behind": false
       },
       "rack": {
         "x": 29,
         "y": 15,
-        "depth": -7.6
+        "depth": -7.6,
+        "behind": false
       },
       "mast": {
         "x": 45,
         "y": 23,
-        "depth": 0.4
+        "depth": 0.4,
+        "behind": false
       },
       "armLeft": {
         "x": 74,
         "y": 36,
-        "depth": -8.4
+        "depth": -8.4,
+        "behind": true
       },
       "armRight": {
         "x": 27,
         "y": 59,
-        "depth": 14.8
+        "depth": 14.8,
+        "behind": false
       }
     },
     "dl": {
       "drill": {
         "x": 30,
         "y": 66,
-        "depth": 6
+        "depth": 6,
+        "behind": false
       },
       "rack": {
         "x": 57,
         "y": 16,
-        "depth": -7.6
+        "depth": -7.6,
+        "behind": false
       },
       "mast": {
         "x": 41,
         "y": 24,
-        "depth": 0.4
+        "depth": 0.4,
+        "behind": false
       },
       "armLeft": {
         "x": 59,
         "y": 60,
-        "depth": 14.8
+        "depth": 14.8,
+        "behind": false
       },
       "armRight": {
         "x": 12,
         "y": 37,
-        "depth": -8.4
+        "depth": -8.4,
+        "behind": true
       }
     },
     "ur": {
       "drill": {
         "x": 54,
         "y": 52,
-        "depth": -6
+        "depth": -6,
+        "behind": true
       },
       "rack": {
         "x": 27,
         "y": 29,
-        "depth": 7.6
+        "depth": 7.6,
+        "behind": false
       },
       "mast": {
         "x": 43,
         "y": 21,
-        "depth": -0.4
+        "depth": -0.4,
+        "behind": false
       },
       "armLeft": {
         "x": 25,
         "y": 29,
-        "depth": -14.8
+        "depth": -14.8,
+        "behind": true
       },
       "armRight": {
         "x": 72,
         "y": 52,
-        "depth": 8.4
+        "depth": 8.4,
+        "behind": false
       }
     },
     "ul": {
       "drill": {
         "x": 28,
         "y": 53,
-        "depth": -6
+        "depth": -6,
+        "behind": true
       },
       "rack": {
         "x": 55,
         "y": 30,
-        "depth": 7.6
+        "depth": 7.6,
+        "behind": false
       },
       "mast": {
         "x": 39,
         "y": 22,
-        "depth": -0.4
+        "depth": -0.4,
+        "behind": false
       },
       "armLeft": {
         "x": 10,
         "y": 53,
-        "depth": 8.4
+        "depth": 8.4,
+        "behind": false
       },
       "armRight": {
         "x": 57,
         "y": 30,
-        "depth": -14.8
+        "depth": -14.8,
+        "behind": true
       }
     },
     "r": {
       "drill": {
         "x": 60,
         "y": 58,
-        "depth": 0
+        "depth": 0,
+        "behind": true
       },
       "rack": {
         "x": 22,
         "y": 21,
-        "depth": 0
+        "depth": 0,
+        "behind": false
       },
       "mast": {
         "x": 45,
         "y": 21,
-        "depth": 0
+        "depth": 0,
+        "behind": false
       },
       "armLeft": {
         "x": 52,
         "y": 27,
-        "depth": -16.405
+        "depth": -16.405,
+        "behind": true
       },
       "armRight": {
         "x": 52,
         "y": 60,
-        "depth": 16.405
+        "depth": 16.405,
+        "behind": false
       }
     },
     "d": {
       "drill": {
         "x": 43,
         "y": 68,
-        "depth": 8.485
+        "depth": 8.485,
+        "behind": false
       },
       "rack": {
         "x": 43,
         "y": 12,
-        "depth": -10.748
+        "depth": -10.748,
+        "behind": false
       },
       "mast": {
         "x": 43,
         "y": 23,
-        "depth": 0.566
+        "depth": 0.566,
+        "behind": false
       },
       "armLeft": {
         "x": 76,
         "y": 50,
-        "depth": 4.525
+        "depth": 4.525,
+        "behind": false
       },
       "armRight": {
         "x": 11,
         "y": 50,
-        "depth": 4.525
+        "depth": 4.525,
+        "behind": false
       }
     },
     "l": {
       "drill": {
         "x": 24,
         "y": 59,
-        "depth": 0
+        "depth": 0,
+        "behind": true
       },
       "rack": {
         "x": 62,
         "y": 23,
-        "depth": 0
+        "depth": 0,
+        "behind": false
       },
       "mast": {
         "x": 39,
         "y": 23,
-        "depth": 0
+        "depth": 0,
+        "behind": false
       },
       "armLeft": {
         "x": 32,
         "y": 62,
-        "depth": 16.405
+        "depth": 16.405,
+        "behind": false
       },
       "armRight": {
         "x": 32,
         "y": 29,
-        "depth": -16.405
+        "depth": -16.405,
+        "behind": true
       }
     },
     "u": {
       "drill": {
         "x": 41,
         "y": 49,
-        "depth": -8.485
+        "depth": -8.485,
+        "behind": true
       },
       "rack": {
         "x": 41,
         "y": 32,
-        "depth": 10.748
+        "depth": 10.748,
+        "behind": false
       },
       "mast": {
         "x": 41,
         "y": 21,
-        "depth": -0.566
+        "depth": -0.566,
+        "behind": false
       },
       "armLeft": {
         "x": 8,
         "y": 39,
-        "depth": -4.525
+        "depth": -4.525,
+        "behind": true
       },
       "armRight": {
         "x": 73,
         "y": 39,
-        "depth": -4.525
+        "depth": -4.525,
+        "behind": true
       }
     }
   },

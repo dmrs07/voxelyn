@@ -10,6 +10,7 @@ import {
   DIAMANDIS_SOCKETS,
   ENTITY_SPECS,
   UNDERTAKER_SOCKETS,
+  diamandisArmModel,
   diamandisChassis,
   diamandisModel,
   diamandisPartModel,
@@ -231,3 +232,94 @@ describe('o Diamandis em pecas', () => {
     expect(Math.abs(40 + p.sy - b.minY)).toBeLessThanOrEqual(3);
   });
 });
+
+describe('a ORDEM das pecas em volta do chassi, contra o rasterizador', () => {
+  // A verdade nao e uma regra: e o proprio rasterizador. Desenhando o chassi e
+  // a peca JUNTOS num so `renderVoxels`, cada voxel entra com a propria
+  // profundidade e a oclusao sai certa por construcao. O cliente nao pode fazer
+  // isso — ele tem dois sprites e um bit —, mas o bit tem de ser o melhor dos
+  // dois lados. Este teste compara os dois lados contra a verdade e cobra que o
+  // `behind` publicado seja o vencedor.
+  //
+  // Foi assim que o defeito relatado apareceu: em `ur` o mastro sumia atras da
+  // torre. A causa e que o `depth` do encaixe so reproduz a chave primaria do
+  // rasterizador (`x + y`) e joga fora o desempate por `z`, entao uma peca
+  // montada no alto — onde `x + y` e quase zero — caia do lado errado.
+  const W = 160;
+  const H = 190;
+  const AX = 80;
+  const AY = 168;
+  type Box = { x: number; y: number; z: number };
+  const at = (boxes: Box[], s: { x: number; y: number; z: number }): Box[] =>
+    boxes.map((b) => ({ ...b, x: b.x + s.x, y: b.y + s.y, z: b.z + s.z }));
+  const px = (boxes: unknown, dir: number): Uint8ClampedArray =>
+    (renderVoxels(boxes, dir, W, H, AX, AY) as Grid).buf;
+  const over = (dst: Uint8ClampedArray, src: Uint8ClampedArray): void => {
+    for (let i = 0; i < dst.length; i += 4) {
+      const a = src[i + 3];
+      if (a === 0) continue;
+      const k = a / 255;
+      const ik = 1 - k;
+      dst[i] = src[i] * k + dst[i] * ik;
+      dst[i + 1] = src[i + 1] * k + dst[i + 1] * ik;
+      dst[i + 2] = src[i + 2] * k + dst[i + 2] * ik;
+      dst[i + 3] = Math.max(dst[i + 3], a);
+    }
+  };
+  const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray): number => {
+    let n = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      if (
+        Math.abs(a[i] - b[i]) > 8 ||
+        Math.abs(a[i + 1] - b[i + 1]) > 8 ||
+        Math.abs(a[i + 2] - b[i + 2]) > 8 ||
+        Math.abs(a[i + 3] - b[i + 3]) > 8
+      )
+        n++;
+    }
+    return n;
+  };
+
+  // O unico residuo conhecido: de frente (`d`) os dois bracos ficam melhor
+  // ATRAS por pouco, porque o OMBRO deles mora dentro do deck e nenhum lado
+  // acerta os dois pedacos ao mesmo tempo. Medido, a diferenca e de shading nas
+  // bordas e nao de oclusao — as duas composicoes sao indistinguiveis a olho.
+  const RESIDUO = new Set(['armLeft|d', 'armRight|d']);
+
+  it('o `behind` publicado e o melhor dos dois lados, peca a peca e rumo a rumo', () => {
+    // O manifest GERADO, e nao o spec: `behind` e decidido na geracao.
+    const manifest = JSON.parse(readFileSync(resolve(ATLASES, 'enemy-diamandis.json'), 'utf8')) as {
+      sockets: Record<string, Record<string, { behind?: boolean }>>;
+    };
+    const errado: string[] = [];
+    for (let d = 0; d < DIRS8.length; d++) {
+      const dir = DIRS8[d];
+      const body = diamandisChassis('idle', 1) as Box[];
+      const bodyPx = px(body, d);
+      const pecas: [string, Box[]][] = [
+        ...(DIAMANDIS_PARTS as string[]).map((p): [string, Box[]] => [
+          p,
+          at(diamandisPartModel(p, 'idle', 1) as Box[], DIAMANDIS_SOCKETS[p]),
+        ]),
+        ...(DIAMANDIS_ARM_SOCKETS as string[]).map((n): [string, Box[]] => [
+          n,
+          at(diamandisArmModel('idle', 0) as Box[], DIAMANDIS_SOCKETS[n]),
+        ]),
+      ];
+      for (const [name, boxes] of pecas) {
+        const verdade = px([...body, ...boxes], d);
+        const pecaPx = px(boxes, d);
+        const naFrente = new Uint8ClampedArray(bodyPx);
+        over(naFrente, pecaPx);
+        const atras = new Uint8ClampedArray(W * H * 4);
+        over(atras, pecaPx);
+        over(atras, bodyPx);
+        const melhor = diff(verdade, naFrente) <= diff(verdade, atras) ? false : true;
+        const publicado = manifest.sockets?.[dir]?.[name]?.behind ?? false;
+        const chave = `${name}|${dir}`;
+        if (publicado !== melhor && !RESIDUO.has(chave)) errado.push(chave);
+      }
+    }
+    expect(errado, `pecas do lado errado: ${errado.join(', ')}`).toEqual([]);
+  });
+}, 60_000);
