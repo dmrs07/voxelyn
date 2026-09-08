@@ -493,6 +493,10 @@ export class NetClient {
     // -1 quando o servidor e anterior a boca do Devorador: "nao ha boca
     // aberta", que e exatamente o que uma simulacao sem ela quer dizer.
     state.bossRuntime.mawOpenedAt = world.mawOpenedAt ?? -1;
+    // OS SUMIDOUROS da Fome, do servidor e nao dos eventos: quem reconecta com
+    // tres crateras abertas nunca recebeu os pousos que as abriram, e o chao
+    // puxa dele do mesmo jeito. Servidor antigo: nenhum.
+    state.bossRuntime.sinkholes = (world.sinkholes ?? []).map((hole) => ({ ...hole }));
     state.bossRuntime.delugeX = world.delugeX ?? 0;
     state.bossRuntime.delugeY = world.delugeY ?? 0;
     // O ENCONTRO fica RETIDO no ultimo `WorldFlags`, e nao escrito no estado

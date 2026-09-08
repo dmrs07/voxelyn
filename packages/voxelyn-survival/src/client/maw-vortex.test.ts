@@ -17,7 +17,12 @@ import {
   MAW_STREAKS,
   MAW_TORUS_RISE,
   MAW_TORUS_TUBE,
+  MAW_CLOUD_RAGGED,
+  MAW_CLOUD_STRETCH,
+  MAW_CLOUD_VERTICES,
   mawCloud,
+  mawCloudShape,
+  mawFlowAt,
   mawInnerRadius,
   mawStreak,
 } from './maw-vortex';
@@ -385,5 +390,81 @@ describe('vortice da boca — o rolo do toro', () => {
 
   it('sao deterministicas: dois clientes da sala desenham a mesma poeira', () => {
     expect(mawCloud(5, 2.5, reach)).toEqual(mawCloud(5, 2.5, reach));
+  });
+});
+
+describe('vortice da boca — a forma das nuvens (Perlin)', () => {
+  const reach = DEVOURER_MAW_RADIUS;
+
+  it('e um contorno fechado, com o numero de vertices declarado', () => {
+    const puff = mawCloud(3, 0.7, reach);
+    const shape = mawCloudShape(3, 0.7, puff);
+    expect(shape.points).toHaveLength(MAW_CLOUD_VERTICES);
+    expect(shape.density).toBeGreaterThanOrEqual(0.55);
+    expect(shape.density).toBeLessThanOrEqual(1);
+  });
+
+  it('cabe no raio da nuvem, esticada ou nao: nenhum vertice foge da mancha', () => {
+    // O contorno pode rasgar (MAW_CLOUD_RAGGED) e esticar (MAW_CLOUD_STRETCH),
+    // mas o produto dos dois e o teto: uma nuvem que passasse disso leria
+    // como um estilhaco voando por cima do disco.
+    const ceiling = MAW_CLOUD_STRETCH * (1 + MAW_CLOUD_RAGGED) + 1e-6;
+    const floor = (1 - MAW_CLOUD_RAGGED) * 0.5;
+    for (let i = 0; i < MAW_CLOUDS; i++) {
+      for (let s = 0; s < 3; s += 0.11) {
+        const puff = mawCloud(i, s, reach);
+        for (const pt of mawCloudShape(i, s, puff).points) {
+          const r = Math.hypot(pt.dx, pt.dy) / puff.radius;
+          expect(r, `nuvem ${i} em ${s.toFixed(2)}: vertice fora`).toBeLessThanOrEqual(ceiling);
+          expect(r, `nuvem ${i} em ${s.toFixed(2)}: vertice colapsou`).toBeGreaterThan(floor);
+        }
+      }
+    }
+  });
+
+  it('ESTICA no sentido do fluxo: a nuvem e mais comprida na direcao do centro que atravessada', () => {
+    // A unica coisa que uma mancha no chao pode dizer sobre a mecanica e para
+    // onde ela esta indo. Uma nuvem redonda diz "estou aqui".
+    for (let i = 0; i < MAW_CLOUDS; i++) {
+      for (const s of [0.4, 1.3, 2.7]) {
+        const puff = mawCloud(i, s, reach);
+        const shape = mawCloudShape(i, s, puff);
+        const flow = mawFlowAt(puff.dx, puff.dy);
+        // O fluxo aponta PARA DENTRO (com o passo da espiral): e o sentido
+        // que os graos riscam na mesma posicao.
+        const r = Math.hypot(puff.dx, puff.dy);
+        expect((flow.x * -puff.dx + flow.y * -puff.dy) / r).toBeGreaterThan(0.7);
+        // A energia do contorno ao longo do fluxo contra a atravessada: a
+        // franja de Perlin mexe vertice a vertice, mas a soma dos quadrados
+        // de doze vertices e dominada pelo estiramento (1,55^2 ~ 2,4 para 1).
+        let along = 0;
+        let across = 0;
+        for (const pt of shape.points) {
+          const a = pt.dx * flow.x + pt.dy * flow.y;
+          const c = -pt.dx * flow.y + pt.dy * flow.x;
+          along += a * a;
+          across += c * c;
+        }
+        expect(along, `nuvem ${i} em ${s}: nao estica no fluxo`).toBeGreaterThan(across * 1.3);
+      }
+    }
+  });
+
+  it('FERVE: o contorno muda com o tempo, sem pular entre dois quadros vizinhos', () => {
+    const puff = mawCloud(4, 0.5, reach);
+    const a = mawCloudShape(4, 0.5, puff);
+    const b = mawCloudShape(4, 0.5 + 1 / 60, puff);
+    const c = mawCloudShape(4, 1.5, puff);
+    const drift = (p: typeof a, q: typeof a) =>
+      Math.max(...p.points.map((pt, k) => Math.hypot(pt.dx - q.points[k].dx, pt.dy - q.points[k].dy)));
+    expect(drift(a, c)).toBeGreaterThan(puff.radius * 0.05);
+    expect(drift(a, b)).toBeLessThan(puff.radius * 0.08);
+  });
+
+  it('e deterministica, e cada nuvem tem a sua forma', () => {
+    const puff = mawCloud(6, 2.2, reach);
+    expect(mawCloudShape(6, 2.2, puff)).toEqual(mawCloudShape(6, 2.2, puff));
+    const other = mawCloudShape(7, 2.2, puff);
+    expect(other).not.toEqual(mawCloudShape(6, 2.2, puff));
   });
 });

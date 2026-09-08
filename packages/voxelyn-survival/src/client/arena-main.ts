@@ -431,6 +431,7 @@ const DEVOURER_SCENARIO_LABELS: Record<DevourerScenario, string> = {
   hopU: 'salto ↖ (u)',
   maw: 'boca aberta',
   burrow: 'submerso',
+  hunger: 'a Fome (45% de vida)',
   reset: 'reiniciar',
 };
 for (const scenario of DEVOURER_SCENARIOS) {

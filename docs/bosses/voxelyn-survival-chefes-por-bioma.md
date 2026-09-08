@@ -777,6 +777,68 @@ agora também dá chão onde a boca não tem o que agarrar. Uma decisão, três 
 e nenhum deles entregue de graça, porque durante a janela a boca come a areia que
 produziria o vidro.
 
+### A Fome — a segunda fase
+
+A vida subiu de 760 para **1500**. Com 760 o encontro cabia em duas janelas (7,5 s de
+bolt básico são 420 de dano), e uma luta de duas janelas não tem onde pendurar uma
+virada. A metade (750) é uma janela e meia de dano limpo: a Fome abre no fim do
+segundo ciclo e a luta ainda pede mais dois inteiros dela.
+
+**A Fome começa na metade da vida, uma vez, sem volta** (`BOSS_PHASE_HUNGER`), e é
+lida _de boca aberta_ — a vida cai justamente na janela, e uma escada que só fosse
+conferida no fluxo de IA esperaria a janela fechar para anunciar o que a janela causou.
+
+Ela **não muda o ciclo.** Rajada, silêncio e boca continuam na mesma ordem e com os
+mesmos tempos, e tudo o que o jogador aprendeu na primeira metade continua verdadeiro.
+O que a Fome retira são **duas promessas laterais** que a primeira metade fazia sem
+dizer:
+
+- **Que o chão fora do disco é neutro.** Na Fome, cada pouso da rajada deixa a
+  cratera aberta: um **sumidouro** (`bossRuntime.sinkholes`) que vive 13 s, puxa com a
+  mesma curva da boca em tamanho menor (raio 3,6; 0,5 tile/s na borda, 3,4 no centro)
+  e come a areia do próprio disco. O estrato se chama Sumidouros de Sílica e até aqui
+  nenhum sumidouro existia — o nome era paisagem.
+- **Que o centro fica onde nasceu.** Depois da rampa completa, a boca **anda** para o
+  jogador mais perto a 1,2 tile/s. Um quarto da caminhada: quem está à distância
+  continua à distância andando para trás; quem está atrás de uma quina continua
+  protegido até a quina deixar de estar entre os dois. A cobertura não some — ela passa
+  a ter prazo. E só nos 3 s finais da janela, para a linha do sem-volta ser lida parada
+  antes de se mover.
+
+**O sumidouro nunca prende sozinho, e há um teste que cobra isso em todo raio.** O
+centro dele fica abaixo da caminhada (4,6): ele não existe para matar — não tem
+garganta — e sim para **somar**. Dois tiles de atraso na saída de uma cratera enquanto
+o arco seguinte cai; um tile a mais para dentro da linha do sem-volta quando a boca
+está perto. É uma ladeira, e a resposta a uma ladeira continua sendo andar — só que
+andar passou a custar tempo, e tempo é o que a rajada cobra. Sobre vidro ele agarra a
+mesma fração que a boca (45%): uma única regra de chão para as duas sucções.
+
+**O que isso faz com o contra-jogo:** três sumidouros comendo areia durante a rajada e
+a boca comendo durante a janela significam que, na Fome, o chefe consome o vidro
+_antes_ de ele ser feito mais rápido do que na primeira metade. Vitrificar cedo — e
+vitrificar onde se vai ficar — deixa de ser a jogada boa para virar a única.
+
+**O desenho é o mesmo em escala menor.** O sumidouro é desenhado com o mesmo
+vórtice da boca (`drawSandVortex`), mais ralo, sem a garganta escura (não há sentença
+ali) e sem a linha vermelha (a caminhada vence em todo raio; uma linha que prometesse
+o contrário seria mentira). O alcance sai de `sinkholeReach`, a mesma conta que a
+simulação usa para puxar. Só o centro e o tick de abertura viajam (`WorldFlags.sinkholes`).
+
+**As nuvens de areia deixaram de ser elipses.** A forma de cada nuvem sai do ruído de
+Perlin (`mawCloudShape`, sobre `noise.ts`): um contorno de doze vértices que rasga,
+ferve com o tempo e **estica no sentido do fluxo** — a tangente da espiral dos grãos,
+não a reta até o centro. É a única coisa que uma mancha no chão pode dizer sobre a
+mecânica: uma nuvem redonda diz "estou aqui"; uma alongada na direção da sucção diz
+"estou indo para lá". Duas camadas do mesmo contorno (o inteiro, ralo, e um miolo
+menor e mais cheio) tiram a borda da nuvem sem um gradiente por quadro. Onde e quão
+grande cada nuvem está continua saindo de `mawCloud` — o rolo toroidal não mudou.
+
+**A Fome tem um som só**, `devourerHunger`: um subgrave que desce e não volta (o chão
+afundando), placas de sílica estalando em cadência irregular, e uma inspiração longa e
+cavernosa — a mesma família da boca abrindo, mais funda, porque o que está abrindo
+agora não é uma boca, é o setor. A barra de vida marca a virada pelo mesmo
+`phasesFired` que os outros chefes usam; o painel de arena ganhou o cenário `hunger`.
+
 ### A linhagem árida mudou de destino
 
 `arid` era `basalto → sílica → fornalha`, e isso tinha uma consequência que só

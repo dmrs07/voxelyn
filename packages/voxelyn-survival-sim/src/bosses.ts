@@ -67,6 +67,9 @@ export const emptyBossRuntime = (): BossRuntime => ({
   // que nascesse com `mawOpenedAt = 0` comecaria com a boca do Devorador ja
   // aberta e ja puxando — num tick em que ele ainda esta por baixo da areia.
   mawOpenedAt: -1,
+  // Um array proprio por encontro, pelo mesmo motivo de `path`: um literal
+  // congelado no modulo faria duas salas escreverem nos mesmos sumidouros.
+  sinkholes: [],
   // -1 e "o Diluvio nunca aconteceu", e tem de ser negativo e nao zero: zero e
   // um tick legitimo, e um encontro que comecasse com `delugeAt = 0` nasceria
   // com o setor ja submerso.

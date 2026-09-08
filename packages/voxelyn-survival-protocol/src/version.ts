@@ -229,7 +229,15 @@
 //     parados enquanto apanha. E o mesmo caso da entrada 18 (`leap`) e da 32
 //     (`probe`/`dive`/`emerge`), e o bump transforma os dois em recusa no
 //     handshake.
-export const PROTOCOL_VERSION = 33;
+// 34: A FOME DO DEVORADOR entra no wire. `WorldFlags` ganha `sinkholes`
+//     (onde e quando cada cratera da rajada ficou aberta), pela mesma
+//     economia de `mawOpenedAt` (entrada 27): o cliente refaz alcance e forca
+//     a partir dos dois numeros. Cliente antigo contra servidor novo seria
+//     puxado por sumidouros que nao desenha — dano de posicao sem sinal, o
+//     invariante que este projeto nao quebra; cliente novo contra servidor
+//     antigo trata a ausencia como lista vazia, mas o bump da simulacao
+//     (65) ja recusa o par de qualquer jeito.
+export const PROTOCOL_VERSION = 34;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -966,7 +974,18 @@ export const PROTOCOL_VERSION = 33;
 //     contra 4,6 do Prospector, a fuga continua possivel e passa a ser
 //     merecida. `DIAMANDIS_HP` 880 -> 1400 para o quarto ato caber. Dano,
 //     alcance e velocidade do chefe mudaram: um replay de 63 nao bate.
-export const SIMULATION_VERSION = 64;
+// 65: A FOME DO DEVORADOR BRANCO — a segunda fase, na metade da vida
+//     (`BOSS_PHASE_HUNGER`, no `phasesFired` que ja entrava no hash). O ciclo
+//     nao muda; duas promessas laterais caem. (1) SUMIDOUROS: na Fome cada
+//     pouso da rajada deixa a cratera aberta por 13 s, puxando com a mesma
+//     curva da boca em tamanho menor (raio 3,6; 0,5 -> 3,4 tile/s, sempre
+//     abaixo da caminhada; sem garganta) e comendo a areia do disco.
+//     `bossRuntime.sinkholes` (x, y, tick) entra no hash e em `WorldFlags`.
+//     (2) A BOCA ANDA: depois da rampa completa, o vortice se desloca para o
+//     jogador mais perto a 1,2 tile/s. `DEVOURER_HP` 760 -> 1500 para a
+//     virada caber (a metade e uma janela e meia de dano). Posicao do chefe,
+//     posicao dos corpos e areia no chao mudaram: um replay de 64 nao bate.
+export const SIMULATION_VERSION = 65;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
