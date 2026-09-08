@@ -35,10 +35,18 @@ node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs /tmp/cerzi
 
 `simulation-events.json` registra os eventos que produziram a prancha. `playtest-results.json` registra quatro controladores automáticos na arena de seed 36, setor 7, com 100 HP e módulo perfurante. Eles não usam a habilidade equipada. O cenário de corte injeta um segmento de tiro cruzando cada fio, para testar a interrupção.
 
-Nos ensaios, o limite permaneceu em quatro auxiliares e nenhum tick de caminhada terminou com a Cerzideira dentro de terreno sólido. Ficar parado atirando terminou em derrota; circular atirando continuou sendo uma estratégia viável. Esses resultados verificam comportamento e regressões, não substituem o ajuste de dificuldade com jogadores.
+Nos ensaios, o limite permaneceu em quatro auxiliares e nenhum tick de caminhada terminou com a Cerzideira dentro de terreno sólido. Ficar parado atirando termina em derrota. Circular atirando continua vencendo sem sofrer dano, mas agora leva mais tempo do que cortar e atacar na janela, e não derruba mais a Cerzideira por acidente. Esses resultados verificam comportamento e regressões, não substituem o ajuste de dificuldade com jogadores.
+
+Os cenários `cut_and_shoot` e `dodge_mark_shoot` medem as duas respostas que a luta promete: cortar o fio e atacar na janela, e sair da marca ao ver o aviso, atirando no resto do tempo. Antes deles, o arquivo media auxiliares e terreno, não a luta.
+
+### Ajustes após a primeira leitura dos ensaios
+
+- O corte do fio ativo só conta para tiros que cruzam o fio com 30° ou mais, a 1,5 tile ou mais do corpo. Ela puxa para um apoio ao lado do jogador, então o fio passava por cima dele e qualquer tiro no corpo já saía encostado no fio: circular atirando a derrubava em 4 de 4 investidas sem ninguém mirar no fio. O trecho protegido é desenhado escuro e o exposto claro, com um nó onde o corte começa a valer.
+- A agulhada alcança 1,6 tile e o pouso é escolhido para que ela caia exatamente na marca travada. Antes ela parava na projeção do alvo sobre a linha do fio e aceitava pousos a até 3 tiles, com raio de golpe de 1,1: metade dos golpes errava um alvo parado por 0,5 a 0,7 tile.
+- Sem golpe de contato por 24 ticks depois do impacto. Ela pousava ao lado do alvo e emendava a agulhada de contato, e quem saía de todas as marcas terminava com 19 de vida por causa disso.
 
 Build de produção, lint, testes focados e verificações por pacote foram executados. Os testes de mundo e pontaria que excederam o tempo em execução concorrente passaram isolados. O teste preexistente do MCP que cria 500 mundos excedeu seu prazo de 20 segundos neste ambiente; os outros 24 testes do pacote passaram. Ambiente: Node 24.19.0; o projeto declara Node 22.
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 36, simulação 70, conteúdo 37.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 36, simulação 71, conteúdo 37.

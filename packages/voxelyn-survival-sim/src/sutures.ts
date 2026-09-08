@@ -183,10 +183,42 @@ export const hitSutures = (
     if (!queen.alive || queen.archetype !== 'seamstress' || !silkSupported(queen, state.tick))
       continue;
     const b = suturePoint(state, queen.action!.silkFlight!.anchor!);
-    const gap = Math.min(1, queen.radius / (Math.hypot(b.x - queen.x, b.y - queen.y) || 1));
-    const a = { x: queen.x + (b.x - queen.x) * gap, y: queen.y + (b.y - queen.y) * gap };
-    if (touchesCable(from, to, a, b)) dropSeamstress(state, queen, events);
+    if (cutsTether(from, to, queen, b)) dropSeamstress(state, queen, events);
   }
+};
+
+/** Seno minimo entre tiro e fio para o corte contar: 30 graus. */
+export const SILK_CUT_MIN_SIN = 0.5;
+/** A partir de quantos tiles do centro do corpo o fio esta EXPOSTO ao corte. */
+export const SILK_CUT_EXPOSED_FROM = 1.5;
+/**
+ * O corte do fio ativo tem de ser INTENCIONAL: um tiro que atravessa o trecho
+ * exposto, de lado.
+ *
+ * A regra frouxa das suturas da colonia (paralelos e rocantes contam) fazia o
+ * corte acontecer sozinho: a Cerzideira puxa para um apoio ao lado do
+ * jogador, o fio passa por cima dele, e todo tiro no corpo dela ja saia
+ * encostado no fio. Nos ensaios, circular atirando a derrubava em 4 de 4
+ * investidas sem ninguem mirar no fio. Aqui contam so os tiros que cruzam o
+ * fio com pelo menos 30 graus, a 1,5 tile ou mais do corpo — o trecho que o
+ * cliente desenha como cortavel.
+ */
+export const cutsTether = (from: Vec2, to: Vec2, body: Vec2, anchor: Vec2): boolean => {
+  const dx = to.x - from.x,
+    dy = to.y - from.y,
+    ex = anchor.x - body.x,
+    ey = anchor.y - body.y;
+  const shot = Math.hypot(dx, dy),
+    cable = Math.hypot(ex, ey);
+  if (shot < 1e-8 || cable < 1e-8) return false;
+  const determinant = dx * ey - dy * ex;
+  if (Math.abs(determinant) / (shot * cable) < SILK_CUT_MIN_SIN) return false;
+  const ax = body.x - from.x,
+    ay = body.y - from.y;
+  const t = (ax * ey - ay * ex) / determinant,
+    u = (ax * dy - ay * dx) / determinant;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return false;
+  return u * cable >= SILK_CUT_EXPOSED_FROM;
 };
 
 export const sewSuture = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {

@@ -1002,7 +1002,16 @@ export const PROTOCOL_VERSION = 36;
 // 69: Cerzideira hunts above terrain, strikes once on arrival and summons jumping helpers.
 // 70: Retry Stitcher layouts without two usable chamber supports. The seeded terrain
 //     can change, so replays and reconnects must use the same generation contract.
-export const SIMULATION_VERSION = 70;
+// 71: O CORTE DO FIO ATIVO passa a ser intencional — so tiros que cruzam o fio
+//     com 30 graus ou mais, a 1,5 tile ou mais do corpo (`cutsTether`); antes,
+//     como ela puxa para um apoio ao lado do jogador, todo tiro no corpo ja
+//     saia encostado no fio e a derrubava sem ninguem mirar nele. A agulhada
+//     alcanca 1,6 tile e o pouso e escolhido para que ela caia na marca
+//     travada (metade dos golpes errava um alvo parado). Sem golpe de contato
+//     por 24 ticks depois do impacto: sair da marca vira resposta completa.
+//     Escolhas, pousos e quedas mudaram: um replay de 70 com a Cerzideira nao
+//     bate.
+export const SIMULATION_VERSION = 71;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

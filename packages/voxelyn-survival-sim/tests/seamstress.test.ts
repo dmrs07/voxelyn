@@ -11,8 +11,10 @@ import {
 import {
   createSutures,
   cutSuture,
+  cutsTether,
   hitSutures,
   loadedSutureAnchor,
+  SILK_CUT_EXPOSED_FROM,
   stepSutures,
   stitcherStep,
   sutureObjective,
@@ -21,10 +23,14 @@ import {
 } from '../src/sutures';
 import {
   dropSeamstress,
+  SEAMSTRESS_CONTACT_GRACE,
   SEAMSTRESS_DROP_TICKS,
   silkLift,
   silkCanLand,
   silkLanding,
+  silkStrike,
+  SILK_NEEDLE_REACH,
+  SILK_STRIKE_RADIUS,
   summonSilkBrood,
 } from '../src/seamstress';
 import { SOLID_NONE, SOLID_ROCK, SOLID_SUTURE_ANCHOR } from '../src/constants';
@@ -195,6 +201,80 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     damageEntity(state, queen, 20, []);
     expect(hp - queen.hp).toBe(30);
     expect(until(state, 132).some((e) => e.t === 'hit' || e.t === 'boss_attack')).toBe(false);
+  });
+  it('only a transversal shot across the exposed stretch cuts the active tether', () => {
+    const body = { x: 10, y: 20 },
+      anchor = { x: 20, y: 20 };
+    // De baixo do fio, mirando no corpo: colinear, nao conta.
+    expect(cutsTether({ x: 16, y: 20.05 }, { x: 15, y: 20.02 }, body, anchor)).toBe(false);
+    // Rasante a 15 graus, tambem nao.
+    expect(cutsTether({ x: 16, y: 20.5 }, { x: 14, y: 19.96 }, body, anchor)).toBe(false);
+    // Cruzando de lado, mas colado ao corpo: protegido.
+    expect(cutsTether({ x: 11, y: 19 }, { x: 11, y: 21 }, body, anchor)).toBe(false);
+    // Cruzando de lado no trecho exposto: corta.
+    expect(
+      cutsTether(
+        { x: 10 + SILK_CUT_EXPOSED_FROM, y: 19 },
+        { x: 10 + SILK_CUT_EXPOSED_FROM, y: 21 },
+        body,
+        anchor,
+      ),
+    ).toBe(true);
+    expect(cutsTether({ x: 15, y: 22 }, { x: 16, y: 18 }, body, anchor)).toBe(true);
+    // Na simulacao: o tiro de quem esta debaixo do fio, no corpo dela, nao a derruba.
+    const { state, queen } = fixture();
+    arm(state, queen);
+    until(state, 109);
+    const under = { x: queen.x + 4, y: queen.y + 0.1 };
+    hitSutures(state, under, { x: queen.x + 3.2, y: queen.y + 0.08 }, [], 0);
+    expect(queen.action).toBeDefined();
+    hitSutures(
+      state,
+      { x: queen.x + 3, y: queen.y - 1 },
+      { x: queen.x + 3, y: queen.y + 1 },
+      [],
+      0,
+    );
+    expect(queen.action).toBeUndefined();
+  });
+  it('lands so the needle falls on the locked mark, and refuses supports that cannot reach it', () => {
+    const { state, queen } = fixture();
+    // Alvo parado fora da linha do fio, dentro do alcance da agulha.
+    state.player.x = 16.3;
+    state.player.y = 21.7;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('tether');
+    const hit = silkStrike(queen);
+    expect(Math.hypot(hit.x - state.player.x, hit.y - state.player.y)).toBeLessThan(
+      SILK_STRIKE_RADIUS - 0.1,
+    );
+    const f = queen.action!.silkFlight!;
+    expect(Math.hypot(f.toX - state.player.x, f.toY - state.player.y)).toBeCloseTo(
+      SILK_NEEDLE_REACH,
+      1,
+    );
+    // Alvo mais longe da linha do que a agulha alcanca: nenhum apoio serve, ela caca a pe.
+    const again = fixture();
+    again.state.player.x = 16.3;
+    again.state.player.y = 23.5;
+    stitcherStep(again.state, again.queen, again.state.player, 0.05, []);
+    expect(again.queen.action).toBeUndefined();
+  });
+  it('gives no contact strike right after a landing: leaving the mark is a full answer', () => {
+    const { state, queen } = fixture();
+    state.player.x = 17.5;
+    state.player.y = 20.5;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('tether');
+    const f = queen.action!.silkFlight!;
+    expect(queen.contactReadyAt).toBe(f.impactAt + SEAMSTRESS_CONTACT_GRACE);
+    // O jogador sai da marca (de lado) e fica a menos de 2 tiles do pouso.
+    state.player.x = f.toX + 0.5;
+    state.player.y = f.toY + 1.8;
+    state.sutures = [];
+    until(state, f.impactAt + SEAMSTRESS_CONTACT_GRACE - 1);
+    expect(state.player.hp).toBe(state.player.maxHp);
+    expect(queen.action?.kind ?? 'none').not.toBe('contact');
   });
   it.each(['support breaks', 'stun', 'landing blocked'])(
     'settles safely if %s changes in flight',

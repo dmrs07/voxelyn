@@ -82,13 +82,14 @@ describe('apresentacao da amarra e do golpe', () => {
       return ctx.calls;
     };
     const before = draw();
-    expect(before).toContain('moveTo:146.0,117.0'); // radius 1.1 at the strike point
+    // Radius 1.1 at the strike point: the needle reaches 1.6 beyond the landing.
+    expect(before).toContain('moveTo:146.0,109.0');
     expect(before).toContain('lineTo:155.0,91.0'); // selected anchor B
     queen.x = 14;
     queen.y = 15;
     state.tick = 133;
     const flight = draw();
-    expect(flight).toContain('moveTo:146.0,117.0');
+    expect(flight).toContain('moveTo:146.0,109.0');
     expect(flight).toContain('lineTo:155.0,91.0');
     state.tick = 144;
     expect(draw()).not.toContain('lineTo:155.0,91.0'); // released support after impact

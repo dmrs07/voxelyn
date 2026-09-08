@@ -23,14 +23,32 @@ export const SEAMSTRESS_DROP_TICKS = 36;
 export const SILK_STRIKE_OFFSET = 4;
 export const SILK_HELPER_CAP = 4;
 export const SILK_STRIKE_RADIUS = 1.1;
+/**
+ * Ate onde a AGULHADA alcanca a partir do centro do corpo, em tiles.
+ *
+ * A puxada desliza pelo fio e para ao lado do alvo; o golpe e a agulha, nao o
+ * corpo. Com o alcance de 0,8 e o pouso preso a linha do fio, a agulha so
+ * acertava quem estivesse quase em cima da linha — nos ensaios, metade dos
+ * golpes errava um alvo PARADO por 0,5 a 0,7 tile. Agora o pouso e escolhido
+ * para que a agulha caia exatamente na marca travada (ver `pull`).
+ */
+export const SILK_NEEDLE_REACH = 1.6;
+/**
+ * Ticks sem golpe de contato depois do impacto de uma puxada (1,2 s).
+ *
+ * Sem a folga, "sair da marca" nao era uma resposta: ela pousava ao lado, a
+ * menos de 2 tiles, e emendava a agulhada de contato. O bot que esquivou de
+ * todas as puxadas terminava com 19 de vida por causa desse contato.
+ */
+export const SEAMSTRESS_CONTACT_GRACE = 24;
 /** The same footprint is used by the authoritative hit and the ground marker. */
 export const silkStrike = (enemy: Entity): Vec2 & { radius: number } => {
   const queen = enemy.archetype === 'seamstress',
     f = enemy.action?.silkFlight;
   const direction = enemy.action?.direction ?? enemy.facing;
   return {
-    x: (f?.toX ?? enemy.x) + (queen ? direction.x * 0.8 : 0),
-    y: (f?.toY ?? enemy.y) + (queen ? direction.y * 0.8 : 0),
+    x: (f?.toX ?? enemy.x) + (queen ? direction.x * SILK_NEEDLE_REACH : 0),
+    y: (f?.toY ?? enemy.y) + (queen ? direction.y * SILK_NEEDLE_REACH : 0),
     radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.55 : 0.85,
   };
 };
@@ -261,11 +279,16 @@ const pull = (
       dx = p.x - queen.x,
       dy = p.y - queen.y;
     const d = Math.hypot(dx, dy);
-    // Pull towards the selected support, stopping beside the locked target to strike.
-    const along = Math.max(
-      2,
-      Math.min(d - 1.6, ((aim.x - queen.x) * dx + (aim.y - queen.y) * dy) / d - 0.8),
-    );
+    // Pull towards the selected support, stopping on the thread at the point
+    // from which the needle reaches the locked mark: the landing is the point
+    // of the line at exactly SILK_NEEDLE_REACH from the aim, on the near side.
+    // A mark farther from the thread than the needle reaches is not a shot
+    // this support can make.
+    const proj = ((aim.x - queen.x) * dx + (aim.y - queen.y) * dy) / d;
+    const perp = Math.abs((aim.x - queen.x) * dy - (aim.y - queen.y) * dx) / d;
+    if (perp > SILK_NEEDLE_REACH) continue;
+    const back = Math.sqrt(SILK_NEEDLE_REACH * SILK_NEEDLE_REACH - perp * perp);
+    const along = Math.max(2, Math.min(d - 1.6, proj - back));
     const to = silkLanding(
       state,
       queen,
@@ -273,11 +296,18 @@ const pull = (
       2,
     );
     if (!to || Math.hypot(to.x - queen.x, to.y - queen.y) < 2) continue;
-    choices.push({ anchor, to, score: Math.hypot(to.x - aim.x, to.y - aim.y) });
+    // How far the needle lands from the mark after clamping and landing search.
+    choices.push({
+      anchor,
+      to,
+      score: Math.abs(Math.hypot(to.x - aim.x, to.y - aim.y) - SILK_NEEDLE_REACH),
+    });
   }
   choices.sort((a, b) => a.score - b.score || a.anchor - b.anchor);
   const choice = choices[0];
-  if (!choice || choice.score > 3) return false;
+  // The mark must sit inside the strike disc: a lunge that would miss a
+  // standing target is not offered — she hunts on foot instead.
+  if (!choice || choice.score > SILK_STRIKE_RADIUS - 0.1) return false;
   const second = queen.hp < queen.maxHp / 2;
   const chained = second && encounter.comboLeft > 0;
   encounter.comboLeft = chained ? 0 : second ? 1 : 0;
@@ -295,6 +325,7 @@ const pull = (
     choice.anchor,
     unit(aim.x - choice.to.x, aim.y - choice.to.y),
   );
+  queen.contactReadyAt = queen.action!.silkFlight!.impactAt + SEAMSTRESS_CONTACT_GRACE;
   return true;
 };
 
