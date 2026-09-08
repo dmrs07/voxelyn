@@ -125,9 +125,11 @@ import {
   MAW_CLOUDS,
   MAW_NO_RETURN_RADIUS,
   MAW_STREAKS,
+  MAW_VEIL_CELLS,
   mawCloud,
   mawCloudShape,
   mawStreak,
+  mawVeilAlpha,
   sinkholeCrestShape,
   sinkholeRamp,
 } from './maw-vortex';
@@ -7070,6 +7072,47 @@ export class SurvivalRenderer {
         Math.PI * 2,
       );
       ctx.stroke();
+    }
+
+    // 3b. O VEU DE AREIA: a nuvem continua, em Perlin, escorrendo para a
+    //     garganta. Vem ANTES das manchas e dos riscos porque e o fundo dos
+    //     dois: a areia em suspensao que cobre o disco, com regioes densas e
+    //     rasgos, e que se move junto com os graos porque e amostrada nas
+    //     coordenadas da espiral (ver `mawVeilNoise`).
+    //
+    //     Uma grade de celulas projetadas no chao, cada uma um losango
+    //     pintado com a opacidade do campo naquele ponto. A resolucao segue o
+    //     preset: 18 celulas por raio no alto, menos nos outros — e no
+    //     sumidouro, metade, porque ele e menor e sao tres.
+    {
+      const cellsPerRadius = Math.max(
+        5,
+        Math.round(MAW_VEIL_CELLS * Math.sqrt(fxScale) * (isMaw ? 1 : 0.6)),
+      );
+      const cell = reach / cellsPerRadius;
+      const half = cell * 0.5;
+      ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
+      const peak = isMaw ? 0.34 : 0.26;
+      for (let gy = -cellsPerRadius; gy < cellsPerRadius; gy++) {
+        for (let gx = -cellsPerRadius; gx < cellsPerRadius; gx++) {
+          const dx = (gx + 0.5) * cell;
+          const dy = (gy + 0.5) * cell;
+          const a = mawVeilAlpha(dx, dy, seconds, reach);
+          if (a <= 0.02) continue;
+          const [x0, y0] = toScreen(cx + dx - half, cy + dy - half);
+          const [x1, y1] = toScreen(cx + dx + half, cy + dy - half);
+          const [x2, y2] = toScreen(cx + dx + half, cy + dy + half);
+          const [x3, y3] = toScreen(cx + dx - half, cy + dy + half);
+          ctx.globalAlpha = a * peak;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.lineTo(x3, y3);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }
 
     // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a

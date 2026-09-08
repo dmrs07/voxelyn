@@ -26,7 +26,7 @@ import {
   DEVOURER_MAW_RADIUS,
   PLAYER_SPEED,
 } from '@voxelyn/survival-sim';
-import { blobRadius, fbm01 } from './noise';
+import { blobRadius, fbm01, fbm2 } from './noise';
 
 /**
  * Quantos graos o vortice carrega de uma vez, NA QUALIDADE ALTA.
@@ -629,4 +629,82 @@ export const sinkholeCrestShape = (
     points.push({ dx: Math.cos(angle) * r, dy: Math.sin(angle) * r });
   }
   return points;
+};
+
+// ---------------------------------------------------------------------------
+// O VEU DE AREIA — a nuvem continua, em Perlin, fluindo para dentro.
+// ---------------------------------------------------------------------------
+// As nuvens de `mawCloud` sao manchas: vinte e duas, de um tile, com o
+// contorno em ruido. Vistas em tela elas sao borroes, e um borrao nao mostra
+// ruido nenhum — o Perlin estava na borda de uma coisa pequena demais para
+// ter borda. O que faz uma nuvem de areia LER como nuvem e textura por
+// dentro: regioes densas e ralas, rasgos, filamentos, tudo se movendo junto.
+//
+// O veu e isso: um campo de Perlin amostrado sobre o disco inteiro, numa
+// grade de celulas projetadas no chao. O truque que o faz parecer SUGADO e
+// nao pintado esta nas coordenadas: o ruido nao e amostrado em (x, y), e sim
+// nas coordenadas MATERIAIS da espiral — o progresso pela lei do sumidouro e
+// o angulo desenrolado pelo passo. Nessas coordenadas um ponto que viaja pelo
+// mesmo caminho dos graos tem coordenadas constantes, entao deslocar o campo
+// no tempo faz a textura inteira escorrer para a garganta, ao longo dos
+// mesmos riscos, sem nunca se rasgar numa costura.
+
+/** Quantas celulas cabem no RAIO do veu, na qualidade alta. Escalado pelo preset. */
+export const MAW_VEIL_CELLS = 18;
+/**
+ * A textura e mais grossa que os graos e mais fina que as nuvens: cerca de
+ * tres nodulos por raio. Menos e um blob; mais e granulado que compete com os
+ * riscos.
+ */
+const VEIL_SCALE_RADIAL = 3.2;
+const VEIL_SCALE_ANGULAR = 2.4;
+/** O limiar abaixo do qual o veu e transparente: e o que abre os rasgos. */
+const VEIL_THRESHOLD = 0.42;
+
+/**
+ * O RUIDO do veu em (dx, dy), em [0, 1], JA em coordenadas de espiral.
+ *
+ * `m` e o progresso da garganta ate a borda pela lei do raio (`r^Q` linear no
+ * tempo, a mesma dos graos) deslocado pelo relogio: o campo escorre para
+ * dentro na velocidade da poeira (MAW_FALL_SECONDS * MAW_CLOUD_DRAG por
+ * travessia). `a` e o angulo com a espiral desenrolada — o mesmo termo de
+ * `mawSpiralAngle` — para os nodulos se alinharem aos riscos. O angulo entra
+ * como um ponto num circulo do plano do ruido, e por isso nao ha costura em
+ * volta nenhuma; `m` desliza esse circulo pelo plano.
+ *
+ * Invariante que o teste guarda: um ponto levado pelo fluxo (o raio caindo
+ * pela lei, o angulo girando pelo passo) le o MESMO valor um instante depois.
+ */
+export const mawVeilNoise = (dx: number, dy: number, seconds: number, reach: number): number => {
+  const r = Math.hypot(dx, dy);
+  if (r <= 1e-6 || reach <= 1e-6) return 0;
+  const inner = mawInnerRadius(reach);
+  const outerQ = Math.pow(reach, SINK_Q);
+  const innerQ = Math.pow(inner, SINK_Q);
+  const span = Math.max(1e-6, outerQ - innerQ);
+  const progress = (Math.pow(r, SINK_Q) - innerQ) / span;
+  const m = progress + seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG);
+  const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
+  const x = Math.cos(a) * VEIL_SCALE_ANGULAR + m * VEIL_SCALE_RADIAL;
+  const y = Math.sin(a) * VEIL_SCALE_ANGULAR + m * 0.35;
+  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 3)));
+};
+
+/**
+ * A OPACIDADE do veu numa celula, em [0, 1]: o ruido com limiar (os rasgos)
+ * vezes a janela do disco — some na garganta, onde nao pode haver poeira por
+ * cima da sentenca, e some na borda, para o veu nao ter contorno.
+ */
+export const mawVeilAlpha = (dx: number, dy: number, seconds: number, reach: number): number => {
+  const r = Math.hypot(dx, dy);
+  if (reach <= 1e-6 || r >= reach) return 0;
+  const inner = mawInnerRadius(reach);
+  if (r <= inner) return 0;
+  const n = mawVeilNoise(dx, dy, seconds, reach);
+  const body = Math.max(0, (n - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD));
+  const t = (r - inner) / Math.max(1e-6, reach - inner);
+  // Rente as duas bordas o veu apaga em rampa curta; no meio do disco vale
+  // inteiro. A da garganta e mais curta: a areia acumula perto dela.
+  const window = Math.min(1, t / 0.12, (1 - t) / 0.28);
+  return body * Math.max(0, window);
 };

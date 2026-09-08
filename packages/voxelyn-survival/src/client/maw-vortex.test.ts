@@ -27,6 +27,8 @@ import {
   mawFlowAt,
   mawInnerRadius,
   mawStreak,
+  mawVeilAlpha,
+  mawVeilNoise,
   sinkholeCrestShape,
   sinkholeRamp,
 } from './maw-vortex';
@@ -504,5 +506,69 @@ describe('sumidouro — o buraco e a rampa toroidal', () => {
     const a = sinkholeCrestShape(100, 1.0, 1.4);
     expect(a).toEqual(sinkholeCrestShape(100, 1.0, 1.4));
     expect(a).not.toEqual(sinkholeCrestShape(101, 1.0, 1.4));
+  });
+});
+
+describe('vortice da boca — o veu de areia (Perlin)', () => {
+  const reach = DEVOURER_MAW_RADIUS;
+  const SINK_Q = 1.2;
+
+  it('e ADVECTADO pelo fluxo: um ponto levado pela espiral le o mesmo valor depois', () => {
+    // O invariante inteiro do veu. As coordenadas do ruido sao as materiais da
+    // espiral, entao a textura escorre para a garganta pelos mesmos caminhos
+    // dos graos — em vez de ser um ruido parado com o disco passando por cima.
+    const inner = mawInnerRadius(reach);
+    const outerQ = Math.pow(reach, SINK_Q);
+    const innerQ = Math.pow(inner, SINK_Q);
+    const T = MAW_FALL_SECONDS * MAW_CLOUD_DRAG;
+    for (const [r0, th0, t0] of [
+      [6.5, 0.3, 0.2],
+      [4.2, 2.9, 1.1],
+      [3.0, -1.7, 0.7],
+    ]) {
+      const dt = 0.25;
+      // O raio depois de dt, pela lei do sumidouro (r^Q linear no tempo).
+      const q0 = Math.pow(r0, SINK_Q);
+      const q1 = q0 - (dt / T) * (outerQ - innerQ);
+      const r1 = Math.pow(q1, 1 / SINK_Q);
+      // E o angulo depois de dt, pelo passo da espiral.
+      const th1 = th0 + Math.tan((38 * Math.PI) / 180) * Math.log(r0 / r1);
+      const before = mawVeilNoise(Math.cos(th0) * r0, Math.sin(th0) * r0, t0, reach);
+      const after = mawVeilNoise(Math.cos(th1) * r1, Math.sin(th1) * r1, t0 + dt, reach);
+      expect(after).toBeCloseTo(before, 5);
+    }
+  });
+
+  it('tem rasgos e nodulos: nem chapado nem branco', () => {
+    let seen = 0;
+    let clear = 0;
+    let total = 0;
+    for (let gy = -12; gy < 12; gy++) {
+      for (let gx = -12; gx < 12; gx++) {
+        const dx = (gx + 0.5) * (reach / 12);
+        const dy = (gy + 0.5) * (reach / 12);
+        if (Math.hypot(dx, dy) >= reach * 0.95 || Math.hypot(dx, dy) <= mawInnerRadius(reach) * 1.3) continue;
+        total++;
+        const a = mawVeilAlpha(dx, dy, 0.9, reach);
+        expect(a).toBeGreaterThanOrEqual(0);
+        expect(a).toBeLessThanOrEqual(1);
+        if (a > 0.15) seen++;
+        if (a < 0.02) clear++;
+      }
+    }
+    expect(seen / total, 'quase nada visivel').toBeGreaterThan(0.2);
+    expect(clear / total, 'sem rasgo nenhum').toBeGreaterThan(0.1);
+  });
+
+  it('some fora do disco e na garganta, e muda com o tempo', () => {
+    expect(mawVeilAlpha(reach + 0.1, 0, 1, reach)).toBe(0);
+    expect(mawVeilAlpha(mawInnerRadius(reach) * 0.5, 0, 1, reach)).toBe(0);
+    expect(mawVeilAlpha(3, 1, 0.4, reach)).toBe(mawVeilAlpha(3, 1, 0.4, reach));
+    let moved = 0;
+    for (let k = 0; k < 20; k++) {
+      const dx = 2 + k * 0.2;
+      if (Math.abs(mawVeilNoise(dx, 1.3, 0.4, reach) - mawVeilNoise(dx, 1.3, 1.4, reach)) > 0.05) moved++;
+    }
+    expect(moved).toBeGreaterThan(5);
   });
 });
