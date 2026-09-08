@@ -446,6 +446,7 @@
       body.tools-hidden #leviathan-panel,
       body.tools-hidden #diamandis-panel,
       body.tools-hidden #ice-panel,
+      body.tools-hidden #sutures-panel,
       body.tools-hidden #hud-note {
         display: none !important;
       }
@@ -616,31 +617,39 @@
 
     <div id="setup">
       <form id="setup-form">
-        <h1>ARENA DE CHEFES</h1>
-        <p class="subtitle">
+        <!-- Os textos da arena seguem o idioma do HUD (`data-i18n`, ver
+             `applyStaticTranslations`): configuracao em portugues e luta em
+             ingles na mesma tela era o que o playtest apontou. -->
+        <h1 data-i18n="arena.setup.title">ARENA DE CHEFES</h1>
+        <p class="subtitle" data-i18n="arena.setup.subtitle">
           Ferramenta de playtest isolado: escolha o chefe e as condições de entrada e jogue a luta
           você mesmo. O setor inteiro (terreno, trash, sítios) é o mesmo que a run normal geraria —
           só a descida até aqui é pulada.
         </p>
 
         <div class="field">
-          <label for="boss">Chefe</label>
+          <label for="setup-locale" data-i18n="arena.setup.locale">Idioma</label>
+          <select id="setup-locale"></select>
+        </div>
+
+        <div class="field">
+          <label for="boss" data-i18n="arena.setup.boss">Chefe</label>
           <select id="boss" name="boss"></select>
           <span class="place-hint" id="boss-place"></span>
         </div>
 
         <div class="field">
-          <label for="hp">HP máximo do Prospector</label>
+          <label for="hp" data-i18n="arena.setup.hp">HP máximo do Prospector</label>
           <input id="hp" name="hp" type="number" min="20" max="6000" step="1" value="100" />
         </div>
 
         <div class="field">
-          <label>Eco (habilidade equipada)</label>
+          <label data-i18n="arena.setup.ability">Eco (habilidade equipada)</label>
           <div class="radio-grid" id="ability-grid"></div>
         </div>
 
         <div class="field">
-          <label>Módulos ativos</label>
+          <label data-i18n="arena.setup.modules">Módulos ativos</label>
           <div class="check-grid" id="module-grid"></div>
         </div>
 
@@ -649,14 +658,14 @@
              Misturá-lo aos módulos ensinaria o modelo errado a quem usa esta
              ferramenta para decidir balanço. -->
         <div class="field">
-          <label>Matriz Geracional</label>
+          <label data-i18n="arena.setup.matrix">Matriz Geracional</label>
           <div class="check-grid">
             <label>
               <input type="checkbox" id="stabilisers" name="stabilisers" />
-              <span>Estabilizadores Giroscópicos (MV-04)</span>
+              <span data-i18n="arena.setup.stabilisers">Estabilizadores Giroscópicos (MV-04)</span>
             </label>
           </div>
-          <span class="place-hint">
+          <span class="place-hint" data-i18n="arena.setup.stabilisersHint">
             Sem o upgrade o Prospector freia ~2,5 tiles no gelo; com ele, ~1,0 — e recupera o rumo
             quatro vezes mais rápido. Não protege contra rachaduras: o que ele compra é a precisão
             de rota que permite desviar da célula crítica.
@@ -664,20 +673,20 @@
         </div>
 
         <div class="field">
-          <label>Co-op de apresentação</label>
+          <label data-i18n="arena.setup.coop">Co-op de apresentação</label>
           <div class="check-grid">
             <label>
               <input type="checkbox" id="coop" name="coop" />
-              <span>Segundo Prospector parado (slot 1)</span>
+              <span data-i18n="arena.setup.coopPartner">Segundo Prospector parado (slot 1)</span>
             </label>
           </div>
-          <span class="place-hint">
+          <span class="place-hint" data-i18n="arena.setup.coopHint">
             Ninguém o controla: serve para ver o congelamento do parceiro — geada, estátua e os dois
             medidores em níveis diferentes.
           </span>
         </div>
 
-        <button type="submit">Entrar na arena</button>
+        <button type="submit" data-i18n="arena.setup.enter">Entrar na arena</button>
       </form>
     </div>
 
@@ -685,8 +694,10 @@
       <div class="panel">
         <h2 id="end-title">—</h2>
         <div id="end-summary"></div>
-        <button id="btn-retry" class="primary">Tentar de novo (mesmas condições)</button>
-        <button id="btn-reconfigure">Trocar configuração</button>
+        <button id="btn-retry" class="primary" data-i18n="arena.end.retry">
+          Tentar de novo (mesmas condições)
+        </button>
+        <button id="btn-reconfigure" data-i18n="arena.end.reconfigure">Trocar configuração</button>
       </div>
     </div>
 

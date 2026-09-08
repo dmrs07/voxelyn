@@ -75,7 +75,15 @@ import {
   type GalleryViewport,
 } from './arena-bossbar-debug';
 import { setReducedMotionOverride } from './render';
-import { LOCALES, LOCALE_LABELS, getLocale, setLocale, t } from './i18n';
+import {
+  LOCALES,
+  LOCALE_LABELS,
+  applyStaticTranslations,
+  getLocale,
+  onLocaleChange,
+  setLocale,
+  t,
+} from './i18n';
 import { BOSS_ARCHETYPES } from '@voxelyn/survival-sim';
 import { bossBarAccent } from './boss-health-bar-palette';
 
@@ -145,6 +153,7 @@ const bossBarButtons = document.getElementById('bossbar-buttons') as HTMLDivElem
 const bossBarReconnect = document.getElementById('bossbar-reconnect') as HTMLButtonElement;
 const bossBarReduced = document.getElementById('bossbar-reduced') as HTMLInputElement;
 const bossBarLocale = document.getElementById('bossbar-locale') as HTMLSelectElement;
+const setupLocale = document.getElementById('setup-locale') as HTMLSelectElement;
 const bossBarGalleryOpen = document.getElementById('bossbar-gallery-open') as HTMLButtonElement;
 const galleryEl = document.getElementById('bossbar-gallery') as HTMLDivElement;
 const galleryScenario = document.getElementById('gallery-scenario') as HTMLSelectElement;
@@ -182,7 +191,7 @@ const readToolsHidden = (): boolean => {
 };
 const applyToolsHidden = (hidden: boolean): void => {
   document.body.classList.toggle('tools-hidden', hidden);
-  toolsToggle.textContent = hidden ? 'ferramentas' : 'esconder ferramentas';
+  toolsToggle.textContent = t(hidden ? 'arena.tools.show' : 'arena.tools.hide');
   toolsToggle.setAttribute('aria-pressed', hidden ? 'false' : 'true');
 };
 applyToolsHidden(readToolsHidden());
@@ -611,6 +620,7 @@ for (const id of Object.keys(GALLERY_VIEWPORTS) as GalleryViewport[]) {
 }
 fillLocaleSelect(bossBarLocale);
 fillLocaleSelect(galleryLocale);
+fillLocaleSelect(setupLocale);
 let galleryRunning = false;
 const galleryFrame = (now: number): void => {
   if (!galleryRunning) return;
@@ -746,31 +756,55 @@ let abandonActiveRun: (() => void) | null = null;
  */
 window.addEventListener('pagehide', () => abandonActiveRun?.());
 
-const OUTCOME_TITLE: Record<ArenaOutcome, string> = {
-  victory: 'Chefe derrotado',
-  defeat: 'O Prospector caiu',
-  abandoned: 'Luta abandonada',
-};
+const OUTCOME_TITLE = {
+  victory: 'arena.end.victory',
+  defeat: 'arena.end.defeat',
+  abandoned: 'arena.end.abandoned',
+} as const satisfies Record<ArenaOutcome, string>;
+
+// A ultima tela de fim, para redesenha-la se o idioma mudar com ela aberta.
+let lastEnd: { outcome: ArenaOutcome; state: SurvivalState } | null = null;
 
 const showEnd = (outcome: ArenaOutcome, state: SurvivalState): void => {
-  endTitle.textContent = OUTCOME_TITLE[outcome];
+  lastEnd = { outcome, state };
+  endTitle.textContent = t(OUTCOME_TITLE[outcome]);
   const summary = state.summary;
-  const lines: string[] = [`${state.tick} ticks simulados`];
+  const lines: string[] = [t('arena.end.ticks', { ticks: state.tick })];
   if (summary) {
-    lines.push(`Causa: ${summary.deathCause?.kind ?? 'nenhuma'}`);
-    lines.push(`Dano causado: ${(summary.stats.damageDealtTenths / 10).toFixed(1)}`);
-    lines.push(`Dano recebido: ${(summary.stats.damageTakenTenths / 10).toFixed(1)}`);
-    lines.push(`Tiros disparados: ${summary.stats.shotsFired}`);
+    lines.push(t('arena.end.cause', { cause: summary.deathCause?.kind ?? t('arena.end.noCause') }));
+    lines.push(
+      t('arena.end.damageDealt', { value: (summary.stats.damageDealtTenths / 10).toFixed(1) }),
+    );
+    lines.push(
+      t('arena.end.damageTaken', { value: (summary.stats.damageTakenTenths / 10).toFixed(1) }),
+    );
+    lines.push(t('arena.end.shots', { value: summary.stats.shotsFired }));
   } else {
     // Vitoria contra o chefe nao encerra `state.phase` (ver arena-outcome.ts),
     // entao nao ha RunSummary — so o que a propria arena sabe medir.
-    lines.push(`Dano causado: ${(state.stats.damageDealtTenths / 10).toFixed(1)}`);
-    lines.push(`Dano recebido: ${(state.stats.damageTakenTenths / 10).toFixed(1)}`);
-    lines.push(`Tiros disparados: ${state.stats.shotsFired}`);
+    lines.push(
+      t('arena.end.damageDealt', { value: (state.stats.damageDealtTenths / 10).toFixed(1) }),
+    );
+    lines.push(
+      t('arena.end.damageTaken', { value: (state.stats.damageTakenTenths / 10).toFixed(1) }),
+    );
+    lines.push(t('arena.end.shots', { value: state.stats.shotsFired }));
   }
   endSummary.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
   endOverlay.classList.remove('hidden');
 };
+
+// A arena inteira fala UMA lingua: a do HUD. Os textos estaticos vem por
+// `data-i18n` (escopo no corpo, para nao reescrever o titulo da aba), e o que
+// e montado em codigo — o interruptor, a tela de fim — e refeito aqui.
+const applyArenaLocale = (): void => {
+  applyStaticTranslations(document.body);
+  applyToolsHidden(document.body.classList.contains('tools-hidden'));
+  if (lastEnd && !endOverlay.classList.contains('hidden')) showEnd(lastEnd.outcome, lastEnd.state);
+  for (const select of [bossBarLocale, galleryLocale, setupLocale]) select.value = getLocale();
+};
+applyArenaLocale();
+onLocaleChange(applyArenaLocale);
 
 /**
  * O CENSO DO GELO, no painel de diagnostico.

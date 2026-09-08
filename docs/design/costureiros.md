@@ -5,7 +5,7 @@ Ocupação do Veio. Os Costureiros fixam seda mineral nas fraturas do estrato e 
 ## Conteúdo entregue
 
 - Costureiro: 108 quadros em quatro rumos; prepara o ponto, costura e fecha uma passagem.
-- Cerzideira: 216 quadros em **oito rumos autorados**, sem espelhamento; seis animações, com atlas de faces para iluminação. As diagonais usam `renderVoxels` com câmera girada sobre o modelo original, sem reamostragem da grade voxel. Um teste compara as diagonais assadas com a projeção direta do modelo.
+- Cerzideira: 240 quadros em **oito rumos autorados**, sem espelhamento; sete animações (inclusive a queda, `downed`), com atlas de faces para iluminação. As diagonais usam `renderVoxels` com câmera girada sobre o modelo original, sem reamostragem da grade voxel. Um teste compara as diagonais assadas com a projeção direta do modelo.
 - Âncora de sutura, âncora rachada, rocha costurada e seda mineral; portal da ocupação, registros de criaturas, dois documentos do Codex e textos em português/inglês.
 - Sons procedurais de tração, chicote e queda; eventos próprios de preparação, golpe e vulnerabilidade do boss.
 
@@ -34,10 +34,13 @@ Cada setor recebe até 12 suturas. A receita substitui apenas material de parede
 | Ser atravessado por uma puxada da Cerzideira | Um impacto de 20 por jogador em cada puxada. Esquivar evita também dano tardio na mesma passagem. |
 | Matar o operário                             | Interrompe a costura pendente; a obra já concluída permanece.                                     |
 | Cortar o suporte carregado pela Cerzideira   | Cancela a puxada, derruba o corpo e o expõe por 60 ticks (3 s).                                   |
+| Puxada encalhar num obstáculo                | Algo fechou a faixa depois da escolha: a amarra se solta e ela cai por 30 ticks (1,5 s).          |
 
 Chicote e queda atingem Prospectores e criaturas. Colisão do tiro usa o segmento percorrido, incluindo disparos paralelos ao fio e à amarra diagonal da Cerzideira. O corte não consome carga adicional de módulo.
 
-A Cerzideira resiste a impactos enquanto sustentada (0,55× dano). Derrubada, recebe 1,5× dano. Continua atacável sem amarras. Pode refazer uma sutura gasta se as duas âncoras sobreviverem. Abaixo de metade da vida, anuncia a segunda fase e reduz o preparo das puxadas de 24 para 16 ticks. A escolha do destino considera a faixa atravessada pelo jogador e a distância até outro apoio.
+A Cerzideira resiste a impactos enquanto sustentada (0,55× dano). Derrubada, recebe 1,5× dano e cai na pose própria (pernas cedendo, abdômen no chão). Continua atacável sem amarras. Pode refazer uma sutura gasta se as duas âncoras sobreviverem, mas só 160 ticks (8 s) depois de ela ter sido gasta; nesse intervalo puxa por outra amarra tensionada ou caça o jogador de perto. A ordem de decisão é puxar, depois costurar, depois caçar. Abaixo de metade da vida, anuncia a segunda fase e reduz o preparo das puxadas de 24 para 16 ticks. A escolha do destino considera a faixa atravessada pelo jogador e a distância até outro apoio, e exige que o corpo inteiro (raio 0,72) caiba na rota, não apenas a linha de visão.
+
+Durante o preparo a puxada desenha no chão a faixa com a largura do corpo, do abdômen até o ponto de chegada, enchendo conforme o tempo passa; a âncora carregada e a amarra pulsam em âmbar, para que o apoio a cortar se distinga das outras suturas. A animação de preparo é a costura (`special`); o golpe (`attack`) começa junto do arranque.
 
 **Objetivo opcional:** recuperar as cargas marcadas, normalmente três, rende 24 de minério à equipe. O HUD mostra a quantidade realmente gerada. A recompensa é paga uma vez por setor; refazer a sutura e revisitar o setor na subida não repete o pagamento.
 
@@ -69,7 +72,7 @@ node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs
 
 O estado de suturas, seus prazos e a máscara de recompensas entram no hash autoritativo, snapshots, resync e estados de apresentação solo/co-op. A sutura desenhada acompanha o tick do corpo, em vez do snapshot mais recente recebido. O snapshot MCP expõe geometria, fase, prazos e objetivo.
 
-Versões: protocolo 34, simulação 66, conteúdo 35. Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
+Versões: protocolo 35, simulação 68, conteúdo 36. Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
 
 Os atlas novos carregam sob demanda. Ao trocar de encontro, o cliente libera os atlas opcionais e mapas de faces do boss anterior, incluindo pedidos ainda em andamento. Os limites existentes de 160 MiB no boot e 48 MiB sob demanda foram mantidos; o validador mede o conjunto comum mais o maior encontro residente.
 

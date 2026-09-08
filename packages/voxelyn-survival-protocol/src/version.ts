@@ -990,7 +990,15 @@ export const PROTOCOL_VERSION = 35;
 //     jogador mais perto a 1,2 tile/s. `DEVOURER_HP` 760 -> 1500 para a
 //     virada caber (a metade e uma janela e meia de dano). Posicao do chefe,
 //     posicao dos corpos e areia no chao mudaram: um replay de 66 nao bate.
-export const SIMULATION_VERSION = 67;
+// 68: A CERZIDEIRA PRESSIONA. A sutura gasta ganha `resewAt` (no hash): a
+//     rainha so a refaz 8 s depois, e nesse intervalo puxa por outra amarra
+//     ou caca de perto — o ciclo estacionario do playtest (recosturar, ser
+//     cortada, cair, repetir a cada 4,7 s) acaba. A puxada vem antes da
+//     costura na decisao dela; a rota e conferida com o corpo inteiro, nao so
+//     com a linha de visao; e encalhar no meio do voo solta a amarra e a
+//     derruba por 1,5 s. Decisoes e posicoes do chefe mudaram: um replay de
+//     67 com a Cerzideira nao bate.
+export const SIMULATION_VERSION = 68;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1180,7 +1188,12 @@ export const SIMULATION_VERSION = 67;
 //     atlas antigos em cache desenharia a arraia curta inteira sobre um corpo
 //     que a simulacao tem por segmentos, e o nucleo das bacias com moldura de
 //     gelo; o bump invalida a precache.
-export const CONTENT_VERSION = 35;
+// 36: a CERZIDEIRA DERRUBADA. O atlas `enemy-seamstress` ganha `downed`
+//     (tres quadros, oito rumos): pernas cedendo, abdome no chao, a costura
+//     ventral exposta — a pose da janela de dano, que antes era o repouso
+//     parado. Um cliente com o atlas antigo em cache cairia no `idle` de
+//     sempre; o bump invalida a precache.
+export const CONTENT_VERSION = 36;
 
 export type VersionTriple = {
   protocolVersion: number;
