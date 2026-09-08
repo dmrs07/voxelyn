@@ -1000,7 +1000,9 @@ export const PROTOCOL_VERSION = 36;
 //     derruba por 1,5 s. Decisoes e posicoes do chefe mudaram: um replay de
 //     67 com a Cerzideira nao bate.
 // 69: Cerzideira hunts above terrain, strikes once on arrival and summons jumping helpers.
-export const SIMULATION_VERSION = 69;
+// 70: Retry Stitcher layouts without two usable chamber supports. The seeded terrain
+//     can change, so replays and reconnects must use the same generation contract.
+export const SIMULATION_VERSION = 70;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -9,6 +9,11 @@ import {
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
 import { approach, suturePoint } from './sutures.js';
+import {
+  SEAMSTRESS_CHAMBER_RADIUS as CHAMBER_RADIUS,
+  sutureInSeamstressChamber,
+  seamstressAnchorInRange,
+} from './suture-layout.js';
 import type { Entity, SemanticEvent, SilkFlight, SurvivalState, Vec2 } from './types.js';
 
 export const SEAMSTRESS_GROUND_SPEED = 4;
@@ -29,7 +34,6 @@ export const silkStrike = (enemy: Entity): Vec2 & { radius: number } => {
     radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.55 : 0.85,
   };
 };
-const CHAMBER_RADIUS = 18;
 const unit = (x: number, y: number): Vec2 => {
   const d = Math.hypot(x, y) || 1;
   return { x: x / d, y: y / d };
@@ -120,13 +124,7 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
     comboLeft: 0,
   };
   for (const s of state.sutures) {
-    if (
-      !s.cells.some((i) => {
-        const p = suturePoint(state, i);
-        return Math.hypot(p.x - queen.x, p.y - queen.y) < CHAMBER_RADIUS;
-      })
-    )
-      continue;
+    if (!sutureInSeamstressChamber(s, state.config.width, queen)) continue;
     s.encounter = true;
     s.closeAt = s.whipAt = s.fallAt = -1;
     for (const i of s.cells)
@@ -255,6 +253,7 @@ const pull = (
   for (const anchor of anchors) {
     if (
       anchor === encounter.lastAnchor ||
+      !seamstressAnchorInRange(anchor, state.config.width, queen) ||
       ![SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED].includes(state.solid[anchor])
     )
       continue;
@@ -262,7 +261,6 @@ const pull = (
       dx = p.x - queen.x,
       dy = p.y - queen.y;
     const d = Math.hypot(dx, dy);
-    if (d < 3 || d > 24) continue;
     // Pull towards the selected support, stopping beside the locked target to strike.
     const along = Math.max(
       2,

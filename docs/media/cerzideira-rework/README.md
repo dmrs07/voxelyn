@@ -15,6 +15,7 @@ Esta imagem usa estados da simulação, atlas publicados e a função de desenho
 - Após duas investidas, a Cerzideira convoca até três crias e um Costureiro. Eles agacham, marcam o pouso, saltam e se recuperam. A morte da matriz encerra os auxiliares e seus ataques.
 - Abaixo de metade da vida, ela encadeia duas investidas usando apoios diferentes e repõe auxiliares com maior frequência.
 - A câmara não fecha passagens, chicoteia fios nem derruba cargas. Esses comportamentos continuam nas suturas da colônia.
+- A geração exige dois apoios utilizáveis na câmara. Tentativas sem eles são refeitas pela sequência determinística existente; isso corrige a câmara sem apoios da seed 66 e a câmara com um único apoio da seed 177, setor 3.
 - O atlas da Cerzideira mantém oito direções autoradas, sem espelhamento, e o raster de câmera das diagonais. A cria tem modelo próprio; os três corpos têm pose de voo.
 
 ## Jogar e reproduzir
@@ -40,4 +41,4 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 36, simulação 69, conteúdo 37.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 36, simulação 70, conteúdo 37.

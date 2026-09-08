@@ -9,6 +9,21 @@ import {
 } from './constants.js';
 import type { SutureRecipe, Vec2 } from './types.js';
 
+export const SEAMSTRESS_CHAMBER_RADIUS = 18;
+
+/** Generation and the live encounter must agree on which supports the boss can use. */
+export const sutureInSeamstressChamber = (s: SutureRecipe, w: number, boss: Vec2): boolean =>
+  s.cells.some(
+    (i) =>
+      Math.hypot((i % w) + 0.5 - boss.x, Math.floor(i / w) + 0.5 - boss.y) <
+      SEAMSTRESS_CHAMBER_RADIUS,
+  );
+
+export const seamstressAnchorInRange = (i: number, w: number, boss: Vec2): boolean => {
+  const distance = Math.hypot((i % w) + 0.5 - boss.x, Math.floor(i / w) + 0.5 - boss.y);
+  return distance >= 3 && distance <= 24;
+};
+
 /** Occupation overlay: existing walls become anchors; no route is carved or sealed at spawn. */
 export const generateSutures = (
   solid: Uint8Array,

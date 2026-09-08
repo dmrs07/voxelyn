@@ -1,4 +1,8 @@
-import { generateSutures } from './suture-layout.js';
+import {
+  generateSutures,
+  sutureInSeamstressChamber,
+  seamstressAnchorInRange,
+} from './suture-layout.js';
 import { RNG } from '@voxelyn/core';
 import {
   ARCHCANTOR_CHOIR_LANCE_LENGTH,
@@ -15,6 +19,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
+  SOLID_SUTURE_ANCHOR,
   SOLID_PIPE_N,
   SOLID_PIPE_E,
   SOLID_PIPE_S,
@@ -2296,6 +2301,19 @@ const generateAttempt = (
     guardianSpawn,
     arenaFilled,
   );
+
+  if ((profile.sutureCount ?? 0) > 0) {
+    const boss = { x: guardianSpawn.x + 0.5, y: guardianSpawn.y + 0.5 };
+    const supports = new Set(
+      sutures
+        .filter((s) => sutureInSeamstressChamber(s, w, boss))
+        .flatMap((s) => [s.a, s.b])
+        .filter((i) => solid[i] === SOLID_SUTURE_ANCHOR && seamstressAnchorInRange(i, w, boss)),
+    );
+    // The boss excludes its last anchor: one support still cannot teach two lunges
+    // or unlock the brood. Retry this layout, like any other unsolvable chamber.
+    if (supports.size < 2) return null;
+  }
 
   return {
     sutures,

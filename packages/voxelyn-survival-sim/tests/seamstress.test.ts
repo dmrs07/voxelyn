@@ -16,6 +16,7 @@ import {
   stepSutures,
   stitcherStep,
   sutureObjective,
+  suturePoint,
   tetherEndpoint,
 } from '../src/sutures';
 import {
@@ -23,6 +24,7 @@ import {
   SEAMSTRESS_DROP_TICKS,
   silkLift,
   silkCanLand,
+  silkLanding,
   summonSilkBrood,
 } from '../src/seamstress';
 import { SOLID_NONE, SOLID_ROCK, SOLID_SUTURE_ANCHOR } from '../src/constants';
@@ -80,6 +82,50 @@ const until = (state: SurvivalState, tick: number): SemanticEvent[] => {
 };
 
 describe('Cerzideira: single support, arrival strike and jumping brood', () => {
+  it.each([66, 177])(
+    'seed %i generates enough supports to attack twice and summon helpers',
+    (seed) => {
+      const state = createRun({ seed, sector: 3 });
+      const queen = state.enemies.find((e) => e.archetype === 'seamstress')!;
+      expect(queen).toBeDefined();
+      const anchors = [
+        ...new Set(state.sutures.filter((s) => s.encounter).flatMap((s) => [s.a, s.b])),
+      ].filter((i) => {
+        const p = suturePoint(state, i);
+        const distance = Math.hypot(p.x - queen.x, p.y - queen.y);
+        return state.solid[i] === SOLID_SUTURE_ANCHOR && distance >= 3 && distance <= 24;
+      });
+      expect(anchors.length).toBeGreaterThanOrEqual(2);
+      expect(hashAuthoritativeState(createRun({ seed, sector: 3 }))).toBe(
+        hashAuthoritativeState(state),
+      );
+      expect(silkCanLand(state, queen, queen.x, queen.y)).toBe(true);
+
+      // Use the generated terrain and the real AI, without arming a tether or injecting helpers.
+      state.playerExtra.iframesUntil = 10000;
+      state.enemies = [queen];
+      const origin = { x: queen.x, y: queen.y };
+      const events: SemanticEvent[] = [];
+      for (let n = 0; n < 8; n++) {
+        const target = silkLanding(state, state.player, {
+          x: origin.x + Math.cos((n * Math.PI) / 4) * 6,
+          y: origin.y + Math.sin((n * Math.PI) / 4) * 6,
+        });
+        if (!target) continue;
+        state.player.x = target.x;
+        state.player.y = target.y;
+        events.push(...until(state, state.tick + 80));
+        if (state.enemies.some((e) => e.summonerId === queen.id)) break;
+      }
+      expect(queen.silk!.lunges).toBeGreaterThanOrEqual(2);
+      expect(
+        events.filter((e) => e.t === 'boss_attack' && e.ability === 'tether').length,
+      ).toBeGreaterThanOrEqual(2);
+      const helpers = state.enemies.filter((e) => e.alive && e.summonerId === queen.id);
+      expect(helpers.some((e) => e.archetype === 'seamstress_brood')).toBe(true);
+      expect(helpers.length).toBeLessThanOrEqual(4);
+    },
+  );
   it('removes chamber hazards while preserving independent colony sutures', () => {
     const { state } = fixture();
     const chamber = state.sutures[0];
