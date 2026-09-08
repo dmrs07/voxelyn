@@ -11,7 +11,7 @@
 // a ordem do pintor e a chave de profundidade vem do core (projectIso,
 // makeDrawKey, sortDrawCommands) — nao ha matematica isometrica duplicada aqui.
 import { makeDrawKey, projectIso, sortDrawCommands } from '@voxelyn/core';
-import { grid, set, setRgb } from './lib.mjs';
+import { COLORS, grid, set, setRgb } from './lib.mjs';
 
 /**
  * Rampas de face por material: [topo, esquerda, direita].
@@ -317,11 +317,11 @@ const DIRECTION_ROTATION = [1, 2, 0, 3, 0.5, 1.5, 2.5, 3.5];
  * intermediarios (as diagonais do mundo, que na tela sao a horizontal e a
  * vertical): 4=r, 5=d, 6=l, 7=u.
  *
- * Um rumo intermediario e uma rotacao de MEIO passo (45 graus) do mesmo modelo,
- * re-rasterizada na grade fina — ver `rotatedVoxels`. Existe por causa dos
- * corpos compridos em pecas: um corpo que nada na vertical da tela com pecas
- * autoradas so nos quatro eixos do mundo empilha oito quadros `dr` um sobre o
- * outro, e le como escada, nao como bicho.
+ * Um rumo intermediario e um meio passo (45 graus) — e quem o da e a CAMERA,
+ * nunca o modelo: ver `rotatedRender`. Existe por causa dos corpos compridos em
+ * pecas: um corpo que nada na vertical da tela com pecas autoradas so nos
+ * quatro eixos do mundo empilha oito quadros `dr` um sobre o outro, e le como
+ * escada, nao como bicho.
  */
 export const DIRS8 = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
 
@@ -393,30 +393,14 @@ const rot = (x, y, r) => {
 };
 
 /**
- * O modelo rotacionado por um numero NAO inteiro de quartos de volta,
- * re-rasterizado na grade fina.
+ * O MODELO EM CELULAS, sem rotacao nenhuma, com material por celula.
  *
- * As rotacoes de 90 graus preservam a grade: um voxel vira outro voxel. A de
- * 45 nao — a caixa autorada vira um losango que atravessa celulas — entao o
- * modelo e amostrado de novo: cada voxel fino da caixa e coberto por uma
- * malha 2x2 de pontos, cada ponto e girado em torno do MESMO pivo das
- * rotacoes inteiras (o canto (0.5, 0.5) da grade fina — e o que `rot` faz,
- * escrito em coordenadas continuas) e cai na celula onde pousa. A malha tem
- * passo 0,5, e uma celula unitaria sempre contem um ponto de uma malha de
- * passo 0,5 girada de qualquer angulo (o disco inscrito tem raio 0,5, e a
- * distancia maxima a um ponto da malha e 0,354): o interior sai macico, sem
- * furo, e a borda fica serrilhada em um voxel — o serrilhado de um voxel e o
- * grao do jogo.
- *
- * A ocupacao e a casca saem do MESMO conjunto, e a casca e o voxel com algum
- * dos seis vizinhos vazio: a mesma definicao de interior que `shellVoxels`
- * usa para as caixas, aplicada a forma girada.
+ * Serve ao caminho de meio passo: ali quem gira e a CAMERA, nao o modelo, entao
+ * a ocupacao e sempre a da grade autorada. Inclui os voxels internos, que a
+ * oclusao precisa ver (a mesma razao de `solidVoxels` existir ao lado de
+ * `shellVoxels`).
  */
-const rotatedVoxels = (boxes, r) => {
-  const angle = (r * Math.PI) / 2;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const PIVOT = 0.5;
+const latticeCells = (boxes) => {
   const cells = new Map();
   for (const b of boxes) {
     const ramp = RAMPS[b.mat];
@@ -429,36 +413,43 @@ const rotatedVoxels = (boxes, r) => {
     const h = Math.max(1, fine(b.h));
     for (let dx = 0; dx < w; dx++) {
       for (let dy = 0; dy < d; dy++) {
-        for (const sx of [0.25, 0.75]) {
-          for (const sy of [0.25, 0.75]) {
-            const px = x0 + dx + sx - PIVOT;
-            const py = y0 + dy + sy - PIVOT;
-            const x = Math.floor(px * cos - py * sin + PIVOT);
-            const y = Math.floor(px * sin + py * cos + PIVOT);
-            for (let dz = 0; dz < h; dz++) {
-              // A caixa mais tarde na lista ganha a celula: e a ordem em que
-              // as caixas se sobrepoem quando o modelo e autorado por camadas.
-              cells.set(occupancyKey(x, y, z0 + dz), { x, y, z: z0 + dz, ramp, mat: b.mat });
-            }
-          }
+        for (let dz = 0; dz < h; dz++) {
+          // A caixa mais tarde na lista ganha a celula: e a ordem em que as
+          // caixas se sobrepoem quando o modelo e autorado por camadas.
+          const x = x0 + dx;
+          const y = y0 + dy;
+          const z = z0 + dz;
+          cells.set(occupancyKey(x, y, z), { x, y, z, ramp, mat: b.mat });
         }
       }
     }
   }
-  const solid = new Set(cells.keys());
-  const shell = [];
-  for (const v of cells.values()) {
-    const buried =
-      solid.has(occupancyKey(v.x + 1, v.y, v.z)) &&
-      solid.has(occupancyKey(v.x - 1, v.y, v.z)) &&
-      solid.has(occupancyKey(v.x, v.y + 1, v.z)) &&
-      solid.has(occupancyKey(v.x, v.y - 1, v.z)) &&
-      solid.has(occupancyKey(v.x, v.y, v.z + 1)) &&
-      solid.has(occupancyKey(v.x, v.y, v.z - 1));
-    if (!buried) shell.push(v);
-  }
-  return { solid, shell };
+  return cells;
 };
+
+/**
+ * As quatro faces LATERAIS de um voxel. Sao quatro e nao duas porque com a
+ * camera girada de meio passo a face virada para quem olha deixa de ser sempre
+ * a +x ou a +y — a lista fixa de `FACES` so vale quando quem gira e o modelo.
+ *
+ * `u` e `v` sao dois eixos quaisquer do plano da face; a oclusao so precisa
+ * deles para varrer os oito vizinhos em volta da celula da frente.
+ */
+const SIDE_FACES = [
+  { n: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1] },
+  { n: [-1, 0, 0], u: [0, 1, 0], v: [0, 0, 1] },
+  { n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+  { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+];
+const TOP_FACE = { n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] };
+
+/** As quatro direcoes do plano do chao, na grade fina. */
+const GROUND_DIRS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
 
 /**
  * Expande caixas em voxels FINOS, descartando os internos (nunca visiveis).
@@ -469,7 +460,6 @@ const rotatedVoxels = (boxes, r) => {
  * grade fina — e o meio-passo que da aos modelos a resolucao nova.
  */
 const shellVoxels = (boxes, r) => {
-  if (!Number.isInteger(r)) return rotatedVoxels(boxes, r).shell;
   const out = [];
   for (const b of boxes) {
     const ramp = RAMPS[b.mat];
@@ -505,7 +495,6 @@ const occupancyKey = (x, y, z) => `${x},${y},${z}`;
  * ha materia macica encostada nela.
  */
 const solidVoxels = (boxes, r) => {
-  if (!Number.isInteger(r)) return rotatedVoxels(boxes, r).solid;
   const solid = new Set();
   for (const b of boxes) {
     const x0 = fine(b.x);
@@ -570,6 +559,19 @@ const FACES = {
 export const ambientOcclusionSteps = (isSolid, x, y, z, face) => {
   const spec = FACES[face];
   if (!spec) throw new Error(`face desconhecida: ${face}`);
+  return occlusionOfFace(isSolid, x, y, z, spec);
+};
+
+/**
+ * O mesmo corte, recebendo a face por ESPECIFICACAO e nao por nome.
+ *
+ * Existe porque com a camera girada de meio passo a face virada para quem olha
+ * pode ser a -x ou a -y, e essas nao tem nome em `FACES` — `FACES` so lista as
+ * tres que a projecao mostra quando quem gira e o modelo. Acrescenta-las ali
+ * quebraria `shadedRamp`, que percorre a tabela inteira e aplicaria sombra duas
+ * vezes no mesmo slot.
+ */
+const occlusionOfFace = (isSolid, x, y, z, spec) => {
   const [nx, ny, nz] = spec.n;
   const [ux, uy, uz] = spec.u;
   const [vx, vy, vz] = spec.v;
@@ -791,10 +793,253 @@ export const layerDepthDispute = (aBoxes, bBoxes, dirIndex) => {
  * @param dirIndex 0=dr, 1=dl, 2=ur, 3=ul (rotacoes do mesmo modelo) e, para
  *   os rumos intermediarios, 4=r, 5=d, 6=l, 7=u (meio passo, re-rasterizado)
  */
+/** Os quatro cantos de uma face, em passos dos eixos `u` e `v` dela. */
+const QUAD_CORNERS = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+];
+
+/**
+ * Preenche um quadrilatero convexo amostrando o CENTRO de cada pixel.
+ *
+ * Amostrar o centro, e nao cobrir por area, e o que mantem a aresta DURA: um
+ * sprite deste jogo nao tem meio-tom de borda, e uma cobertura parcial
+ * inventaria cores fora da paleta.
+ *
+ * A aresta conta como DENTRO (o teste rejeita so o lado estritamente negativo),
+ * entao duas faces que compartilham um lado cobrem os dois a fila de pixels
+ * dele: nunca sobra um pixel de fundo entre faces vizinhas. Quem pinta por
+ * ultimo fica, e a ordem do pintor ja resolveu quem e.
+ *
+ * O PISO DE UM PIXEL, no fim, e o que impede uma face de SUMIR.
+ *
+ * Uma face de um voxel so, girada de meio passo, mede cerca de 2,8 por 1,4
+ * pixels — e uma forma desse tamanho pode nao conter nenhum centro de pixel.
+ * O carimbo de cubo nunca teve esse problema porque sempre punha pelo menos um
+ * pixel. Sem o piso, o mastro do Diamandis perdia o topo de TODAS as suas
+ * colunas de `loot`: as hastes tem meio voxel de lado, e a cor sumia do atlas
+ * inteiro — o manifest deixou de listar `#ffd166`, que foi como o defeito
+ * apareceu.
+ */
+const fillQuad = (g, pts, rgb) => {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  // Area nula: face de perfil. Preencher uma linha aqui poria uma listra de um
+  // pixel na silhueta, que e exatamente o tipo de sujeira que o quadrilatero
+  // veio evitar.
+  if (maxX - minX < 1e-9 || maxY - minY < 1e-9) return;
+  const x0 = Math.max(0, Math.floor(minX));
+  const x1 = Math.min(g.w - 1, Math.ceil(maxX));
+  const y0 = Math.max(0, Math.floor(minY));
+  const y1 = Math.min(g.h - 1, Math.ceil(maxY));
+  let painted = 0;
+  for (let py = y0; py <= y1; py++) {
+    for (let px = x0; px <= x1; px++) {
+      const cx = px + 0.5;
+      const cy = py + 0.5;
+      let inside = true;
+      for (let k = 0; k < 4 && inside; k++) {
+        const [ax, ay] = pts[k];
+        const [bx, by] = pts[(k + 1) % 4];
+        if ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax) < -1e-9) inside = false;
+      }
+      if (!inside) continue;
+      paint(g, px, py, rgb);
+      painted++;
+    }
+  }
+  if (painted > 0) return;
+  // Nenhum centro de pixel caiu dentro: a face existe e e visivel, entao ela
+  // recebe o pixel mais proximo do proprio centroide.
+  let cx = 0;
+  let cy = 0;
+  for (const [x, y] of pts) {
+    cx += x / 4;
+    cy += y / 4;
+  }
+  paint(g, Math.floor(cx), Math.floor(cy), rgb);
+};
+
+const paint = (g, x, y, rgb) => {
+  if (x < 0 || y < 0 || x >= g.w || y >= g.h) return;
+  const i = (y * g.w + x) * 4;
+  g.buf[i] = rgb[0];
+  g.buf[i + 1] = rgb[1];
+  g.buf[i + 2] = rgb[2];
+  g.buf[i + 3] = 255;
+};
+
+/** Cor da paleta mestra por nome, com a mesma recusa que `set` faz. */
+const paletteRgb = (name) => {
+  const c = COLORS[name];
+  if (!c) throw new Error(`cor fora da paleta: ${name}`);
+  return c;
+};
+
+/**
+ * RASTERIZACAO POR FACES, para os rumos de meio passo.
+ *
+ * ---------------------------------------------------------------------------
+ * O DEFEITO QUE ISTO CORRIGE
+ * ---------------------------------------------------------------------------
+ * O caminho antigo girava o MODELO 45 graus e o re-amostrava na mesma grade.
+ * A grade so aceita giros de 90 graus; a 45 todo plano do modelo vira ESCADA de
+ * um voxel, e o carimbo de cubo entao mostra o topo de uma coluna e so a lateral
+ * da vizinha, alternando. O resultado media-se em jogo: o chassi do Diamandis
+ * virava um paliçado de ripas verticais e as pernas dele, dois pentes.
+ *
+ * Nao era sombra — desligando `shadedRamp` inteiro as listras continuavam. Era a
+ * forma.
+ *
+ * ---------------------------------------------------------------------------
+ * A CORRECAO
+ * ---------------------------------------------------------------------------
+ * Girar o modelo por alfa e girar a camera por alfa dao a MESMA imagem: a
+ * rotacao entra somada dentro do seno e do cosseno da projecao. Entao aqui o
+ * modelo NAO gira — gira a projecao. A grade fica intacta, um plano continua
+ * plano, e o preco e que os cantos deixam de cair em pixel inteiro.
+ *
+ * Esse preco so existe para quem carimba um bitmap de tamanho fixo. Preenchendo
+ * QUADRILATEROS o problema some: faces vizinhas compartilham canto por
+ * construcao, entao nao ha fenda entre elas, e o teste de dentro/fora inclui a
+ * aresta dos dois lados — pixel nenhum fica orfao, e o que se sobrepoe e
+ * resolvido pela ordem do pintor.
+ *
+ * O PIVO e o mesmo de `projectModelPoint` (o canto 0,5 da grade fina), e isso
+ * nao e detalhe: os ENCAIXES das pecas destacaveis do Diamandis sao publicados
+ * por aquela funcao. Um pivo diferente aqui desprenderia a broca do chassi em
+ * metade dos rumos.
+ *
+ * Os rumos de rotacao INTEIRA nao passam por aqui. O carimbo de cubo e
+ * estilizado de proposito (`CUBE_CELLS` desenha o topo como trapezio afunilado,
+ * e nao como o losango exato da projecao) e trocar os dois caminhos de lugar
+ * mudaria o desenho de todo sprite do jogo, e nao so o dos oito rumos.
+ */
+const rotatedRender = (boxes, r, g, anchorX, anchorY) => {
+  const angle = (r * Math.PI) / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const PIVOT = 0.5;
+  const spin = (fx, fy) => {
+    const px = fx - PIVOT;
+    const py = fy - PIVOT;
+    return [px * cos - py * sin + PIVOT, px * sin + py * cos + PIVOT];
+  };
+  const at = (fx, fy, fz) => {
+    const [rx, ry] = spin(fx, fy);
+    const { sx, sy } = projectIso(rx, ry, fz, VOX.tileW, VOX.tileH, VOX.zStep);
+    return [anchorX + sx, anchorY + sy];
+  };
+  // Profundidade e lado da tela de uma DIRECAO ja girada. A soma e o mesmo eixo
+  // por que `makeDrawKey` ordena; positiva quer dizer mais perto de quem olha.
+  const depthOf = (dx, dy) => {
+    const [rx, ry] = spin(dx + PIVOT, dy + PIVOT);
+    return rx + ry - 1;
+  };
+  const screenXOf = (dx, dy) => {
+    const [rx, ry] = spin(dx + PIVOT, dy + PIVOT);
+    return rx - ry;
+  };
+
+  const cells = latticeCells(boxes);
+  const solid = new Set(cells.keys());
+  const isSolid = (x, y, z) => solid.has(occupancyKey(x, y, z));
+
+  // AS DUAS DIRECOES VIRADAS PARA A LUZ, que a quina acesa consulta.
+  //
+  // A key light da Art Bible vem do topo-esquerda da TELA, e subir na tela e
+  // diminuir a soma projetada. Com o modelo girado essas duas direcoes eram
+  // sempre -x e -y; com a camera girada elas mudam por rumo, entao saem daqui:
+  // as duas de menor profundidade, empate desfeito pela mais a esquerda.
+  const lit = [...GROUND_DIRS]
+    .sort((a, b) => {
+      const d = depthOf(a[0], a[1]) - depthOf(b[0], b[1]);
+      return Math.abs(d) > 1e-9 ? d : screenXOf(a[0], a[1]) - screenXOf(b[0], b[1]);
+    })
+    .slice(0, 2);
+  const litCorner = (v) =>
+    !isSolid(v.x, v.y, v.z + 1) && lit.every(([dx, dy]) => !isSolid(v.x + dx, v.y + dy, v.z));
+
+  // Ordem do pintor: fundo -> frente pela soma projetada, altura como desempate,
+  // exatamente a hierarquia de `makeDrawKey`.
+  const order = [...cells.values()].sort((a, b) => {
+    const d = depthOf(a.x, a.y) - depthOf(b.x, b.y);
+    return Math.abs(d) > 1e-9 ? d : a.z - b.z;
+  });
+
+  for (const v of order) {
+    for (const spec of [TOP_FACE, ...SIDE_FACES]) {
+      const [nx, ny, nz] = spec.n;
+      if (isSolid(v.x + nx, v.y + ny, v.z + nz)) continue; // face tapada
+      const top = nz > 0;
+      // Uma face lateral so entra se estiver virada para quem olha. De perfil a
+      // profundidade da normal e zero e o quadrilatero degenera numa linha —
+      // que e o caso real de dois dos quatro lados em todo rumo de meio passo.
+      if (!top && depthOf(nx, ny) <= 1e-9) continue;
+      // O TOM DA FRENTE, e o empate aqui nao e caso de borda: e a regra.
+      //
+      // Num rumo de meio passo a camera olha reto por um eixo da grade, entao
+      // das quatro laterais duas ficam de perfil, uma fica escondida e a que
+      // sobra fica exatamente DE FRENTE — screen-x zero, nem esquerda nem
+      // direita. Ou seja: o empate decide o tom da frente inteira de todo
+      // sprite destes quatro rumos.
+      //
+      // Ele vai para o tom do MEIO (slot 1) e nao para o mais escuro. A key
+      // light da Art Bible vem do topo-esquerda, entao uma parede de frente
+      // esta mais perto da parede esquerda que da direita. Resolvendo para o
+      // escuro, o funil de minerio do Diamandis — a unica faixa clara do
+      // chassi — sumia num navy chapado nos quatro rumos.
+      const slot = top ? 0 : screenXOf(nx, ny) <= 1e-9 ? 1 : 2;
+      const steps = occlusionOfFace(isSolid, v.x, v.y, v.z, spec);
+      let tone = stepped(SHADOW_OF, v.ramp[slot], steps);
+      if (top && steps === 0 && litCorner(v)) tone = stepped(LIGHT_OF, v.ramp[0], 1);
+      if (EMISSIVE.has(v.mat)) tone = v.ramp[slot];
+      const [ux, uy, uz] = spec.u;
+      const [vx, vy, vz] = spec.v;
+      // O canto de origem da face: a que aponta para + fica na parede de cima.
+      const ox = v.x + (nx > 0 ? 1 : 0);
+      const oy = v.y + (ny > 0 ? 1 : 0);
+      const oz = v.z + (nz > 0 ? 1 : 0);
+      const quad = QUAD_CORNERS.map(([a, b]) =>
+        at(ox + ux * a + vx * b, oy + uy * a + vy * b, oz + uz * a + vz * b),
+      );
+      // O teste de dentro/fora cobra um sentido so. Qual dos dois a face sai
+      // depende do rumo, entao ele e medido e corrigido em vez de suposto.
+      const twice =
+        (quad[1][0] - quad[0][0]) * (quad[2][1] - quad[0][1]) -
+        (quad[1][1] - quad[0][1]) * (quad[2][0] - quad[0][0]);
+      fillQuad(
+        g,
+        twice < 0 ? [quad[0], quad[3], quad[2], quad[1]] : quad,
+        faceCapture ? FACE_RGB[slot] : paletteRgb(tone),
+      );
+    }
+  }
+  return g;
+};
+
 export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   const rotation = DIRECTION_ROTATION[dirIndex];
   if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
   const g = grid(w, h);
+  // MEIO PASSO vai pelo outro caminho, e a divisao nao e conveniencia.
+  //
+  // Um giro de 90 graus leva a grade na grade: o modelo pode girar e o cubo
+  // continua sendo carimbado em pixel inteiro. Um de 45 nao leva, e girar o
+  // MODELO ali transformava todo plano em escada (ver `rotatedRender`). Entao
+  // no meio passo quem gira e a camera, e o desenho passa a ser por faces.
+  if (!Number.isInteger(rotation)) return rotatedRender(boxes, rotation, g, anchorX, anchorY);
+
   const commands = [];
   // A ocupacao e medida no modelo ROTACIONADO. A rotacao e de 90 graus, entao
   // preserva a grade e a vizinhanca continua sendo a dos eixos — mas as faces

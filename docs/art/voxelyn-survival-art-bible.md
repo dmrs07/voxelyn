@@ -49,6 +49,37 @@ imagens borradas/semi-realistas, personagens com perspectivas diferentes entre s
 | Profundidade de cor | Paleta indexada; máx. 20 cores por atlas incluindo outline (`tools/validate.mjs`) |
 | Transparência | Alpha binário: 0 ou 255 em TODO atlas; efeitos translúcidos vivem em sistemas de FX de runtime, nunca no atlas |
 
+## 2.5 Os oito rumos: duas rasterizações
+
+Quatro dos oito rumos autorados (`dr`, `dl`, `ur`, `ul`) são os **eixos do mundo**; os outros quatro
+(`r`, `d`, `l`, `u`) são as **diagonais**. A diferença entre eles não é de arte, é de grade — e ela
+obriga a duas rasterizações em `tools/voxel.mjs`.
+
+**Rumo de quarto de volta** (os quatro eixos): a rotação leva a grade na grade, um voxel vira outro
+voxel, e o desenho é o **carimbo de cubo** (`CUBE_CELLS`) em posição inteira de pixel. Esse carimbo é
+estilizado de propósito — o topo é um trapézio afunilado e não o losango exato da projeção, e é dele
+que vem a leitura de faceta do jogo inteiro.
+
+**Rumo de meio passo** (as quatro diagonais): a grade **não** aceita 45°. Girar o modelo ali e
+re-amostrar transforma todo plano em escada de um voxel, e o carimbo passa a mostrar o topo de uma
+coluna e só a lateral da vizinha, alternando — um *corduroy* que em jogo lia como ripas verticais.
+Então quem gira é a **câmera**: o modelo fica na grade, a projeção é que roda, e o desenho é por
+**quadrilátero de face** (`rotatedRender`). Três consequências que valem estar escritas:
+
+- **O pivô é o mesmo de `projectModelPoint`** (o canto 0,5 da grade fina). Não é detalhe: os encaixes
+  das peças destacáveis são publicados por aquela função, e um pivô diferente aqui desprenderia a
+  broca do chassi em metade dos rumos.
+- **Duas faces, não três.** Nesses rumos a câmera olha reto por um eixo da grade: das quatro laterais,
+  duas ficam de perfil, uma fica escondida, e a que sobra fica exatamente de frente. O empate de lado
+  resolve para o **tom do meio** (a key light vem do topo-esquerda, então uma parede de frente está
+  mais perto da esquerda que da direita).
+- **Piso de um pixel.** Uma face de um voxel só, girada, mede ~2,8 × 1,4 px e pode não conter nenhum
+  centro de pixel. Sem um piso ela sumiria — e sumia: o mastro do Diamandis perdia o topo de todas as
+  hastes de `loot`.
+
+Trocar os dois caminhos de lugar mudaria o desenho de **todo** sprite do jogo, e não só o dos oito
+rumos. Eles não são intercambiáveis.
+
 ## 3. Anchors e footprint
 
 - Anchor de toda entidade: **centro do losango do tile ocupado**, em px do canvas do frame.

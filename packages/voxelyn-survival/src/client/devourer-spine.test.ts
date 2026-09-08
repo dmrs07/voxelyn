@@ -11,6 +11,7 @@ import {
   DEVOURER_MAW_BURY_TICKS,
   TICK_HZ,
 } from '@voxelyn/survival-sim';
+import { dirFromFacing, dirFromFacing8 } from '@voxelyn/survival-content';
 import broodManifest from '@voxelyn/survival-content/assets/atlases/part-devourer-brood.json';
 import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
 import coilManifest from '@voxelyn/survival-content/assets/atlases/part-white-devourer-coil.json';
@@ -325,6 +326,40 @@ describe('coluna do Devorador — o mergulho e a emergencia', () => {
           `zoom ${z}, quadro de ${m.frameHeight}`,
         ).toBeGreaterThanOrEqual(m.frameHeight * spriteZoom);
       }
+    }
+  });
+
+  it('o anel do corpo escolhe o quadro pelo MESMO rumo que a cabeca', () => {
+    // O DEFEITO QUE ESTA PROVA FECHA, visto em jogo: a cabeca passou a oito
+    // rumos e o anel do corpo ficou em quatro. Num salto diagonal a cabeca
+    // mostrava o rumo certo e os dez aneis atras dela caiam no vizinho mais
+    // proximo dos quatro autorados — o corpo torcia atras da cabeca.
+    //
+    // E era em METADE dos saltos, nao num canto raro: os quatro rumos que
+    // faltavam ao anel sao exatamente as diagonais do mundo, que e por onde o
+    // Devorador salta.
+    //
+    // A prova nao compara `directions` e para: ela passa pelo MESMO seletor que
+    // `drawLoadedFrame` usa (oito setores quando o manifesto declara oito,
+    // quatro quando nao) e cobra que os dois atlas cheguem na mesma letra em
+    // toda a volta. E o que o olho ve — nao o numero no JSON.
+    type Manifesto = { directions: number };
+    const cabeca = devourerManifest as unknown as Manifesto;
+    const anel = coilManifest as unknown as Manifesto;
+    const rumo = (m: Manifesto, x: number, y: number) =>
+      m.directions === 8 ? dirFromFacing8(x, y) : dirFromFacing(x, y);
+    const volta: Array<[number, number]> = [
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [-1, 1],
+      [-1, 0],
+      [-1, -1],
+      [0, -1],
+      [1, -1],
+    ];
+    for (const [x, y] of volta) {
+      expect(rumo(anel, x, y), `rumo ${x},${y}`).toBe(rumo(cabeca, x, y));
     }
   });
 });

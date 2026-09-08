@@ -280,11 +280,21 @@ describe('a ORDEM das pecas em volta do chassi, contra o rasterizador', () => {
     return n;
   };
 
-  // O unico residuo conhecido: de frente (`d`) os dois bracos ficam melhor
-  // ATRAS por pouco, porque o OMBRO deles mora dentro do deck e nenhum lado
-  // acerta os dois pedacos ao mesmo tempo. Medido, a diferenca e de shading nas
-  // bordas e nao de oclusao — as duas composicoes sao indistinguiveis a olho.
-  const RESIDUO = new Set(['armLeft|d', 'armRight|d']);
+  // O unico residuo conhecido, e ele MUDOU DE RUMO quando o meio passo passou a
+  // ser desenhado por faces.
+  //
+  // A causa e a mesma de sempre: o OMBRO do braco mora dentro do deck, entao
+  // nenhum dos dois lados acerta o ombro e a mao ao mesmo tempo, e a escolha
+  // vira uma questao de qual erro e menor. Antes o empate caia em `d` para os
+  // dois bracos; agora `d` decide sozinho (54 contra 60 e 48 contra 51, os dois
+  // para a frente, de acordo com o publicado) e sobra `armLeft` em `u`, onde a
+  // medida da EXATAMENTE 60 contra 60.
+  //
+  // Empate exato quer dizer que as duas composicoes erram o mesmo tanto: nao ha
+  // lado certo a cobrar, e forcar um seria escolher por gosto. Os dois rumos de
+  // `d` saem da lista em vez de ficar como peso morto — mantidos, esconderiam
+  // uma regressao futura ali.
+  const RESIDUO = new Set(['armLeft|u']);
 
   it('o `behind` publicado e o melhor dos dois lados, peca a peca e rumo a rumo', () => {
     // O manifest GERADO, e nao o spec: `behind` e decidido na geracao.

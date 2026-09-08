@@ -893,6 +893,121 @@ E a resposta some rápido: o arco só existe durante a erupção, pouco mais de 
 segundo. O painel **guarda** a última resposta até o pedido seguinte, senão nem
 quem clica e olha, nem uma captura automatizada, chegam a tempo.
 
+### Os ANÉIS do corpo também em oito rumos
+
+O primeiro passo deu oito rumos à **cabeça** e deixou o anel do corpo
+(`part-white-devourer-coil`) nos quatro de antes. O defeito aparece em jogo e não
+no JSON: num salto diagonal a cabeça mostra o rumo certo e os **dez anéis**
+pendurados no rastro caem no vizinho mais próximo dos quatro autorados — o corpo
+**torce** atrás da cabeça. E era em metade dos saltos, porque os quatro rumos que
+faltavam (`r`/`d`/`l`/`u`) são exatamente as diagonais do mundo, que é por onde
+ele salta (a tabela acima: 4/4 diagonais).
+
+| | quadro | rumos | quadros | custo |
+| --- | --- | --- | --- | --- |
+| *antes* | *64×58* | *4* | *40* | *0,57 MiB* |
+| `part-white-devourer-coil` | 70×58 | **8** | 80 | **1,24 MiB** |
+
+O boot subiu de 165.453.984 para **166.159.264** bytes — **+705.280**, com
+1.612.896 de folga no teto. Barato porque o anel é um quadro minúsculo: dobrar os
+rumos de uma peça de 70×58 custa uma fração do que custaria na cabeça.
+
+Três medidas guiaram o quadro novo, e nenhuma foi escolha de gosto:
+
+- **70 de largura, não 64.** Nos quatro rumos novos o anel projeta mais para os
+  lados (conteúdo 64 contra os 60 dos rumos antigos) e a validação ainda cobra 2
+  px de margem. 66 foi medido e **recusado pelo próprio gerador** (`conteudo
+  64x52 nao cabe em 66x58 com margem 2`). Um pixel de anel cortado, numa fila de
+  dez, lê como um degrau no meio do corpo.
+- **A altura não mudou.** O anel desce os mesmos **11 px** abaixo da origem nos
+  oito rumos, e esse número é a **linha da areia** que o cliente compartilha com
+  a cabeça (`DEVOURER_BELOW_ANCHOR_PX`). Mexer nele desalinharia o corte do
+  mergulho.
+- **A âncora publicada foi de 30 para 33**, e não para 32 como a conta ingênua
+  daria. Há **duas** âncoras aqui: a de rasterização, que `renderVoxels` recebe,
+  e a publicada no manifest — e entre uma e outra passa `fitSpriteToMargin`, que
+  recentraliza a **união de todos os quadros** dentro do frame. Esse deslocamento
+  sai da união, então ele **muda quando se acrescenta rumo**: era `-2` com quatro
+  rumos em 64 px, é `-1` com oito em 70 px. Carregar o número antigo põe a fila
+  inteira de dez anéis **um pixel fora** da linha da cabeça, em todos os rumos, e
+  nada mais reclama — foi o que a primeira versão desta mudança fez.
+
+No cliente **não houve mudança**: `drawLoadedFrame` escolhe entre oito e quatro
+setores lendo o `directions` do manifest **carregado**, e a direção de cada anel
+já era a tangente contínua do rastro (`spine-trail.ts`), não um rumo
+pré-quantizado. Passar o atlas a oito rumos foi o bastante.
+
+As duas provas que fecham isso não repetem números do JSON. Em
+`devourer-spine.test.ts`, a do rumo passa pelo **mesmo seletor** que o desenho
+usa e cobra que cabeça e anel cheguem à mesma letra nas oito voltas — com o
+manifest antigo ela falha em `(1, 1)`, `dl` contra `d`. Em
+`tests/devourer-coil.test.ts`, a da âncora **recalcula o deslocamento** a partir
+dos quadros crus e cobra a igualdade — com o 32 ela falha.
+
+### O CORDUROY dos rumos de meio passo, e o fim dele
+
+Com os anéis em oito rumos ficou visível uma coisa que já estava lá desde o
+Diamandis: nos quatro rumos de meio passo (`r`/`d`/`l`/`u`) os corpos vinham
+**listrados** — ripas verticais claras e escuras alternadas. O chassi do
+Diamandis lia como um paliçado, e as pernas dele como dois pentes.
+
+**Não era sombra.** Desligando `shadedRamp` inteiro — sem oclusão, sem quina
+acesa — as listras continuavam idênticas. Era a forma: o caminho antigo girava o
+**modelo** 45° e o re-amostrava na mesma grade, e a grade só aceita 90°. A 45°
+todo plano vira escada de um voxel, e o carimbo de cubo então mostra o topo de
+uma coluna e só a lateral da vizinha.
+
+A correção está na §2.5 da Art Bible: quem gira passa a ser a **câmera**, e o
+desenho vira preenchimento de quadrilátero de face. Girar o modelo por α e girar
+a câmera por α dão a mesma imagem — a rotação entra somada dentro do seno e do
+cosseno da projeção —, então a grade fica intacta e um plano continua plano.
+
+Vale para os **nove atlas de oito rumos**: chassi, braço, broca, rampa e mastro
+do Diamandis; cabeça e anel do Devorador; cauda e asas do Leviatã. Só os quatro
+rumos de meio passo mudam de pixel — os de quarto de volta continuam byte a byte
+iguais, porque continuam no carimbo de cubo.
+
+Três medidas que fecham a conta:
+
+- **Consistência de paleta.** Antes, cinco dos nove atlas usavam nos rumos de
+  meio passo cores que **não aparecem em rumo nenhum** de quarto de volta: tops
+  expostos a mais e frestas fundas demais, ambos inventados pela escada. Depois,
+  oito dos nove com zero cores fora, e o nono (`part-diamandis-rack`) com a mesma
+  uma de antes.
+- **Memória.** Boot inalterado em 166.159.264 bytes. PNG total caiu de 3.532.242
+  para **3.388.582** — superfície lisa comprime melhor que ruído.
+- **Quadros.** Dois precisaram crescer, porque sem a escada o desenho projeta um
+  pixel mais para os lados: a âncora do braço foi de 27 para 29, e a rampa foi de
+  60 para 62 de largura (âncora 30). Nos dois, âncora de render e âncora
+  publicada saem do mesmo objeto, então a peça não sai do lugar na tela.
+- **E um precisou ENCOLHER**, pela mesma razão invertida. O quadro da broca foi
+  dimensionado quando o meio passo ainda era re-amostrado, e a escada projetava
+  mais longe do que a geometria pede: medido no rasterizador de hoje, o conteúdo
+  cabe em 102×65 nos oito rumos e em todas as poses. De 128×68 para **104×66**
+  (âncora 52,31), o consumo sob demanda caiu de 50.205.168 para **48.174.448** —
+  a folga contra o teto foi de 126.480 para **2.157.200 bytes**, dezessete vezes
+  maior.
+
+Três defeitos meus no caminho, todos achados por medida e não por leitura:
+
+- **A frente saía no tom mais escuro.** Nesses rumos a única lateral visível fica
+  exatamente de frente (screen-x zero), e eu resolvia o empate para o `right` da
+  rampa. O funil de minério do Diamandis — a única faixa clara do chassi — virava
+  um navy chapado nos quatro rumos.
+- **Faces de um voxel sumiam.** Uma face girada mede ~2,8 × 1,4 px e pode não
+  conter centro de pixel nenhum. O mastro perdeu o topo de todas as hastes de
+  `loot`, e o defeito apareceu como uma cor a menos no manifest (`#ffd166`).
+- **A âncora do anel, de novo.** O rasterizador novo mudou o deslocamento do
+  `fitSpriteToMargin` de −1 para 0, então a âncora publicada teve de ir de 33
+  para 34. É a terceira vez que esse deslocamento muda debaixo de um número
+  escrito à mão; `tests/devourer-coil.test.ts` o recalcula em vez de repetir, e
+  foi ele que pegou.
+
+O que se perde: os rumos de meio passo ficam mais **lisos**. A textura que a
+escada dava era ruído, não informação — mas num corpo sem geometria própria (o
+anel é um tubo liso) o resultado limpo lê mais chapado que o listrado. No
+Diamandis, que tem geometria de sobra, não há disputa.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |
