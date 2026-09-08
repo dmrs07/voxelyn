@@ -43,7 +43,16 @@ import {
   summonSilkBrood,
 } from '../src/seamstress';
 import { SOLID_NONE, SOLID_ROCK, SOLID_SUTURE_ANCHOR } from '../src/constants';
-import { isWebStrand, webCovers, webSpeedMul, WEB_SLOW } from '../src/web';
+import {
+  isWebStrand,
+  webAnchors,
+  webCovers,
+  webIntegrity,
+  webSpeedMul,
+  WEB_ARMOR,
+  WEB_ARMOR_THRESHOLD,
+  WEB_SLOW,
+} from '../src/web';
 import type { Entity, SemanticEvent, SurvivalState } from '../src/types';
 
 const fixture = (players = 1) => {
@@ -562,6 +571,24 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     state.player.y = second.y;
     until(state, state.tick + 40);
     expect(second.action?.kind === 'stitch' && second.action.target === strand.id).toBe(false);
+  });
+
+  it('no frenesi a teia a blinda ate ser cortada abaixo do limiar; a camara garante apoios em volta', () => {
+    const { state, queen } = fixture();
+    toFrenzy(state, queen);
+    const web = state.sutures.filter(isWebStrand);
+    expect(webAnchors(state, queen.silk!).length).toBeGreaterThanOrEqual(8);
+    expect(webIntegrity(state)).toBe(1);
+    const full = queen.hp;
+    damageEntity(state, queen, 100, []);
+    expect(full - queen.hp).toBeCloseTo(100 * WEB_ARMOR, 5);
+    for (const s of web) {
+      if (webIntegrity(state) < WEB_ARMOR_THRESHOLD) break;
+      if (s.phase === 'taut') cutSuture(state, s, [], 0);
+    }
+    const exposed = queen.hp;
+    damageEntity(state, queen, 100, []);
+    expect(exposed - queen.hp).toBeCloseTo(100, 5);
   });
 
   it('a morte da Cerzideira encerra os auxiliares e dissolve a teia', () => {

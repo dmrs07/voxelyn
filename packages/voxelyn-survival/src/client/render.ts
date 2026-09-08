@@ -7,6 +7,7 @@ import {
   silkLift,
   seamstressFrenzied,
   seamstressHidden,
+  webIntegrity,
   SEAMSTRESS_STAGE_ALOFT,
 } from '@voxelyn/survival-sim';
 import { appendSutureDraws } from './suture-presentation';
@@ -8229,6 +8230,7 @@ export class SurvivalRenderer {
               : seamstressFrenzied(silkQueen)
                 ? 'seamstress.frenzy'
                 : 'seamstress.hint',
+          { integrity: Math.round(webIntegrity(state) * 100) },
         ),
       );
     else if (suturedCargo.total > 0 && !suturedCargo.rewarded)

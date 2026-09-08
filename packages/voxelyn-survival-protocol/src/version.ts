@@ -1027,7 +1027,16 @@ export const PROTOCOL_VERSION = 37;
 // 73: Stop each web spoke and spiral at its first wall or map boundary, keeping
 //     only the visible prefix. Detached strands beyond obstacles no longer slow
 //     players or create repair jobs, so Cerzideira replays from 72 can diverge.
-export const SIMULATION_VERSION = 73;
+// 74: A TEIA VIRA TEIA DE ARANHA e sustenta a rainha. A camara garante ancoras
+//     em volta (`ensureWebAnchors`: a primeira parede de dezesseis rumos, onde
+//     a parede permite — a geracao muda, e a impressao digital tambem); a
+//     segunda fase tece raios do centro a cada ancora e aneis concentricos
+//     (razao 1,3), cobrindo a camara. Juncoes sao apoios de puxada no frenesi
+//     (`supportHolds`). Com a integridade da teia a 60% ou mais ela leva 0,4x
+//     de dano (`WEB_ARMOR`); vida 780 -> 900; crias a 4,8 tiles/s, salto de
+//     10 com raio 0,7; ate dez auxiliares com tres Costureiros, reposicao a
+//     cada 4,5 s. Replays de 73 com a Cerzideira nao batem.
+export const SIMULATION_VERSION = 74;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

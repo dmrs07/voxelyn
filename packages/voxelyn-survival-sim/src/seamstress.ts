@@ -1,15 +1,15 @@
-import {
-  SOLID_NONE,
-  SOLID_STITCHED_ROCK,
-  SOLID_SUTURE_ANCHOR,
-  SOLID_SUTURE_CRACKED,
-  TICK_HZ,
-  MAX_ENEMIES,
-} from './constants.js';
+import { SOLID_NONE, SOLID_STITCHED_ROCK, TICK_HZ, MAX_ENEMIES } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
 import { approach, sewJob, suturePoint } from './sutures.js';
-import { spinWeb, weaveWeb, webRepairJobs } from './web.js';
+import {
+  chamberAnchors,
+  spinWeb,
+  supportHolds,
+  weaveWeb,
+  webJunctions,
+  webRepairJobs,
+} from './web.js';
 import {
   SEAMSTRESS_CHAMBER_RADIUS as CHAMBER_RADIUS,
   sutureInSeamstressChamber,
@@ -63,9 +63,9 @@ export const SEAMSTRESS_ASCEND_TICKS = 30;
 export const SEAMSTRESS_DESCEND_TICKS = 24;
 /** Frenesi: perseguicao mais rapida, puxadas mais curtas, mais auxiliares. */
 export const SEAMSTRESS_FRENZY_SPEED = 5.2;
-export const SILK_FRENZY_HELPER_CAP = 8;
-export const SILK_FRENZY_STITCHERS = 2;
-export const SILK_FRENZY_WAVE_INTERVAL = 120;
+export const SILK_FRENZY_HELPER_CAP = 10;
+export const SILK_FRENZY_STITCHERS = 3;
+export const SILK_FRENZY_WAVE_INTERVAL = 90;
 /** Altura, em pixels de zoom 1, a partir da qual o corpo esta fora da tela. */
 export const SEAMSTRESS_OFFSCREEN_LIFT = 320;
 
@@ -88,7 +88,7 @@ export const silkStrike = (enemy: Entity): Vec2 & { radius: number } => {
   return {
     x: (f?.toX ?? enemy.x) + (queen ? direction.x * SILK_NEEDLE_REACH : 0),
     y: (f?.toY ?? enemy.y) + (queen ? direction.y * SILK_NEEDLE_REACH : 0),
-    radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.55 : 0.85,
+    radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.7 : 0.85,
   };
 };
 const unit = (x: number, y: number): Vec2 => {
@@ -320,13 +320,21 @@ const pull = (
 ): boolean => {
   const encounter = queen.silk!;
   const aim = silkAim(player, 0.7);
-  const anchors = [...new Set(state.sutures.filter((s) => s.encounter).flatMap((s) => [s.a, s.b]))];
+  // Os APOIOS: toda ancora da camara (as das suturas e as garantidas em volta
+  // dela) e, no frenesi, as juncoes inteiras da teia — a teia e a locomocao
+  // dela, e cortar os fios de uma juncao a derruba no meio da puxada.
+  const anchors = [
+    ...new Set([
+      ...chamberAnchors(state, { x: encounter.x, y: encounter.y }),
+      ...(seamstressFrenzied(queen) ? webJunctions(state) : []),
+    ]),
+  ];
   const choices: Array<{ anchor: number; to: Vec2; score: number }> = [];
   for (const anchor of anchors) {
     if (
       anchor === encounter.lastAnchor ||
       !seamstressAnchorInRange(anchor, state.config.width, queen) ||
-      ![SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED].includes(state.solid[anchor])
+      !supportHolds(state, anchor)
     )
       continue;
     const p = suturePoint(state, anchor),
@@ -713,11 +721,7 @@ export const silkMaintenance = (
       open: false,
     });
   const anchor = enemy.action?.silkFlight?.anchor;
-  if (
-    anchor !== undefined &&
-    ![SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED].includes(state.solid[anchor])
-  )
-    dropSeamstress(state, enemy, events);
+  if (anchor !== undefined && !supportHolds(state, anchor)) dropSeamstress(state, enemy, events);
   return false;
 };
 
@@ -767,7 +771,7 @@ export const silkStride = (state: SurvivalState, enemy: Entity, events: Semantic
   for (const p of activePlayers(state)) {
     if (Math.hypot(p.x - hit.x, p.y - hit.y) > hit.radius + p.radius) continue;
     action.contactedSlots = (action.contactedSlots ?? 0) | (1 << (p.slot ?? 0));
-    damageEntity(state, p, queen ? 24 : enemy.archetype === 'seamstress_brood' ? 7 : 12, events, {
+    damageEntity(state, p, queen ? 24 : enemy.archetype === 'seamstress_brood' ? 10 : 12, events, {
       kind: 'enemy_contact',
       archetype: enemy.archetype as 'seamstress' | 'seamstress_brood' | 'stitcher',
       elite: false,

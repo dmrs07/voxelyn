@@ -24,6 +24,122 @@ export const seamstressAnchorInRange = (i: number, w: number, boss: Vec2): boole
   return distance >= 3 && distance <= 24;
 };
 
+/** Quantas ancoras a camara da Cerzideira garante em volta dela, e quantos raios as procuram. */
+export const WEB_ANCHOR_MIN = 8;
+export const WEB_ANCHOR_RAYS = 16;
+/** Alcance dos raios, em tiles: a teia da segunda fase vai ate essas ancoras. */
+export const WEB_ANCHOR_REACH = 22;
+
+/**
+ * ANCORAS EM VOLTA DA CAMARA, para a teia da segunda fase ter onde se prender.
+ *
+ * Dezesseis raios a partir do chefe; a primeira parede de cada um vira ancora
+ * (rocha ou fragil, fora das paredes estruturais reservadas). As suturas da
+ * colonia ja pagam duas ou tres; isto garante oito ou mais, espalhadas em
+ * todas as direcoes, e sao tambem apoios de puxada na primeira fase. Devolve
+ * as celulas encontradas (novas e existentes), sem repetir.
+ */
+export const ensureWebAnchors = (
+  solid: Uint8Array,
+  w: number,
+  h: number,
+  boss: Vec2,
+  protectedCells: ReadonlySet<number> = new Set(),
+): number[] => {
+  const anchors: number[] = [];
+  for (let k = 0; k < WEB_ANCHOR_RAYS; k++) {
+    const angle = (k / WEB_ANCHOR_RAYS) * Math.PI * 2 + 0.2;
+    const i = farWallAlong(solid, w, h, boss, angle, WEB_ANCHOR_REACH);
+    if (i < 0 || solid[i] === SOLID_NONE) continue;
+    if (solid[i] === SOLID_SUTURE_ANCHOR) {
+      if (!anchors.includes(i)) anchors.push(i);
+    } else if ((solid[i] === SOLID_ROCK || solid[i] === SOLID_FRAGILE) && !protectedCells.has(i)) {
+      solid[i] = SOLID_SUTURE_ANCHOR;
+      anchors.push(i);
+    }
+  }
+  return anchors;
+};
+
+/**
+ * Duas celulas de chao estao no MESMO espaco? Uma busca curta a pe, ate
+ * `maxSteps`, sem atravessar parede. E o que separa um pilar no meio da sala
+ * — o fio contorna e segue — de uma parede que divide duas salas, que o fio
+ * nao pode saltar.
+ */
+export const nearbyReachable = (
+  solid: Uint8Array,
+  w: number,
+  from: number,
+  to: number,
+  maxSteps: number,
+): boolean => {
+  if (from === to) return true;
+  const seen = new Set<number>([from]);
+  let frontier = [from];
+  for (let step = 0; step < maxSteps && frontier.length; step++) {
+    const next: number[] = [];
+    for (const c of frontier)
+      for (const n of [c - 1, c + 1, c - w, c + w]) {
+        if (n < 0 || n >= solid.length || seen.has(n)) continue;
+        if (Math.abs((n % w) - (c % w)) > 1) continue;
+        if (solid[n] !== SOLID_NONE) continue;
+        if (n === to) return true;
+        seen.add(n);
+        next.push(n);
+      }
+    frontier = next;
+  }
+  return false;
+};
+
+/**
+ * A PAREDE DE FUNDO de um rumo: a primeira parede que nao e um pilar. Um
+ * pilar e um solido com chao logo atras (ate tres tiles) que continua a mesma
+ * sala (`nearbyReachable`); o raio o atravessa e segue. Sem parede ate
+ * `reach`, devolve a celula de chao no alcance — a teia se prende ali mesmo.
+ * `-1` quando o rumo sai do mapa antes de qualquer coisa.
+ */
+export const farWallAlong = (
+  solid: Uint8Array,
+  w: number,
+  h: number,
+  from: Vec2,
+  angle: number,
+  reach: number,
+): number => {
+  const cellAt = (r: number): number => {
+    const x = Math.floor(from.x + Math.cos(angle) * r),
+      y = Math.floor(from.y + Math.sin(angle) * r);
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) return -1;
+    return y * w + x;
+  };
+  let lastFloor = -1;
+  for (let r = 1; r <= reach; r += 0.5) {
+    const c = cellAt(r);
+    if (c < 0) return lastFloor;
+    if (solid[c] === SOLID_NONE) {
+      lastFloor = c;
+      continue;
+    }
+    // Ha chao logo atras, na mesma sala? Entao e pilar: segue.
+    let resumed = -1;
+    for (let q = r + 0.5; q <= Math.min(reach, r + 3); q += 0.5) {
+      const n = cellAt(q);
+      if (n < 0) break;
+      if (solid[n] === SOLID_NONE) {
+        resumed = n;
+        r = q - 0.5;
+        break;
+      }
+    }
+    if (resumed >= 0 && lastFloor >= 0 && nearbyReachable(solid, w, lastFloor, resumed, 8))
+      continue;
+    return c;
+  }
+  return lastFloor;
+};
+
 /** Occupation overlay: existing walls become anchors; no route is carved or sealed at spawn. */
 export const generateSutures = (
   solid: Uint8Array,

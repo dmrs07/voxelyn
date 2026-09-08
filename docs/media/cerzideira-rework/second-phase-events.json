@@ -23,131 +23,467 @@
       "t": "suture",
       "phase": "taut",
       "id": 3,
-      "x": 86.5,
+      "x": 84.5,
       "y": 92.5
     },
     {
-      "tick": 87,
+      "tick": 81,
       "t": "suture",
       "phase": "taut",
       "id": 4,
-      "x": 90.5,
-      "y": 94.5
+      "x": 80.5,
+      "y": 91.5
+    },
+    {
+      "tick": 85,
+      "t": "suture",
+      "phase": "taut",
+      "id": 5,
+      "x": 75.5,
+      "y": 90.5
+    },
+    {
+      "tick": 89,
+      "t": "suture",
+      "phase": "taut",
+      "id": 6,
+      "x": 71.5,
+      "y": 89.5
+    },
+    {
+      "tick": 93,
+      "t": "suture",
+      "phase": "taut",
+      "id": 7,
+      "x": 66.5,
+      "y": 89.5
     },
     {
       "tick": 97,
       "t": "suture",
       "phase": "taut",
-      "id": 5,
+      "id": 8,
       "x": 84.5,
-      "y": 92.5
+      "y": 91.5
     },
     {
-      "tick": 107,
+      "tick": 101,
       "t": "suture",
       "phase": "taut",
-      "id": 6,
+      "id": 9,
+      "x": 77.5,
+      "y": 87.5
+    },
+    {
+      "tick": 105,
+      "t": "suture",
+      "phase": "taut",
+      "id": 10,
       "x": 85.5,
       "y": 91.5
     },
     {
-      "tick": 117,
+      "tick": 110,
       "t": "suture",
       "phase": "taut",
-      "id": 7,
-      "x": 87.5,
-      "y": 88.5
+      "id": 11,
+      "x": 83.5,
+      "y": 87.5
     },
     {
-      "tick": 127,
+      "tick": 114,
       "t": "suture",
       "phase": "taut",
-      "id": 8,
-      "x": 89.5,
-      "y": 84.5
+      "id": 12,
+      "x": 82.5,
+      "y": 82.5
     },
     {
-      "tick": 137,
+      "tick": 118,
       "t": "suture",
       "phase": "taut",
-      "id": 9,
+      "id": 13,
       "x": 85.5,
-      "y": 93.5
+      "y": 91.5
+    },
+    {
+      "tick": 122,
+      "t": "suture",
+      "phase": "taut",
+      "id": 14,
+      "x": 85.5,
+      "y": 91.5
+    },
+    {
+      "tick": 126,
+      "t": "suture",
+      "phase": "taut",
+      "id": 15,
+      "x": 88.5,
+      "y": 86.5
+    },
+    {
+      "tick": 130,
+      "t": "suture",
+      "phase": "taut",
+      "id": 16,
+      "x": 90.5,
+      "y": 82.5
+    },
+    {
+      "tick": 134,
+      "t": "suture",
+      "phase": "taut",
+      "id": 17,
+      "x": 86.5,
+      "y": 92.5
+    },
+    {
+      "tick": 139,
+      "t": "suture",
+      "phase": "taut",
+      "id": 18,
+      "x": 90.5,
+      "y": 90.5
+    },
+    {
+      "tick": 143,
+      "t": "suture",
+      "phase": "taut",
+      "id": 19,
+      "x": 86.5,
+      "y": 92.5
     },
     {
       "tick": 147,
       "t": "suture",
       "phase": "taut",
-      "id": 10,
+      "id": 20,
+      "x": 90.5,
+      "y": 93.5
+    },
+    {
+      "tick": 151,
+      "t": "suture",
+      "phase": "taut",
+      "id": 21,
+      "x": 86.5,
+      "y": 93.5
+    },
+    {
+      "tick": 155,
+      "t": "suture",
+      "phase": "taut",
+      "id": 22,
       "x": 84.5,
+      "y": 92.5
+    },
+    {
+      "tick": 159,
+      "t": "suture",
+      "phase": "taut",
+      "id": 23,
+      "x": 83.5,
+      "y": 92.5
+    },
+    {
+      "tick": 163,
+      "t": "suture",
+      "phase": "taut",
+      "id": 24,
+      "x": 83.5,
       "y": 91.5
     },
     {
-      "tick": 157,
+      "tick": 168,
       "t": "suture",
       "phase": "taut",
-      "id": 11,
-      "x": 81.5,
-      "y": 89.5
-    },
-    {
-      "tick": 167,
-      "t": "suture",
-      "phase": "taut",
-      "id": 12,
-      "x": 86.5,
-      "y": 92.5
-    },
-    {
-      "tick": 177,
-      "t": "suture",
-      "phase": "taut",
-      "id": 13,
-      "x": 86.5,
-      "y": 94.5
-    },
-    {
-      "tick": 187,
-      "t": "suture",
-      "phase": "taut",
-      "id": 14,
+      "id": 25,
       "x": 84.5,
+      "y": 90.5
+    },
+    {
+      "tick": 172,
+      "t": "suture",
+      "phase": "taut",
+      "id": 26,
+      "x": 86.5,
+      "y": 90.5
+    },
+    {
+      "tick": 176,
+      "t": "suture",
+      "phase": "taut",
+      "id": 27,
+      "x": 87.5,
+      "y": 91.5
+    },
+    {
+      "tick": 180,
+      "t": "suture",
+      "phase": "taut",
+      "id": 28,
+      "x": 87.5,
       "y": 92.5
+    },
+    {
+      "tick": 184,
+      "t": "suture",
+      "phase": "taut",
+      "id": 29,
+      "x": 87.5,
+      "y": 93.5
+    },
+    {
+      "tick": 188,
+      "t": "suture",
+      "phase": "taut",
+      "id": 30,
+      "x": 82.5,
+      "y": 91.5
+    },
+    {
+      "tick": 192,
+      "t": "suture",
+      "phase": "taut",
+      "id": 31,
+      "x": 82.5,
+      "y": 90.5
     },
     {
       "tick": 197,
       "t": "suture",
       "phase": "taut",
-      "id": 15,
+      "id": 32,
       "x": 84.5,
-      "y": 90.5
+      "y": 89.5
     },
     {
-      "tick": 207,
+      "tick": 201,
       "t": "suture",
       "phase": "taut",
-      "id": 16,
+      "id": 33,
       "x": 86.5,
-      "y": 90.5
+      "y": 89.5
+    },
+    {
+      "tick": 205,
+      "t": "suture",
+      "phase": "taut",
+      "id": 34,
+      "x": 87.5,
+      "y": 89.5
+    },
+    {
+      "tick": 209,
+      "t": "suture",
+      "phase": "taut",
+      "id": 35,
+      "x": 88.5,
+      "y": 91.5
+    },
+    {
+      "tick": 213,
+      "t": "suture",
+      "phase": "taut",
+      "id": 36,
+      "x": 88.5,
+      "y": 92.5
     },
     {
       "tick": 217,
       "t": "suture",
       "phase": "taut",
-      "id": 17,
-      "x": 87.5,
-      "y": 92.5
-    },
-    {
-      "tick": 227,
-      "t": "suture",
-      "phase": "taut",
-      "id": 18,
-      "x": 87.5,
+      "id": 37,
+      "x": 88.5,
       "y": 94.5
     },
     {
-      "tick": 247,
+      "tick": 221,
+      "t": "suture",
+      "phase": "taut",
+      "id": 38,
+      "x": 81.5,
+      "y": 89.5
+    },
+    {
+      "tick": 225,
+      "t": "suture",
+      "phase": "taut",
+      "id": 39,
+      "x": 83.5,
+      "y": 88.5
+    },
+    {
+      "tick": 230,
+      "t": "suture",
+      "phase": "taut",
+      "id": 40,
+      "x": 86.5,
+      "y": 88.5
+    },
+    {
+      "tick": 234,
+      "t": "suture",
+      "phase": "taut",
+      "id": 41,
+      "x": 87.5,
+      "y": 88.5
+    },
+    {
+      "tick": 238,
+      "t": "suture",
+      "phase": "taut",
+      "id": 42,
+      "x": 89.5,
+      "y": 91.5
+    },
+    {
+      "tick": 242,
+      "t": "suture",
+      "phase": "taut",
+      "id": 43,
+      "x": 90.5,
+      "y": 93.5
+    },
+    {
+      "tick": 246,
+      "t": "suture",
+      "phase": "taut",
+      "id": 44,
+      "x": 78.5,
+      "y": 91.5
+    },
+    {
+      "tick": 250,
+      "t": "suture",
+      "phase": "taut",
+      "id": 45,
+      "x": 79.5,
+      "y": 88.5
+    },
+    {
+      "tick": 254,
+      "t": "suture",
+      "phase": "taut",
+      "id": 46,
+      "x": 83.5,
+      "y": 86.5
+    },
+    {
+      "tick": 259,
+      "t": "suture",
+      "phase": "taut",
+      "id": 47,
+      "x": 88.5,
+      "y": 86.5
+    },
+    {
+      "tick": 263,
+      "t": "suture",
+      "phase": "taut",
+      "id": 48,
+      "x": 91.5,
+      "y": 89.5
+    },
+    {
+      "tick": 267,
+      "t": "suture",
+      "phase": "taut",
+      "id": 49,
+      "x": 91.5,
+      "y": 90.5
+    },
+    {
+      "tick": 271,
+      "t": "suture",
+      "phase": "taut",
+      "id": 50,
+      "x": 75.5,
+      "y": 90.5
+    },
+    {
+      "tick": 275,
+      "t": "suture",
+      "phase": "taut",
+      "id": 51,
+      "x": 77.5,
+      "y": 87.5
+    },
+    {
+      "tick": 279,
+      "t": "suture",
+      "phase": "taut",
+      "id": 52,
+      "x": 80.5,
+      "y": 85.5
+    },
+    {
+      "tick": 283,
+      "t": "suture",
+      "phase": "taut",
+      "id": 53,
+      "x": 89.5,
+      "y": 84.5
+    },
+    {
+      "tick": 288,
+      "t": "suture",
+      "phase": "taut",
+      "id": 54,
+      "x": 90.5,
+      "y": 83.5
+    },
+    {
+      "tick": 292,
+      "t": "suture",
+      "phase": "taut",
+      "id": 55,
+      "x": 91.5,
+      "y": 87.5
+    },
+    {
+      "tick": 296,
+      "t": "suture",
+      "phase": "taut",
+      "id": 56,
+      "x": 71.5,
+      "y": 89.5
+    },
+    {
+      "tick": 300,
+      "t": "suture",
+      "phase": "taut",
+      "id": 57,
+      "x": 75.5,
+      "y": 88.5
+    },
+    {
+      "tick": 304,
+      "t": "suture",
+      "phase": "taut",
+      "id": 58,
+      "x": 65.5,
+      "y": 88.5
+    },
+    {
+      "tick": 308,
+      "t": "suture",
+      "phase": "taut",
+      "id": 59,
+      "x": 69.5,
+      "y": 88.5
+    },
+    {
+      "tick": 312,
+      "t": "suture",
+      "phase": "taut",
+      "id": 60,
+      "x": 74.5,
+      "y": 87.5
+    },
+    {
+      "tick": 327,
       "t": "boss_state",
       "archetype": "seamstress",
       "state": "descend",
@@ -155,66 +491,12 @@
       "y": 92.5
     },
     {
-      "tick": 271,
+      "tick": 351,
       "t": "boss_state",
       "archetype": "seamstress",
       "state": "frenzy",
       "x": 85.5,
       "y": 92.5
-    },
-    {
-      "tick": 371,
-      "t": "suture",
-      "phase": "snap",
-      "id": -32,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
-    },
-    {
-      "tick": 373,
-      "t": "suture",
-      "phase": "snap",
-      "id": -31,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
-    },
-    {
-      "tick": 375,
-      "t": "suture",
-      "phase": "snap",
-      "id": -33,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
-    },
-    {
-      "tick": 376,
-      "t": "suture",
-      "phase": "snap",
-      "id": -29,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
-    },
-    {
-      "tick": 377,
-      "t": "suture",
-      "phase": "snap",
-      "id": -30,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
-    },
-    {
-      "tick": 377,
-      "t": "suture",
-      "phase": "snap",
-      "id": -34,
-      "x": 90.5,
-      "y": 94.5,
-      "radius": 0.55
     }
   ]
 }

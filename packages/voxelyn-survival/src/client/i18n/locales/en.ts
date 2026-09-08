@@ -333,7 +333,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'seamstress.hint': 'Cut the tether · dodge the mark',
   'seamstress.exposed': 'ABDOMEN EXPOSED · attack now',
   'seamstress.aloft': 'SHE CLIMBED · the web forms: read the bands',
-  'seamstress.frenzy': 'FRENZY · cut the web to open a lane · kill the menders',
+  'seamstress.frenzy':
+    'FRENZY · the web sustains her ({integrity}%) · cut it below 60% to expose her · kill the menders',
   'enemy.stitcher': 'Stitcher',
   'enemy.seamstress': 'The Darner',
   'bestiary.name.stitcher': 'Stitcher',
