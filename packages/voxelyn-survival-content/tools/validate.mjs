@@ -143,6 +143,8 @@ const MAX_ON_DEMAND_DECODED_BYTES = 48 * 1024 * 1024;
  * validacao confere os dois lados).
  */
 export const ON_DEMAND_ATLASES = new Set([
+  'enemy-stitcher',
+  'enemy-seamstress',
   'part-diamandis-drill',
   'part-diamandis-rack',
   'part-diamandis-mast',
@@ -549,6 +551,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let totalBytes = 0;
   let decodedBytes = 0;
   let onDemandDecodedBytes = 0;
+  const encounters = JSON.parse(readFileSync(resolve(DIR, '../encounter-atlases.json'), 'utf8'));
+  const groupOf = new Map(
+    Object.entries(encounters).flatMap(([group, ids]) => ids.map((id) => [id, group])),
+  );
+  const encounterBytes = new Map();
+  const countDemand = (id, bytes) => {
+    const group = groupOf.get(id);
+    if (group) encounterBytes.set(group, (encounterBytes.get(group) ?? 0) + bytes);
+    else onDemandDecodedBytes += bytes;
+  };
   // Terreno e chao ficam FORA do index de sprites: nao tem animacao por
   // direcao, nem frameMap, e o validador de personagem tentaria le-los assim.
   for (const [id, run] of [
@@ -588,7 +600,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       // quem encontra o chefe as carrega (ver `ON_DEMAND_ATLASES` em
       // sprites.ts). Contam no orcamento de sob demanda, nao no de boot — e a
       // regra escrita acima: peso novo e pago com carregamento sob demanda.
-      if (ON_DEMAND_ATLASES.has(id)) onDemandDecodedBytes += png.width * png.height * 4;
+      if (ON_DEMAND_ATLASES.has(id)) countDemand(id, png.width * png.height * 4);
       else decodedBytes += png.width * png.height * 4;
     }
     // O MAPA DE FACES conta no mesmo orcamento.
@@ -606,12 +618,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       } else {
         totalBytes += statSync(normalPath).size;
         const normal = PNG.sync.read(readFileSync(normalPath));
-        onDemandDecodedBytes += normal.width * normal.height * 4;
+        countDemand(id, normal.width * normal.height * 4);
       }
     }
     if (errs.length === 0) console.log(`  OK ${id}`);
     else for (const e of errs) console.error(`  FAIL ${e}`);
   }
+  // Matches SpriteBank.retainEncounter: shared maps plus the largest resident encounter.
+  onDemandDecodedBytes += Math.max(0, ...encounterBytes.values());
   if (totalBytes > MAX_TOTAL_PNG_BYTES) {
     console.error(`  FAIL total PNG ${totalBytes} > ${MAX_TOTAL_PNG_BYTES}`);
     totalErrors++;

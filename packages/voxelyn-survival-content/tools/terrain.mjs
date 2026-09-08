@@ -75,6 +75,9 @@ export const BLOCK_KINDS = [
   // -----------------------------------------------------------------------
   'leyline',
   'leylineNode',
+  'sutureAnchor',
+  'sutureCracked',
+  'stitchedRock',
 ];
 
 const hash2 = (x, y, seed) => {
@@ -84,7 +87,11 @@ const hash2 = (x, y, seed) => {
 };
 
 const hash3d = (x, y, z, seed) => {
-  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 2246822519);
+  let h =
+    Math.imul(x, 374761393) ^
+    Math.imul(y, 668265263) ^
+    Math.imul(z, 2147483647) ^
+    Math.imul(seed, 2246822519);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return (h ^ (h >>> 16)) >>> 0;
 };
@@ -210,6 +217,23 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
  * volumetrica tem o dobro da frequencia da grade autorada.
  */
 export const blockModel = (kind, variant) => {
+  if (kind === 'sutureAnchor' || kind === 'sutureCracked') {
+    const cracked = kind === 'sutureCracked';
+    const boxes = [box(-4, -4, 0, 8, 8, 5, 'rock')];
+    // Two stone jaws clasped by a broad U-shaped mineral staple.
+    boxes.push(box(-3, -3, 5, 2, 6, cracked ? 1 : 3, 'chitin'));
+    boxes.push(box(1, -3, 5, 2, 6, 3, 'chitin'));
+    boxes.push(box(-3, -3, 2, 1, 1, 6, 'silk'));
+    boxes.push(box(2, -3, 2, 1, 1, 6, 'silk'));
+    if (!cracked) boxes.push(box(-3, -3, 7, 6, 1, 1, 'silk'));
+    boxes.push(box(-3, 2, 4, 6, 1, 1, 'silk'));
+    return boxes;
+  }
+  if (kind === 'stitchedRock') {
+    const boxes = [box(-4, -4, 0, 8, 8, 3, 'rock'), box(-4, -4, 3.5, 8, 8, 3, 'rock')];
+    for (const x of [-3, 0, 3]) boxes.push(box(x, -4, 1, 0.5, 8, 5.5, 'silk'));
+    return boxes;
+  }
   const boxes = [];
   const F = MODEL_SCALE;
   const half = BLOCK_COLS / 2;
@@ -235,7 +259,8 @@ export const blockModel = (kind, variant) => {
       for (let cz = 0; cz < height; cz++) {
         const mat = voxelMaterial(cx, cy, cz, kind, variant, height - 1);
         if (mat !== runMat) {
-          if (runMat) boxes.push(box(x, y, runStart / F, 1 / F, 1 / F, (cz - runStart) / F, runMat));
+          if (runMat)
+            boxes.push(box(x, y, runStart / F, 1 / F, 1 / F, (cz - runStart) / F, runMat));
           runMat = mat;
           runStart = cz;
         }
@@ -247,7 +272,9 @@ export const blockModel = (kind, variant) => {
       // grade fina as agulhas tem metade da largura e o dobro da contagem por
       // area — mesma presenca, grao mais fino.
       if ((kind === 'crystal' || kind === 'crystalDull') && (h >>> 8) % 9 === 0) {
-        boxes.push(box(x, y, height / F, 1 / F, 1 / F, 2, kind === 'crystal' ? 'biolum' : 'fungusDeep'));
+        boxes.push(
+          box(x, y, height / F, 1 / F, 1 / F, 2, kind === 'crystal' ? 'biolum' : 'fungusDeep'),
+        );
       }
     }
   }
@@ -279,7 +306,14 @@ export const buildTerrainFrames = (frameW, frameH, anchorX, anchorY) => {
       // rotacionado deslocava o bloco 2px para a direita do que o manifest
       // declarava — a coluna da ponta era cortada pela borda do frame e o bloco
       // nao assentava sobre o proprio tile.
-      const lit = renderVoxels(blockModel(kind, variant), DIR_UNROTATED, frameW, frameH, anchorX, anchorY);
+      const lit = renderVoxels(
+        blockModel(kind, variant),
+        DIR_UNROTATED,
+        frameW,
+        frameH,
+        anchorX,
+        anchorY,
+      );
       for (let level = 0; level < LIGHT_LEVELS; level++) frames.push(dim(lit, lightFactor(level)));
     }
   }

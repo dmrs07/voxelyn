@@ -1,3 +1,4 @@
+import { mountSutureDebug } from './arena-sutures-debug';
 // Ponto de entrada da Arena de Chefes: uma ferramenta de playtest isolado,
 // separada da run normal (arena.html, nao index.html). Deixa escolher chefe,
 // HP e eco/módulos de entrada e joga a luta com o MESMO motor de render/input
@@ -266,6 +267,8 @@ const readConditions = (): ArenaConditions => {
 // Os botoes agem sobre a run ATIVA; `activeFrostState` e trocado a cada run.
 // ---------------------------------------------------------------------------
 let activeFrostState: SurvivalState | null = null;
+let suturePaused = false;
+
 let activeFrostEvents: ((events: SemanticEvent[]) => void) | null = null;
 for (const scenario of FROST_SCENARIOS) {
   const button = document.createElement('button');
@@ -521,6 +524,14 @@ bossBarReconnect.addEventListener('click', () => {
 bossBarReduced.addEventListener('change', () => {
   setReducedMotionOverride(bossBarReduced.checked ? true : null);
 });
+mountSutureDebug(
+  () => activeFrostState,
+  (events) => activeFrostEvents?.(events),
+  (paused) => {
+    suturePaused = paused;
+  },
+);
+
 const fillLocaleSelect = (select: HTMLSelectElement): void => {
   for (const locale of LOCALES) {
     const option = document.createElement('option');
@@ -809,6 +820,7 @@ const runArena = (conditions: ArenaConditions): void => {
   resize();
 
   const state: SurvivalState = createArenaRun(conditions);
+  suturePaused = false;
   activeFrostState = state;
   audio.setLocalPlayerId(1);
   audio.reset();
@@ -850,7 +862,7 @@ const runArena = (conditions: ArenaConditions): void => {
     frameNow = now;
     const delta = Math.min(120, now - lastTime);
     lastTime = now;
-    accumulator += delta;
+    accumulator += suturePaused ? 0 : delta;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -884,7 +896,8 @@ const runArena = (conditions: ArenaConditions): void => {
       return;
     }
 
-    while (accumulator >= TICK_MS) {
+    if (suturePaused) playout.capture(state);
+    while (!suturePaused && accumulator >= TICK_MS) {
       const raw = input.snapshot(playerScreen());
       if (queuedChoice !== null) {
         raw.choose = queuedChoice;

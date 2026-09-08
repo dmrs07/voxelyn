@@ -265,8 +265,13 @@ const OCCUPATION_KIT: Record<
   Exclude<OccupationId, 'none'>,
   { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[] }
 > = {
+  stitchers: { edge: ['strut'], micro: [], ceiling: ['cable_hook'] },
   mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
-  aurix: { edge: ['crate', 'strut', 'canary_cage'], micro: ['walkway', 'rail'], ceiling: ['cable_hook'] },
+  aurix: {
+    edge: ['crate', 'strut', 'canary_cage'],
+    micro: ['walkway', 'rail'],
+    ceiling: ['cable_hook'],
+  },
 };
 
 /**
@@ -372,7 +377,7 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
 
   const taken = new Set<number>();
   const props: DecorativeProp[] = [];
-  const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length) % arr.length];
+  const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length) % arr.length];
 
   /** Sorteio global: qualquer celula da moldura para dentro. */
   const anywhere = (): { x: number; y: number } => ({
@@ -401,8 +406,19 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
         // Borda e teto moram junto a uma parede: o prop de borda no PE dela, o
         // de teto PENDURADO onde a rocha desce — nunca no centro do corredor.
         const walls: number[] = [];
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          if (!isOpen(x + dx, y + dy) && x + dx > 0 && y + dy > 0 && x + dx < w - 1 && y + dy < h - 1) {
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          if (
+            !isOpen(x + dx, y + dy) &&
+            x + dx > 0 &&
+            y + dy > 0 &&
+            x + dx < w - 1 &&
+            y + dy < h - 1
+          ) {
             walls.push(idx(x + dx, y + dy));
           }
         }
@@ -444,7 +460,8 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
           // lascado/opaco), e um monumento opaco em cima deles esconderia
           // exatamente a informacao que precisa ficar visivel.
           if (solid[idx(x, y)] !== SOLID_ROCK) continue;
-          const visible = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
+          const visible =
+            isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
           if (!visible || !allowed(x, y) || taken.has(idx(x, y))) continue;
           taken.add(idx(x, y));
           props.push({
@@ -521,7 +538,8 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
     for (let n = 0; n < OCCUPATION_MICRO_BUDGET; n++) tryPlace(occKit.micro, 'floor', occFloor);
     // O veu de esporos so pende sobre o tapete da colonia — teto e chao
     // contam a mesma historia. O gancho Aurix pende sobre o chao firme.
-    for (let n = 0; n < OCCUPATION_CEILING_BUDGET; n++) tryPlace(occKit.ceiling, 'ceiling', occFloor);
+    for (let n = 0; n < OCCUPATION_CEILING_BUDGET; n++)
+      tryPlace(occKit.ceiling, 'ceiling', occFloor);
   }
 
   return props;

@@ -20,6 +20,11 @@ import { COLORS, grid, set, setRgb } from './lib.mjs';
  * Key light no topo-esquerda, conforme a art bible.
  */
 export const RAMPS = {
+  // Mineral silk keeps warm, pale highlights; the load-bearing cuticle is
+  // cool and dark. Existing palette only, with no new emissive decoration.
+  silk: ['chalk', 'bone', 'brass'],
+  chitin: ['mist', 'rockLight', 'rockShadow'],
+  sutureResin: ['bone', 'brass', 'char'],
   rock: ['rockLight', 'rock', 'rockShadow'],
   rockDeep: ['rock', 'rockShadow', 'dark'],
   // Chao e queimado: rampas proprias porque o piso tem de ficar ao menos dois

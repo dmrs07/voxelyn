@@ -27,6 +27,7 @@ describe('contrato visual das materias organicas e volateis', () => {
       'ice-critical',
       'deep-water',
       'aquifer-deep-water',
+      'mineral-silk',
     ]);
   });
 

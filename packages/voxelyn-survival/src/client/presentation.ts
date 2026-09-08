@@ -114,6 +114,8 @@ type ActionVisualClock = {
 };
 
 export const actionAnimation = (action: EntityActionKind): string => {
+  if (action === 'stitch') return 'special';
+  if (action === 'tether') return 'attack';
   // `special` e a pose de PREPARO — o pod inchando, o corpo recuando para a
   // investida, a coroa abrindo. `haul` pertence a esta familia: no atlas do
   // Coveiro o `special` e a carga do eletroima (bobinas acesas, campo visivel)

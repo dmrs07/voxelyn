@@ -76,6 +76,8 @@ class GridBuffer {
  * copiar o que ninguem escreve so custa.
  */
 type Pose = {
+  sutures: SurvivalState['sutures'];
+  sutureRewardsMask: number;
   tick: number;
   /** Setor deste retrato; troca dele e descontinuidade, ver `capture`. */
   sector: number;
@@ -157,6 +159,8 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     charges: state.charges.map((c) => ({ ...c })),
     // Relogios e rele por valor, celulas/adjacencia por referencia: a
     // geometria nunca muda.
+    sutures: state.sutures.map((s) => ({ ...s, cells: [...s.cells], slabCells: [...s.slabCells] })),
+    sutureRewardsMask: state.sutureRewardsMask,
     leylineSegments: state.leylineSegments.map((s) => ({ ...s })),
     leylineNodes: state.leylineNodes.map((n) => ({ ...n })),
     // Fase do circuito por valor (ela muda); a geometria dele — nascente e
@@ -275,6 +279,8 @@ export class LocalPlayout {
       sectorBoss: from.sectorBoss,
       contamination: from.contamination,
       charges: from.charges,
+      sutures: from.sutures,
+      sutureRewardsMask: from.sutureRewardsMask,
       leylineSegments: from.leylineSegments,
       leylineNodes: from.leylineNodes,
       leylineCircuit: from.leylineCircuit,

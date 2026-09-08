@@ -15,6 +15,16 @@
 // em que foi escrita.
 
 export const PT_BR = {
+  'arena.suture.title': 'Suturas · inspeção',
+  'arena.suture.select': 'Selecione A Cerzideira e inicie a arena.',
+  'arena.suture.status': 'tick {tick} · carga {done}/{total} · {taut} amarras tensionadas',
+  'arena.suture.inspect': 'Examinar amarra',
+  'arena.suture.cut': 'Cortar amarra',
+  'arena.suture.anchor': 'Romper âncora',
+  'arena.suture.step': 'Avançar 0,4 s',
+  'arena.suture.phase': 'Segunda fase',
+  'arena.suture.pause': 'Pausar',
+  'arena.suture.resume': 'Continuar',
   // ---------------------------------------------------------------------
   // Marca e telas de menu
   // ---------------------------------------------------------------------
@@ -290,6 +300,26 @@ export const PT_BR = {
   'enemy.scoriac': 'Escoriáceo',
   'enemy.frost_wraith': 'Espectro',
   'enemy.sulfur_bomber': 'Bombardeiro',
+  'enemy.stitcher': 'Costureiro',
+  'enemy.seamstress': 'A Cerzideira',
+  'bestiary.name.stitcher': 'Costureiro',
+  'bestiary.name.seamstress': 'A Cerzideira',
+  'bestiary.code.stitcher': 'ESPÉCIME SUT-01',
+  'bestiary.code.seamstress': 'MATRIZ SUT-00',
+  'bestiary.note.stitcher':
+    'Costura passagens entre duas âncoras. Interrompa o operário antes do terceiro ponto ou deixe que feche a rota. Fios tensionados chicoteiam após o corte.',
+  'bestiary.note.seamstress':
+    'Desloca o corpo por fios de sustentação. Corte a amarra carregada para derrubá-la e expor o abdômen. Na metade da vida, encurta a preparação das puxadas.',
+  'biome.occupation.stitchers': 'COLÔNIA DOS COSTUREIROS',
+  'bossBar.material.seamstress': 'seda mineral e quitina pálida',
+  'suture.objective': 'Carga suspensa: {done}/{total} · +24 minério',
+  'suture.reward': 'CARGA SUTURADA RECUPERADA',
+  'summary.cause.suture_whip.headline': 'A sutura chicoteou.',
+  'summary.cause.suture_whip.lesson':
+    'Após cortar o fio tensionado, saia da faixa marcada antes do estalo.',
+  'summary.cause.suture_fall.headline': 'A carga suspensa caiu.',
+  'summary.cause.suture_fall.lesson':
+    'Romper a amarra solta a laje. As cruzes no chão anunciam onde ela vai cair.',
   'enemy.undertaker': 'Coveiro',
   'enemy.diamandis': 'Diamandis',
   'enemy.white_devourer': 'Devorador Branco',

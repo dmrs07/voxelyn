@@ -50,6 +50,16 @@ const attack = (
 });
 
 describe('cada chefe tem assinatura, e ela usa os tres momentos', () => {
+  it('a Cerzideira distingue tracao, puxada e queda da amarra', () => {
+    expect(cuesForEvent(windup('seamstress', 'tether'), ctx)[0].voice).toBe('silkTension');
+    expect(cuesForEvent(attack('seamstress', 'tether'), ctx)[0].voice).toBe('silkSnap');
+    expect(
+      cuesForEvent(
+        { t: 'boss_vulnerable', archetype: 'seamstress', open: true, x: 1, y: 1 },
+        ctx,
+      )[0].voice,
+    ).toBe('silkFall');
+  });
   it('um chefe NUNCA fala pelo telegrafo generico do action_start', () => {
     for (const archetype of BOSS_ARCHETYPES) {
       const ev: SemanticEvent = {

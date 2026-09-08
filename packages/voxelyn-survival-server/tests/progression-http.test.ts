@@ -696,10 +696,10 @@ describe('codex', () => {
       locked: { maskedCode: string }[];
       total: number;
     };
-    expect(body.total).toBe(128);
+    expect(body.total).toBe(130);
     expect(body.unlocked).toHaveLength(1);
     expect(body.unlocked[0].id).toBe('AX-PUB-001');
-    expect(body.locked).toHaveLength(127);
+    expect(body.locked).toHaveLength(129);
   });
 
   // O que este teste protege e a razao inteira de o texto morar no servidor.
@@ -750,9 +750,9 @@ describe('codex', () => {
       body: '{}',
     });
     expect(marked.status).toBe(200);
-    expect(((await marked.json()) as { readLoreFragmentIds: string[] }).readLoreFragmentIds).toEqual(
-      ['AX-PUB-001'],
-    );
+    expect(
+      ((await marked.json()) as { readLoreFragmentIds: string[] }).readLoreFragmentIds,
+    ).toEqual(['AX-PUB-001']);
 
     // Persiste no perfil, sem subir a versao (leitura nao e uma "escrita" de
     // economia e nao pode derrubar uma compra concorrente em 409).

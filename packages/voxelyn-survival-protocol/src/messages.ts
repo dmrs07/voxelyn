@@ -12,6 +12,7 @@ import type {
   RunPhase,
   RunSummary,
   SemanticEvent,
+  Suture,
 } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
@@ -256,6 +257,8 @@ export type WellOfferFlags = {
 };
 
 export type WorldFlags = {
+  sutures?: Suture[];
+  sutureRewardsMask?: number;
   salvageSites: SalvageSiteFlags[];
   /**
    * ALGUM Nucleo da run ja saiu do pedestal.

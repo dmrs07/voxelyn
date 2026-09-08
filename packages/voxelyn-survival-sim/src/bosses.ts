@@ -118,6 +118,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
  * Diamandis antes de o Diamandis lutar.
  */
 export type BossId =
+  | 'seamstress'
   | 'bishop'
   | 'guardian'
   | 'diamandis'
@@ -131,6 +132,7 @@ export type BossId =
 
 /** Ocupacoes FORTES: quem tomou o mapa manda no encontro final. */
 export const BOSS_OF_OCCUPATION: Partial<Record<OccupationId, BossId>> = {
+  stitchers: 'seamstress',
   mycelial: 'bishop',
   aurix: 'diamandis',
 };
@@ -173,6 +175,7 @@ export const bossForBiome = ({ stratum, occupation }: BossBiome): BossId =>
  * corpo, e ate la a camara dele nao pode ficar vazia.
  */
 export const IMPLEMENTED_BOSS: Partial<Record<BossId, EnemyArchetype>> = {
+  seamstress: 'seamstress',
   bishop: 'bishop',
   guardian: 'guardian',
   diamandis: 'diamandis',

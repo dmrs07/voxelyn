@@ -453,10 +453,16 @@ describe('os atlas sob demanda batem com o orcamento do validador', () => {
     expect(match).not.toBeNull();
     const ids = [...match![1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
     expect(ids).toEqual([...ON_DEMAND_ATLASES].sort());
-    // Sob demanda sao as tres FERRAMENTAS mais o BRACO. O braco nao esta em
+    // As pecas sob demanda sao as tres FERRAMENTAS mais o BRACO. O braco nao esta em
     // `DIAMANDIS_PART_ATLASES` porque aquela lista e indexada por modulo da
     // simulacao, e ele nao e um modulo — nao solta, nao e carregado, nao cai.
-    expect(ids).toEqual([...DIAMANDIS_PART_ATLASES, DIAMANDIS_ARM_ATLAS].sort());
+    expect(ids.filter((id) => id.startsWith('part-'))).toEqual(
+      [...DIAMANDIS_PART_ATLASES, DIAMANDIS_ARM_ATLAS].sort(),
+    );
+    expect(ids.filter((id) => id.startsWith('enemy-'))).toEqual([
+      'enemy-seamstress',
+      'enemy-stitcher',
+    ]);
   });
 });
 

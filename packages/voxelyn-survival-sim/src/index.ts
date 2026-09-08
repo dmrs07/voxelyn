@@ -247,3 +247,6 @@ export {
   type UpgradeDefinition,
   type UpgradeId,
 } from './progression.js';
+
+export * from './sutures.js';
+export { generateSutures } from './suture-layout.js';

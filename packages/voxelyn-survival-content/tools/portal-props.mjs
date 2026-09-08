@@ -34,6 +34,7 @@ export const PORTAL_KEYS = [
   'ferric',
   'mycelial',
   'aurix',
+  'stitchers',
 ];
 
 // Mesma cadencia do poco original (170ms): o ritmo tambem e parte da lingua.
@@ -75,7 +76,12 @@ const guides = (boxes, step) => {
   const inset = Math.min(3, 1 + Math.floor(step / 2));
   const g = HALF - inset - 1;
   const z = 3 - Math.min(2, Math.floor(step / 2));
-  for (const [x, y] of [[-g, 0], [g, 0], [0, -g], [0, g]]) {
+  for (const [x, y] of [
+    [-g, 0],
+    [g, 0],
+    [0, -g],
+    [0, g],
+  ]) {
     boxes.push(box(x, y, z, 1, 1, 1, 'loot'));
   }
 };
@@ -83,7 +89,14 @@ const guides = (boxes, step) => {
 // Posicoes de colar fora dos EIXOS: as luzes-guia caminham pelos eixos
 // (|x| ou |y| ate 4) e uma torre de flavor na frente delas as engoliria.
 const COLLAR_8 = [
-  [4, -5], [5, 1], [2, 5], [-2, 4], [-5, 3], [-6, -2], [-4, -5], [1, -6],
+  [4, -5],
+  [5, 1],
+  [2, 5],
+  [-2, 4],
+  [-5, 3],
+  [-6, -2],
+  [-4, -5],
+  [1, -6],
 ];
 
 const flavorOf = (key, step) => {
@@ -137,7 +150,14 @@ const flavorOf = (key, step) => {
       // anel: o topo da rampa do enxofre e ouro, e um aro amarelo cheio
       // leria como premio e afogaria a propria cruz-guia.
       ring(boxes, 0, 0, 2, 'bone');
-      for (const [cx, cy] of [[-6, -3], [5, 2], [-2, -6], [1, 5], [-6, 3], [4, -6]]) {
+      for (const [cx, cy] of [
+        [-6, -3],
+        [5, 2],
+        [-2, -6],
+        [1, 5],
+        [-6, 3],
+        [4, -6],
+      ]) {
         boxes.push(box(cx, cy, 2, 1, 1, 1, 'sulfur'));
       }
       COLLAR_8.forEach(([cx, cy], i) => {
@@ -168,7 +188,12 @@ const flavorOf = (key, step) => {
       ring(boxes, 0, 0, 1, 'bone');
       ring(boxes, 1, 0, 1, 'rock');
       ring(boxes, 2, 1, 1, 'rust');
-      for (const [px, py] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) {
+      for (const [px, py] of [
+        [-5, -5],
+        [4, -5],
+        [-5, 4],
+        [4, 4],
+      ]) {
         boxes.push(box(px, py, 0, 1, 1, 5, 'bone'));
         boxes.push(box(px, py, 5, 1, 1, 1, 'rust'));
       }
@@ -179,7 +204,12 @@ const flavorOf = (key, step) => {
       // Furo no gelo: colar leitoso com rachaduras radiais escuras — e o
       // reflexo correndo a borda, como em toda superficie da Cripta.
       ring(boxes, 0, 0, 2, 'ice');
-      for (const [cx, cy] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) {
+      for (const [cx, cy] of [
+        [-5, -5],
+        [4, -5],
+        [-5, 4],
+        [4, 4],
+      ]) {
         boxes.push(box(cx, cy, 2, 2, 2, 1, 'ice'));
         boxes.push(box(cx, cy, 0, 1, 1, 2, 'rockDeep')); // rachadura
       }
@@ -199,6 +229,16 @@ const flavorOf = (key, step) => {
       boxes.push(box(4, 2, 5, 1, 1, 1, step % 2 === 1 ? 'electric' : 'rockDeep'));
       break;
     }
+    case 'stitchers': {
+      ring(boxes, 0, 0, 2, 'chitin');
+      for (const x of [-5, 4]) {
+        boxes.push(box(x, -4, 0, 1, 8, 7, 'silk'));
+        boxes.push(box(x, -4, 7, 1, 8, 1, 'chitin'));
+      }
+      for (const y of [-3, 0, 3])
+        boxes.push(box(-5, y, 6 + (step % 2) * 0.5, 10, 0.5, 0.5, 'silk'));
+      break;
+    }
     case 'mycelial': {
       // Iris fungica: labios organicos que RESPIRAM em volta da boca —
       // abrem e fecham no ciclo. O biolum pontua como esporo, nao como
@@ -207,8 +247,15 @@ const flavorOf = (key, step) => {
       ring(boxes, 2, 1, 1, 'fungus');
       const breath = step < 3 ? step : 5 - step; // 0,1,2,2,1,0
       const lip = 3 - breath;
-      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-        boxes.push(box(sx * lip + (sx < 0 ? 0 : -1), sy * lip + (sy < 0 ? 0 : -1), 2, 1, 1, 1, 'fungus'));
+      for (const [sx, sy] of [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ]) {
+        boxes.push(
+          box(sx * lip + (sx < 0 ? 0 : -1), sy * lip + (sy < 0 ? 0 : -1), 2, 1, 1, 1, 'fungus'),
+        );
       }
       boxes.push(box(-5, 2, 3, 1, 1, 1, breath === 2 ? 'biolum' : 'fungus'));
       boxes.push(box(4, -4, 3, 1, 1, 1, breath === 0 ? 'biolum' : 'fungus'));
@@ -219,7 +266,12 @@ const flavorOf = (key, step) => {
       // no topo e a CABINE descendo — o descentModel crescido, porque aqui
       // a ocupacao construiu de verdade o que os outros biomas so cavaram.
       ring(boxes, 0, 0, 1, 'rust');
-      for (const [px, py] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) {
+      for (const [px, py] of [
+        [-5, -5],
+        [4, -5],
+        [-5, 4],
+        [4, 4],
+      ]) {
         boxes.push(box(px, py, 0, 1, 1, 8, 'rust'));
         boxes.push(box(px, py, 8, 1, 1, 1, 'bone'));
       }
@@ -262,7 +314,12 @@ const sealedModel = () => {
   boxes.push(box(-3, -3, 1, 6, 6, 1, 'rockDeep')); // a laje sobre o furo
   boxes.push(box(-3, 0, 2, 6, 1, 1, 'rust')); // barrotes cruzados
   boxes.push(box(0, -3, 2, 1, 6, 1, 'rust'));
-  for (const [rx, ry] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) {
+  for (const [rx, ry] of [
+    [-3, -3],
+    [2, -3],
+    [-3, 2],
+    [2, 2],
+  ]) {
     boxes.push(box(rx, ry, 2, 1, 1, 1, 'bone')); // rebites
   }
   return boxes;

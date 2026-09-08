@@ -545,6 +545,12 @@ export class GameRoom {
       // Relogios dos trilhos: o cliente regenera a GEOMETRIA da seed, mas os
       // gatilhos sao estado de runtime — sem eles, quem entra no meio do
       // aviso de carrinho nao ve telegrafo (ver WorldFlags no protocol).
+      sutures: this.state.sutures.map((s) => ({
+        ...s,
+        cells: [...s.cells],
+        slabCells: [...s.slabCells],
+      })),
+      sutureRewardsMask: this.state.sutureRewardsMask,
       railTimers: this.state.railTracks.map((track) => ({
         readyAt: track.readyAt,
         firingAt: track.firingAt,

@@ -17,6 +17,7 @@
 import type { ProspectorGeneration } from '@voxelyn/survival-sim';
 
 export type ArenaBossId =
+  | 'seamstress'
   | 'guardian'
   | 'bishop'
   | 'diamandis'
@@ -41,6 +42,15 @@ export type ArenaCatalogEntry = {
 };
 
 export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
+  seamstress: {
+    label: 'A Cerzideira',
+    place: 'Colônia dos Costureiros',
+    seed: 36,
+    sector: 7,
+    generation: 'G-04',
+    sectorCount: 7,
+    coreSectors: [3, 7],
+  },
   guardian: {
     label: 'Guardião',
     place: 'Galerias de Basalto',
@@ -150,6 +160,7 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
 
 /** Ordem de exibicao no seletor: da entrada mais rasa (G-04 setor 3) a mais funda. */
 export const ARENA_BOSS_ORDER: readonly ArenaBossId[] = [
+  'seamstress',
   'guardian',
   'bishop',
   'archcantor',

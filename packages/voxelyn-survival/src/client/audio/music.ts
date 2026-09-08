@@ -325,6 +325,7 @@ export const MUSIC_THEMES: Record<StratumId, MusicTheme> = {
 };
 
 export const OCCUPATION_VARIATIONS: Record<OccupationId, OccupationVariation> = {
+  stitchers: { secondaryDetuneCents: -13, padTremoloHz: 2.3, tensionInterval: 1 },
   none: { secondaryDetuneCents: 0 },
   // MATRIZ MICELIAL — organico e levemente errado: a copia do drone deriva 8
   // cents (batimento lento, quase enjoo) e uma terca menor cresce por baixo.

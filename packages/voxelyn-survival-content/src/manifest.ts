@@ -223,6 +223,8 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-furnace-heart',
   'enemy-frost-queen',
   'enemy-magnetarch',
+  'enemy-stitcher',
+  'enemy-seamstress',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [
