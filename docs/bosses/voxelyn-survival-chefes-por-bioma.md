@@ -975,11 +975,18 @@ Três medidas que fecham a conta:
   oito dos nove com zero cores fora, e o nono (`part-diamandis-rack`) com a mesma
   uma de antes.
 - **Memória.** Boot inalterado em 166.159.264 bytes. PNG total caiu de 3.532.242
-  para **3.395.427** — superfície lisa comprime melhor que ruído.
+  para **3.388.582** — superfície lisa comprime melhor que ruído.
 - **Quadros.** Dois precisaram crescer, porque sem a escada o desenho projeta um
   pixel mais para os lados: a âncora do braço foi de 27 para 29, e a rampa foi de
   60 para 62 de largura (âncora 30). Nos dois, âncora de render e âncora
   publicada saem do mesmo objeto, então a peça não sai do lugar na tela.
+- **E um precisou ENCOLHER**, pela mesma razão invertida. O quadro da broca foi
+  dimensionado quando o meio passo ainda era re-amostrado, e a escada projetava
+  mais longe do que a geometria pede: medido no rasterizador de hoje, o conteúdo
+  cabe em 102×65 nos oito rumos e em todas as poses. De 128×68 para **104×66**
+  (âncora 52,31), o consumo sob demanda caiu de 50.205.168 para **48.174.448** —
+  a folga contra o teto foi de 126.480 para **2.157.200 bytes**, dezessete vezes
+  maior.
 
 Três defeitos meus no caminho, todos achados por medida e não por leitura:
 

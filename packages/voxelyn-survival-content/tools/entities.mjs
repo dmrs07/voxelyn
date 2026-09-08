@@ -3589,7 +3589,17 @@ const diamandisArmFrame = (dir, anim, f) =>
   );
 
 export const DIAMANDIS_PART_FRAMES = {
-  drill: { w: 128, h: 68, ax: 62, ay: 32 },
+  // 104x66 e nao 128x68: o quadro da broca foi dimensionado quando o meio passo
+  // ainda era re-amostrado, e a escada projetava mais longe do que a geometria
+  // pede. Medido no rasterizador de hoje, o conteudo cabe em 102x65 nos oito
+  // rumos e em todas as poses (o pior caso e `ul/carried/3`); 104x66 deixa 3 px
+  // de margem em tres lados e 2 no de baixo, contra os 2 que a validacao cobra.
+  //
+  // Nao e limpeza gratuita: a peca vive no pacote SOB DEMANDA, e alargar a rampa
+  // (para caber sem a escada) tinha deixado so 126.480 bytes de folga contra o
+  // teto. A ancora acompanha a largura porque ela e o ENCAIXE — render e
+  // manifest leem deste mesmo objeto, entao a broca nao sai do lugar na tela.
+  drill: { w: 104, h: 66, ax: 52, ay: 31 },
   // 62 e nao 60, e a ancora acompanha: pela mesma razao do braco, a rampa
   // projeta mais para os lados sem a escada, e aqui os dois lados apertaram ao
   // mesmo tempo — nenhuma ancora dentro de 60 deixava 2 px nos dois.
