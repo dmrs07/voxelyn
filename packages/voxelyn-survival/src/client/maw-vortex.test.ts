@@ -20,11 +20,15 @@ import {
   MAW_CLOUD_RAGGED,
   MAW_CLOUD_STRETCH,
   MAW_CLOUD_VERTICES,
+  SINKHOLE_CREST_RAGGED,
+  SINKHOLE_CREST_VERTICES,
   mawCloud,
   mawCloudShape,
   mawFlowAt,
   mawInnerRadius,
   mawStreak,
+  sinkholeCrestShape,
+  sinkholeRamp,
 } from './maw-vortex';
 
 const head = (g: { path: ReadonlyArray<{ dx: number; dy: number }> }) => g.path[g.path.length - 1];
@@ -466,5 +470,39 @@ describe('vortice da boca — a forma das nuvens (Perlin)', () => {
     expect(mawCloudShape(6, 2.2, puff)).toEqual(mawCloudShape(6, 2.2, puff));
     const other = mawCloudShape(7, 2.2, puff);
     expect(other).not.toEqual(mawCloudShape(6, 2.2, puff));
+  });
+});
+
+describe('sumidouro — o buraco e a rampa toroidal', () => {
+  it('buraco < crista < borda da rampa < alcance, e tudo escala com o alcance', () => {
+    // A ordem e a forma inteira: um buraco no fundo, a crista por cima e a
+    // rampa espalhando ate o chao. Nada passa do alcance, senao a rampa
+    // desenharia terreno cedendo onde a simulacao nao puxa.
+    for (const reach of [0.5, 1.8, 3.6]) {
+      const ramp = sinkholeRamp(reach);
+      expect(ramp.hole).toBeGreaterThan(0);
+      expect(ramp.crest).toBeGreaterThan(ramp.hole);
+      expect(ramp.outer).toBeGreaterThan(ramp.crest);
+      expect(ramp.outer).toBeLessThan(reach);
+    }
+    expect(sinkholeRamp(3.6).hole).toBeCloseTo(sinkholeRamp(1.8).hole * 2);
+  });
+
+  it('a crista e um anel rasgado, fechado, que nunca encosta no buraco', () => {
+    const ramp = sinkholeRamp(3.6);
+    const crest = sinkholeCrestShape(123, 0.4, ramp.crest);
+    expect(crest).toHaveLength(SINKHOLE_CREST_VERTICES);
+    for (const pt of crest) {
+      const r = Math.hypot(pt.dx, pt.dy);
+      expect(r).toBeLessThanOrEqual(ramp.crest * (1 + SINKHOLE_CREST_RAGGED) + 1e-6);
+      expect(r).toBeGreaterThanOrEqual(ramp.crest * (1 - SINKHOLE_CREST_RAGGED) - 1e-6);
+      expect(r).toBeGreaterThan(ramp.hole);
+    }
+  });
+
+  it('cada sumidouro tem a sua crista, e a mesma em dois clientes', () => {
+    const a = sinkholeCrestShape(100, 1.0, 1.4);
+    expect(a).toEqual(sinkholeCrestShape(100, 1.0, 1.4));
+    expect(a).not.toEqual(sinkholeCrestShape(101, 1.0, 1.4));
   });
 });

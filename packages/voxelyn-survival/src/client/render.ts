@@ -128,6 +128,8 @@ import {
   mawCloud,
   mawCloudShape,
   mawStreak,
+  sinkholeCrestShape,
+  sinkholeRamp,
 } from './maw-vortex';
 import { PAL } from './palette';
 import { BossHealthBarPresentation, drawBossHealthBar, usesMonumentalBar } from './boss-health-bar';
@@ -3709,6 +3711,7 @@ export class SurvivalRenderer {
           seconds,
           fxScale,
           'sinkhole',
+          hole.at,
         );
       }
     }
@@ -6922,6 +6925,8 @@ export class SurvivalRenderer {
     seconds: number,
     fxScale: number,
     kind: 'maw' | 'sinkhole',
+    /** A semente da crista do sumidouro (o tick de abertura). Ignorada pela boca. */
+    seed = 0,
   ): void {
     const [mx, my] = toScreen(cx, cy);
     // O FATOR DA PROJECAO, e ele nao e cosmetico.
@@ -6968,6 +6973,72 @@ export class SurvivalRenderer {
         Math.PI * 2,
       );
       ctx.fill();
+    }
+
+    // 1b. O CENTRO DO SUMIDOURO: o buraco e a rampa toroidal de silica.
+    //
+    //     A boca tem garganta e o sumidouro nao — e por isso ele nao pode
+    //     ter um centro que prometa sentenca. Mas um disco de sucao sem
+    //     centro nenhum le como riscos flutuando: nao ha para ONDE a areia
+    //     vai. O que ele ganha e um centro de TERRENO: um buraco escuro e
+    //     pequeno, e em volta dele a areia comida empilhada num anel que
+    //     desce — a crista clara por fora, a parede escurecendo para dentro.
+    //     E o corte de um funil de areia visto de cima.
+    //
+    //     Um gradiente radial no espaco do tile, esmagado pela projecao com
+    //     `scale`: o mesmo achatamento 2:1 de todo anel desta lamina, num
+    //     unico preenchimento por sumidouro. A crista ganha um contorno
+    //     rasgado por Perlin por cima, porque areia empilhada nao tem borda
+    //     geometrica.
+    if (!isMaw) {
+      const ramp = sinkholeRamp(reach);
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.scale(ringX(1), ringY(1));
+      const fill = ctx.createRadialGradient(0, 0, 0, 0, 0, ramp.outer);
+      const holeAt = ramp.hole / ramp.outer;
+      const crestAt = ramp.crest / ramp.outer;
+      fill.addColorStop(0, 'rgba(5,3,2,0.94)');
+      fill.addColorStop(holeAt * 0.85, 'rgba(7,5,4,0.92)');
+      // A PAREDE: do fundo escuro ate a crista clara, a rampa subindo.
+      fill.addColorStop(holeAt, 'rgba(38,28,20,0.85)');
+      fill.addColorStop(holeAt + (crestAt - holeAt) * 0.55, 'rgba(126,104,74,0.7)');
+      fill.addColorStop(crestAt, 'rgba(222,203,164,0.72)');
+      // O LADO DE FORA: a crista desce de volta ao chao e some.
+      fill.addColorStop(crestAt + (1 - crestAt) * 0.45, 'rgba(184,163,124,0.36)');
+      fill.addColorStop(1, 'rgba(184,163,124,0)');
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, ramp.outer, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // A CRISTA RASGADA: o contorno do topo do anel, em ruido. Projetado
+      // ponto a ponto como as nuvens, para achatar com o chao.
+      const crest = sinkholeCrestShape(seed, seconds, ramp.crest);
+      ctx.strokeStyle = 'rgba(240,226,190,0.5)';
+      ctx.lineWidth = Math.max(1, z * 0.6);
+      ctx.beginPath();
+      for (let k = 0; k < crest.length; k++) {
+        const [px, py] = toScreen(cx + crest[k].dx, cy + crest[k].dy);
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      // E a BOCA do buraco, um contorno escuro por dentro da crista: a linha
+      // onde a areia deixa de ser rampa e passa a ser queda.
+      const lip = sinkholeCrestShape(seed + 17, seconds, ramp.hole * 1.15, 16);
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = Math.max(1, z * 0.5);
+      ctx.beginPath();
+      for (let k = 0; k < lip.length; k++) {
+        const [px, py] = toScreen(cx + lip[k].dx, cy + lip[k].dy);
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
     }
 
     // 2. A BORDA: ate onde a sucao chega NESTE tick. Cresce com a janela,

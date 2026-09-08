@@ -565,3 +565,68 @@ export const mawCloudShape = (
   const density = 0.55 + 0.45 * fbm01(seconds * 0.35 + i * 0.31, i * 1.7 + 11.3, seed + 1, 2);
   return { points, density };
 };
+
+// ---------------------------------------------------------------------------
+// O CENTRO DO SUMIDOURO — o buraco e a rampa toroidal.
+// ---------------------------------------------------------------------------
+// A boca tem garganta; o sumidouro nao tem, e nao pode ter um centro que
+// prometa uma sentenca. Mas um disco de sucao sem centro nenhum le como um
+// anel de riscos flutuando sobre o chao — nao ha para ONDE a areia esta indo.
+// O que ele ganha e um centro de terreno: um buraco escuro, pequeno, e em
+// volta dele a areia empilhada num anel que desce — a crista clara por fora,
+// a parede escurecendo para dentro, o buraco no fundo. E o corte de um funil
+// de areia visto de cima: a materia que a sucao come nao some, ela se
+// amontoa na borda do buraco antes de cair.
+
+/** O raio do buraco, como fracao do alcance do instante. */
+export const SINKHOLE_HOLE_FRACTION = 0.2;
+/** Onde a crista da rampa fica, como fracao do alcance: o ponto mais alto e mais claro. */
+export const SINKHOLE_CREST_FRACTION = 0.38;
+/** Ate onde a rampa se espalha antes de virar chao, como fracao do alcance. */
+export const SINKHOLE_RAMP_FRACTION = 0.6;
+/** Quantos vertices tem a crista rasgada. */
+export const SINKHOLE_CREST_VERTICES = 24;
+/** Quanto a crista ondula (fracao do raio dela). Menos que a nuvem: e areia empilhada, nao poeira. */
+export const SINKHOLE_CREST_RAGGED = 0.14;
+
+export type SinkholeRamp = {
+  /** Raio do buraco, em tiles. */
+  hole: number;
+  /** Raio da crista, em tiles. */
+  crest: number;
+  /** Raio externo da rampa, em tiles. */
+  outer: number;
+};
+
+/**
+ * Os tres raios da rampa para um alcance. Tudo escala com o alcance, pela
+ * mesma razao das nuvens: o sumidouro abre de zero e fecha a zero, e um
+ * buraco de tamanho fixo seria maior que o proprio disco nas pontas.
+ */
+export const sinkholeRamp = (reach: number): SinkholeRamp => ({
+  hole: reach * SINKHOLE_HOLE_FRACTION,
+  crest: reach * SINKHOLE_CREST_FRACTION,
+  outer: reach * SINKHOLE_RAMP_FRACTION,
+});
+
+/**
+ * O CONTORNO DA CRISTA: um anel de raio `radius` rasgado por Perlin, em tiles
+ * a partir do centro do sumidouro. A semente vem de quem chama (o tick de
+ * abertura serve): dois sumidouros nao tem a mesma crista, e o mesmo
+ * sumidouro tem a mesma crista em dois clientes. Ferve devagar — e areia
+ * empilhada escorregando, nao poeira.
+ */
+export const sinkholeCrestShape = (
+  seed: number,
+  seconds: number,
+  radius: number,
+  vertices = SINKHOLE_CREST_VERTICES
+): ReadonlyArray<{ dx: number; dy: number }> => {
+  const points: Array<{ dx: number; dy: number }> = [];
+  for (let k = 0; k < vertices; k++) {
+    const angle = (k / vertices) * Math.PI * 2;
+    const r = radius * blobRadius(angle, seconds * 0.35, seed, SINKHOLE_CREST_RAGGED, 2.6);
+    points.push({ dx: Math.cos(angle) * r, dy: Math.sin(angle) * r });
+  }
+  return points;
+};
