@@ -4,6 +4,7 @@ import {
   SOLID_STITCHED_ROCK,
   SURF_MINERAL_SILK,
   sutureObjective,
+  silkLift,
 } from '@voxelyn/survival-sim';
 import { appendSutureDraws } from './suture-presentation';
 import {
@@ -2453,6 +2454,13 @@ export class SurvivalRenderer {
           );
           break;
         case 'boss_attack':
+          if (
+            ev.archetype === 'seamstress' &&
+            (ev.ability === 'tether' || ev.ability === 'contact')
+          ) {
+            this.addFlash(ev.x, ev.y, 1.1, 0.6, nowMs, 140, PAL.mist);
+            this.shake = { power: 2, until: nowMs + 90 };
+          }
           if (ev.archetype === 'frost_queen' && ev.ability === 'freeze') {
             // O CONGELAMENTO: a coroa de estilhacos abrindo em volta dela, com
             // o alcance REAL da habilidade — e o clarao frio curto do lago
@@ -4354,8 +4362,12 @@ export class SurvivalRenderer {
       // baixo. Todo o resto (sprite da cabeca, barra, sombra) continua cortado.
       const headDark = b <= 0.05;
       if (headDark && enemy.archetype !== 'white_devourer') continue;
-      if (enemy.archetype === 'stitcher' || enemy.archetype === 'seamstress')
-        this.sprites.requestPart(`enemy-${enemy.archetype}`);
+      if (
+        enemy.archetype === 'stitcher' ||
+        enemy.archetype === 'seamstress' ||
+        enemy.archetype === 'seamstress_brood'
+      )
+        this.sprites.requestPart(`enemy-${enemy.archetype.replaceAll('_', '-')}`);
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       let presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // O DIAMANDIS EM FRENESI, fora do desenho: a fumaca nasce por segundo e
@@ -4829,8 +4841,17 @@ export class SurvivalRenderer {
         continue;
       }
 
+      const silkHeight = silkLift(enemy, state.tick);
+      if (silkHeight > 0)
+        items.push({
+          depth: enemy.x + enemy.y - 0.2,
+          draw: () => {
+            const [sx, sy] = toScreen(enemy.x, enemy.y);
+            drawShadow(sx, sy, enemy.radius * TILE_W * 0.9 * z * (1 - silkHeight / 100), 0.5);
+          },
+        });
       items.push({
-        depth: enemy.x + enemy.y,
+        depth: enemy.x + enemy.y + (silkHeight > 0 ? 3 : 0),
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
@@ -4852,7 +4873,8 @@ export class SurvivalRenderer {
             }
             return;
           }
-          drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
+          if (silkHeight <= 0)
+            drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
           // O RECORTE NA LINHA DA AREIA, so para quem esta atravessando ela.
           //
           // O anel do corpo ja fazia isso; a cabeca nunca fez, e enquanto o
@@ -4904,13 +4926,7 @@ export class SurvivalRenderer {
           const drawY = bodyY + (dip?.drop ?? 0) - swimLift;
           // O corpo sacode; o chao nao. Ver `frenzyTwitch`.
           const bodyX = sx + twitch.dx * z;
-          const silkLift =
-            enemy.archetype === 'seamstress' &&
-            (enemy.mood ?? 0) > 0 &&
-            enemy.stunnedUntil <= state.tick
-              ? 4 * z
-              : 0;
-          const bodyDrawY = drawY + twitch.dy * z - silkLift;
+          const bodyDrawY = drawY + twitch.dy * z - silkLift(enemy, state.tick) * z;
           // AS PECAS DO DIAMANDIS em volta do chassi, na ordem do encaixe: as
           // de tras entram antes do corpo, as da frente depois. Sem o manifest
           // do chassi (atlas ainda carregando) nao ha pecas — e o corpo cai no
@@ -8155,7 +8171,12 @@ export class SurvivalRenderer {
       (text) => ctx.measureText(text).width,
     ).slice(0, HUD_OBJECTIVE_MAX_LINES);
     const suturedCargo = sutureObjective(state);
-    if (suturedCargo.total > 0 && !suturedCargo.rewarded)
+    const silkQueen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
+    if (silkQueen && state.bossRuntime.awake)
+      objectiveLines.push(
+        t(silkQueen.stunnedUntil > state.tick ? 'seamstress.exposed' : 'seamstress.hint'),
+      );
+    else if (suturedCargo.total > 0 && !suturedCargo.rewarded)
       objectiveLines.push(
         t('suture.objective', { done: suturedCargo.done, total: suturedCargo.total }),
       );

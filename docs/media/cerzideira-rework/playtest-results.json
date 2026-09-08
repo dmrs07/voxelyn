@@ -1,0 +1,51 @@
+{
+  "seed": 36,
+  "sector": 7,
+  "automated": true,
+  "metrics": [
+    {
+      "scenario": "idle",
+      "seconds": 12.8,
+      "playerHp": 0,
+      "queenHp": 780,
+      "lunges": 5,
+      "impacts": 4,
+      "cuts": 0,
+      "maxHelpers": 4,
+      "blockedGroundTicks": 0
+    },
+    {
+      "scenario": "stationary_shoot",
+      "seconds": 12.9,
+      "playerHp": 0,
+      "queenHp": 221,
+      "lunges": 5,
+      "impacts": 4,
+      "cuts": 0,
+      "maxHelpers": 4,
+      "blockedGroundTicks": 0
+    },
+    {
+      "scenario": "circle_shoot",
+      "seconds": 19.2,
+      "playerHp": 88,
+      "queenHp": 0,
+      "lunges": 4,
+      "impacts": 0,
+      "cuts": 0,
+      "maxHelpers": 4,
+      "blockedGroundTicks": 0
+    },
+    {
+      "scenario": "cut_every_tether",
+      "seconds": 18.85,
+      "playerHp": 0,
+      "queenHp": 780,
+      "lunges": 6,
+      "impacts": 0,
+      "cuts": 6,
+      "maxHelpers": 4,
+      "blockedGroundTicks": 0
+    }
+  ]
+}

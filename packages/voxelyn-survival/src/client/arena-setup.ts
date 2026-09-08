@@ -366,9 +366,7 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   state.enemies = state.enemies.filter(
     (e) =>
       e === boss ||
-      ((e.archetype === 'devourer_brood' ||
-        (bossArchetype === 'seamstress' && e.archetype === 'stitcher')) &&
-        dist[Math.floor(e.y) * w + Math.floor(e.x)] >= 0),
+      (e.archetype === 'devourer_brood' && dist[Math.floor(e.y) * w + Math.floor(e.x)] >= 0),
   );
   // Cenario que so faria sentido no setor inteiro. Os respiradouros e os
   // trilhos que sobraram DENTRO da arena ficam: eles sao o chao do bioma, e o

@@ -237,7 +237,8 @@
 //     invariante que este projeto nao quebra; cliente novo contra servidor
 //     antigo trata a ausencia como lista vazia, mas o bump da simulacao
 //     (67) ja recusa o par de qualquer jeito.
-export const PROTOCOL_VERSION = 35;
+// 36: locked silk flights, impact ticks, helper ownership and chamber sutures.
+export const PROTOCOL_VERSION = 36;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -998,7 +999,8 @@ export const PROTOCOL_VERSION = 35;
 //     com a linha de visao; e encalhar no meio do voo solta a amarra e a
 //     derruba por 1,5 s. Decisoes e posicoes do chefe mudaram: um replay de
 //     67 com a Cerzideira nao bate.
-export const SIMULATION_VERSION = 68;
+// 69: Cerzideira hunts above terrain, strikes once on arrival and summons jumping helpers.
+export const SIMULATION_VERSION = 69;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1193,7 +1195,8 @@ export const SIMULATION_VERSION = 68;
 //     ventral exposta — a pose da janela de dano, que antes era o repouso
 //     parado. Um cliente com o atlas antigo em cache cairia no `idle` de
 //     sempre; o bump invalida a precache.
-export const CONTENT_VERSION = 36;
+// 37: tucked flight poses and the Cerzideira brood atlas.
+export const CONTENT_VERSION = 37;
 
 export type VersionTriple = {
   protocolVersion: number;

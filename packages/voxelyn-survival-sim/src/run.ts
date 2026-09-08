@@ -803,6 +803,12 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
   const targets = [...joinedPlayers(state), ...state.enemies];
   for (const ent of targets) {
     if (!ent.alive) continue;
+    if (
+      ent.action?.silkFlight &&
+      state.tick >= ent.action.releaseAt &&
+      state.tick < ent.action.silkFlight.landAt
+    )
+      continue;
     const surf = state.surface[cellIndexAt(state, ent.x, ent.y)];
     if (surf === SURF_FIRE) {
       damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events, { kind: 'fire' }, true);
@@ -3493,6 +3499,7 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'magnetarch',
   'stitcher',
   'seamstress',
+  'seamstress_brood',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -3528,6 +3535,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(s.fallAt);
     mix(s.cutBySlot);
     mix(s.resewAt);
+    mix(s.encounter ? 1 : 0);
     mix(s.objective ? 1 : 0);
     mix(s.recovered ? 1 : 0);
     mix(s.cells.length);
@@ -3829,6 +3837,20 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     // selvagem, a orbita do coro e o ataque diagonal do Solista. Dois estados
     // com papeis diferentes precisam divergir ANTES do proximo movimento.
     mix(enemy.mood ?? 0);
+    mix(enemy.summonerId ?? -1);
+    if (enemy.silk) {
+      mix(1);
+      for (const key of [
+        'x',
+        'y',
+        'lunges',
+        'lastAnchor',
+        'broodAt',
+        'repositionUntil',
+        'comboLeft',
+      ] as const)
+        mix(Math.round(enemy.silk[key] * 1000));
+    } else mix(0);
     if (enemy.action) {
       mixString(enemy.action.kind);
       mix(enemy.action.startedAt);
@@ -3842,6 +3864,14 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
       // divergirem quando os iframes acabassem antes da recovery.
       mix(enemy.action.landed === true ? 1 : 0);
       mix(enemy.action.contactedSlots ?? 0);
+      mix(enemy.action.target ?? -1);
+      const flight = enemy.action.silkFlight;
+      if (flight) {
+        mix(1);
+        for (const key of ['fromX', 'fromY', 'toX', 'toY', 'landAt', 'impactAt'] as const)
+          mix(Math.round(flight[key] * 1000));
+        mix(flight.anchor ?? -1);
+      } else mix(0);
     }
   }
   for (const proj of state.projectiles) {

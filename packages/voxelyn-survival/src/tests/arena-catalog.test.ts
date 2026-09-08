@@ -65,7 +65,7 @@ describe('ARENA_CATALOG', () => {
 });
 
 describe('createArenaRun', () => {
-  it('preserva as ancoras das suturas recortadas e suas cargas no primeiro tick', () => {
+  it('preserva os apoios e inicia a Cerzideira sozinha, sem armadilhas de carga', () => {
     const state = createArenaRun({
       boss: 'seamstress',
       maxHp: 200,
@@ -74,7 +74,12 @@ describe('createArenaRun', () => {
       stabilisers: false,
     });
     expect(state.enemies[0].archetype).toBe('seamstress');
-    expect(state.enemies.some((e) => e.archetype === 'stitcher')).toBe(true);
+    expect(state.enemies).toHaveLength(1);
+    expect(
+      state.sutures.every(
+        (s) => s.encounter && s.whipAt === -1 && s.fallAt === -1 && s.closeAt === -1,
+      ),
+    ).toBe(true);
     const loaded = state.sutures.filter((s) => s.phase === 'taut').length;
     expect(loaded).toBeGreaterThan(0);
     for (const s of state.sutures) {

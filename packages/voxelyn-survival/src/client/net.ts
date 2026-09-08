@@ -705,6 +705,7 @@ export class NetClient {
                 endsAt: snap.action.endsAt,
                 direction: { x: snap.action.dx, y: snap.action.dy },
                 target: snap.action.target,
+                silkFlight: snap.action.silkFlight ? { ...snap.action.silkFlight } : undefined,
               }
             : undefined;
         }
@@ -715,6 +716,8 @@ export class NetClient {
           kind: 'enemy',
           archetype: snap.archetype as EnemyArchetype,
           mood: snap.mood,
+          silk: snap.silk ? { ...snap.silk } : undefined,
+          summonerId: snap.summonerId,
           // O espelho do cliente nao simula: `alertedUntil` so existe aqui para
           // satisfazer o tipo compartilhado com a sim. Zero e o valor honesto —
           // quem decide aggro e o servidor, e este campo nunca e lido no cliente.
@@ -743,6 +746,7 @@ export class NetClient {
                 endsAt: snap.action.endsAt,
                 direction: { x: snap.action.dx, y: snap.action.dy },
                 target: snap.action.target,
+                silkFlight: snap.action.silkFlight ? { ...snap.action.silkFlight } : undefined,
               }
             : undefined,
         });

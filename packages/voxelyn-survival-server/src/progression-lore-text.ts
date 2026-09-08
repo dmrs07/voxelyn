@@ -37,8 +37,15 @@ const pt: Record<LoreFragmentId, LoreText> = {
   'AX-SUT-002': {
     title: 'Carga que se desloca sozinha',
     summary: 'A matriz usa a própria obra como sistema de locomoção.',
-    body: 'A unidade SUT-00, denominada Cerzideira pelas equipes de recuperação, redistribui o peso entre amarras durante cada deslocamento. A carapaça sustenta impactos enquanto a tração se mantém.\n\nRomper a amarra carregada derruba o corpo e expõe o abdômen por três segundos. Não há evidência de que a matriz diferencie uma unidade Prospector de material a ser fixado. Recomenda-se não permanecer sob o reparo.',
+    body: 'A unidade SUT-00, denominada Cerzideira pelas equipes de recuperação, redistribui o peso entre amarras durante cada deslocamento. A carapaça sustenta impactos enquanto a tração se mantém.\n\nRomper a amarra carregada derruba o corpo e expõe o abdômen por 1,8 segundo. Durante o voo ela ultrapassa a rocha; o golpe sai no ponto marcado ao pousar. Não há evidência de que a matriz diferencie uma unidade Prospector de material a ser fixado. Recomenda-se não permanecer sob o reparo.',
     source: 'Recuperação Patrimonial — matriz de risco',
+  },
+
+  'AX-SUT-003': {
+    title: 'Material que salta da carga',
+    summary: 'As crias da matriz não aguardam a conclusão da obra.',
+    body: 'A primeira amostra foi registrada como resíduo de seda. O registro foi corrigido quando o resíduo cruzou a bancada.\n\nAs crias saem do abdômen da Cerzideira com a quitina ainda incompleta. Antes de saltar, recolhem as patas e fixam o ponto de pouso. A recuperação é curta, mas suficiente para quebrar a carapaça. Os Costureiros convocados pela matriz repetem o gesto com maior alcance. Não confundir o tamanho reduzido com ausência de função.',
+    source: 'Engenharia de Campo — adendo de incubação',
   },
 
   // -------------------------------------------------------------------------
@@ -889,8 +896,15 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-SUT-002': {
     title: 'A load that moves itself',
     summary: 'The matrix uses its own construction for locomotion.',
-    body: 'Recovery crews call SUT-00 the Darner. It redistributes its weight between tethers during each movement. Its shell resists impacts while the support remains loaded.\n\nCutting that support knocks the body down and exposes the abdomen for three seconds. There is no evidence the matrix distinguishes a Prospector from material awaiting fixation. Do not remain beneath its repairs.',
+    body: 'Recovery crews call SUT-00 the Darner. It redistributes its weight between tethers during each movement. Its shell resists impacts while the support remains loaded.\n\nCutting that support knocks the body down and exposes the abdomen for 1.8 seconds. In flight she crosses over rock; the strike lands at the marked spot. There is no evidence the matrix distinguishes a Prospector from material awaiting fixation. Do not remain beneath its repairs.',
     source: 'Asset Recovery — risk matrix',
+  },
+
+  'AX-SUT-003': {
+    title: 'Material jumping off the load',
+    summary: 'The matrix brood does not wait for construction to finish.',
+    body: 'The first specimen was logged as silk residue. The record was amended when the residue crossed the workbench.\n\nBrood emerge from the Darner abdomen with unfinished chitin. They tuck their legs and fix a landing point before jumping. Their brief recovery allows the shell to be broken. Stitchers summoned by the matrix repeat the movement at longer range. Small size does not imply lack of purpose.',
+    source: 'Field Engineering — incubation addendum',
   },
 
   'AX-PUB-001': {

@@ -1,3 +1,6 @@
+import silkBroodManifest from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.json';
+import silkBroodUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.png?url';
+import silkBroodNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.normal.png?url';
 import encounterAtlases from '@voxelyn/survival-content/assets/encounter-atlases.json';
 import stitcherManifest from '@voxelyn/survival-content/assets/atlases/enemy-stitcher.json';
 import stitcherUrl from '@voxelyn/survival-content/assets/atlases/enemy-stitcher.png?url';
@@ -233,6 +236,7 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-stalker.normal.png': enemyStalkerNormalUrl,
   'enemy-sulfur-bomber.normal.png': enemySulfurBomberNormalUrl,
   'enemy-stitcher.normal.png': stitcherNormalUrl,
+  'enemy-seamstress-brood.normal.png': silkBroodNormalUrl,
   'enemy-seamstress.normal.png': seamstressNormalUrl,
   'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
   'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
@@ -649,10 +653,15 @@ export const DIAMANDIS_PART_ATLASES: readonly string[] = [
 export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
   'enemy-stitcher',
   'enemy-seamstress',
+  'enemy-seamstress-brood',
   ...DIAMANDIS_PART_ATLASES,
   DIAMANDIS_ARM_ATLAS,
 ]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'enemy-seamstress-brood': {
+    manifest: silkBroodManifest as unknown as SpriteManifestEntry,
+    url: silkBroodUrl,
+  },
   'enemy-seamstress': {
     manifest: seamstressManifest as unknown as SpriteManifestEntry,
     url: seamstressUrl,
@@ -729,6 +738,7 @@ export const DEVOURER_BROOD_ATLAS = 'part-devourer-brood';
 
 export const ARCHETYPE_SPRITE: Record<string, string> = {
   seamstress: 'enemy-seamstress',
+  seamstress_brood: 'enemy-seamstress-brood',
   stitcher: 'enemy-stitcher',
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',

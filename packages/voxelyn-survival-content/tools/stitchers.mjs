@@ -19,7 +19,9 @@ const limb = (out, a, b, width, mat) => {
   }
 };
 
-export const stitcherModel = (anim, frame, queen = false) => {
+export const stitcherModel = (anim, frame, queen = false, brood = false) => {
+  const flying = anim === 'fly';
+  const crouching = anim === 'burst';
   const phase = (frame * Math.PI) / 3;
   const moving = anim === 'walk';
   const sewing = anim === 'special';
@@ -31,12 +33,12 @@ export const stitcherModel = (anim, frame, queen = false) => {
   // corpo continuava de pe, imovel, e lia como um congelamento.
   const downed = anim === 'downed';
   const struggle = downed ? [0, 1, 0.5][frame % 3] : 0;
-  const pull = sewing ? [0, 0.5, 1.5, 2, 1, 0][frame % 6] : 0;
+  const pull = sewing ? (queen ? [0, 1, 2][frame % 3] : [0, 0.5, 1.5, 2, 1, 0][frame % 6]) : 0;
   const thrust = striking ? [-0.5, -1, 2, 0.5][frame % 4] : 0;
   const breath = anim === 'idle' ? [0, 0.5, 0.5, 0][frame % 4] : 0;
   const hurt = anim === 'hit' ? [1, 0][frame % 2] : 0;
-  const scale = queen ? 1.4 : 1;
-  const z = downed ? 1 + struggle * 0.5 : (queen ? 4.5 : 2.5) + breath - hurt;
+  const scale = queen ? 1.4 : brood ? 0.55 : 1;
+  const z = downed ? 1 + struggle * 0.5 : crouching ? 1 : (queen ? 4.5 : 2.5) + breath - hurt;
   const b = [];
 
   // Low thorax, pinched waist, raised OPEN abdomen. The negative space is
@@ -76,12 +78,16 @@ export const stitcherModel = (anim, frame, queen = false) => {
       const kick = downed ? struggle * ((p + (side < 0 ? 1 : 0)) % 2) : 0;
       // O alcance nao cresce: o quadro do atlas e a uniao medida das poses de
       // pe, e uma perna mais aberta que a caminhada nao caberia nele.
-      const knee = downed
-        ? [side * (reach + 0.5), y - 0.5, 0.75 + kick]
-        : [side * reach, y - 0.5 + gait * 0.5, z + 1.5];
-      const foot = downed
-        ? [side * (reach + 1), y + (p - 1) * 0.75, 0.5]
-        : [side * (reach + 1), y + (p - 1) * 0.75 + gait, Math.max(0.5, gait)];
+      const knee = flying
+        ? [side * (reach - 2), y, z + 1]
+        : downed
+          ? [side * (reach + 0.5), y - 0.5, 0.75 + kick]
+          : [side * reach, y - 0.5 + gait * 0.5, z + 1.5];
+      const foot = flying
+        ? [side * 2, y + 1, z - 0.5]
+        : downed
+          ? [side * (reach + 1), y + (p - 1) * 0.75, 0.5]
+          : [side * (reach + 1), y + (p - 1) * 0.75 + gait, Math.max(0.5, gait)];
       limb(b, [side * 1.5, y, z + 0.5], knee, 0.75, 'chitin');
       limb(b, knee, foot, 0.5, 'silk');
       b.push(box(knee[0] - 0.5, knee[1] - 0.5, knee[2] - 0.5, 1, 1, 1, 'sutureResin'));
@@ -107,6 +113,11 @@ export const stitcherModel = (anim, frame, queen = false) => {
     limb(b, needle, [needle[0], needle[1] - 1.5, needle[2] - 1], 0.5, 'silk');
   }
 
+  if (brood) {
+    // Unspun silk sacs: a compact, unfinished abdomen, distinct from a small worker.
+    b.push(box(-2, 2.5, z + 1, 4, 3, 2, 'silk'));
+    b.push(box(-0.5, 3, z + 3, 1, 1.5, 0.5, 'sutureResin'));
+  }
   if (queen) {
     // A fan of mineral needles identifies the queen from the rear as well.
     // Unequal heights and an open middle retain the silhouette at 45 degrees.
@@ -137,11 +148,13 @@ export const stitcherModel = (anim, frame, queen = false) => {
 };
 
 const animations = (queen) => ({
-  idle: { frames: 4, fps: 6, loop: true },
+  idle: { frames: queen ? 3 : 4, fps: queen ? 5 : 6, loop: true },
   walk: { frames: 6, fps: 10, loop: true },
   attack: { frames: 4, fps: 10, loop: false },
-  special: { frames: 6, fps: 8, loop: false },
+  special: { frames: queen ? 3 : 6, fps: queen ? 5 : 8, loop: false },
   hit: { frames: 2, fps: 12, loop: false },
+  fly: { frames: 1, fps: 6, loop: true },
+  ...(!queen ? { burst: { frames: 2, fps: 8, loop: false } } : {}),
   // So a rainha cai: e a unica que o jogador derruba cortando o apoio. Tres
   // quadros lentos, em laco — um corpo se debatendo no chao, nao um golpe.
   // Cada quadro custa oito rumos; tres e o que cabe no orcamento sob demanda.
@@ -149,15 +162,15 @@ const animations = (queen) => ({
   die: { frames: 5, fps: 10, loop: false },
 });
 
-const spec = (queen) => {
+const spec = (queen, brood = false) => {
   // Union measured across every animation in every authored direction,
   // including death. Two pixels of border, no rescaling or unused canvas.
-  const w = queen ? 176 : 104;
-  const h = queen ? 122 : 72;
-  const ax = queen ? 88 : 50;
-  const ay = queen ? 88 : 48;
+  const w = queen ? 176 : brood ? 64 : 104;
+  const h = queen ? 122 : brood ? 48 : 74;
+  const ax = queen ? 88 : brood ? 32 : 50;
+  const ay = queen ? 88 : brood ? 34 : 48;
   return {
-    id: queen ? 'enemy-seamstress' : 'enemy-stitcher',
+    id: queen ? 'enemy-seamstress' : brood ? 'enemy-seamstress-brood' : 'enemy-stitcher',
     version: 1,
     frameWidth: w,
     frameHeight: h,
@@ -170,11 +183,11 @@ const spec = (queen) => {
     footprint: { w: queen ? 2 : 1, h: queen ? 2 : 1, offsetX: 0, offsetY: 0 },
     animations: animations(queen),
     draw: (dir, anim, frame) =>
-      renderVoxels(stitcherModel(anim, frame, queen), DIR_INDEX[dir], w, h, ax, ay),
+      renderVoxels(stitcherModel(anim, frame, queen, brood), DIR_INDEX[dir], w, h, ax, ay),
     prompt: queen
       ? 'Cerzideira: eight-direction mineral arthropod, suspended hollow silk ribcage, eight articulated load-bearing legs, paired asymmetrical needle forelimbs, open dorsal fan; existing camera-rotation face raster for diagonal anti-corduroy'
       : 'Costureiro: pale six-legged subterranean arthropod, open silk abdomen, pinning and pulling needle forelimbs, articulated sewing and walking poses',
   };
 };
 
-export const STITCHER_SPECS = [spec(false), spec(true)];
+export const STITCHER_SPECS = [spec(false), spec(true), spec(false, true)];

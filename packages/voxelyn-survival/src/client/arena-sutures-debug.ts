@@ -1,6 +1,7 @@
 import { t, onLocaleChange, type MessageKey } from './i18n';
 import {
   cutSuture,
+  hitSutures,
   breakSolid,
   emptyCommand,
   stepRun,
@@ -36,7 +37,10 @@ export const mountSutureDebug = (
   const selected = (state: SurvivalState) => {
     const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
     return (
-      state.sutures.find((s) => s.id + 1 === queen?.mood && s.phase === 'taut') ??
+      state.sutures.find(
+        (s) =>
+          s.a === queen?.action?.silkFlight?.anchor || s.b === queen?.action?.silkFlight?.anchor,
+      ) ??
       state.sutures
         .filter((s) => s.phase === 'taut' && s.kind === 'roof')
         .sort((a, b) => {
@@ -62,12 +66,21 @@ export const mountSutureDebug = (
       fn(state, events);
       emit(events);
       const goal = sutureObjective(state);
-      output.textContent = t('arena.suture.status', {
-        tick: state.tick,
-        done: goal.done,
-        total: goal.total,
-        taut: state.sutures.filter((s) => s.phase === 'taut').length,
-      });
+      const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
+      const flight = queen?.action?.silkFlight;
+      output.textContent = flight
+        ? t('arena.suture.flight', {
+            tick: state.tick,
+            takeoff: queen!.action!.releaseAt,
+            land: flight.landAt,
+            impact: flight.impactAt,
+          })
+        : t('arena.suture.status', {
+            tick: state.tick,
+            done: goal.done,
+            total: goal.total,
+            taut: state.sutures.filter((s) => s.phase === 'taut' && !s.encounter).length,
+          });
     });
     controls.append(button);
   };
@@ -94,23 +107,41 @@ export const mountSutureDebug = (
       (a, b) => Math.hypot(a.x - p.x - 2, a.y - p.y - 2) - Math.hypot(b.x - p.x - 2, b.y - p.y - 2),
     );
     if (positions[0]) Object.assign(state.player, positions[0]);
-    const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
-    if (queen) queen.mood = s.id + 1;
   });
   add('arena.suture.cut', (state, events) => {
     const s = selected(state);
-    if (s) cutSuture(state, s, events, 0);
+    const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
+    const anchor = queen?.action?.silkFlight?.anchor;
+    if (queen && anchor !== undefined) {
+      const p = suturePoint(state, anchor);
+      const mid = { x: (p.x + queen.x) / 2, y: (p.y + queen.y) / 2 };
+      const dx = p.x - queen.x,
+        dy = p.y - queen.y,
+        len = Math.hypot(dx, dy) || 1;
+      hitSutures(
+        state,
+        { x: mid.x - dy / len, y: mid.y + dx / len },
+        { x: mid.x + dy / len, y: mid.y - dx / len },
+        events,
+        0,
+      );
+    } else if (s) cutSuture(state, s, events, 0);
   });
   add('arena.suture.anchor', (state, events) => {
     const s = selected(state);
     if (s) {
-      const p = suturePoint(state, s.a);
+      const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
+      const p = suturePoint(state, queen?.action?.silkFlight?.anchor ?? s.a);
       breakSolid(state, Math.floor(p.x), Math.floor(p.y), events);
     }
   });
   add('arena.suture.step', (state, events) => {
     pause(true);
     for (let i = 0; i < 8; i++) events.push(...stepRun(state, [emptyCommand()]).events);
+  });
+  add('arena.suture.tick', (state, events) => {
+    pause(true);
+    events.push(...stepRun(state, [emptyCommand()]).events);
   });
   add('arena.suture.phase', (state) => {
     const queen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');

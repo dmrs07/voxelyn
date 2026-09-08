@@ -55,46 +55,42 @@ const fixture = () => {
 
 const project = (x: number, y: number): [number, number] => [x * 10, y * 10];
 
-describe('apresentacao das suturas', () => {
-  it('sem puxada, o apoio carregado ganha a marca da ancora mas nenhuma faixa', () => {
+describe('apresentacao da amarra e do golpe', () => {
+  it('sem acao nao desenha carga, fio ou perigo na camara', () => {
     const { state } = fixture();
     const items: { depth: number; draw: () => void }[] = [];
-    const ctx = fakeContext();
-    appendSutureDraws(ctx, state, items, project, 2, () => 1, 0);
-    for (const item of items) item.draw();
-    // A marca da ancora e um losango de quatro cantos fechado; a faixa seria um
-    // preenchimento (`fill`), que nao existe sem acao.
-    expect(ctx.calls.some((c) => c === 'closePath:')).toBe(true);
-    expect(ctx.calls.some((c) => c.startsWith('fill:'))).toBe(false);
+    appendSutureDraws(fakeContext(), state, items, project, 2, () => 1, 0);
+    expect(items).toHaveLength(0);
   });
-
-  it('durante o preparo a faixa vai do corpo ao fim da puxada, com a largura do corpo', () => {
+  it('o aviso marca somente o golpe e mantem a ancora escolhida durante o voo', () => {
     const { state, queen } = fixture();
-    startAction(state, queen, 'tether', { x: 0, y: -1 }, 24, 20, [], 0);
-    state.tick = 112;
-    const items: { depth: number; draw: () => void }[] = [];
-    const ctx = fakeContext();
-    appendSutureDraws(ctx, state, items, project, 2, () => 1, 0);
-    for (const item of items) item.draw();
-    // O destino e a segunda celula a partir da ancora `b`: (13.5, 12.5). As
-    // bordas da faixa correm em x = 13.5 +- 0.72 ate la, em tela x10.
-    expect(ctx.calls.some((c) => c === 'fill:')).toBe(true);
-    const edge = ctx.calls.filter((c) => c.startsWith('lineTo:'));
-    expect(edge.some((c) => c === 'lineTo:127.8,125.0')).toBe(true);
-    expect(edge.some((c) => c === 'lineTo:142.2,125.0')).toBe(true);
-  });
-
-  it('no arranque a faixa continua, agora a partir de onde o corpo esta', () => {
-    const { state, queen } = fixture();
-    startAction(state, queen, 'tether', { x: 0, y: -1 }, 2, 20, [], 0);
-    state.tick = 110;
-    queen.action!.phase = 'recovery';
-    queen.y = 16.5;
-    const items: { depth: number; draw: () => void }[] = [];
-    const ctx = fakeContext();
-    appendSutureDraws(ctx, state, items, project, 2, () => 1, 0);
-    for (const item of items) item.draw();
-    expect(ctx.calls.some((c) => c === 'moveTo:127.8,165.0')).toBe(true);
-    expect(ctx.calls.some((c) => c === 'lineTo:127.8,125.0')).toBe(true);
+    startAction(state, queen, 'tether', { x: 0, y: -1 }, 24, 30, [], 0);
+    queen.action!.silkFlight = {
+      fromX: queen.x,
+      fromY: queen.y,
+      toX: 13.5,
+      toY: 12.5,
+      landAt: 140,
+      impactAt: 144,
+      anchor: state.sutures[0].b,
+    };
+    const draw = () => {
+      const ctx = fakeContext(),
+        items: { depth: number; draw: () => void }[] = [];
+      appendSutureDraws(ctx, state, items, project, 2, () => 1, 0);
+      items.forEach((i) => i.draw());
+      return ctx.calls;
+    };
+    const before = draw();
+    expect(before).toContain('moveTo:146.0,117.0'); // radius 1.1 at the strike point
+    expect(before).toContain('lineTo:155.0,91.0'); // selected anchor B
+    queen.x = 14;
+    queen.y = 15;
+    state.tick = 133;
+    const flight = draw();
+    expect(flight).toContain('moveTo:146.0,117.0');
+    expect(flight).toContain('lineTo:155.0,91.0');
+    state.tick = 144;
+    expect(draw()).not.toContain('lineTo:155.0,91.0'); // released support after impact
   });
 });

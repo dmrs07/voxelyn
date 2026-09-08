@@ -15,6 +15,8 @@
 // em que foi escrita.
 
 export const PT_BR = {
+  'arena.suture.flight': 'tick {tick} · voo {takeoff}–{land} · golpe {impact}',
+  'arena.suture.tick': 'Avançar 1 tick',
   'arena.suture.title': 'Suturas · inspeção',
   'arena.suture.select': 'Selecione A Cerzideira e inicie a arena.',
   'arena.suture.status': 'tick {tick} · carga {done}/{total} · {taut} amarras tensionadas',
@@ -331,6 +333,13 @@ export const PT_BR = {
   'enemy.scoriac': 'Escoriáceo',
   'enemy.frost_wraith': 'Espectro',
   'enemy.sulfur_bomber': 'Bombardeiro',
+  'enemy.seamstress_brood': 'Cria da Cerzideira',
+  'bestiary.name.seamstress_brood': 'Cria da Cerzideira',
+  'bestiary.code.seamstress_brood': 'ESPÉCIME SUT-03',
+  'bestiary.note.seamstress_brood':
+    'Sai do abdome da Cerzideira. Agacha, marca o pouso e salta. Saia da marca e ataque durante a recuperação.',
+  'seamstress.hint': 'Corte o fio · esquive da marca',
+  'seamstress.exposed': 'ABDOME EXPOSTO · ataque agora',
   'enemy.stitcher': 'Costureiro',
   'enemy.seamstress': 'A Cerzideira',
   'bestiary.name.stitcher': 'Costureiro',
@@ -340,7 +349,7 @@ export const PT_BR = {
   'bestiary.note.stitcher':
     'Costura passagens entre duas âncoras. Interrompa o operário antes do terceiro ponto ou deixe que feche a rota. Fios tensionados chicoteiam após o corte.',
   'bestiary.note.seamstress':
-    'Desloca o corpo por fios de sustentação. Corte a amarra carregada para derrubá-la e expor o abdômen. Na metade da vida, encurta a preparação das puxadas.',
+    'Escolhe um apoio, voa sobre a rocha e golpeia no ponto marcado. Corte o único fio ativo para expor o abdome. A ninhada salta; abaixo de meia vida, ela encadeia duas investidas.',
   'biome.occupation.stitchers': 'COLÔNIA DOS COSTUREIROS',
   'bossBar.material.seamstress': 'seda mineral e quitina pálida',
   'suture.objective': 'Carga suspensa: {done}/{total} · +24 minério',

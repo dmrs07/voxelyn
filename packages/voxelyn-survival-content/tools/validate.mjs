@@ -145,6 +145,7 @@ const MAX_ON_DEMAND_DECODED_BYTES = 48 * 1024 * 1024;
 export const ON_DEMAND_ATLASES = new Set([
   'enemy-stitcher',
   'enemy-seamstress',
+  'enemy-seamstress-brood',
   'part-diamandis-drill',
   'part-diamandis-rack',
   'part-diamandis-mast',

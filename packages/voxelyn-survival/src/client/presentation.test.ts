@@ -223,7 +223,7 @@ describe('EntityPresentation', () => {
     expect(again.elapsedMs).toBe(0);
   });
 
-  it('a puxada prepara em special e so arranca em attack a partir do release', () => {
+  it('a puxada prepara, voa e sincroniza o terceiro quadro com o impacto', () => {
     const presentation = new EntityPresentation();
     const entity = {
       id: 10,
@@ -234,7 +234,8 @@ describe('EntityPresentation', () => {
         kind: 'tether',
         startedAt: 0,
         releaseAt: 24,
-        endsAt: 44,
+        endsAt: 54,
+        silkFlight: { fromX: 0, fromY: 0, toX: 5, toY: 0, landAt: 34, impactAt: 38, anchor: 12 },
         direction: { x: 1, y: 0 },
       },
     };
@@ -252,7 +253,7 @@ describe('EntityPresentation', () => {
       baseAnim('idle') as never,
       1_200,
     );
-    expect(release.anim).toBe('attack');
+    expect(release.anim).toBe('fly');
     expect(release.elapsedMs).toBe(0);
     const stride = presentation.animationFor(
       entity as never,
@@ -260,8 +261,23 @@ describe('EntityPresentation', () => {
       baseAnim('idle') as never,
       1_500,
     );
-    expect(stride.anim).toBe('attack');
+    expect(stride.anim).toBe('fly');
     expect(stride.elapsedMs).toBe(300);
+    const impact = presentation.animationFor(
+      entity as never,
+      { tick: 38 } as never,
+      baseAnim('idle') as never,
+      9000,
+    );
+    expect(impact.anim).toBe('attack');
+    expect(impact.elapsedMs).toBe(200); // frame 2 at 10 fps, even after a wall-clock pause
+    const resumed = new EntityPresentation().animationFor(
+      entity as never,
+      { tick: 38 } as never,
+      baseAnim('idle') as never,
+      10000,
+    );
+    expect(resumed.elapsedMs).toBe(200);
   });
 
   it('preserva o telegraph quando o snapshot ainda mantem a acao autoritativa durante o stun', () => {

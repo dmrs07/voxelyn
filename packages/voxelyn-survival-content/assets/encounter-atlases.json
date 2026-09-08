@@ -39,6 +39,8 @@
     "enemy-magnetarch"
   ],
   "seamstress": [
-    "enemy-seamstress"
+    "enemy-seamstress",
+    "enemy-stitcher",
+    "enemy-seamstress-brood"
   ]
 }

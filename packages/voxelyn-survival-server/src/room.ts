@@ -409,6 +409,8 @@ export class GameRoom {
         facingY: round3(e.facing.y),
         stunnedUntil: e.stunnedUntil,
         mood: e.mood,
+        silk: e.silk ? { ...e.silk } : undefined,
+        summonerId: e.summonerId,
         action: e.action
           ? {
               kind: e.action.kind,
@@ -419,6 +421,7 @@ export class GameRoom {
               dx: round3(e.action.direction.x),
               dy: round3(e.action.direction.y),
               target: e.action.target,
+              silkFlight: e.action.silkFlight ? { ...e.action.silkFlight } : undefined,
             }
           : undefined,
       });

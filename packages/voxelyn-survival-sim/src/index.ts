@@ -250,3 +250,5 @@ export {
 
 export * from './sutures.js';
 export { generateSutures } from './suture-layout.js';
+
+export * from './seamstress.js';

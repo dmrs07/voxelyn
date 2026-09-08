@@ -1,14 +1,14 @@
 {
-  "id": "enemy-stitcher",
+  "id": "enemy-seamstress-brood",
   "version": 1,
-  "atlas": "enemy-stitcher.png",
-  "normalAtlas": "enemy-stitcher.normal.png",
+  "atlas": "enemy-seamstress-brood.png",
+  "normalAtlas": "enemy-seamstress-brood.normal.png",
   "normalScale": 2,
-  "frameWidth": 104,
-  "frameHeight": 74,
-  "columns": 30,
-  "anchorX": 50,
-  "anchorY": 48,
+  "frameWidth": 64,
+  "frameHeight": 48,
+  "columns": 60,
+  "anchorX": 32,
+  "anchorY": 34,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -39,6 +39,7 @@
     "#8a7154",
     "#b8a98f",
     "#d5cdba",
+    "#d93b4c",
     "#e8f1ff"
   ],
   "animations": {

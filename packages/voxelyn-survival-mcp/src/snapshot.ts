@@ -115,6 +115,8 @@ export type NearbyEnemy = {
   maxHp: number;
   stunned: boolean;
   alerted: boolean;
+  summonerId?: number;
+  silkFlight?: { toX: number; toY: number; landAt: number; impactAt: number; anchor?: number };
 };
 
 export type NearbyProjectile = {
@@ -232,6 +234,8 @@ export const buildAgentSnapshot = (
     maxHp: e.maxHp,
     stunned: e.stunnedUntil > state.tick,
     alerted: e.alertedUntil > state.tick,
+    summonerId: e.summonerId,
+    silkFlight: e.action?.silkFlight ? { ...e.action.silkFlight } : undefined,
   }));
 
   const sortedProjectiles = [...state.projectiles].sort(
