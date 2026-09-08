@@ -25,6 +25,37 @@ export const PT_BR = {
   'arena.suture.phase': 'Segunda fase',
   'arena.suture.pause': 'Pausar',
   'arena.suture.resume': 'Continuar',
+  'arena.tools.show': 'ferramentas',
+  'arena.tools.hide': 'esconder ferramentas',
+  'arena.setup.title': 'ARENA DE CHEFES',
+  'arena.setup.subtitle':
+    'Ferramenta de playtest isolado: escolha o chefe e as condições de entrada e jogue a luta você mesmo. O setor inteiro (terreno, trash, sítios) é o mesmo que a run normal geraria — só a descida até aqui é pulada.',
+  'arena.setup.locale': 'Idioma',
+  'arena.setup.boss': 'Chefe',
+  'arena.setup.hp': 'HP máximo do Prospector',
+  'arena.setup.ability': 'Eco (habilidade equipada)',
+  'arena.setup.modules': 'Módulos ativos',
+  'arena.setup.matrix': 'Matriz Geracional',
+  'arena.setup.stabilisers': 'Estabilizadores Giroscópicos (MV-04)',
+  'arena.setup.stabilisersHint':
+    'Sem o upgrade o Prospector freia ~2,5 tiles no gelo; com ele, ~1,0 — e recupera o rumo quatro vezes mais rápido. Não protege contra rachaduras: o que ele compra é a precisão de rota que permite desviar da célula crítica.',
+  'arena.setup.coop': 'Co-op de apresentação',
+  'arena.setup.coopPartner': 'Segundo Prospector parado (slot 1)',
+  'arena.setup.coopHint':
+    'Ninguém o controla: serve para ver o congelamento do parceiro — geada, estátua e os dois medidores em níveis diferentes.',
+  'arena.setup.enter': 'Entrar na arena',
+  'arena.end.victory': 'Chefe derrotado',
+  'arena.end.defeat': 'O Prospector caiu',
+  'arena.end.abandoned': 'Luta abandonada',
+  'arena.end.ticks': '{ticks} ticks simulados',
+  'arena.end.cause': 'Causa: {cause}',
+  'arena.end.noCause': 'nenhuma',
+  'arena.end.damageDealt': 'Dano causado: {value}',
+  'arena.end.damageTaken': 'Dano recebido: {value}',
+  'arena.end.shots': 'Tiros disparados: {value}',
+  'arena.end.retry': 'Tentar de novo (mesmas condições)',
+  'arena.end.reconfigure': 'Trocar configuração',
+  'toast.boss.awake': '{name} DESPERTOU',
   // ---------------------------------------------------------------------
   // Marca e telas de menu
   // ---------------------------------------------------------------------
@@ -757,7 +788,6 @@ export const PT_BR = {
   'toast.core.deeper': 'NÚCLEO {taken}/{total} RECUPERADO — DESCIDA ADICIONAL AUTORIZADA',
   'toast.furnace.cooled': 'A SALA ESFRIA',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
-  'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
   // As FALAS do Diamandis, como legenda. A voz e sintetizada em fonemas e as
   // palavras nao ficam inteligiveis — a legenda devolve a palavra, no mesmo
   // instante e pelo mesmo evento (boss-voice-lines.ts). Frases de ordem de

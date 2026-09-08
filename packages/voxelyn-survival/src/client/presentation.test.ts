@@ -37,7 +37,7 @@ describe('locomotionFacing', () => {
     const facing = locomotionFacing(
       { ...baseAnim('walk'), moveFacingX: moveX, moveFacingY: moveY } as never,
       0,
-      0
+      0,
     );
 
     expect(facing).toEqual({ x: moveX, y: moveY });
@@ -47,7 +47,7 @@ describe('locomotionFacing', () => {
     const facing = locomotionFacing(
       { ...baseAnim('idle'), moveFacingX: 0, moveFacingY: -1 } as never,
       -1,
-      0
+      0,
     );
 
     expect(facing).toEqual({ x: -1, y: 0 });
@@ -74,7 +74,12 @@ describe('EntityPresentation', () => {
     const state = { tick: 0 };
     const base = { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 };
 
-    const presented = presentation.animationFor(entity as never, state as never, base as never, 1_000);
+    const presented = presentation.animationFor(
+      entity as never,
+      state as never,
+      base as never,
+      1_000,
+    );
 
     // O Prospector caminha COMPOSTO, e nao pelo sheet completo: o sheet ainda
     // carrega a picareta que a arma substituiu, e alternar entre os dois trocava
@@ -94,7 +99,10 @@ describe('EntityPresentation', () => {
 
     for (const pose of ['hit', 'die']) {
       const presented = presentation.animationFor(
-        entity as never, { tick: 0 } as never, baseAnim(pose) as never, 1_000
+        entity as never,
+        { tick: 0 } as never,
+        baseAnim(pose) as never,
+        1_000,
       );
       expect(presented.anim).toBe(pose);
     }
@@ -105,8 +113,18 @@ describe('EntityPresentation', () => {
     const entity = actionEntity('prospector', 'shoot');
     const state = { tick: 1 };
 
-    const first = presentation.animationFor(entity as never, state as never, baseAnim('walk') as never, 1_000);
-    const second = presentation.animationFor(entity as never, state as never, baseAnim('walk') as never, 1_030);
+    const first = presentation.animationFor(
+      entity as never,
+      state as never,
+      baseAnim('walk') as never,
+      1_000,
+    );
+    const second = presentation.animationFor(
+      entity as never,
+      state as never,
+      baseAnim('walk') as never,
+      1_030,
+    );
 
     expect(typeof first.anim).toBe('object');
     expect(typeof second.anim).toBe('object');
@@ -123,31 +141,137 @@ describe('EntityPresentation', () => {
     const entity = actionEntity('bomber', 'detonate');
     const state = { tick: 3 };
 
-    const presented = presentation.animationFor(entity as never, state as never, baseAnim('hit', 900) as never, 1_000);
+    const presented = presentation.animationFor(
+      entity as never,
+      state as never,
+      baseAnim('hit', 900) as never,
+      1_000,
+    );
 
     expect(presented.anim).toBe('special');
   });
 
   it('cancela imediatamente um telegraph visual armazenado quando a entidade e atordoada', () => {
     const presentation = new EntityPresentation();
-    presentation.ingest([{
-      t: 'action_start', entity: 10, action: 'hurl', x: 0, y: 0, dx: 1, dy: 0,
-      startTick: 0, releaseTick: 16, endTick: 24,
-    }] as never, 0);
+    presentation.ingest(
+      [
+        {
+          t: 'action_start',
+          entity: 10,
+          action: 'hurl',
+          x: 0,
+          y: 0,
+          dx: 1,
+          dy: 0,
+          startTick: 0,
+          releaseTick: 16,
+          endTick: 24,
+        },
+      ] as never,
+      0,
+    );
     const entity = { id: 10, archetype: 'bruiser', facing: { x: 1, y: 0 }, stunnedUntil: 20 };
-    const stunned = presentation.animationFor(entity as never, { tick: 5 } as never, baseAnim('walk') as never, 250);
+    const stunned = presentation.animationFor(
+      entity as never,
+      { tick: 5 } as never,
+      baseAnim('walk') as never,
+      250,
+    );
     expect(stunned.anim).toBe('idle');
     const recovered = presentation.animationFor(
-      { ...entity, stunnedUntil: 20 } as never, { tick: 20 } as never, baseAnim('walk') as never, 1_000
+      { ...entity, stunnedUntil: 20 } as never,
+      { tick: 20 } as never,
+      baseAnim('walk') as never,
+      1_000,
     );
     expect(recovered.anim).toBe('walk');
+  });
+
+  it('a Cerzideira atordoada cai na pose derrubada, com o relogio andando desde a queda', () => {
+    const presentation = new EntityPresentation();
+    const entity = { id: 10, archetype: 'seamstress', facing: { x: 1, y: 0 }, stunnedUntil: 60 };
+    const first = presentation.animationFor(
+      entity as never,
+      { tick: 5 } as never,
+      baseAnim('idle') as never,
+      1_000,
+    );
+    expect(first.anim).toBe('downed');
+    expect(first.elapsedMs).toBe(0);
+    const later = presentation.animationFor(
+      entity as never,
+      { tick: 20 } as never,
+      baseAnim('idle') as never,
+      1_750,
+    );
+    expect(later.anim).toBe('downed');
+    expect(later.elapsedMs).toBe(750);
+    const up = presentation.animationFor(
+      { ...entity, stunnedUntil: 60 } as never,
+      { tick: 60 } as never,
+      baseAnim('walk') as never,
+      4_000,
+    );
+    expect(up.anim).toBe('walk');
+    // Uma segunda queda recomeca do zero.
+    const again = presentation.animationFor(
+      { ...entity, stunnedUntil: 200 } as never,
+      { tick: 100 } as never,
+      baseAnim('idle') as never,
+      9_000,
+    );
+    expect(again.elapsedMs).toBe(0);
+  });
+
+  it('a puxada prepara em special e so arranca em attack a partir do release', () => {
+    const presentation = new EntityPresentation();
+    const entity = {
+      id: 10,
+      archetype: 'seamstress',
+      facing: { x: 1, y: 0 },
+      stunnedUntil: 0,
+      action: {
+        kind: 'tether',
+        startedAt: 0,
+        releaseAt: 24,
+        endsAt: 44,
+        direction: { x: 1, y: 0 },
+      },
+    };
+    const windup = presentation.animationFor(
+      entity as never,
+      { tick: 12 } as never,
+      baseAnim('idle') as never,
+      600,
+    );
+    expect(windup.anim).toBe('special');
+    expect(windup.elapsedMs).toBe(600);
+    const release = presentation.animationFor(
+      entity as never,
+      { tick: 24 } as never,
+      baseAnim('idle') as never,
+      1_200,
+    );
+    expect(release.anim).toBe('attack');
+    expect(release.elapsedMs).toBe(0);
+    const stride = presentation.animationFor(
+      entity as never,
+      { tick: 30 } as never,
+      baseAnim('idle') as never,
+      1_500,
+    );
+    expect(stride.anim).toBe('attack');
+    expect(stride.elapsedMs).toBe(300);
   });
 
   it('preserva o telegraph quando o snapshot ainda mantem a acao autoritativa durante o stun', () => {
     const presentation = new EntityPresentation();
     const entity = { ...actionEntity('bomber', 'detonate'), stunnedUntil: 20 };
     const presented = presentation.animationFor(
-      entity as never, { tick: 5 } as never, baseAnim('idle') as never, 250
+      entity as never,
+      { tick: 5 } as never,
+      baseAnim('idle') as never,
+      250,
     );
     expect(presented.anim).toBe('special');
   });
@@ -157,7 +281,12 @@ describe('EntityPresentation', () => {
     const entity = actionEntity('prospector', 'shoot');
     const state = { tick: 3 };
 
-    const presented = presentation.animationFor(entity as never, state as never, baseAnim('hit', 900) as never, 1_000);
+    const presented = presentation.animationFor(
+      entity as never,
+      state as never,
+      baseAnim('hit', 900) as never,
+      1_000,
+    );
 
     expect(presented.anim).toBe('hit');
   });
@@ -183,7 +312,14 @@ describe('EntityPresentation', () => {
     // Cada item e o deslocamento OBSERVADO num quadro: os `0,-1` sao os quadros
     // em que a parede comeu o avanco em x.
     const observed = [
-      [0.94, -0.33], [0, -1], [0, -1], [0.94, -0.33], [0, -1], [0.93, -0.36], [0, -1], [0.94, -0.33],
+      [0.94, -0.33],
+      [0, -1],
+      [0, -1],
+      [0.94, -0.33],
+      [0, -1],
+      [0.93, -0.36],
+      [0, -1],
+      [0.94, -0.33],
     ] as const;
 
     const dirs = observed.map(([mx, my], i) => {
@@ -191,7 +327,7 @@ describe('EntityPresentation', () => {
         { id: 10, archetype: 'miner', facing: heading, stunnedUntil: 0 } as never,
         { tick: i } as never,
         { ...baseAnim('walk'), moveFacingX: mx, moveFacingY: my } as never,
-        1_000 + i * 50
+        1_000 + i * 50,
       );
       return dirFromFacing(presented.facingX, presented.facingY);
     });
@@ -209,7 +345,7 @@ describe('EntityPresentation', () => {
       { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 } as never,
       { tick: 0 } as never,
       { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 } as never,
-      1_000
+      1_000,
     );
 
     expect(typeof presented.anim).toBe('object');
@@ -229,7 +365,10 @@ describe('EntityPresentation', () => {
     };
 
     const shot = presentation.animationFor(
-      firing as never, { tick: 0 } as never, walkingWest as never, 1_000
+      firing as never,
+      { tick: 0 } as never,
+      walkingWest as never,
+      1_000,
     );
     // Disparo: pernas no andar, tronco no cano. As duas metades do mesmo quadro.
     expect(typeof shot.anim).toBe('object');
@@ -240,7 +379,10 @@ describe('EntityPresentation', () => {
 
     // Acabada a acao, o tronco volta para as pernas em vez de ficar torcido.
     const after = presentation.animationFor(
-      entity as never, { tick: 20 } as never, walkingWest as never, 2_000
+      entity as never,
+      { tick: 20 } as never,
+      walkingWest as never,
+      2_000,
     );
     expect(typeof after.anim).toBe('object');
     if (typeof after.anim === 'object') {
@@ -264,11 +406,17 @@ describe('EntityPresentation', () => {
     presentation.animationFor(
       {
         ...entity,
-        action: { kind: 'player_shot', startedAt: 0, releaseAt: 0, endsAt: 7, direction: { x: 1, y: 0 } },
+        action: {
+          kind: 'player_shot',
+          startedAt: 0,
+          releaseAt: 0,
+          endsAt: 7,
+          direction: { x: 1, y: 0 },
+        },
       } as never,
       { tick: 0 } as never,
       { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 } as never,
-      1_000
+      1_000,
     );
 
     // Agora sobe a tela: em coordenadas de mundo, o vetor que cai exatamente
@@ -278,13 +426,15 @@ describe('EntityPresentation', () => {
       entity as never,
       { tick: 20 } as never,
       { ...baseAnim('walk'), moveFacingX: up, moveFacingY: up } as never,
-      2_000
+      2_000,
     );
 
     expect(typeof presented.anim).toBe('object');
     if (typeof presented.anim === 'object') {
       const { lower, upper } = presented.anim;
-      expect(dirFromFacing(upper.facingX, upper.facingY)).toBe(dirFromFacing(lower.facingX, lower.facingY));
+      expect(dirFromFacing(upper.facingX, upper.facingY)).toBe(
+        dirFromFacing(lower.facingX, lower.facingY),
+      );
     }
   });
 
@@ -307,11 +457,14 @@ describe('EntityPresentation', () => {
         },
         { t: 'action_end', entity: 1 },
       ] as never,
-      1_000
+      1_000,
     );
     const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
     const presented = presentation.animationFor(
-      entity as never, { tick: 12 } as never, baseAnim('idle') as never, 1_500
+      entity as never,
+      { tick: 12 } as never,
+      baseAnim('idle') as never,
+      1_500,
     );
     expect(typeof presented.anim).toBe('object');
     if (typeof presented.anim === 'object') {
@@ -353,12 +506,15 @@ describe('EntityPresentation', () => {
           reach: [4.2, 4.2, 4.2, 4.2, 4.2],
         },
       ] as never,
-      1_000
+      1_000,
     );
     // `entity.facing` aponta para onde os PES andam; a chama manda no tronco.
     const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
     const presented = presentation.animationFor(
-      entity as never, { tick: 10 } as never, baseAnim('idle') as never, 1_000
+      entity as never,
+      { tick: 10 } as never,
+      baseAnim('idle') as never,
+      1_000,
     );
     expect(typeof presented.anim).toBe('object');
     if (typeof presented.anim === 'object') {

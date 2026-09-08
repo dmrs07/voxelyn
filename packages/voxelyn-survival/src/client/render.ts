@@ -340,7 +340,7 @@ import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from '
 import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
 import { drawPipeSpill, drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
-import { t } from './i18n';
+import { t, type MessageKey } from './i18n';
 import {
   deathEchoReadout,
   deathEchoReadoutRegion,
@@ -2589,9 +2589,13 @@ export class SurvivalRenderer {
         case 'boss_awake':
           // O Diamandis se apresenta com a propria fala (legenda acima); o
           // aviso generico de despertar so nao faria sentido em cima dela.
+          // O aviso NOMEIA quem acordou: o texto era o do Guardiao para todo
+          // chefe, e a Cerzideira entrava em cena anunciada como outro bicho.
           if (ev.archetype !== 'diamandis') {
             this.messages.push({
-              text: t('toast.guardian.awake'),
+              text: t('toast.boss.awake', {
+                name: t(`enemy.${ev.archetype}` as MessageKey).toUpperCase(),
+              }),
               until: nowMs + 3000,
               tone: 'warn',
             });
@@ -4135,7 +4139,7 @@ export class SurvivalRenderer {
         });
       }
     }
-    appendSutureDraws(ctx, state, items, toScreen, z, brightness);
+    appendSutureDraws(ctx, state, items, toScreen, z, brightness, nowMs);
     // AS CICATRIZES do feixe: onde a linha esteve, apagando.
     this.diamandisBeam.step(nowMs);
     for (const mark of this.diamandisBeam.scorches) {

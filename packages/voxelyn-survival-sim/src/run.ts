@@ -3527,6 +3527,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(s.whipAt);
     mix(s.fallAt);
     mix(s.cutBySlot);
+    mix(s.resewAt);
     mix(s.objective ? 1 : 0);
     mix(s.recovered ? 1 : 0);
     mix(s.cells.length);

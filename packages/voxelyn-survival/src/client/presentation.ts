@@ -115,6 +115,8 @@ type ActionVisualClock = {
 
 export const actionAnimation = (action: EntityActionKind): string => {
   if (action === 'stitch') return 'special';
+  // O arranque; o preparo da puxada e resolvido em `animationFor`, que sabe
+  // em que tempo da acao o corpo esta.
   if (action === 'tether') return 'attack';
   // `special` e a pose de PREPARO — o pod inchando, o corpo recuando para a
   // investida, a coroa abrindo. `haul` pertence a esta familia: no atlas do
@@ -370,6 +372,14 @@ export class EntityPresentation {
   private readonly actions = new Map<number, ActionIntent>();
   private readonly actionVisualClocks = new Map<number, ActionVisualClock>();
   private readonly downedAt = new Map<number, number>();
+  /**
+   * Quando o ATORDOAMENTO de um inimigo comecou a ser desenhado, por id.
+   *
+   * A simulacao so publica ate quando ele dura (`stunnedUntil`), e a pose de
+   * queda precisa de um relogio que ande a partir do inicio — sem ele, o corpo
+   * ficaria preso no primeiro quadro.
+   */
+  private readonly stunnedAt = new Map<number, number>();
 
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
@@ -704,6 +714,21 @@ export class EntityPresentation {
       this.actions.delete(entity.id);
       this.actionVisualClocks.delete(entity.id);
       const aim = bodyFacing();
+      // A CERZIDEIRA DERRUBADA e a janela de dano do encontro (1,5x por 3 s),
+      // e o atlas dela tem a pose: pernas cedendo, abdome no chao. Parada em
+      // `idle` a vantagem era invisivel — o playtest leu como congelamento.
+      // Os demais inimigos continuam parados no repouso: nenhum tem a pose,
+      // e o quadro fixo e a leitura de "atordoado" que eles sempre tiveram.
+      if (entity.archetype === 'seamstress') {
+        const start = this.stunnedAt.get(entity.id) ?? nowMs;
+        this.stunnedAt.set(entity.id, start);
+        return {
+          anim: 'downed',
+          elapsedMs: nowMs - start,
+          facingX: aim.x,
+          facingY: aim.y,
+        };
+      }
       return {
         anim: 'idle',
         elapsedMs: 0,
@@ -711,6 +736,7 @@ export class EntityPresentation {
         facingY: aim.y,
       };
     }
+    this.stunnedAt.delete(entity.id);
 
     const eventIntent = this.actions.get(entity.id);
     const action: ActionIntent | undefined = authoritative
@@ -759,6 +785,22 @@ export class EntityPresentation {
         // Inimigo desenha a acao com o corpo inteiro: a direcao dela E o rumo do
         // corpo, e por isso divide a memoria de quadrante com a locomocao.
         const aim = facing(FACING_BODY, action.dx, action.dy);
+        if (action.action === 'tether') {
+          // A PUXADA tem dois tempos e duas poses. O preparo (1,2 s; 0,8 na
+          // segunda fase) e a Cerzideira tensionando a amarra: `special`, as
+          // agulhas puxando o fio. O arranque e `attack`, com o relogio ZERADO
+          // no release — antes, os quatro quadros de 10 fps do golpe rodavam
+          // durante o preparo e o corpo deslizava a arena inteira preso no
+          // ultimo quadro.
+          const releaseMs = ((action.releaseTick - action.startTick) / TICK_HZ) * 1000;
+          const striding = state.tick >= action.releaseTick;
+          return {
+            anim: striding ? 'attack' : 'special',
+            elapsedMs: striding ? Math.max(0, elapsedMs - releaseMs) : elapsedMs,
+            facingX: aim.x,
+            facingY: aim.y,
+          };
+        }
         return {
           anim: actionAnimation(action.action),
           elapsedMs,

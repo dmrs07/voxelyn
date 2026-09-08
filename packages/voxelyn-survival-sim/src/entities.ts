@@ -829,6 +829,15 @@ const deepWaterBlocks = (state: SurvivalState, ent: Entity, x: number, y: number
   return state.surface[cy * state.config.width + cx] === SURF_DEEP_WATER;
 };
 
+/**
+ * O CORPO desta entidade cabe em (x, y)? E a mesma pergunta que `moveEntity`
+ * faz a cada passo (parede pelo raio, agua profunda pela celula), exposta para
+ * quem precisa responder ANTES de andar — a Cerzideira, escolhendo a ancora de
+ * uma puxada, confere a faixa inteira por aqui (ver `tetherLaneClear`).
+ */
+export const bodyBlocked = (state: SurvivalState, ent: Entity, x: number, y: number): boolean =>
+  circleBlocked(state, x, y, ent.radius) || deepWaterBlocks(state, ent, x, y);
+
 export const moveEntity = (
   state: SurvivalState,
   ent: Entity,
@@ -840,7 +849,7 @@ export const moveEntity = (
   let blockedY = false;
   if (dx !== 0) {
     const nx = ent.x + dx;
-    if (!circleBlocked(state, nx, ent.y, ent.radius) && !deepWaterBlocks(state, ent, nx, ent.y)) {
+    if (!bodyBlocked(state, ent, nx, ent.y)) {
       ent.x = nx;
     } else {
       blockedX = true;
@@ -849,7 +858,7 @@ export const moveEntity = (
   }
   if (dy !== 0) {
     const ny = ent.y + dy;
-    if (!circleBlocked(state, ent.x, ny, ent.radius) && !deepWaterBlocks(state, ent, ent.x, ny)) {
+    if (!bodyBlocked(state, ent, ent.x, ny)) {
       ent.y = ny;
     } else {
       blockedY = true;

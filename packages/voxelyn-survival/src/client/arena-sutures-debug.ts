@@ -18,6 +18,9 @@ export const mountSutureDebug = (
   pause: (paused: boolean) => void,
 ): void => {
   const panel = document.createElement('details');
+  // Obedece ao interruptor das ferramentas como os demais paineis (ver o CSS
+  // de `body.tools-hidden` em arena.html): durante a luta ele cobria a sala.
+  panel.id = 'sutures-panel';
   panel.style.cssText =
     'position:fixed;right:12px;top:70px;z-index:40;background:#131920ee;color:#ddd4c2;padding:10px;border:1px solid #766951;font:12px monospace;max-width:230px';
   panel.innerHTML =

@@ -13,9 +13,14 @@ import {
   stepSutures,
   sutureObjective,
   stitcherStep,
+  tetherEndpoint,
+  tetherLaneClear,
+  SEAMSTRESS_RESEW_DELAY,
+  SEAMSTRESS_SNAG_STUN,
 } from '../src/sutures';
 import {
   SOLID_NONE,
+  SOLID_ROCK,
   SOLID_SUTURE_ANCHOR,
   SOLID_SUTURE_CRACKED,
   SOLID_STITCHED_ROCK,
@@ -395,11 +400,116 @@ describe('Colônia dos Costureiros', () => {
     expect(state.stats.oreCollected).toBe(total);
   });
 
+  it('a sutura gasta espera 8 s antes de ser refeita; nesse intervalo a Cerzideira caca', () => {
+    const state = fixture('gate'),
+      queen = spawnEnemy(state, 'seamstress', 12, 9, false),
+      s = state.sutures[0];
+    state.bossRuntime.awake = true;
+    // Uma amarra recem-cortada vira `spent` com o prazo de recostura marcado.
+    s.phase = 'taut';
+    s.tension = 100;
+    cutSuture(state, s, [], 0);
+    while (s.phase !== 'spent') {
+      state.tick++;
+      stepSutures(state, []);
+    }
+    expect(s.resewAt).toBe(state.tick + SEAMSTRESS_RESEW_DELAY);
+    // O ciclo antigo: ela recosturava imediatamente, do lado da ancora.
+    state.player.x = 15.5;
+    state.player.y = 16.5;
+    const before = { x: queen.x, y: queen.y };
+    queen.nextActionAt = 0;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).not.toBe('stitch');
+    expect(queen.x !== before.x || queen.y !== before.y).toBe(true);
+    // Vencido o prazo, a sutura volta para a lista dela.
+    state.tick = s.resewAt;
+    queen.nextActionAt = 0;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('stitch');
+    expect(queen.action?.target).toBe(s.id);
+  });
+
+  it('com uma amarra tensionada ao alcance, a puxada vem antes da costura', () => {
+    const state = fixture('roof'),
+      w = state.config.width;
+    // Um fio frouxo a duas celulas dela, que a ordem antiga costuraria primeiro.
+    const cells = [10, 11, 12, 13, 14].map((x) => 8 * w + x);
+    const loose: SutureRecipe = {
+      id: 1,
+      a: cells[0] - 1,
+      b: cells[4] + 1,
+      cells,
+      slabCells: [],
+      kind: 'gate',
+      objective: false,
+    };
+    state.solid[loose.a] = state.solid[loose.b] = SOLID_SUTURE_ANCHOR;
+    state.sutures.push(...createSutures([loose]));
+    const queen = spawnEnemy(state, 'seamstress', 12.5, 10.5, false);
+    state.bossRuntime.awake = true;
+    state.player.x = 12.5;
+    state.player.y = 16.5;
+    const events: SemanticEvent[] = [];
+    stitcherStep(state, queen, state.player, 0.05, events);
+    expect(queen.action?.kind).toBe('tether');
+    expect(queen.mood).toBe(1);
+  });
+
+  it('a rota da puxada precisa caber no corpo, nao so na linha de visao', () => {
+    const state = fixture('roof'),
+      w = state.config.width,
+      queen = spawnEnemy(state, 'seamstress', 11.5, 20.5, false),
+      end = tetherEndpoint(state, queen, state.sutures[0]);
+    expect(end).toEqual({ x: 11.5, y: 12.5 });
+    // Um corredor de UMA celula entre ela e o destino: o raio passa, o corpo nao.
+    for (let y = 14; y <= 18; y++)
+      for (let x = 0; x < w; x++) if (x !== 11) state.solid[y * w + x] = SOLID_ROCK;
+    expect(tetherLaneClear(state, queen, end)).toBe(false);
+    state.bossRuntime.awake = true;
+    state.player.x = 11.5;
+    state.player.y = 24.5;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).not.toBe('tether');
+    expect(queen.mood ?? 0).toBe(0);
+    // Corredor de tres celulas: cabe, e a puxada volta a ser escolhida.
+    for (let y = 14; y <= 18; y++) for (const x of [10, 12]) state.solid[y * w + x] = SOLID_NONE;
+    expect(tetherLaneClear(state, queen, end)).toBe(true);
+    queen.action = undefined;
+    queen.nextActionAt = 0;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('tether');
+  });
+
+  it('encalhar no meio da puxada solta a amarra e derruba a Cerzideira por 1,5 s', () => {
+    const { state, queen } = passFixture();
+    const w = state.config.width;
+    // Uma parede que fecha a faixa DEPOIS de a rota ter sido aceita. Tres
+    // celulas de altura: a colisao le os cantos do corpo (raio 0,72), e uma
+    // celula solta entre eles passaria despercebida.
+    for (const y of [19, 20, 21]) state.solid[y * w + 11] = SOLID_ROCK;
+    queen.mood = 1;
+    const events = finishPass(state, queen);
+    expect(queen.action).toBeUndefined();
+    expect(queen.mood).toBe(0);
+    expect(queen.x).toBeLessThan(11);
+    expect(
+      events.some((e) => e.t === 'boss_vulnerable' && e.archetype === 'seamstress' && e.open),
+    ).toBe(true);
+    expect(queen.stunnedUntil - SEAMSTRESS_SNAG_STUN).toBeGreaterThan(100);
+    expect(queen.stunnedUntil).toBeLessThan(state.tick + SEAMSTRESS_SNAG_STUN);
+    // A sutura em si continua tensionada: quem a derrubou foi a sala, nao um corte.
+    expect(state.sutures[0].phase).toBe('taut');
+  });
+
   it('hashes every deadline and copies runtime data without aliasing', () => {
     const a = fixture(),
       b = fixture();
     expect(hashAuthoritativeState(a)).toBe(hashAuthoritativeState(b));
     b.sutures[0].fallAt++;
+    expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
+    b.sutures[0].fallAt--;
+    b.sutures[0].resewAt = 500;
     expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
     const copy = cloneSutures(a.sutures);
     copy[0].cells[0]++;
