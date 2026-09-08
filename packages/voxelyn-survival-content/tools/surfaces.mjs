@@ -99,6 +99,7 @@ export const SURFACE_KINDS = [
   // brilhante por tile, para uma poca de varias celulas ler como UMA massa
   // continua sem grade interna. Tres quadros, lentos: massa gira, nao ondula.
   { name: 'aquifer-deep-water', frames: 3, frameMs: 640 },
+  { name: 'mineral-silk', frames: 1, frameMs: 0 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -446,6 +447,14 @@ const gasModel = (variant, frame) => {
 
 /** Modelo de um tipo num quadro de animacao. */
 export const surfaceModel = (kind, variant, frame) => {
+  if (kind === 'mineral-silk') {
+    const boxes = slab(variant, 'floor', 'rockDeep');
+    for (let i = -3; i <= 3; i++) {
+      boxes.push(box(i, ((i + variant) % 3) - 1, 0.3, 1.5, 0.5, 0.35, 'silk'));
+      if (i % 2 === 0) boxes.push(box(i, -2, 0.35, 0.5, 4, 0.35, 'silk'));
+    }
+    return boxes;
+  }
   if (kind === 'bare') return slab(variant, 'floor', 'rockDeep');
 
   if (kind === 'scorched') {
@@ -786,7 +795,7 @@ export const surfaceModel = (kind, variant, frame) => {
     // nao anda), mas para os graos grossos trocarem de lugar e a superficie
     // parecer solta em vez de fundida.
     const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 149, ({ cx, cy, x, y, top, h }) => {
+    overSlab(variant, 149, ({ cx, x, y, top, h }) => {
       if (h % 29 === 0) return; // rocha aparecendo: a camada e fina, nao infinita
       // Crista de duna a cada oito colunas finas, com DUAS de largura: no
       // periodo curto que isto tinha antes as cristas caiam quase coladas e o

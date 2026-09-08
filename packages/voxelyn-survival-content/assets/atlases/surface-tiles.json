@@ -107,6 +107,11 @@
       "name": "aquifer-deep-water",
       "frames": 3,
       "frameMs": 640
+    },
+    {
+      "name": "mineral-silk",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "variants": 3,

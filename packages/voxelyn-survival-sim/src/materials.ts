@@ -1,3 +1,4 @@
+import { SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED, SOLID_STITCHED_ROCK } from './constants.js';
 // Como cada CLASSE de projetil reage com cada MATERIAL.
 //
 // Por que existe: a taxonomia de materiais ja estava no mundo — rocha, frágil,
@@ -76,7 +77,7 @@ export const explosiveArmedByDistance = (p: Projectile): boolean =>
 export const projectileClass = (
   p: Projectile,
   conductiveEnabled = true,
-  explosiveEnabled = true
+  explosiveEnabled = true,
 ): ProjectileClass => {
   if (p.leavesBiofluid) return 'bio';
   if (explosiveEnabled && explosiveArmedByDistance(p)) return 'thermal';
@@ -165,7 +166,7 @@ export const impactSolid = (
   cy: number,
   cls: ProjectileClass,
   events: SemanticEvent[],
-  origin: EffectOrigin = { source: 'environment' }
+  origin: EffectOrigin = { source: 'environment' },
 ): SolidImpact => {
   const w = W(state);
   const i = cy * w + cx;
@@ -173,6 +174,14 @@ export const impactSolid = (
   const at = { x: cx + 0.5, y: cy + 0.5 };
 
   switch (solid) {
+    case SOLID_SUTURE_ANCHOR:
+      state.solid[i] = SOLID_SUTURE_CRACKED;
+      markDirty(state, cx, cy);
+      events.push({ t: 'chip', ...at });
+      return { stop: true, broke: false };
+    case SOLID_SUTURE_CRACKED:
+    case SOLID_STITCHED_ROCK:
+      return { stop: true, broke: breakSolid(state, cx, cy, events) };
     // -----------------------------------------------------------------------
     case SOLID_ROCK: {
       if (cls === 'energy') {
@@ -254,7 +263,7 @@ export const impactSolid = (
           cx,
           cy,
           state.stratum === 'ferric' ? BUDGET_VEIN_CELLS * FERRIC_VEIN_SCALE : BUDGET_VEIN_CELLS,
-          (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED
+          (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED,
         );
         chargeCells(state, openNeighbours(state, vein), events, origin);
         // So conta como descoberta quando o veio REALMENTE conduziu a algum
@@ -315,7 +324,13 @@ export const impactSolid = (
       }
       if (cls === 'energy') {
         // Ressoa: a cadeia leva os cristais vizinhos junto.
-        const chain = floodFrom(state, cx, cy, BUDGET_RESONANCE_CELLS, (n) => state.solid[n] === SOLID_CRYSTAL);
+        const chain = floodFrom(
+          state,
+          cx,
+          cy,
+          BUDGET_RESONANCE_CELLS,
+          (n) => state.solid[n] === SOLID_CRYSTAL,
+        );
         for (const n of chain) breakSolid(state, n % w, Math.floor(n / w), events);
         return { stop: true, broke: true };
       }
@@ -348,8 +363,14 @@ export const impactSolid = (
             events.push({ t: 'leyline_short', seg: segIdx, cells: seg.cells });
           } else if (seg.dischargeAt === 0 && state.tick >= seg.refractoryUntil) {
             seg.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
-            seg.triggeredBy = origin.source === 'player' && origin.owner !== undefined ? origin.owner : -1;
-            events.push({ t: 'leyline_charge', seg: segIdx, cells: seg.cells, dischargeTick: seg.dischargeAt });
+            seg.triggeredBy =
+              origin.source === 'player' && origin.owner !== undefined ? origin.owner : -1;
+            events.push({
+              t: 'leyline_charge',
+              seg: segIdx,
+              cells: seg.cells,
+              dischargeTick: seg.dischargeAt,
+            });
           }
         }
       }
@@ -388,7 +409,7 @@ export const impactSurface = (
   cy: number,
   cls: ProjectileClass,
   events: SemanticEvent[],
-  origin: EffectOrigin = { source: 'environment' }
+  origin: EffectOrigin = { source: 'environment' },
 ): boolean => {
   const i = cy * W(state) + cx;
   const surface = state.surface[i];
@@ -437,7 +458,12 @@ export const impactSurface = (
       if (surface === SURF_FUNGAL_HEATED) setSurface(state, i, SURF_FUNGAL, 0);
       const w = W(state);
       const h = state.config.height;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
         const nx = cx + dx;
         const ny = cy + dy;
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;

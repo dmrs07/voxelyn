@@ -1,3 +1,4 @@
+import { generateSutures } from './suture-layout.js';
 import { RNG } from '@voxelyn/core';
 import {
   ARCHCANTOR_CHOIR_LANCE_LENGTH,
@@ -32,7 +33,7 @@ import {
   LEVIATHAN_POOL_RIM_RADIUS,
   WORLD_W,
 } from './constants.js';
-import type { LeylineNode, Vec2 } from './types.js';
+import type { LeylineNode, SutureRecipe, Vec2 } from './types.js';
 
 export type GeneratedSalvageSite = { id: number; tier: 1 | 2 | 3; terminal: Vec2; cache: Vec2 };
 
@@ -50,6 +51,7 @@ export type SurfaceBlobSpec = { count: number; rMin: number; rMax: number };
  * novo entra aqui com um default que preserve o comportamento historico.
  */
 export type WorldgenProfile = {
+  sutureCount?: number;
   /** Chance de parede FINA (aberta dos dois lados) virar rocha fragil. */
   fragileThinChance: number;
   /** Chance de parede exposta virar veio de minerio. */
@@ -161,6 +163,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
 };
 
 export type GeneratedWorld = {
+  sutures: SutureRecipe[];
   solid: Uint8Array;
   surface: Uint8Array;
   entry: Vec2;
@@ -2281,7 +2284,21 @@ const generateAttempt = (
   }
   if (enemySpawns.length < 10) return null;
 
+  const sutures = generateSutures(
+    solid,
+    surface,
+    w,
+    h,
+    seed,
+    profile.sutureCount ?? 0,
+    entry,
+    corePos,
+    guardianSpawn,
+    arenaFilled,
+  );
+
   return {
+    sutures,
     solid,
     surface,
     entry,

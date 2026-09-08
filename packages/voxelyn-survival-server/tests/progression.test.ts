@@ -529,18 +529,18 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 128 documentos: 30 protocolos, 8 por geracao, 47 de Ativo, 25 Descobertas, 17 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(128);
-    // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
+  it('tem 130 documentos: 30 protocolos, 8 por geracao, 49 de Ativo, 25 Descobertas, 17 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(130);
+    // A contagem de Ativo = 25 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 23 + ASSET_MILESTONE_LORE.length + 25 + 17);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 25 + ASSET_MILESTONE_LORE.length + 25 + 17);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     // OITO por geracao: os quatro marcos de homologacao do chassi
     // (`AX-GEN-*`) e as quatro autorizacoes de descida, que sao documentos
     // sobre o VEIO e nao sobre a unidade — mesmo gatilho, assuntos distintos.
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(8);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
-      23 + ASSET_MILESTONE_LORE.length,
+      25 + ASSET_MILESTONE_LORE.length,
     );
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(25);
     // Quatro dos seis compostos sao o arco do Bispo: ele aparece uma vez por
@@ -615,7 +615,11 @@ describe('codex', () => {
   it('os desbloqueios derivam dos fatos — um perfil inconsistente e reparavel', () => {
     const allBits = LORE_DISCOVERY_BITS.reduce((m, b) => m | b, 0);
     const allKills = Object.fromEntries(ASSET_ARCHETYPES.map((a) => [a, 99]));
-    const full = expectedLoreIds(UPGRADES.map((u) => u.id), allKills, allBits);
+    const full = expectedLoreIds(
+      UPGRADES.map((u) => u.id),
+      allKills,
+      allBits,
+    );
     expect(full).toHaveLength(TOTAL_LORE_FRAGMENTS);
     expect(expectedLoreIds([])).toEqual([...DEFAULT_UNLOCKED_LORE]);
   });
@@ -649,14 +653,11 @@ describe('codex', () => {
     expect(triggerSatisfied({ kind: 'generation', generation: 'G-02' }, facts)).toBe(false);
     expect(triggerSatisfied({ kind: 'asset', archetype: 'miner' }, facts)).toBe(true);
     expect(triggerSatisfied({ kind: 'asset', archetype: 'bishop' }, facts)).toBe(false);
+    expect(triggerSatisfied({ kind: 'discovery', discoveryBit: DISCOVERY_MINER_FLED }, facts)).toBe(
+      true,
+    );
     expect(
-      triggerSatisfied({ kind: 'discovery', discoveryBit: DISCOVERY_MINER_FLED }, facts),
-    ).toBe(true);
-    expect(
-      triggerSatisfied(
-        { kind: 'compound', anyOf: [{ kind: 'asset', archetype: 'miner' }] },
-        facts,
-      ),
+      triggerSatisfied({ kind: 'compound', anyOf: [{ kind: 'asset', archetype: 'miner' }] }, facts),
     ).toBe(true);
     // Compound vazio nao abre nada: e erro de catalogo, nao um "sempre aberto".
     expect(triggerSatisfied({ kind: 'compound' }, facts)).toBe(false);
@@ -844,9 +845,7 @@ describe('liquidacao com fatos narrativos', () => {
       frost_wraith: 14,
     };
     expect(expectedLoreIds([], threeOfFour, 0)).not.toContain('AX-UNK-054');
-    expect(
-      expectedLoreIds([], { ...threeOfFour, frost_wraith: 15 }, 0),
-    ).toContain('AX-UNK-054');
+    expect(expectedLoreIds([], { ...threeOfFour, frost_wraith: 15 }, 0)).toContain('AX-UNK-054');
     expect(expectedLoreIds([], { resonant: 99, scoriac: 99 }, 0)).not.toContain('AX-UNK-054');
   });
 
@@ -871,7 +870,13 @@ describe('liquidacao com fatos narrativos', () => {
     if (!profile) throw new Error('perfil sumiu');
     const index = loreIndexFor(profile);
     expect(index.assets.fungal_horse).toEqual(
-      expect.arrayContaining(['AX-INC-024', 'AX-ENG-023', 'AX-INC-034', 'AX-EXE-043', 'AX-UNK-046']),
+      expect.arrayContaining([
+        'AX-INC-024',
+        'AX-ENG-023',
+        'AX-INC-034',
+        'AX-EXE-043',
+        'AX-UNK-046',
+      ]),
     );
   });
 

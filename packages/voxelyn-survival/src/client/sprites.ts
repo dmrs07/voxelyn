@@ -1,3 +1,10 @@
+import encounterAtlases from '@voxelyn/survival-content/assets/encounter-atlases.json';
+import stitcherManifest from '@voxelyn/survival-content/assets/atlases/enemy-stitcher.json';
+import stitcherUrl from '@voxelyn/survival-content/assets/atlases/enemy-stitcher.png?url';
+import stitcherNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-stitcher.normal.png?url';
+import seamstressManifest from '@voxelyn/survival-content/assets/atlases/enemy-seamstress.json';
+import seamstressUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress.png?url';
+import seamstressNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress.normal.png?url';
 import {
   dirFromFacing,
   dirFromFacing8,
@@ -225,6 +232,8 @@ const NORMAL_URLS: Record<string, string> = {
   'enemy-spore-bomber.normal.png': enemySporeBomberNormalUrl,
   'enemy-stalker.normal.png': enemyStalkerNormalUrl,
   'enemy-sulfur-bomber.normal.png': enemySulfurBomberNormalUrl,
+  'enemy-stitcher.normal.png': stitcherNormalUrl,
+  'enemy-seamstress.normal.png': seamstressNormalUrl,
   'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
   'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
   'part-white-devourer-coil.normal.png': partWhiteDevourerCoilNormalUrl,
@@ -358,6 +367,7 @@ type Loaded = {
    * que lado a luz bate.
    */
   normal: HTMLImageElement | null;
+  normalPending?: HTMLImageElement | null;
   normalState: 'absent' | 'idle' | 'loading' | 'ready' | 'failed';
 };
 
@@ -637,10 +647,20 @@ export const DIAMANDIS_PART_ATLASES: readonly string[] = [
   'part-diamandis-mast',
 ];
 export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
+  'enemy-stitcher',
+  'enemy-seamstress',
   ...DIAMANDIS_PART_ATLASES,
   DIAMANDIS_ARM_ATLAS,
 ]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'enemy-seamstress': {
+    manifest: seamstressManifest as unknown as SpriteManifestEntry,
+    url: seamstressUrl,
+  },
+  'enemy-stitcher': {
+    manifest: stitcherManifest as unknown as SpriteManifestEntry,
+    url: stitcherUrl,
+  },
   'part-diamandis-drill': {
     manifest: diamandisDrillManifest as unknown as SpriteManifestEntry,
     url: diamandisDrillUrl,
@@ -708,6 +728,8 @@ export const ANIM_ATLAS_OVERRIDE: Record<string, Record<string, string>> = {
 export const DEVOURER_BROOD_ATLAS = 'part-devourer-brood';
 
 export const ARCHETYPE_SPRITE: Record<string, string> = {
+  seamstress: 'enemy-seamstress',
+  stitcher: 'enemy-stitcher',
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',
   spitter: 'enemy-spitter',
@@ -745,7 +767,8 @@ export const ARCHETYPE_SPRITE: Record<string, string> = {
 export const ARCHETYPE_DIRECTIONS: Record<string, number> = Object.fromEntries(
   Object.entries(ARCHETYPE_SPRITE).map(([archetype, id]) => [
     archetype,
-    SOURCES.find((source) => source.manifest.id === id)?.manifest.directions ?? 4,
+    (SOURCES.find((source) => source.manifest.id === id) ?? PART_SOURCES[id])?.manifest
+      .directions ?? 4,
   ]),
 );
 
@@ -1183,7 +1206,40 @@ export const recoilScreenOffset = (
   };
 };
 
+const ENCOUNTER_ATLASES: Record<string, string[]> = encounterAtlases;
+const ENCOUNTER_IDS = new Set(Object.values(ENCOUNTER_ATLASES).flat());
 export class SpriteBank {
+  private encounter: string | null | undefined;
+  private retainedEncounter = new Set<string>();
+
+  /** Keep the current encounter resident; old boss normals and optional parts are released. */
+  retainEncounter(archetype: string | null): void {
+    if (this.encounter === archetype) return;
+    this.encounter = archetype;
+    this.retainedEncounter = new Set(archetype ? (ENCOUNTER_ATLASES[archetype] ?? []) : []);
+    for (const id of ENCOUNTER_IDS) {
+      if (this.retainedEncounter.has(id)) continue;
+      const loaded = this.byId.get(id);
+      if (!loaded) continue;
+      loaded.normal = null;
+      if (loaded.normalPending) {
+        loaded.normalPending.onload = loaded.normalPending.onerror = null;
+        loaded.normalPending.removeAttribute('src');
+        loaded.normalPending = null;
+      }
+      loaded.normalState = loaded.manifest.normalAtlas ? 'idle' : 'absent';
+      if (ON_DEMAND_ATLASES.has(id)) {
+        loaded.image.onload = loaded.image.onerror = null;
+        loaded.image.removeAttribute('src');
+        loaded.glow = null;
+        const settlement = this.settlements.get(id);
+        if (settlement) settle(settlement, false);
+        this.byId.delete(id);
+        this.settlements.delete(id);
+      }
+    }
+  }
+
   private readonly byId = new Map<string, Loaded>();
   /** Uma liquidacao por atlas. Ver "Liquidacao dos atlas". */
   private readonly settlements = new Map<string, Settlement>();
@@ -1296,9 +1352,11 @@ export class SpriteBank {
    * carregado devolve na hora, sem tocar em rede.
    */
   retryFailed(): void {
-    const again = [...SOURCES, ...Object.values(MODULE_SOURCES)].filter(
-      (source) => this.byId.get(source.manifest.id)?.failed,
-    );
+    const again = [
+      ...SOURCES,
+      ...Object.values(MODULE_SOURCES),
+      ...Object.values(PART_SOURCES),
+    ].filter((source) => this.byId.get(source.manifest.id)?.failed);
     for (const { manifest } of again) {
       this.settlements.set(manifest.id, newSettlement());
       // Apagar a entrada e o que ARMA a nova tentativa: `loadSource` recusa um
@@ -1328,6 +1386,12 @@ export class SpriteBank {
    */
   private requestNormal(loaded: Loaded): void {
     if (loaded.normalState !== 'idle') return;
+    if (
+      this.encounter !== undefined &&
+      ENCOUNTER_IDS.has(loaded.manifest.id) &&
+      !this.retainedEncounter.has(loaded.manifest.id)
+    )
+      return;
     const name = loaded.manifest.normalAtlas;
     const url = name ? NORMAL_URLS[name] : undefined;
     if (!url) {
@@ -1336,11 +1400,22 @@ export class SpriteBank {
     }
     loaded.normalState = 'loading';
     const image = new Image();
+    loaded.normalPending = image;
     image.onload = () => {
+      if (this.byId.get(loaded.manifest.id) !== loaded) return;
+      if (
+        this.encounter !== undefined &&
+        ENCOUNTER_IDS.has(loaded.manifest.id) &&
+        !this.retainedEncounter.has(loaded.manifest.id)
+      )
+        return;
+      loaded.normalPending = null;
       loaded.normal = image;
       loaded.normalState = 'ready';
     };
     image.onerror = () => {
+      if (this.byId.get(loaded.manifest.id) !== loaded) return;
+      loaded.normalPending = null;
       loaded.normalState = 'failed';
       console.warn(`[sprites] mapa de faces indisponivel: ${loaded.manifest.id}`);
     };

@@ -238,7 +238,9 @@ describe('impressao digital da geracao', () => {
     // respiradouros, spawns) passou a ser sorteado sobre chao CAMINHAVEL
     // (aberto e nao profundo). Onde nao ha agua profunda a lista e identica a
     // `openCells`, e o sorteio dos estratos secos nao muda um byte.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3903803443);
+    // v65: Costureiros occupy rolls 88..99, replacing existing wall material
+    // with anchors and adding mineral silk without changing initial routes.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(4090887622);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

@@ -316,6 +316,10 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
     }
   }
 
+  // Anchor walls belong to retained seams even though BFS only visits floor.
+  const keptSutures = state.sutures.filter((s) => s.cells.every((i) => dist[i] >= 0));
+  const sutureAnchors = new Set(keptSutures.flatMap((s) => [s.a, s.b]));
+
   // Fora da arena, TUDO vira rocha comum — e o "tudo" e literal.
   //
   // Nao basta fechar o vao: o macico selado herdava cristal, minerio e duto
@@ -330,6 +334,7 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   // despejam aqui dentro, e o Diluvio voltava a brotar do corpo do chefe.
   for (let i = 0; i < state.solid.length; i++) {
     if (dist[i] >= 0) continue;
+    if (sutureAnchors.has(i)) continue;
     if (bossArchetype === 'archcantor' && state.solid[i] === SOLID_CRYSTAL) {
       const x = i % w;
       const y = Math.floor(i / w);
@@ -361,13 +366,17 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   state.enemies = state.enemies.filter(
     (e) =>
       e === boss ||
-      (e.archetype === 'devourer_brood' && dist[Math.floor(e.y) * w + Math.floor(e.x)] >= 0),
+      ((e.archetype === 'devourer_brood' ||
+        (bossArchetype === 'seamstress' && e.archetype === 'stitcher')) &&
+        dist[Math.floor(e.y) * w + Math.floor(e.x)] >= 0),
   );
   // Cenario que so faria sentido no setor inteiro. Os respiradouros e os
   // trilhos que sobraram DENTRO da arena ficam: eles sao o chao do bioma, e o
   // chao do bioma e metade do que se esta testando.
   state.vents = state.vents.filter((v) => dist[v.y * w + v.x] >= 0);
   state.railTracks = state.railTracks.filter((t) => dist[t.y * w + t.x] >= 0);
+  state.enemies.sort((a, b) => Number(b === boss) - Number(a === boss));
+  state.sutures = keptSutures;
   state.salvageSites = [];
   state.wellOffers = [];
   // As ondas de contaminacao ja nasceram gastas: `stepContamination` so dispara

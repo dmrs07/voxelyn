@@ -28,6 +28,19 @@ export type LoreText = {
 };
 
 const pt: Record<LoreFragmentId, LoreText> = {
+  'AX-SUT-001': {
+    title: 'Reparação sem ordem de serviço',
+    summary: 'A colônia fecha os cortes da lavra com seda mineral.',
+    body: 'Os organismos SUT-01 foram classificados inicialmente como agentes de estabilização. Duas âncoras, três ciclos de tração e a galeria voltava a suportar carga.\n\nA classificação foi revista quando uma equipe precisou reabrir a única saída. Eliminar o operário não desfaz o reparo. Romper o fio tensionado produz chicote e queda da carga suspensa; evacuar a faixa marcada antes de recolher o material.',
+    source: 'Engenharia de Campo — revisão de contenção',
+  },
+  'AX-SUT-002': {
+    title: 'Carga que se desloca sozinha',
+    summary: 'A matriz usa a própria obra como sistema de locomoção.',
+    body: 'A unidade SUT-00, denominada Cerzideira pelas equipes de recuperação, redistribui o peso entre amarras durante cada deslocamento. A carapaça sustenta impactos enquanto a tração se mantém.\n\nRomper a amarra carregada derruba o corpo e expõe o abdômen por três segundos. Não há evidência de que a matriz diferencie uma unidade Prospector de material a ser fixado. Recomenda-se não permanecer sob o reparo.',
+    source: 'Recuperação Patrimonial — matriz de risco',
+  },
+
   // -------------------------------------------------------------------------
   // ATO I — Propaganda
   // -------------------------------------------------------------------------
@@ -709,7 +722,7 @@ const pt: Record<LoreFragmentId, LoreText> = {
   'AX-ENG-032': {
     title: 'Classificação: AQF-00',
     summary: 'Cada equipe mediu um comprimento diferente.',
-    body: 'ATIVO HOSTIL AQF-00. Corpo de grande porte em deslocamento submerso.\n\nO ativo desloca-se sob a lâmina e emerge sob a posição prevista das unidades. Fora d\'água ele é lento e vulnerável; sob ela, praticamente inalcançável.\n\nSobre o dimensionamento: sete equipes reportaram comprimentos entre 9 e 60 metros. As medições não convergem e não há erro instrumental que explique a dispersão.\n\nEngenharia oferece três leituras e não escolhe entre elas: as medições estão erradas; o ativo muda de tamanho; ou o que foi medido não é um corpo, e sim vários, sincronizados.',
+    body: "ATIVO HOSTIL AQF-00. Corpo de grande porte em deslocamento submerso.\n\nO ativo desloca-se sob a lâmina e emerge sob a posição prevista das unidades. Fora d'água ele é lento e vulnerável; sob ela, praticamente inalcançável.\n\nSobre o dimensionamento: sete equipes reportaram comprimentos entre 9 e 60 metros. As medições não convergem e não há erro instrumental que explique a dispersão.\n\nEngenharia oferece três leituras e não escolhe entre elas: as medições estão erradas; o ativo muda de tamanho; ou o que foi medido não é um corpo, e sim vários, sincronizados.",
     source: 'Engenharia de Sistemas — classificação de ativo',
   },
   'AX-ENG-033': {
@@ -867,6 +880,19 @@ const pt: Record<LoreFragmentId, LoreText> = {
 };
 
 const en: Record<LoreFragmentId, LoreText> = {
+  'AX-SUT-001': {
+    title: 'Repairs without a work order',
+    summary: 'The colony closes mining cuts with mineral silk.',
+    body: 'SUT-01 organisms were initially classified as stabilization agents. Two anchors, three pulling cycles and the gallery carried weight again.\n\nThe classification changed when a crew had to reopen its only exit. Killing the worker does not undo the repair. Cutting a taut thread produces a whip and drops its suspended load; clear the marked lane before recovering the material.',
+    source: 'Field Engineering — containment revision',
+  },
+  'AX-SUT-002': {
+    title: 'A load that moves itself',
+    summary: 'The matrix uses its own construction for locomotion.',
+    body: 'Recovery crews call SUT-00 the Darner. It redistributes its weight between tethers during each movement. Its shell resists impacts while the support remains loaded.\n\nCutting that support knocks the body down and exposes the abdomen for three seconds. There is no evidence the matrix distinguishes a Prospector from material awaiting fixation. Do not remain beneath its repairs.',
+    source: 'Asset Recovery — risk matrix',
+  },
+
   'AX-PUB-001': {
     title: 'The Prospector Program',
     summary: 'The public version: no human life goes down into the Vein.',
@@ -1558,7 +1584,7 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-ENG-031': {
     title: 'Classification: PRZ-00',
     summary: 'A natural piezoelectric array. That answers before the stimulus.',
-    body: 'FORMATION PRZ-00. Approved technical classification: large natural piezoelectric array.\n\nThe formation emits a low-frequency pulse to which the chamber\'s crystal structures respond with discharge. The company records the phenomenon as mechanical resonance and advises against crystal extraction within operating radius.\n\nTechnical annex, not incorporated into the assessment: the emitted frequencies match, across three bands, those of the transmission that motivated the operation.\n\nSecond annex, also not incorporated: in 11 records, chamber crystals discharged BEFORE the pulse.',
+    body: "FORMATION PRZ-00. Approved technical classification: large natural piezoelectric array.\n\nThe formation emits a low-frequency pulse to which the chamber's crystal structures respond with discharge. The company records the phenomenon as mechanical resonance and advises against crystal extraction within operating radius.\n\nTechnical annex, not incorporated into the assessment: the emitted frequencies match, across three bands, those of the transmission that motivated the operation.\n\nSecond annex, also not incorporated: in 11 records, chamber crystals discharged BEFORE the pulse.",
     source: 'Systems Engineering — formation classification',
   },
   'AX-ENG-032': {
@@ -1570,13 +1596,13 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-ENG-033': {
     title: 'Classification: VNT-00',
     summary: 'We thought the vents fed it. It is the other way round.',
-    body: 'STRUCTURE VNT-00. Fixed organic body, connected to the stratum\'s vent network.\n\nThe structure inhales gas from neighbouring chambers and expels it in another direction, in regular cycles. The initial reading was that the vents fed it.\n\nThe revision inverts the relationship. In sectors where the structure was neutralised, stratum ventilation ceased within nine cycles, and the chambers downstream became permanently unbreathable.\n\nEngineering records, without recommendation: it is not clear that killing this asset constitutes a favourable outcome.',
+    body: "STRUCTURE VNT-00. Fixed organic body, connected to the stratum's vent network.\n\nThe structure inhales gas from neighbouring chambers and expels it in another direction, in regular cycles. The initial reading was that the vents fed it.\n\nThe revision inverts the relationship. In sectors where the structure was neutralised, stratum ventilation ceased within nine cycles, and the chambers downstream became permanently unbreathable.\n\nEngineering records, without recommendation: it is not clear that killing this asset constitutes a favourable outcome.",
     source: 'Systems Engineering — structure classification',
   },
   'AX-ENG-034': {
     title: 'Classification: FRN-00',
     summary: 'We tried to use it as a source. It is the output, not the input.',
-    body: 'FORMATION FRN-00. Partially exposed igneous core on a regular thermal cycle.\n\nThe formation alternates overheating and cooling in predictable windows. During overheating the outer shell dissipates any impact; while cooling, the structure is exposed.\n\nThe energy recovery project was closed after the following finding: the heat does not rise from the magma. The magma remains liquid BECAUSE of the emission, and the formation\'s temperature responds, with a lag of hours, to variations in the transmission.\n\nThe formation is not the power source. It is what the power source is doing to the rock.',
+    body: "FORMATION FRN-00. Partially exposed igneous core on a regular thermal cycle.\n\nThe formation alternates overheating and cooling in predictable windows. During overheating the outer shell dissipates any impact; while cooling, the structure is exposed.\n\nThe energy recovery project was closed after the following finding: the heat does not rise from the magma. The magma remains liquid BECAUSE of the emission, and the formation's temperature responds, with a lag of hours, to variations in the transmission.\n\nThe formation is not the power source. It is what the power source is doing to the rock.",
     source: 'Systems Engineering — formation classification',
   },
   'AX-ENG-035': {
@@ -1588,7 +1614,7 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-ENG-036': {
     title: 'Classification: MGN-00',
     summary: 'The field predates the mine. The mine came afterwards.',
-    body: 'ANOMALY MGN-00. Magnetite body incorporating metal debris, rails and ore.\n\nThe asset alternates polarity in regular cycles: it draws units in during one phase and repels them in the next, moving the chamber\'s ferrous material along with them. There is no fixed safe position within field radius.\n\nThe institutional version attributes the field to decades of extraction. The archived pre-operational geomagnetic survey already records the same pattern — same orientation, same periodicity.\n\nThe question the institutional version avoids: did the company choose this place because of the ore, or because the field was already carrying data through it?',
+    body: "ANOMALY MGN-00. Magnetite body incorporating metal debris, rails and ore.\n\nThe asset alternates polarity in regular cycles: it draws units in during one phase and repels them in the next, moving the chamber's ferrous material along with them. There is no fixed safe position within field radius.\n\nThe institutional version attributes the field to decades of extraction. The archived pre-operational geomagnetic survey already records the same pattern — same orientation, same periodicity.\n\nThe question the institutional version avoids: did the company choose this place because of the ore, or because the field was already carrying data through it?",
     source: 'Systems Engineering — anomaly classification',
   },
 
@@ -1598,7 +1624,7 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-INC-043': {
     title: 'Incident 43 — the silence of PRZ-00',
     summary: 'With no crystal to answer, the formation is defenceless.',
-    body: 'Engagement record against formation PRZ-00 in a chamber previously stripped of crystal structure.\n\nWith no crystals in radius the formation produces no discharge at all — and its resistance to impact drops below that of an ordinary organic body. What we read as armour was not armour: it was the chamber answering on its behalf.\n\nThe operational consequence is recorded, and it is uncomfortable: crystal extraction drastically reduces engagement risk AND removes the sector\'s natural lighting, its charge source, and the very reason the chamber had value.\n\nThe unit chooses between crossing a dangerous cathedral or a safe ruin.',
+    body: "Engagement record against formation PRZ-00 in a chamber previously stripped of crystal structure.\n\nWith no crystals in radius the formation produces no discharge at all — and its resistance to impact drops below that of an ordinary organic body. What we read as armour was not armour: it was the chamber answering on its behalf.\n\nThe operational consequence is recorded, and it is uncomfortable: crystal extraction drastically reduces engagement risk AND removes the sector's natural lighting, its charge source, and the very reason the chamber had value.\n\nThe unit chooses between crossing a dangerous cathedral or a safe ruin.",
     source: 'Incident Committee — engagement analysis',
   },
   'AX-UNK-062': {
@@ -1616,7 +1642,7 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-UNK-063': {
     title: 'On the seven measurements',
     summary: 'They do not disagree. Each measured a different part.',
-    body: 'The seven AQF-00 measurements were cross-referenced against each team\'s position and timestamp.\n\nThe readings do not contradict one another: they describe SIMULTANEOUS stretches in pools the surveys treat as separate, at distances no body would cover in the recorded interval.\n\nThree possible readings, and this record picks none: several synchronised bodies; one body whose length is not a constant; or what moves beneath the sheet is not a body at all, but the sheet itself reacting — in which case the measured extent is merely how much of it was reacting at the time.\n\nThe last reading carries a consequence the approved assessments avoid: the asset could not be killed, only interrupted. Which fits, uncomfortably, with the only thing we know how to do to it.',
+    body: "The seven AQF-00 measurements were cross-referenced against each team's position and timestamp.\n\nThe readings do not contradict one another: they describe SIMULTANEOUS stretches in pools the surveys treat as separate, at distances no body would cover in the recorded interval.\n\nThree possible readings, and this record picks none: several synchronised bodies; one body whose length is not a constant; or what moves beneath the sheet is not a body at all, but the sheet itself reacting — in which case the measured extent is merely how much of it was reacting at the time.\n\nThe last reading carries a consequence the approved assessments avoid: the asset could not be killed, only interrupted. Which fits, uncomfortably, with the only thing we know how to do to it.",
     source: 'No department assigned',
   },
   'AX-INC-045': {
@@ -1640,7 +1666,7 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-UNK-065': {
     title: 'On what heats what',
     summary: 'The magma does not heat the formation. The emission heats the magma.',
-    body: 'The thermal chronology of FRN-00 was cross-referenced against the transmission record.\n\nThe formation\'s temperature tracks variations in the emission with a lag of three to five hours. The relationship is consistent across the whole series. The inverse relationship — emission responding to temperature — appears nowhere.\n\nThe energy recovery project assumed a geothermal source with a signal on top of it. It is the other way round: there is a signal, and the heat is what it does to the rock.\n\nThe consequence the project closure does not record: if the emission ceased, this stratum would cool. And if it rises, nothing down here has any way not to respond.',
+    body: "The thermal chronology of FRN-00 was cross-referenced against the transmission record.\n\nThe formation's temperature tracks variations in the emission with a lag of three to five hours. The relationship is consistent across the whole series. The inverse relationship — emission responding to temperature — appears nowhere.\n\nThe energy recovery project assumed a geothermal source with a signal on top of it. It is the other way round: there is a signal, and the heat is what it does to the rock.\n\nThe consequence the project closure does not record: if the emission ceased, this stratum would cool. And if it rises, nothing down here has any way not to respond.",
     source: 'No department assigned',
   },
   'AX-INC-047': {

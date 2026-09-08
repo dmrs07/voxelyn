@@ -1,3 +1,4 @@
+import { createSutures, hitSutures, stepSutures } from './sutures.js';
 import { RNG } from '@voxelyn/core';
 import {
   BLEEDOUT_TICKS,
@@ -447,6 +448,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
       firingAt: 0,
       fromEnd: 0 as const,
     })),
+    sutures: createSutures(world.sutures),
+    sutureRewardsMask: 0,
     // Geometria da seed, relogios zerados: todo segmento nasce dormente. Ver
     // LeylineSegment para o contrato (relogios no hash, celulas fora).
     leylineSegments: world.leylines.map((seg) => ({
@@ -2691,6 +2694,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       );
       const cls = projectileClass(proj, conductiveReady, explosiveArmed);
 
+      if (state.solid[i] === SOLID_NONE)
+        hitSutures(state, { x: prevX, y: prevY }, proj, events, ownerSlot);
+
       if (state.solid[i] !== SOLID_NONE) {
         // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por
         // uma detonacao, e essa e a escolha — nao um dos dois sumindo em silencio.
@@ -3379,6 +3385,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepProjectiles(state, events);
   updateEnemies(state, events);
   stepCells(state, events);
+  stepSutures(state, events);
   stepRailCarts(state, events);
   stepLeylines(state, events);
   // O teto DEPOIS dos projeteis e do movimento: a estalactite cobra onde o
@@ -3480,6 +3487,8 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'furnace_heart',
   'frost_queen',
   'magnetarch',
+  'stitcher',
+  'seamstress',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -3501,6 +3510,26 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   };
 
   mix(state.tick);
+  mix(state.sutureRewardsMask);
+  mix(state.sutures.length);
+  for (const s of state.sutures) {
+    mix(s.id);
+    mix(s.a);
+    mix(s.b);
+    mixString(s.kind);
+    mixString(s.phase);
+    mix(s.tension);
+    mix(s.closeAt);
+    mix(s.whipAt);
+    mix(s.fallAt);
+    mix(s.cutBySlot);
+    mix(s.objective ? 1 : 0);
+    mix(s.recovered ? 1 : 0);
+    mix(s.cells.length);
+    for (const i of s.cells) mix(i);
+    mix(s.slabCells.length);
+    for (const i of s.slabCells) mix(i);
+  }
   mixString(state.phase);
   // As ofertas do poco sao estado autoritativo: elas decidem o que pode ser
   // pego, e uma simulacao que as revelou noutro tick oferece outra coisa.

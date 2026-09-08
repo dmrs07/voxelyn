@@ -159,6 +159,11 @@ const ACCENTS: Record<string, BossBarAccent> = {
     tail: 'ice',
     ...slate(WHITE_ICE, 0.3),
   },
+  seamstress: {
+    materialKey: 'bossBar.material.seamstress',
+    tail: 'mineral',
+    ...slate(PAL.bone, 0.3),
+  },
   magnetarch: {
     materialKey: 'bossBar.material.magnetarch',
     tail: 'metal',

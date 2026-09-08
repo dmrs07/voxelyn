@@ -254,6 +254,8 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'furnace_heart',
   'frost_queen',
   'magnetarch',
+  'stitcher',
+  'seamstress',
 ];
 
 /**
@@ -266,6 +268,8 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
  * recusou a escrever fica para os documentos posteriores, ligados por codigo.
  */
 export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
+  stitcher: 'AX-SUT-001',
+  seamstress: 'AX-SUT-002',
   stalker: 'AX-ENG-012',
   spitter: 'AX-ENG-014',
   bomber: 'AX-ENG-016',
@@ -434,6 +438,7 @@ export const LORE_DISCOVERY_BITS: readonly number[] = DISCOVERY_LORE.map((d) => 
 export const LORE_DISCOVERY_MASK: number = LORE_DISCOVERY_BITS.reduce((m, b) => m | b, 0);
 
 const CATEGORY_BY_PREFIX: Record<string, LoreCategory> = {
+  SUT: 'engineering',
   PUB: 'public_relations',
   ENG: 'engineering',
   PRC: 'procurement',
@@ -444,6 +449,7 @@ const CATEGORY_BY_PREFIX: Record<string, LoreCategory> = {
 };
 
 const CLEARANCE_BY_PREFIX: Record<string, number> = {
+  SUT: 1,
   PUB: 0,
   ENG: 1,
   PRC: 1,
@@ -730,6 +736,8 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   // Ato II — Procedimento
   'AX-ENG-011',
   'AX-ENG-012',
+  'AX-SUT-001',
+  'AX-SUT-002',
   'AX-ENG-013',
   'AX-ENG-014',
   'AX-ENG-015',

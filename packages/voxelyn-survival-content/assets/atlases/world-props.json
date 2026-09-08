@@ -496,6 +496,11 @@
       "frameMs": 170
     },
     {
+      "name": "portal:stitchers",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
       "name": "portal:sealed",
       "frames": 1,
       "frameMs": 0

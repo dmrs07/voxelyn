@@ -1,3 +1,4 @@
+import { SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED, SOLID_STITCHED_ROCK } from './constants.js';
 import {
   BUDGET_DISCHARGE_CELLS,
   BUDGET_REACTING_CELLS,
@@ -811,7 +812,13 @@ export const breakSolid = (
   const w = W(state);
   const i = y * w + x;
   const solid = state.solid[i];
-  if (solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK) {
+  if (
+    solid === SOLID_FRAGILE ||
+    solid === SOLID_FRAGILE_WEAK ||
+    solid === SOLID_SUTURE_ANCHOR ||
+    solid === SOLID_SUTURE_CRACKED ||
+    solid === SOLID_STITCHED_ROCK
+  ) {
     state.solid[i] = SOLID_NONE;
     state.surface[i] = SURF_SCORCHED;
     markDirty(state, x, y);
