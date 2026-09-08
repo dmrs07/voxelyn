@@ -2226,6 +2226,16 @@ export type Suture = SutureRecipe & {
   fallAt: number;
   cutBySlot: number;
   recovered: boolean;
+  /**
+   * Tick a partir do qual a Cerzideira pode REFAZER esta sutura gasta.
+   *
+   * Sem a espera, o encontro virava um ciclo estacionario: ela recosturava o
+   * mesmo fio ao lado da ancora, o tiro cortava o apoio, ela caia por 3 s, e
+   * repetia — a cada 4,7 s, sem sair do lugar. A sutura recem-gasta fica
+   * fora da lista dela por `SEAMSTRESS_RESEW_DELAY`, e nesse intervalo ela
+   * puxa por outra amarra ou caca o jogador de perto. `-1` = nunca gasta.
+   */
+  resewAt: number;
 };
 
 export type SurvivalState = {
