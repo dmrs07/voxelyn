@@ -130,6 +130,7 @@ import {
   mawCloudShape,
   mawStreak,
   mawVeilAlpha,
+  mawVeilGrain,
   sinkholeCrestShape,
   sinkholeRamp,
 } from './maw-vortex';
@@ -599,6 +600,10 @@ const drawBiomeVeil = (
  * agora vem do ruido (`mawCloudShape`), e duas copias dela bastam para a
  * opacidade crescer para o centro sem um gradiente por quadro.
  */
+/** Os tons do grao do veu de areia, em volta do tom base da silica solta. */
+const VEIL_SAND_DARK = 'rgb(118,98,66)';
+const VEIL_SAND_LIGHT = 'rgb(236,220,184)';
+
 const CLOUD_LAYERS = [
   { scale: 1, alpha: 1 },
   { scale: 0.58, alpha: 1.35 },
@@ -7091,14 +7096,19 @@ export class SurvivalRenderer {
       );
       const cell = reach / cellsPerRadius;
       const half = cell * 0.5;
-      ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
-      const peak = isMaw ? 0.34 : 0.26;
+      const peak = isMaw ? 0.4 : 0.3;
       for (let gy = -cellsPerRadius; gy < cellsPerRadius; gy++) {
         for (let gx = -cellsPerRadius; gx < cellsPerRadius; gx++) {
           const dx = (gx + 0.5) * cell;
           const dy = (gy + 0.5) * cell;
           const a = mawVeilAlpha(dx, dy, seconds, reach);
           if (a <= 0.02) continue;
+          // TRES AREIAS, escolhidas pelo grao: escura, base e clara. E o
+          // pontilhado que faz o veu ler como areia e nao como fumaca —
+          // fumaca tem um tom, areia tem graos de tons diferentes.
+          const g = mawVeilGrain(dx, dy, seconds, reach);
+          ctx.fillStyle =
+            g < 0.4 ? VEIL_SAND_DARK : g > 0.62 ? VEIL_SAND_LIGHT : SURFACE_FALLBACK[SURF_SILT];
           const [x0, y0] = toScreen(cx + dx - half, cy + dy - half);
           const [x1, y1] = toScreen(cx + dx + half, cy + dy - half);
           const [x2, y2] = toScreen(cx + dx + half, cy + dy + half);

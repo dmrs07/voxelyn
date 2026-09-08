@@ -650,16 +650,24 @@ export const sinkholeCrestShape = (
 // mesmos riscos, sem nunca se rasgar numa costura.
 
 /** Quantas celulas cabem no RAIO do veu, na qualidade alta. Escalado pelo preset. */
-export const MAW_VEIL_CELLS = 18;
+export const MAW_VEIL_CELLS = 26;
 /**
  * A textura e mais grossa que os graos e mais fina que as nuvens: cerca de
  * tres nodulos por raio. Menos e um blob; mais e granulado que compete com os
  * riscos.
  */
-const VEIL_SCALE_RADIAL = 3.2;
-const VEIL_SCALE_ANGULAR = 2.4;
+const VEIL_SCALE_RADIAL = 5.5;
+const VEIL_SCALE_ANGULAR = 4.2;
 /** O limiar abaixo do qual o veu e transparente: e o que abre os rasgos. */
-const VEIL_THRESHOLD = 0.42;
+const VEIL_THRESHOLD = 0.38;
+/**
+ * O GRAO: um segundo ruido, tres vezes mais fino que o corpo do veu, que
+ * decide o tom de cada celula (areia escura, base ou clara) e mexe na
+ * opacidade. E o que separa "nuvem" de "areia": nuvem e lisa por dentro,
+ * areia e feita de grao, e o olho le grao como pontilhado de tons — nao como
+ * uma mancha mais ou menos densa.
+ */
+const VEIL_GRAIN_SCALE = 3.1;
 
 /**
  * O RUIDO do veu em (dx, dy), em [0, 1], JA em coordenadas de espiral.
@@ -687,7 +695,35 @@ export const mawVeilNoise = (dx: number, dy: number, seconds: number, reach: num
   const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
   const x = Math.cos(a) * VEIL_SCALE_ANGULAR + m * VEIL_SCALE_RADIAL;
   const y = Math.sin(a) * VEIL_SCALE_ANGULAR + m * 0.35;
-  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 3)));
+  // Cinco oitavas com ganho alto: as finas pesam o bastante para o corpo do
+  // veu ja ter grao, e nao so a forma.
+  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 5, 2, 0.62)));
+};
+
+/**
+ * As MESMAS coordenadas materiais do veu, para o grao viajar junto com ele.
+ * Extraido para as duas amostras nao poderem discordar da espiral.
+ */
+const veilCoords = (dx: number, dy: number, seconds: number, reach: number): [number, number] => {
+  const r = Math.hypot(dx, dy);
+  const inner = mawInnerRadius(reach);
+  const outerQ = Math.pow(reach, SINK_Q);
+  const innerQ = Math.pow(inner, SINK_Q);
+  const span = Math.max(1e-6, outerQ - innerQ);
+  const progress = (Math.pow(r, SINK_Q) - innerQ) / span;
+  const m = progress + seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG);
+  const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
+  return [Math.cos(a) * VEIL_SCALE_ANGULAR + m * VEIL_SCALE_RADIAL, Math.sin(a) * VEIL_SCALE_ANGULAR + m * 0.35];
+};
+
+/**
+ * O GRAO em (dx, dy), em [0, 1]: fino, advectado pelo mesmo fluxo. Quem
+ * desenha usa-o para escolher o tom da celula e temperar a opacidade.
+ */
+export const mawVeilGrain = (dx: number, dy: number, seconds: number, reach: number): number => {
+  if (Math.hypot(dx, dy) <= 1e-6 || reach <= 1e-6) return 0.5;
+  const [x, y] = veilCoords(dx, dy, seconds, reach);
+  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x * VEIL_GRAIN_SCALE, y * VEIL_GRAIN_SCALE, 9191, 2, 2, 0.7)));
 };
 
 /**
@@ -701,7 +737,10 @@ export const mawVeilAlpha = (dx: number, dy: number, seconds: number, reach: num
   const inner = mawInnerRadius(reach);
   if (r <= inner) return 0;
   const n = mawVeilNoise(dx, dy, seconds, reach);
-  const body = Math.max(0, (n - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD));
+  // O grao tempera a opacidade em +-35%: celulas vizinhas com o mesmo corpo
+  // de nuvem saem diferentes, que e o pontilhado da areia.
+  const grain = 0.65 + 0.7 * mawVeilGrain(dx, dy, seconds, reach);
+  const body = Math.max(0, (n - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD)) * grain;
   const t = (r - inner) / Math.max(1e-6, reach - inner);
   // Rente as duas bordas o veu apaga em rampa curta; no meio do disco vale
   // inteiro. A da garganta e mais curta: a areia acumula perto dela.
