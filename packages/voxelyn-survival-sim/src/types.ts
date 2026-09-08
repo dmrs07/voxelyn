@@ -48,6 +48,7 @@ export type RunConfig = {
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
 export type EnemyArchetype =
+  | 'seamstress_brood'
   | 'stitcher'
   | 'seamstress'
   | 'stalker'
@@ -585,6 +586,29 @@ export type EntityAction = {
   landed?: true;
   /** Slots que ja cruzaram esta puxada, inclusive por esquiva. Reinicia por acao. */
   contactedSlots?: number;
+  /** Locked flight geometry. Impact, animation and reconnect use these same ticks. */
+  silkFlight?: SilkFlight;
+};
+
+export type SilkFlight = {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  landAt: number;
+  impactAt: number;
+  /** Exact support cell selected at windup. Absent for a helper's jump. */
+  anchor?: number;
+};
+
+export type SilkEncounter = {
+  x: number;
+  y: number;
+  lunges: number;
+  lastAnchor: number;
+  broodAt: number;
+  repositionUntil: number;
+  comboLeft: number;
 };
 
 export type Entity = {
@@ -625,6 +649,9 @@ export type Entity = {
   alertedUntil: number;
   facing: Vec2;
   action?: EntityAction;
+  silk?: SilkEncounter;
+  /** Only summoned combat helpers have an owner; colony workers keep sewing. */
+  summonerId?: number;
   slot?: number;
   /**
    * Postura do Empoverished Miner. Ver MINER_MOOD_*.
@@ -2219,6 +2246,8 @@ export type SutureRecipe = {
 
 /** Bounded, authoritative construction; a corpse never owns a finished seam. */
 export type Suture = SutureRecipe & {
+  /** Supports in the boss chamber carry only her active tether, never cargo/traps. */
+  encounter?: boolean;
   phase: 'loose' | 'taut' | 'cut' | 'spent';
   tension: number;
   closeAt: number;

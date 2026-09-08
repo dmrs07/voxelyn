@@ -529,18 +529,18 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 130 documentos: 30 protocolos, 8 por geracao, 49 de Ativo, 25 Descobertas, 17 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(130);
-    // A contagem de Ativo = 25 fichas + as trilhas de ASSET_MILESTONE_LORE,
+  it('tem 131 documentos: 30 protocolos, 8 por geracao, 50 de Ativo, 25 Descobertas, 17 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(131);
+    // A contagem de Ativo = 26 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 25 + ASSET_MILESTONE_LORE.length + 25 + 17);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 26 + ASSET_MILESTONE_LORE.length + 25 + 17);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     // OITO por geracao: os quatro marcos de homologacao do chassi
     // (`AX-GEN-*`) e as quatro autorizacoes de descida, que sao documentos
     // sobre o VEIO e nao sobre a unidade — mesmo gatilho, assuntos distintos.
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(8);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
-      25 + ASSET_MILESTONE_LORE.length,
+      26 + ASSET_MILESTONE_LORE.length,
     );
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(25);
     // Quatro dos seis compostos sao o arco do Bispo: ele aparece uma vez por

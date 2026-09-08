@@ -13,6 +13,8 @@ import type {
   RunSummary,
   SemanticEvent,
   Suture,
+  SilkFlight,
+  SilkEncounter,
 } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
@@ -92,6 +94,7 @@ export type EntityActionSnapshot = {
   dx: number;
   dy: number;
   target?: number;
+  silkFlight?: SilkFlight;
 };
 
 export type EntitySnapshot = {
@@ -119,6 +122,8 @@ export type EntitySnapshot = {
   /** Tick autoritativo ate o qual a entidade permanece atordoada. */
   stunnedUntil?: number;
   action?: EntityActionSnapshot;
+  silk?: SilkEncounter;
+  summonerId?: number;
   /**
    * Postura do Empoverished Miner (MINER_MOOD_*). Ausente nos demais.
    *

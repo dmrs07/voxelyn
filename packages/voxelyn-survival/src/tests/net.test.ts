@@ -6,6 +6,8 @@ import {
   CART_WINDUP_TICKS,
   createRun,
   createSutures,
+  spawnEnemy,
+  startAction,
   cutSuture,
   SOLID_SUTURE_ANCHOR,
   emptyCommand,
@@ -88,6 +90,49 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(restored.sutures).toEqual(state.sutures);
     expect(restored.sutures[0].whipAt).toBeGreaterThan(state.tick);
     expect(restored.sutureRewardsMask).toBe(state.sutureRewardsMask);
+  });
+  it('reconecta durante o voo com a mesma ancora, marca, tick de impacto e ninhada', () => {
+    const loop = new Loop(),
+      client = loop.connect('silk');
+    client.connect();
+    loop.advance(3);
+    const state = loop.server.roomForClient('silk')!.state;
+    state.enemies = [];
+    state.solid.fill(0);
+    state.surface.fill(0);
+    const anchor = state.config.width * 22 + 28;
+    state.solid[anchor] = SOLID_SUTURE_ANCHOR;
+    const queen = spawnEnemy(state, 'seamstress', 22, 22, false);
+    startAction(state, queen, 'tether', { x: 1, y: 0 }, 1, 80, [], state.player.id);
+    queen.action!.silkFlight = {
+      fromX: queen.x,
+      fromY: queen.y,
+      toX: 26.5,
+      toY: 22.5,
+      landAt: state.tick + 50,
+      impactAt: state.tick + 54,
+      anchor,
+    };
+    queen.silk!.lunges = 3;
+    const helper = spawnEnemy(state, 'seamstress_brood', 23, 22, false);
+    helper.summonerId = queen.id;
+    helper.nextActionAt = 10000;
+    loop.advance(4);
+    const view = client.sampleRenderState(loop['now'])!;
+    const visible = view.enemies.find((e) => e.id === queen.id)!;
+    expect(visible.action!.silkFlight).toEqual(queen.action!.silkFlight);
+    expect(visible.action!.silkFlight).not.toBe(queen.action!.silkFlight);
+    expect(visible.silk).toEqual(queen.silk);
+    const token = client.resumeToken!;
+    loop.server.removeConnection('silk');
+    const resumed = loop.connect('silk-2');
+    resumed.connect(token);
+    loop.advance(2);
+    const restored = resumed.sampleRenderState(loop['now'])!;
+    expect(restored.enemies.find((e) => e.id === queen.id)!.action!.silkFlight).toEqual(
+      queen.action!.silkFlight,
+    );
+    expect(restored.enemies.find((e) => e.id === helper.id)!.summonerId).toBe(queen.id);
   });
   it('handshake reconstroi o estado renderavel com os dois players', () => {
     const loop = new Loop();

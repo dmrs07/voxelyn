@@ -47,8 +47,8 @@
   ],
   "animations": {
     "idle": {
-      "frames": 4,
-      "fps": 6,
+      "frames": 3,
+      "fps": 5,
       "loop": true
     },
     "walk": {
@@ -62,14 +62,19 @@
       "loop": false
     },
     "special": {
-      "frames": 6,
-      "fps": 8,
+      "frames": 3,
+      "fps": 5,
       "loop": false
     },
     "hit": {
       "frames": 2,
       "fps": 12,
       "loop": false
+    },
+    "fly": {
+      "frames": 1,
+      "fps": 6,
+      "loop": true
     },
     "downed": {
       "frames": 3,
@@ -85,75 +90,83 @@
   "frameMap": {
     "dr": {
       "idle": 0,
-      "walk": 4,
-      "attack": 10,
-      "special": 14,
-      "hit": 20,
-      "downed": 22,
-      "die": 25
+      "walk": 3,
+      "attack": 9,
+      "special": 13,
+      "hit": 16,
+      "downed": 18,
+      "die": 21,
+      "fly": 26
     },
     "dl": {
-      "idle": 30,
-      "walk": 34,
-      "attack": 40,
-      "special": 44,
-      "hit": 50,
-      "downed": 52,
-      "die": 55
+      "idle": 27,
+      "walk": 30,
+      "attack": 36,
+      "special": 40,
+      "hit": 43,
+      "downed": 45,
+      "die": 48,
+      "fly": 53
     },
     "ur": {
-      "idle": 60,
-      "walk": 64,
-      "attack": 70,
-      "special": 74,
-      "hit": 80,
-      "downed": 82,
-      "die": 85
+      "idle": 54,
+      "walk": 57,
+      "attack": 63,
+      "special": 67,
+      "hit": 70,
+      "downed": 72,
+      "die": 75,
+      "fly": 80
     },
     "ul": {
-      "idle": 90,
-      "walk": 94,
-      "attack": 100,
-      "special": 104,
-      "hit": 110,
-      "downed": 112,
-      "die": 115
+      "idle": 81,
+      "walk": 84,
+      "attack": 90,
+      "special": 94,
+      "hit": 97,
+      "downed": 99,
+      "die": 102,
+      "fly": 107
     },
     "r": {
-      "idle": 120,
-      "walk": 124,
-      "attack": 130,
-      "special": 134,
-      "hit": 140,
-      "downed": 142,
-      "die": 145
+      "idle": 108,
+      "walk": 111,
+      "attack": 117,
+      "special": 121,
+      "hit": 124,
+      "downed": 126,
+      "die": 129,
+      "fly": 134
     },
     "d": {
-      "idle": 150,
-      "walk": 154,
-      "attack": 160,
-      "special": 164,
-      "hit": 170,
-      "downed": 172,
-      "die": 175
+      "idle": 135,
+      "walk": 138,
+      "attack": 144,
+      "special": 148,
+      "hit": 151,
+      "downed": 153,
+      "die": 156,
+      "fly": 161
     },
     "l": {
-      "idle": 180,
-      "walk": 184,
-      "attack": 190,
-      "special": 194,
-      "hit": 200,
-      "downed": 202,
-      "die": 205
+      "idle": 162,
+      "walk": 165,
+      "attack": 171,
+      "special": 175,
+      "hit": 178,
+      "downed": 180,
+      "die": 183,
+      "fly": 188
     },
     "u": {
-      "idle": 210,
-      "walk": 214,
-      "attack": 220,
-      "special": 224,
-      "hit": 230,
-      "downed": 232,
-      "die": 235
+      "idle": 189,
+      "walk": 192,
+      "attack": 198,
+      "special": 202,
+      "hit": 205,
+      "downed": 207,
+      "die": 210,
+      "fly": 215
     }
   },
   "generation": {

@@ -11,6 +11,8 @@
 import type { PT_BR } from './pt-BR';
 
 export const EN: Record<keyof typeof PT_BR, string> = {
+  'arena.suture.flight': 'tick {tick} · flight {takeoff}–{land} · strike {impact}',
+  'arena.suture.tick': 'Advance 1 tick',
   'arena.suture.title': 'Sutures · inspection',
   'arena.suture.select': 'Select the Darner and start the arena.',
   'arena.suture.status': 'tick {tick} · cargo {done}/{total} · {taut} taut tethers',
@@ -323,6 +325,13 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.furnace_heart': 'Furnace Heart',
   'enemy.frost_queen': 'Frost Queen',
   'enemy.magnetarch': 'Magnetarch',
+  'enemy.seamstress_brood': 'Darner Brood',
+  'bestiary.name.seamstress_brood': 'Darner Brood',
+  'bestiary.code.seamstress_brood': 'SPECIMEN SUT-03',
+  'bestiary.note.seamstress_brood':
+    'Hatches from the Darner. Crouches, marks its landing and jumps. Leave the mark and punish its recovery.',
+  'seamstress.hint': 'Cut the tether · dodge the mark',
+  'seamstress.exposed': 'ABDOMEN EXPOSED · attack now',
   'enemy.stitcher': 'Stitcher',
   'enemy.seamstress': 'The Darner',
   'bestiary.name.stitcher': 'Stitcher',
@@ -332,7 +341,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.note.stitcher':
     'Sews passages between two anchors. Interrupt the third stitch or let it close a route. Taut threads lash after being cut.',
   'bestiary.note.seamstress':
-    'Pulls her body along support threads. Cut the loaded tether to knock her down and expose the abdomen. Below half health, pulls have shorter windups.',
+    'Chooses a support, flies over rock and strikes the marked spot. Cut her active tether to expose the abdomen. Her brood jumps; below half health, she chains two lunges.',
   'biome.occupation.stitchers': 'STITCHER COLONY',
   'bossBar.material.seamstress': 'mineral silk and pale chitin',
   'suture.objective': 'Suspended cargo: {done}/{total} · +24 ore',

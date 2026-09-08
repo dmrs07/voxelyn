@@ -122,8 +122,13 @@ type Pose = {
 const cloneEntity = (e: Entity): Entity => ({
   ...e,
   facing: { x: e.facing.x, y: e.facing.y },
+  silk: e.silk ? { ...e.silk } : undefined,
   action: e.action
-    ? { ...e.action, direction: { x: e.action.direction.x, y: e.action.direction.y } }
+    ? {
+        ...e.action,
+        direction: { x: e.action.direction.x, y: e.action.direction.y },
+        silkFlight: e.action.silkFlight ? { ...e.action.silkFlight } : undefined,
+      }
     : undefined,
 });
 

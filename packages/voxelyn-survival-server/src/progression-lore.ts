@@ -256,6 +256,7 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'magnetarch',
   'stitcher',
   'seamstress',
+  'seamstress_brood',
 ];
 
 /**
@@ -270,6 +271,7 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
 export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   stitcher: 'AX-SUT-001',
   seamstress: 'AX-SUT-002',
+  seamstress_brood: 'AX-SUT-003',
   stalker: 'AX-ENG-012',
   spitter: 'AX-ENG-014',
   bomber: 'AX-ENG-016',
@@ -738,6 +740,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-012',
   'AX-SUT-001',
   'AX-SUT-002',
+  'AX-SUT-003',
   'AX-ENG-013',
   'AX-ENG-014',
   'AX-ENG-015',

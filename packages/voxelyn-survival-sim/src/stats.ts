@@ -75,6 +75,7 @@ export const emptyStats = (): RunStats => ({
     magnetarch: 0,
     stitcher: 0,
     seamstress: 0,
+    seamstress_brood: 0,
   },
   damageTakenTenths: 0,
   damageDealtTenths: 0,

@@ -80,7 +80,7 @@ await sharp({ create: { width: 1400, height: 1210, channels: 4, background: '#11
   .toFile(resolve(out, '01-criaturas-oito-rumos.png'));
 
 const silhouette = [];
-for (const [i, spec] of STITCHER_SPECS.entries())
+for (const [i, spec] of STITCHER_SPECS.slice(0, 2).entries())
   for (const [j, light] of [false, true].entries()) {
     const x = i * 550;
     const y = j * 405;

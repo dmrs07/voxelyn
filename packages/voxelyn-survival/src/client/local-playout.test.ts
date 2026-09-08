@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { TICK_MS, createRun, createSutures, emptyCommand, stepRun } from '@voxelyn/survival-sim';
+import {
+  TICK_MS,
+  createRun,
+  createSutures,
+  spawnEnemy,
+  startAction,
+  emptyCommand,
+  stepRun,
+} from '@voxelyn/survival-sim';
 import type { SurvivalState, Vec2 } from '@voxelyn/survival-sim';
 import { LocalPlayout } from './local-playout';
 
@@ -326,4 +334,30 @@ describe('LocalPlayout: estado discreto e descontinuidade', () => {
     const view = playout.sample(state, 0.5)!;
     expect(view.player.x).toBeCloseTo(x0 + 0.5, 6);
   });
+});
+
+it('clona os destinos de voo e a cadencia da Cerzideira sem alias entre ticks', () => {
+  const state = createRun({ seed: 1 });
+  state.enemies = [];
+  state.solid.fill(0);
+  const queen = spawnEnemy(state, 'seamstress', 15, 15, false);
+  startAction(state, queen, 'tether', { x: 1, y: 0 }, 20, 20, [], state.player.id);
+  queen.action!.silkFlight = {
+    fromX: 15.5,
+    fromY: 15.5,
+    toX: 20.5,
+    toY: 15.5,
+    landAt: 30,
+    impactAt: 34,
+    anchor: 100,
+  };
+  const playout = new LocalPlayout();
+  playout.capture(state);
+  state.tick++;
+  queen.silk!.lunges = 10;
+  queen.action!.silkFlight.toX = 30;
+  playout.capture(state);
+  const view = playout.sample(state, 0)!;
+  expect(view.enemies[0].silk!.lunges).toBe(0);
+  expect(view.enemies[0].action!.silkFlight!.toX).toBe(20.5);
 });

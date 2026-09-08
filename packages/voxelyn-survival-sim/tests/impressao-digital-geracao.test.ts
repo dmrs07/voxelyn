@@ -240,7 +240,10 @@ describe('impressao digital da geracao', () => {
     // `openCells`, e o sorteio dos estratos secos nao muda um byte.
     // v65: Costureiros occupy rolls 88..99, replacing existing wall material
     // with anchors and adding mineral silk without changing initial routes.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(4090887622);
+    // v70: reject Stitcher chambers with fewer than two in-range supports.
+    // Only rejected layouts advance the existing deterministic retry sequence;
+    // their terrain and spawn positions intentionally differ from v69.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(792388682);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

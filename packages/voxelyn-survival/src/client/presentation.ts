@@ -5,6 +5,7 @@ import {
   DEVOURER_MAW_SPOOL_TICKS,
   HEAT_MAX,
   TICK_HZ,
+  SILK_STRIKE_OFFSET,
   moduleHasCapacity,
   type Entity,
   type EntityActionKind,
@@ -714,7 +715,7 @@ export class EntityPresentation {
       this.actions.delete(entity.id);
       this.actionVisualClocks.delete(entity.id);
       const aim = bodyFacing();
-      // A CERZIDEIRA DERRUBADA e a janela de dano do encontro (1,5x por 3 s),
+      // A CERZIDEIRA DERRUBADA e a janela de dano do encontro (1,5x por 1,8 s),
       // e o atlas dela tem a pose: pernas cedendo, abdome no chao. Parada em
       // `idle` a vantagem era invisivel — o playtest leu como congelamento.
       // Os demais inimigos continuam parados no repouso: nenhum tem a pose,
@@ -785,22 +786,34 @@ export class EntityPresentation {
         // Inimigo desenha a acao com o corpo inteiro: a direcao dela E o rumo do
         // corpo, e por isso divide a memoria de quadrante com a locomocao.
         const aim = facing(FACING_BODY, action.dx, action.dy);
-        if (action.action === 'tether') {
-          // A PUXADA tem dois tempos e duas poses. O preparo (1,2 s; 0,8 na
-          // segunda fase) e a Cerzideira tensionando a amarra: `special`, as
-          // agulhas puxando o fio. O arranque e `attack`, com o relogio ZERADO
-          // no release — antes, os quatro quadros de 10 fps do golpe rodavam
-          // durante o preparo e o corpo deslizava a arena inteira preso no
-          // ultimo quadro.
-          const releaseMs = ((action.releaseTick - action.startTick) / TICK_HZ) * 1000;
-          const striding = state.tick >= action.releaseTick;
+        const flight = authoritative?.silkFlight;
+        if (flight) {
+          const queen = entity.archetype === 'seamstress';
+          const airborne = state.tick >= action.releaseTick && state.tick < flight.landAt;
+          const striking = state.tick >= flight.landAt;
           return {
-            anim: striding ? 'attack' : 'special',
-            elapsedMs: striding ? Math.max(0, elapsedMs - releaseMs) : elapsedMs,
+            anim: striking ? 'attack' : airborne ? 'fly' : queen ? 'special' : 'burst',
+            elapsedMs: striking
+              ? Math.max(0, ((state.tick - flight.impactAt + SILK_STRIKE_OFFSET) / TICK_HZ) * 1000)
+              : Math.max(
+                  0,
+                  ((state.tick - (airborne ? action.releaseTick : action.startTick)) / TICK_HZ) *
+                    1000,
+                ),
             facingX: aim.x,
             facingY: aim.y,
           };
         }
+        if (entity.archetype === 'seamstress' && action.action === 'contact') {
+          const strikeStart = action.releaseTick - SILK_STRIKE_OFFSET;
+          return {
+            anim: state.tick < strikeStart ? 'special' : 'attack',
+            elapsedMs: Math.max(0, ((state.tick - strikeStart) / TICK_HZ) * 1000),
+            facingX: aim.x,
+            facingY: aim.y,
+          };
+        }
+
         return {
           anim: actionAnimation(action.action),
           elapsedMs,

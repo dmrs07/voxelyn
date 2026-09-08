@@ -1,4 +1,13 @@
-import { sewSuture, stitcherStep, seamstressStride } from './sutures.js';
+import { sewSuture, stitcherStep } from './sutures.js';
+import {
+  initSeamstress,
+  silkMaintenance,
+  silkStride,
+  silkSupported,
+  silkLanding,
+  silkContact,
+  silkStrike,
+} from './seamstress.js';
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
@@ -461,9 +470,17 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     contactCooldown: 28,
     aggroRange: 9,
   },
+  seamstress_brood: {
+    hp: 18,
+    speed: 3.8,
+    radius: 0.25,
+    contactDamage: 7,
+    contactCooldown: 32,
+    aggroRange: 18,
+  },
   seamstress: {
     hp: 780,
-    speed: 2.8,
+    speed: 4,
     radius: 0.72,
     contactDamage: 20,
     contactCooldown: 28,
@@ -1000,7 +1017,7 @@ export const damageEntity = (
 ): void => {
   if (!ent.alive) return;
   if (ent.archetype === 'seamstress') {
-    const support = state.sutures.find((s) => s.id + 1 === ent.mood && s.phase === 'taut');
+    const support = silkSupported(ent, state.tick);
     amount *= state.tick < ent.stunnedUntil ? 1.5 : support ? 0.55 : 1;
   }
   // O Leviata FORA DE VISTA nao e alvo: submerso, ou com a cabeca ainda por
@@ -1173,6 +1190,11 @@ export const damageEntity = (
   // A MAE CAIU: a ninhada vai junto. Ver `devourerBroodEnds` — sem isto, o que
   // sobra na camara limpa sao catorze filhotes orfaos ocupando vaga do teto de
   // inimigos e parando bala.
+  if (ent.archetype === 'seamstress') {
+    ent.action = undefined;
+    for (const helper of state.enemies)
+      if (helper.alive && helper.summonerId === ent.id) silkMaintenance(state, helper, events);
+  }
   if (ent.archetype === 'white_devourer') {
     devourerBroodEnds(state, events);
     // E o chao para de ceder: os sumidouros eram a fome dele, nao do estrato.
@@ -1347,6 +1369,7 @@ export const spawnEnemy = (
     ...(archetype === 'magnetarch' ? { mood: MAGNET_ATTRACT } : {}),
   };
   state.enemies.push(enemy);
+  if (archetype === 'seamstress') initSeamstress(state, enemy);
   return enemy;
 };
 
@@ -1421,6 +1444,18 @@ export const stunEntity = (state: SurvivalState, entity: Entity, durationTicks: 
   entity.vx = 0;
   entity.vy = 0;
   if (entity.kind === 'enemy') {
+    if (entity.action?.silkFlight) {
+      const at = silkLanding(
+        state,
+        entity,
+        entity,
+        Math.max(state.config.width, state.config.height),
+      );
+      if (at) {
+        entity.x = at.x;
+        entity.y = at.y;
+      }
+    }
     entity.action = undefined;
   } else {
     const extra = state.playerExtras[entity.slot ?? 0];
@@ -1821,13 +1856,15 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   // descarga, o `hit`) que o ramo especifico produz: o "aconteceu agora" e
   // um evento, e o que ele causou no mundo sao outros.
   const bossAbility = bossAbilityOfAction(enemy, action.kind);
-  if (bossAbility) {
+  if (bossAbility && !action.silkFlight) {
+    const impact =
+      enemy.archetype === 'seamstress' && action.kind === 'contact' ? silkStrike(enemy) : enemy;
     events.push({
       t: 'boss_attack',
       archetype: enemy.archetype as EnemyArchetype,
       ability: bossAbility,
-      x: enemy.x,
-      y: enemy.y,
+      x: impact.x,
+      y: impact.y,
       dx: action.direction.x,
       dy: action.direction.y,
       // O canto do Arquicantor carrega o tamanho da rede que vai responder:
@@ -1842,7 +1879,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     sewSuture(state, enemy, events);
     return;
   }
-  if (action.kind === 'tether') return;
+  if (action.kind === 'tether' || action.silkFlight) return;
+  if (action.kind === 'contact' && enemy.archetype === 'seamstress') {
+    silkContact(state, enemy, events);
+    return;
+  }
   if (action.kind === 'pulse') {
     // O SOLISTA nao arma a sala: ele foi expulso da formacao e perdeu o papel
     // de operar a Catedral. O que sobrou dele e a descarga curta de perto.
@@ -7755,6 +7796,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   archcantorChoirTick(state, events);
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
+    if (silkMaintenance(state, enemy, events)) continue;
     // A cura do bispo roda ANTES do portao de acao, e nao dentro do ramo de IA.
     // Ela e uma propriedade do chao, nao uma decisao dele: suspende-la durante
     // cada golpe ou cada atordoamento ensinaria ao jogador uma janela que nao
@@ -7793,7 +7835,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // Cavalo e Diamandis sao conduzidos passo a passo (a recuperacao E a
       // acao); todo o resto gasta aqui o impulso que o `release` deixou — ver
       // `driftByVelocity`.
-      if (enemy.archetype === 'seamstress') seamstressStride(state, enemy, dt, events);
+      if (enemy.action?.silkFlight) silkStride(state, enemy, events);
       else if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
       else if (enemy.archetype === 'diamandis') diamandisDrillStride(state, enemy, events);
       // O ARCO do Devorador entra aqui pela mesma razao dos dois acima: durante
@@ -7915,7 +7957,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // COVEIRO SUCATEIRO: se ha peca solta para recolher, e isso que ele faz.
     // Roda antes do fluxo comum porque ele LARGA o jogador para trabalhar —
     // ver `undertakerSalvageStep`.
-    if (enemy.archetype === 'stitcher' || enemy.archetype === 'seamstress') {
+    if (
+      enemy.archetype === 'stitcher' ||
+      enemy.archetype === 'seamstress' ||
+      enemy.archetype === 'seamstress_brood'
+    ) {
       stitcherStep(state, enemy, player, dt, events);
       continue;
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy, startAction, updateEnemies } from '../src/entities';
+import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
 import { impactSolid, impactSurface } from '../src/materials';
 import { breakSolid } from '../src/cells';
 import {
@@ -8,19 +8,13 @@ import {
   cloneSutures,
   cutSuture,
   hitSutures,
-  loadedSutureAnchor,
   sewSuture,
   stepSutures,
   sutureObjective,
   stitcherStep,
-  tetherEndpoint,
-  tetherLaneClear,
-  SEAMSTRESS_RESEW_DELAY,
-  SEAMSTRESS_SNAG_STUN,
 } from '../src/sutures';
 import {
   SOLID_NONE,
-  SOLID_ROCK,
   SOLID_SUTURE_ANCHOR,
   SOLID_SUTURE_CRACKED,
   SOLID_STITCHED_ROCK,
@@ -31,7 +25,7 @@ import {
 import { sectorBiome, sectorProfile } from '../src/strata';
 import { generateWorld } from '../src/worldgen';
 import { sectorSeed } from '../src/sectors';
-import type { Entity, SemanticEvent, SurvivalState, SutureRecipe } from '../src/types';
+import type { SemanticEvent, SutureRecipe } from '../src/types';
 
 const fixture = (kind: 'roof' | 'gate' = 'roof', playerCount = 1) => {
   const state = createRun({ seed: 1, playerCount });
@@ -59,35 +53,6 @@ const fixture = (kind: 'roof' | 'gate' = 'roof', playerCount = 1) => {
   state.player.y = 12.5;
   state.playerExtra.iframesUntil = 0;
   return state;
-};
-
-const beginPass = (state: SurvivalState, queen: Entity): void => {
-  queen.x = 8.5;
-  queen.y = 20.5;
-  startAction(state, queen, 'tether', { x: 1, y: 0 }, 2, 30, [], 0);
-  queen.nextActionAt = queen.action!.endsAt + 100;
-};
-
-const passFixture = (playerCount = 1) => {
-  const state = fixture('roof', playerCount);
-  state.players.forEach((p, slot) => {
-    p.x = 12.5 + slot * 4;
-    p.y = 20.5;
-    state.playerExtras[slot].iframesUntil = 0;
-  });
-  const queen = spawnEnemy(state, 'seamstress', 8, 20, false);
-  beginPass(state, queen);
-  return { state, queen };
-};
-
-const finishPass = (state: SurvivalState, queen: Entity): SemanticEvent[] => {
-  const events: SemanticEvent[] = [];
-  const end = queen.action!.endsAt;
-  while (state.tick < end) {
-    state.tick++;
-    updateEnemies(state, events);
-  }
-  return events;
 };
 
 describe('Colônia dos Costureiros', () => {
@@ -245,118 +210,6 @@ describe('Colônia dos Costureiros', () => {
     expect(state.sutures[0].tension).toBe(0);
   });
 
-  it('cutting the loaded support drops the queen and increases damage for three seconds', () => {
-    const state = fixture(),
-      queen = spawnEnemy(state, 'seamstress', 15, 10, false);
-    queen.mood = 1;
-    const initial = queen.hp;
-    damageEntity(state, queen, 20, []);
-    const armored = initial - queen.hp;
-    hitSutures(state, { x: 15, y: 11.5 }, { x: 16, y: 11.5 }, [], 0);
-    expect(queen.mood).toBe(0);
-    expect(queen.stunnedUntil).toBe(160);
-    const before = queen.hp;
-    damageEntity(state, queen, 20, []);
-    expect(before - queen.hp).toBeGreaterThan(armored * 2);
-  });
-
-  it('a puxada liga a ancora no rumo correto e aceita tiros colineares na diagonal', () => {
-    const state = fixture(),
-      queen = spawnEnemy(state, 'seamstress', 12, 9, false),
-      s = state.sutures[0];
-    queen.mood = 1;
-    queen.action = {
-      kind: 'tether',
-      phase: 'windup',
-      startedAt: 100,
-      releaseAt: 124,
-      endsAt: 140,
-      target: 0,
-      direction: { x: -1, y: 1 },
-    };
-    const anchor = loadedSutureAnchor(state, queen, s);
-    expect(anchor.x).toBe(9.5);
-    const point = (t: number) => ({
-      x: queen.x + (anchor.x - queen.x) * t,
-      y: queen.y + (anchor.y - queen.y) * t,
-    });
-    hitSutures(state, point(0.3), point(0.65), [], 0);
-    expect(s.phase).toBe('cut');
-    expect(queen.action).toBeUndefined();
-  });
-
-  it('a segunda fase avisa uma vez e usa eventos de boss para a puxada', () => {
-    const state = fixture(),
-      queen = spawnEnemy(state, 'seamstress', 12, 8, false),
-      events: SemanticEvent[] = [];
-    state.bossRuntime.awake = true;
-    queen.hp = queen.maxHp * 0.45;
-    state.player.x = 15.5;
-    state.player.y = 16.5;
-    stitcherStep(state, queen, state.player, 0.05, events);
-    expect(queen.action?.kind).toBe('tether');
-    expect(queen.action!.releaseAt - state.tick).toBe(16);
-    expect(events.some((e) => e.t === 'boss_windup' && e.ability === 'tether')).toBe(true);
-    stitcherStep(state, queen, state.player, 0.05, events);
-    expect(events.filter((e) => e.t === 'boss_phase')).toHaveLength(1);
-  });
-
-  it('a puxada causa um unico impacto de 20 por passagem e rearma na proxima', () => {
-    const { state, queen } = passFixture();
-    const hp = state.player.hp;
-    const first = finishPass(state, queen);
-    expect(state.player.hp).toBe(hp - 20);
-    expect(first.filter((e) => e.t === 'hit' && e.target === state.player.id)).toHaveLength(1);
-    beginPass(state, queen);
-    const second = finishPass(state, queen);
-    expect(state.player.hp).toBe(hp - 40);
-    expect(second.filter((e) => e.t === 'hit' && e.target === state.player.id)).toHaveLength(1);
-  });
-
-  it('cada parceiro pode receber um impacto, mesmo em pontos diferentes da puxada', () => {
-    const { state, queen } = passFixture(2);
-    const hp = state.players.map((p) => p.hp);
-    const events = finishPass(state, queen);
-    state.players.forEach((p, slot) => {
-      expect(p.hp).toBe(hp[slot] - 20);
-      expect(events.filter((e) => e.t === 'hit' && e.target === p.id)).toHaveLength(1);
-    });
-  });
-
-  it('esquivar do primeiro contato evita dano tardio quando os iframes terminam', () => {
-    const { state, queen } = passFixture();
-    state.player.x = 9.5;
-    state.playerExtra.iframesUntil = queen.action!.releaseAt + 1;
-    const hp = state.player.hp;
-    const events = finishPass(state, queen);
-    expect(state.player.hp).toBe(hp);
-    expect(events.filter((e) => e.t === 'hit')).toHaveLength(0);
-  });
-
-  it('o hash distingue uma puxada que ja resolveu contato sem mudar o HP', () => {
-    const a = passFixture(),
-      b = passFixture();
-    expect(hashAuthoritativeState(a.state)).toBe(hashAuthoritativeState(b.state));
-    b.queen.action!.contactedSlots = 1;
-    expect(a.state.player.hp).toBe(b.state.player.hp);
-    expect(hashAuthoritativeState(a.state)).not.toBe(hashAuthoritativeState(b.state));
-  });
-
-  it.each(['zero hp', 'dead', 'downed', 'not joined'])(
-    'a puxada ignora um jogador %s sem registrar dano',
-    (condition) => {
-      const { state, queen } = passFixture();
-      if (condition === 'zero hp') state.player.hp = 0;
-      if (condition === 'dead') state.player.alive = false;
-      if (condition === 'downed') state.playerExtra.downed = true;
-      if (condition === 'not joined') state.playerExtra.joined = false;
-      const before = state.stats.damageTakenTenths;
-      const events = finishPass(state, queen);
-      expect(events.filter((e) => e.t === 'hit')).toHaveLength(0);
-      expect(state.stats.damageTakenTenths).toBe(before);
-    },
-  );
-
   it.each(['flamethrower', 'thermal impact'])(
     '%s acende a seda mineral e solta a carga com os avisos normais',
     (source) => {
@@ -398,108 +251,6 @@ describe('Colônia dos Costureiros', () => {
     state.tick += 32;
     stepSutures(state, events);
     expect(state.stats.oreCollected).toBe(total);
-  });
-
-  it('a sutura gasta espera 8 s antes de ser refeita; nesse intervalo a Cerzideira caca', () => {
-    const state = fixture('gate'),
-      queen = spawnEnemy(state, 'seamstress', 12, 9, false),
-      s = state.sutures[0];
-    state.bossRuntime.awake = true;
-    // Uma amarra recem-cortada vira `spent` com o prazo de recostura marcado.
-    s.phase = 'taut';
-    s.tension = 100;
-    cutSuture(state, s, [], 0);
-    while (s.phase !== 'spent') {
-      state.tick++;
-      stepSutures(state, []);
-    }
-    expect(s.resewAt).toBe(state.tick + SEAMSTRESS_RESEW_DELAY);
-    // O ciclo antigo: ela recosturava imediatamente, do lado da ancora.
-    state.player.x = 15.5;
-    state.player.y = 16.5;
-    const before = { x: queen.x, y: queen.y };
-    queen.nextActionAt = 0;
-    stitcherStep(state, queen, state.player, 0.05, []);
-    expect(queen.action?.kind).not.toBe('stitch');
-    expect(queen.x !== before.x || queen.y !== before.y).toBe(true);
-    // Vencido o prazo, a sutura volta para a lista dela.
-    state.tick = s.resewAt;
-    queen.nextActionAt = 0;
-    stitcherStep(state, queen, state.player, 0.05, []);
-    expect(queen.action?.kind).toBe('stitch');
-    expect(queen.action?.target).toBe(s.id);
-  });
-
-  it('com uma amarra tensionada ao alcance, a puxada vem antes da costura', () => {
-    const state = fixture('roof'),
-      w = state.config.width;
-    // Um fio frouxo a duas celulas dela, que a ordem antiga costuraria primeiro.
-    const cells = [10, 11, 12, 13, 14].map((x) => 8 * w + x);
-    const loose: SutureRecipe = {
-      id: 1,
-      a: cells[0] - 1,
-      b: cells[4] + 1,
-      cells,
-      slabCells: [],
-      kind: 'gate',
-      objective: false,
-    };
-    state.solid[loose.a] = state.solid[loose.b] = SOLID_SUTURE_ANCHOR;
-    state.sutures.push(...createSutures([loose]));
-    const queen = spawnEnemy(state, 'seamstress', 12.5, 10.5, false);
-    state.bossRuntime.awake = true;
-    state.player.x = 12.5;
-    state.player.y = 16.5;
-    const events: SemanticEvent[] = [];
-    stitcherStep(state, queen, state.player, 0.05, events);
-    expect(queen.action?.kind).toBe('tether');
-    expect(queen.mood).toBe(1);
-  });
-
-  it('a rota da puxada precisa caber no corpo, nao so na linha de visao', () => {
-    const state = fixture('roof'),
-      w = state.config.width,
-      queen = spawnEnemy(state, 'seamstress', 11.5, 20.5, false),
-      end = tetherEndpoint(state, queen, state.sutures[0]);
-    expect(end).toEqual({ x: 11.5, y: 12.5 });
-    // Um corredor de UMA celula entre ela e o destino: o raio passa, o corpo nao.
-    for (let y = 14; y <= 18; y++)
-      for (let x = 0; x < w; x++) if (x !== 11) state.solid[y * w + x] = SOLID_ROCK;
-    expect(tetherLaneClear(state, queen, end)).toBe(false);
-    state.bossRuntime.awake = true;
-    state.player.x = 11.5;
-    state.player.y = 24.5;
-    stitcherStep(state, queen, state.player, 0.05, []);
-    expect(queen.action?.kind).not.toBe('tether');
-    expect(queen.mood ?? 0).toBe(0);
-    // Corredor de tres celulas: cabe, e a puxada volta a ser escolhida.
-    for (let y = 14; y <= 18; y++) for (const x of [10, 12]) state.solid[y * w + x] = SOLID_NONE;
-    expect(tetherLaneClear(state, queen, end)).toBe(true);
-    queen.action = undefined;
-    queen.nextActionAt = 0;
-    stitcherStep(state, queen, state.player, 0.05, []);
-    expect(queen.action?.kind).toBe('tether');
-  });
-
-  it('encalhar no meio da puxada solta a amarra e derruba a Cerzideira por 1,5 s', () => {
-    const { state, queen } = passFixture();
-    const w = state.config.width;
-    // Uma parede que fecha a faixa DEPOIS de a rota ter sido aceita. Tres
-    // celulas de altura: a colisao le os cantos do corpo (raio 0,72), e uma
-    // celula solta entre eles passaria despercebida.
-    for (const y of [19, 20, 21]) state.solid[y * w + 11] = SOLID_ROCK;
-    queen.mood = 1;
-    const events = finishPass(state, queen);
-    expect(queen.action).toBeUndefined();
-    expect(queen.mood).toBe(0);
-    expect(queen.x).toBeLessThan(11);
-    expect(
-      events.some((e) => e.t === 'boss_vulnerable' && e.archetype === 'seamstress' && e.open),
-    ).toBe(true);
-    expect(queen.stunnedUntil - SEAMSTRESS_SNAG_STUN).toBeGreaterThan(100);
-    expect(queen.stunnedUntil).toBeLessThan(state.tick + SEAMSTRESS_SNAG_STUN);
-    // A sutura em si continua tensionada: quem a derrubou foi a sala, nao um corte.
-    expect(state.sutures[0].phase).toBe('taut');
   });
 
   it('hashes every deadline and copies runtime data without aliasing', () => {
