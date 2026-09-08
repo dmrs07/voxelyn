@@ -6,6 +6,8 @@ import {
   SOLID_CRYSTAL,
   SOLID_ORE,
   SOLID_NONE,
+  SOLID_SUTURE_ANCHOR,
+  stepSutures,
   SURF_DEEP_WATER,
   SURF_ICE,
   SURF_ICE_CRITICAL,
@@ -63,6 +65,25 @@ describe('ARENA_CATALOG', () => {
 });
 
 describe('createArenaRun', () => {
+  it('preserva as ancoras das suturas recortadas e suas cargas no primeiro tick', () => {
+    const state = createArenaRun({
+      boss: 'seamstress',
+      maxHp: 200,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+    });
+    expect(state.enemies[0].archetype).toBe('seamstress');
+    expect(state.enemies.some((e) => e.archetype === 'stitcher')).toBe(true);
+    const loaded = state.sutures.filter((s) => s.phase === 'taut').length;
+    expect(loaded).toBeGreaterThan(0);
+    for (const s of state.sutures) {
+      expect(state.solid[s.a]).toBe(SOLID_SUTURE_ANCHOR);
+      expect(state.solid[s.b]).toBe(SOLID_SUTURE_ANCHOR);
+    }
+    stepSutures(state, []);
+    expect(state.sutures.filter((s) => s.phase === 'taut')).toHaveLength(loaded);
+  });
   it('aplica HP, eco e modulos escolhidos antes do primeiro tick', () => {
     const state = createArenaRun({
       boss: 'guardian',
@@ -129,6 +150,7 @@ describe('createArenaRun — o recorte da arena', () => {
       const kinds = new Set(state.enemies.map((e) => e.archetype));
       kinds.delete(boss);
       if (boss === 'white_devourer') kinds.delete('devourer_brood');
+      if (boss === 'seamstress') kinds.delete('stitcher');
       expect([...kinds], `arena de ${boss} tem bicho que nao e do chefe`).toEqual([]);
       // O chefe continua sendo o PRIMEIRO corpo em campo: o teste abaixo (e o
       // recorte da propria arena) leem `enemies[0]` como sendo ele.

@@ -334,6 +334,39 @@ const bossBarBody = (ctx: AudioContext, out: AudioNode, t0: number, noise: Audio
 };
 
 export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
+  silkTension: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'triangle',
+      from: 190,
+      to: 620,
+      peak: 0.34,
+      decay: 0.55,
+      attack: 0.12,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 193, to: 633, peak: 0.18, decay: 0.52, attack: 0.12 });
+    burst(ctx, out, t0 + 0.04, noise, {
+      peak: 0.12,
+      decay: 0.4,
+      type: 'bandpass',
+      from: 1800,
+      to: 3000,
+    });
+  },
+  silkSnap: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.65, decay: 0.06, type: 'highpass', from: 3000, to: 900 });
+    tone(ctx, out, t0, { type: 'triangle', from: 720, to: 90, peak: 0.45, decay: 0.2 });
+  },
+  silkFall: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 100, to: 36, peak: 0.65, decay: 0.38 });
+    for (let i = 0; i < 4; i++)
+      burst(ctx, out, t0 + i * 0.045, noise, {
+        peak: 0.35 - i * 0.05,
+        decay: 0.16,
+        type: 'lowpass',
+        from: 1600,
+        to: 220,
+      });
+  },
   // --- telegrafos ---------------------------------------------------------
   // Dois toques subindo: "vem na sua direcao".
   telegraphCharge: (ctx, out, t0) => {

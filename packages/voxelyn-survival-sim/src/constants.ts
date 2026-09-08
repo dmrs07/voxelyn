@@ -73,6 +73,10 @@ export const isPipe = (solid: number): boolean =>
  */
 export const SOLID_LEYLINE = 13;
 export const SOLID_LEYLINE_NODE = 14;
+// Mineral silk anchors and repaired walls. Append-only wire IDs.
+export const SOLID_SUTURE_ANCHOR = 15;
+export const SOLID_SUTURE_CRACKED = 16;
+export const SOLID_STITCHED_ROCK = 17;
 
 // Camada de superficie (o que cobre o chao de uma celula aberta).
 //
@@ -163,6 +167,7 @@ export const SURF_ICE_CRITICAL = 17;
  * ("liquido conectado = circuito") e a que o jogador ja tem.
  */
 export const SURF_DEEP_WATER = 18;
+export const SURF_MINERAL_SILK = 19;
 
 /**
  * Isto e gelo? — a pergunta que substituiu quatro comparacoes soltas.

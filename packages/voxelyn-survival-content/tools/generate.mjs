@@ -463,10 +463,23 @@ const buildSurfaces = () => {
   };
 };
 
-const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS, ...MODULE_LAYER_SPECS].map(buildEntity);
+// Pass atlas IDs to regenerate a bounded set while authoring. The index
+// always describes the complete catalog; no-argument generation is unchanged.
+const allSpecs = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS, ...MODULE_LAYER_SPECS];
+const selectedIds = new Set(process.argv.slice(2));
+const selected = (id) => selectedIds.size === 0 || selectedIds.has(id);
+for (const id of selectedIds) {
+  if (
+    !allSpecs.some((spec) => spec.id === id) &&
+    !['terrain-blocks', 'surface-tiles', 'world-props'].includes(id)
+  ) {
+    throw new Error(`Unknown atlas: ${id}`);
+  }
+}
+const results = allSpecs.filter((spec) => selected(spec.id)).map(buildEntity);
 // O terreno fica FORA do index de sprites: nao tem animacao, direcao nem
 // frameMap, e o validador de sprites tentaria le-lo como personagem.
-const terrainResult = buildTerrain();
+const terrainResult = selected('terrain-blocks') ? buildTerrain() : null;
 /**
  * Atlas de objetos de mundo (Nucleo, plataforma de extracao).
  *
@@ -554,14 +567,14 @@ const buildProps = () => {
   };
 };
 
-const surfaceResult = buildSurfaces();
-const propResult = buildProps();
+const surfaceResult = selected('surface-tiles') ? buildSurfaces() : null;
+const propResult = selected('world-props') ? buildProps() : null;
 const index = {
   version: 3,
   generated: 'deterministic-code-v3-layered-player',
-  ids: results.map((r) => r.id),
+  ids: allSpecs.map((r) => r.id),
 };
 writeFileSync(resolve(OUT, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 console.log('atlases gerados:');
-for (const r of [...results, terrainResult, surfaceResult, propResult])
+for (const r of [...results, terrainResult, surfaceResult, propResult].filter(Boolean))
   console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);

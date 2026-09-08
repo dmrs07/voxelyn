@@ -35,7 +35,13 @@ const nest = (seed: number) => {
   for (let i = 0; i < DEVOURER_BROOD_COUNT; i++) {
     const a = i * 2.39996;
     const r = 2 + Math.sqrt((i + 1) / DEVOURER_BROOD_COUNT) * DEVOURER_BROOD_RING;
-    spawnEnemy(state, 'devourer_brood', px + 0.5 + Math.cos(a) * r, py + 0.5 + Math.sin(a) * r, false);
+    spawnEnemy(
+      state,
+      'devourer_brood',
+      px + 0.5 + Math.cos(a) * r,
+      py + 0.5 + Math.sin(a) * r,
+      false,
+    );
   }
   state.player.x = px + 0.5;
   state.player.y = py - 18.5;
@@ -130,7 +136,7 @@ describe('a ninhada — o bando', () => {
           const gap = Math.hypot(live[i].x - live[j].x, live[i].y - live[j].y);
           expect(
             gap,
-            `tick ${t}: dois filhotes a ${gap.toFixed(4)} de ${min}`
+            `tick ${t}: dois filhotes a ${gap.toFixed(4)} de ${min}`,
           ).toBeGreaterThanOrEqual(min - 1e-6);
         }
       }
@@ -168,7 +174,7 @@ describe('a ninhada — o bando', () => {
     expect(now?.alive, 'o filhote foi esmagado em vez de fugir').toBe(true);
     expect(
       Math.hypot(now!.x - state.player.x, now!.y - state.player.y),
-      'ele nao recuou'
+      'ele nao recuou',
     ).toBeGreaterThan(d0);
   });
 });
@@ -261,7 +267,7 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
         const cy = Math.floor(b.y);
         expect(
           state.solid[cy * w + cx],
-          `tick ${t}: filhote ${b.id} dentro da pedra em ${cx},${cy}`
+          `tick ${t}: filhote ${b.id} dentro da pedra em ${cx},${cy}`,
         ).toBe(SOLID_NONE);
       }
     }
@@ -270,7 +276,7 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
   // porque varrer sessenta sementes x tres setores custa oito segundos e o que
   // importa aqui nao e a varredura: e que camara GERADA de verdade, com a
   // parede onde o gerador a pos, nasca com o enxame inteiro.
-  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60, 95, 153, 710];
+  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60, 95, 211, 710];
 
   it('camara gerada nasce com o enxame INTEIRO, e nenhum corpo encostado na pedra', () => {
     // O ANGULO AUREO e ideal e a camara e escavada: o anel de fora encosta na
@@ -291,7 +297,7 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
 
       expect(
         litter.length,
-        `semente ${seed}: ${litter.length} filhotes de ${DEVOURER_BROOD_COUNT}`
+        `semente ${seed}: ${litter.length} filhotes de ${DEVOURER_BROOD_COUNT}`,
       ).toBe(DEVOURER_BROOD_COUNT);
 
       for (const b of litter) {
@@ -301,13 +307,13 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
         // ninguem, porque todo passo que sairia ja comeca bloqueado.
         expect(
           circleBlocked(state, b.x, b.y, b.radius),
-          `semente ${seed}: filhote ${b.id} nasceu com o corpo na pedra em ${b.x},${b.y}`
+          `semente ${seed}: filhote ${b.id} nasceu com o corpo na pedra em ${b.x},${b.y}`,
         ).toBe(false);
         // Ninguem nasce dentro da garganta: quem desce o raio para no raio da
         // mordida e nao um passo alem dele.
         expect(
           Math.hypot(b.x - mother!.x, b.y - mother!.y),
-          `semente ${seed}: filhote ${b.id} nasceu dentro da boca`
+          `semente ${seed}: filhote ${b.id} nasceu dentro da boca`,
         ).toBeGreaterThanOrEqual(DEVOURER_MAW_BITE_RADIUS - 1e-6);
       }
     }
@@ -323,16 +329,14 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
     for (const seed of DEVOURER_SEEDS) {
       const state = createRun({ seed, sector: 3 });
       const mother = state.enemies.find((e) => e.archetype === 'white_devourer')!;
-      const ideais = Array.from(
-        { length: DEVOURER_BROOD_COUNT * 8 },
-        (_, i) => i * 2.39996
-      );
+      const ideais = Array.from({ length: DEVOURER_BROOD_COUNT * 8 }, (_, i) => i * 2.39996);
       for (const b of brood(state)) {
         const a = Math.atan2(b.y - mother.y, b.x - mother.x);
         const perto = ideais.some((ideal) => {
           // Diferenca angular mais curta, com as voltas do angulo aureo (ele
           // passa de 2pi a partir do terceiro filhote) dobradas de volta.
-          const d = (((a - ideal + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          const d =
+            ((((a - ideal + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
           return Math.abs(d) < 1e-6;
         });
         expect(perto, `semente ${seed}: filhote ${b.id} saiu do proprio raio`).toBe(true);

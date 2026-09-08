@@ -53,6 +53,9 @@ export type VoiceId =
   | 'bishopHeal'
   | 'minerFlee'
   | 'minerRage'
+  | 'silkTension'
+  | 'silkSnap'
+  | 'silkFall'
   | 'oreGained'
   // --- mundo --------------------------------------------------------------
   | 'explosion'
@@ -406,6 +409,9 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   minerRage: { priority: 9, gain: 0.75, minIntervalMs: 0, spatial: true },
   minerFlee: { priority: 5, gain: 0.45, minIntervalMs: 0, spatial: true },
   // Recibo, e nao evento: baixo e agudo, para sumir sob o combate.
+  silkTension: { priority: 9, gain: 0.35, minIntervalMs: 150, spatial: true },
+  silkSnap: { priority: 9, gain: 0.5, minIntervalMs: 80, spatial: true },
+  silkFall: { priority: 9, gain: 0.55, minIntervalMs: 100, spatial: true },
   oreGained: { priority: 3, gain: 0.28, minIntervalMs: 90, spatial: true },
 
   explosion: { priority: 8, gain: 0.75, minIntervalMs: 70, spatial: true },

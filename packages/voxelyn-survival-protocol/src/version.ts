@@ -229,7 +229,7 @@
 //     parados enquanto apanha. E o mesmo caso da entrada 18 (`leap`) e da 32
 //     (`probe`/`dive`/`emerge`), e o bump transforma os dois em recusa no
 //     handshake.
-export const PROTOCOL_VERSION = 33;
+export const PROTOCOL_VERSION = 34;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -966,7 +966,12 @@ export const PROTOCOL_VERSION = 33;
 //     contra 4,6 do Prospector, a fuga continua possivel e passa a ser
 //     merecida. `DIAMANDIS_HP` 880 -> 1400 para o quarto ato caber. Dano,
 //     alcance e velocidade do chefe mudaram: um replay de 63 nao bate.
-export const SIMULATION_VERSION = 64;
+// 65: A COLONIA DOS COSTUREIROS, suturas, cargas e Cerzideira entram na geracao
+//     e na simulacao autoritativa.
+// 66: A puxada registra contato por slot e por acao, inclusive esquivas, para
+//     nao repetir dano durante a sobreposicao. Seda mineral responde a chama
+//     e impacto termico. O latch da puxada entra no hash; replays de 65 divergem.
+export const SIMULATION_VERSION = 66;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1156,7 +1161,7 @@ export const SIMULATION_VERSION = 64;
 //     atlas antigos em cache desenharia a arraia curta inteira sobre um corpo
 //     que a simulacao tem por segmentos, e o nucleo das bacias com moldura de
 //     gelo; o bump invalida a precache.
-export const CONTENT_VERSION = 34;
+export const CONTENT_VERSION = 35;
 
 export type VersionTriple = {
   protocolVersion: number;

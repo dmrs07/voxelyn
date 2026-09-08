@@ -62,6 +62,9 @@ const TEST_BOXES: Box[] = [
   box(-2.5, -0.5, 0, 1, 1, 3, 'fungus') as Box,
   box(-0.5, -1.5, 3.5, 1, 0.5, 0.5, 'biolum') as Box,
   box(-0.5, 0.5, 0.5, 1, 1, 1, 'loot') as Box,
+  box(-1.5, -0.5, 3.5, 1, 1, 0.5, 'chitin') as Box,
+  box(0.5, -0.5, 3.5, 1, 1, 0.5, 'silk') as Box,
+  box(-0.5, 0.5, 2.5, 1, 1, 0.5, 'sutureResin') as Box,
 ];
 
 describe('paridade com o rasterizador do jogo', () => {

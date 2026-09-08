@@ -11,6 +11,16 @@
 import type { PT_BR } from './pt-BR';
 
 export const EN: Record<keyof typeof PT_BR, string> = {
+  'arena.suture.title': 'Sutures · inspection',
+  'arena.suture.select': 'Select the Darner and start the arena.',
+  'arena.suture.status': 'tick {tick} · cargo {done}/{total} · {taut} taut tethers',
+  'arena.suture.inspect': 'Inspect tether',
+  'arena.suture.cut': 'Cut tether',
+  'arena.suture.anchor': 'Break anchor',
+  'arena.suture.step': 'Advance 0.4 s',
+  'arena.suture.phase': 'Second phase',
+  'arena.suture.pause': 'Pause',
+  'arena.suture.resume': 'Resume',
   // ---------------------------------------------------------------------
   // Brand and menus
   // ---------------------------------------------------------------------
@@ -282,6 +292,26 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.furnace_heart': 'Furnace Heart',
   'enemy.frost_queen': 'Frost Queen',
   'enemy.magnetarch': 'Magnetarch',
+  'enemy.stitcher': 'Stitcher',
+  'enemy.seamstress': 'The Darner',
+  'bestiary.name.stitcher': 'Stitcher',
+  'bestiary.name.seamstress': 'The Darner',
+  'bestiary.code.stitcher': 'SPECIMEN SUT-01',
+  'bestiary.code.seamstress': 'MATRIX SUT-00',
+  'bestiary.note.stitcher':
+    'Sews passages between two anchors. Interrupt the third stitch or let it close a route. Taut threads lash after being cut.',
+  'bestiary.note.seamstress':
+    'Pulls her body along support threads. Cut the loaded tether to knock her down and expose the abdomen. Below half health, pulls have shorter windups.',
+  'biome.occupation.stitchers': 'STITCHER COLONY',
+  'bossBar.material.seamstress': 'mineral silk and pale chitin',
+  'suture.objective': 'Suspended cargo: {done}/{total} · +24 ore',
+  'suture.reward': 'STITCHED CARGO RECOVERED',
+  'summary.cause.suture_whip.headline': 'The suture lashed back.',
+  'summary.cause.suture_whip.lesson':
+    'After cutting a taut thread, leave the marked lane before it snaps back.',
+  'summary.cause.suture_fall.headline': 'The suspended load fell.',
+  'summary.cause.suture_fall.lesson':
+    'Breaking a support releases the slab. Crosses on the floor mark where it will land.',
   'enemy.undertaker': 'Undertaker',
 
   'bestiary.name.stalker': 'Stalker',

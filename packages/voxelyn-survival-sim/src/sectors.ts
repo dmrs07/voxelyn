@@ -1,3 +1,4 @@
+import { createSutures, suturePoint } from './sutures.js';
 // A descida: o que acontece quando o jogador alcanca o poco.
 //
 // Este arquivo existe porque a run tinha 96x96 tiles fixos, um bioma e uma
@@ -286,6 +287,7 @@ export const populateSector = (
     }
   }
 
+  let workerHome = 0;
   for (let i = 0; i < budget; i++) {
     if (i === eliteIndex && horseHere) {
       // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
@@ -298,7 +300,19 @@ export const populateSector = (
       spawnEnemy(state, signature, home.x, home.y, false);
       continue;
     }
-    spawnEnemy(state, mix[i % mix.length], spawns[i].x, spawns[i].y, i === eliteIndex);
+    const archetype = mix[i % mix.length];
+    const sites = state.sutures.filter((s) => s.phase === 'loose');
+    const home =
+      archetype === 'stitcher' && sites.length
+        ? suturePoint(state, sites[workerHome++ % sites.length].cells[0])
+        : null;
+    spawnEnemy(
+      state,
+      archetype,
+      home ? Math.floor(home.x) : spawns[i].x,
+      home ? Math.floor(home.y) : spawns[i].y,
+      i === eliteIndex,
+    );
   }
 
   // A camara recebe o chefe QUE O BIOMA PEDE: ocupacao forte primeiro
@@ -565,6 +579,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   // relogio herdado recongelaria uma celula que hoje pode ser rocha.
   state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
+  state.sutures = createSutures(world.sutures);
   state.railTracks = world.railTracks.map((t) => ({
     ...t,
     readyAt: 0,
@@ -713,6 +728,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   // relogio herdado recongelaria uma celula que hoje pode ser rocha.
   state.iceHoles = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
+  state.sutures = createSutures(world.sutures);
   state.railTracks = world.railTracks.map((t) => ({
     ...t,
     readyAt: 0,

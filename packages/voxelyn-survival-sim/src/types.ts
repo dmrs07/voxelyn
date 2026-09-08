@@ -48,6 +48,8 @@ export type RunConfig = {
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
 export type EnemyArchetype =
+  | 'stitcher'
+  | 'seamstress'
   | 'stalker'
   | 'bruiser'
   | 'spitter'
@@ -227,6 +229,7 @@ export type PendingModuleChoice = {
  * uma morte de decisao — exatamente o tipo que o design quer que aconteca.
  */
 export type DamageCause =
+  | { kind: 'suture_whip' | 'suture_fall' }
   | { kind: 'player_shot' }
   | { kind: 'enemy_contact'; archetype: EnemyArchetype; elite: boolean }
   | {
@@ -493,6 +496,8 @@ export type RunSummary = {
 };
 
 export type EntityActionKind =
+  | 'stitch'
+  | 'tether'
   | 'player_shot'
   | 'ranged'
   | 'contact'
@@ -578,6 +583,8 @@ export type EntityAction = {
    * So os botes de espreitador o escrevem.
    */
   landed?: true;
+  /** Slots que ja cruzaram esta puxada, inclusive por esquiva. Reinicia por acao. */
+  contactedSlots?: number;
 };
 
 export type Entity = {
@@ -926,6 +933,8 @@ export type BossRuntime = {
  * ameaca ("o chao onde voce esta"), entao sao um.
  */
 export type BossAbility =
+  // Cerzideira: fechar uma sutura e puxar o corpo por ela.
+  | 'stitch'
   // Guardiao: pedra e massa.
   | 'salvo'
   | 'slam'
@@ -1543,6 +1552,13 @@ export type LeylineCircuit = {
 };
 
 export type SemanticEvent =
+  | {
+      t: 'suture';
+      phase: 'sew' | 'taut' | 'cut' | 'snap' | 'fall' | 'reward';
+      id: number;
+      x: number;
+      y: number;
+    }
   | {
       t: 'action_start';
       entity: number;
@@ -2164,7 +2180,31 @@ export type PlayerCommand = {
   choose: 0 | 1 | null;
 };
 
+export type SutureRecipe = {
+  id: number;
+  a: number;
+  b: number;
+  cells: number[];
+  slabCells: number[];
+  kind: 'gate' | 'roof';
+  objective: boolean;
+};
+
+/** Bounded, authoritative construction; a corpse never owns a finished seam. */
+export type Suture = SutureRecipe & {
+  phase: 'loose' | 'taut' | 'cut' | 'spent';
+  tension: number;
+  closeAt: number;
+  whipAt: number;
+  fallAt: number;
+  cutBySlot: number;
+  recovered: boolean;
+};
+
 export type SurvivalState = {
+  sutures: Suture[];
+  /** One salvage payment per sector, including return trips and reconnects. */
+  sutureRewardsMask: number;
   config: Required<RunConfig>;
   rng: RNG;
   tick: number;

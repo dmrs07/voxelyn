@@ -70,6 +70,8 @@ export const bossBarVoice = (archetype: EnemyArchetype | undefined): VoiceId =>
  * generico devolveria o problema ao visual, que ja esta saturado.
  */
 const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
+  stitch: 'silkTension',
+  tether: 'silkTension',
   player_shot: null,
   ranged: 'telegraphRanged',
   contact: 'telegraphCharge',
@@ -135,6 +137,7 @@ type BossVoiceTable<K extends string> = Partial<
 >;
 
 const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
+  seamstress: { stitch: 'silkTension', tether: 'silkTension', contact: 'silkTension' },
   guardian: {
     salvo: 'guardianSalvoCrack',
     slam: 'guardianCompress',
@@ -174,6 +177,7 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
  * sem ela nao haveria o que dizer).
  */
 const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
+  stitch: 'silkTension',
   salvo: 'telegraphRanged',
   slam: 'telegraphSlam',
   charge: 'telegraphCharge',
@@ -198,6 +202,7 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
 };
 
 const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
+  seamstress: { tether: 'silkSnap', contact: 'silkSnap' },
   // A salva NAO esta aqui: cada pedra ja sai como `shot`. O contato e o
   // mesmo golpe de massa, menor.
   guardian: { slam: 'guardianSlam', charge: 'guardianSlam', contact: 'guardianSlam' },
@@ -291,6 +296,7 @@ const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
 const BOSS_VULNERABLE_VOICE: Partial<
   Record<EnemyArchetype, { open: VoiceId; close: VoiceId | null }>
 > = {
+  seamstress: { open: 'silkFall', close: null },
   white_devourer: { open: 'devourerVulnerable', close: null },
   archcantor: { open: 'archcantorSilenced', close: 'archcantorNote' },
   furnace_heart: { open: 'furnaceCooling', close: 'furnaceReheat' },
@@ -518,6 +524,8 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       const x = ev.x ?? 0;
       const y = ev.y ?? 0;
       switch (ev.archetype) {
+        case 'seamstress':
+          return [{ voice: 'silkTension', x, y, scale: 1.2 }];
         case 'diamandis':
           // A fala ("FALHA OPERACIONAL") entra pela tabela das falas, abaixo.
           if (ev.phase === BOSS_PHASE_REACTOR)
@@ -706,6 +714,22 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'ignite':
       return [{ voice: 'ignite', x: ev.x, y: ev.y, scale: 1 }];
 
+    case 'suture':
+      return [
+        {
+          voice:
+            ev.phase === 'fall'
+              ? 'silkFall'
+              : ev.phase === 'snap'
+                ? 'silkSnap'
+                : ev.phase === 'reward'
+                  ? 'oreGained'
+                  : 'silkTension',
+          x: ev.x,
+          y: ev.y,
+          scale: 0.7,
+        },
+      ];
     case 'break':
       return [
         {

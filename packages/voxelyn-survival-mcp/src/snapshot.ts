@@ -1,3 +1,4 @@
+import { sutureObjective, suturePoint } from '@voxelyn/survival-sim';
 // Traduz o SurvivalState (arrays tipados, ids numericos, campos pensados para
 // hash/wire) numa vista que um agente de LLM consegue ler e decidir em cima:
 // nomes em vez de ids, distancias em vez de so coordenadas, e uma janela local
@@ -13,6 +14,10 @@ import {
   SOLID_ORE_CHIPPED,
   SOLID_ORE_SPENT,
   SOLID_ROCK,
+  SOLID_SUTURE_ANCHOR,
+  SOLID_SUTURE_CRACKED,
+  SOLID_STITCHED_ROCK,
+  SURF_MINERAL_SILK,
   SURF_BIOFLUID,
   SURF_EMBER,
   SURF_FIRE,
@@ -36,6 +41,9 @@ import {
 } from '@voxelyn/survival-sim';
 
 const SOLID_NAMES: Record<number, string> = {
+  [SOLID_SUTURE_ANCHOR]: 'suture_anchor',
+  [SOLID_SUTURE_CRACKED]: 'suture_cracked',
+  [SOLID_STITCHED_ROCK]: 'stitched_rock',
   [SOLID_NONE]: 'none',
   [SOLID_ROCK]: 'rock',
   [SOLID_FRAGILE]: 'fragile',
@@ -48,6 +56,7 @@ const SOLID_NAMES: Record<number, string> = {
 };
 
 const SURFACE_NAMES: Record<number, string> = {
+  [SURF_MINERAL_SILK]: 'mineral_silk',
   [SURF_NONE]: 'none',
   [SURF_FUNGAL]: 'fungal',
   [SURF_BIOFLUID]: 'biofluid',
@@ -128,6 +137,18 @@ export type AgentSnapshot = {
   stratum: string;
   occupation: string;
   contamination: number;
+  sutures: Array<{
+    id: number;
+    a: { x: number; y: number };
+    b: { x: number; y: number };
+    phase: string;
+    kind: string;
+    tension: number;
+    whipAt: number;
+    fallAt: number;
+    objective: boolean;
+  }>;
+  sutureObjective: { done: number; total: number; rewarded: boolean };
   player: {
     x: number;
     y: number;
@@ -236,6 +257,18 @@ export const buildAgentSnapshot = (
     stratum: state.stratum,
     occupation: state.occupation,
     contamination: state.contamination,
+    sutures: state.sutures.map((s) => ({
+      id: s.id,
+      a: suturePoint(state, s.a),
+      b: suturePoint(state, s.b),
+      phase: s.phase,
+      kind: s.kind,
+      tension: s.tension,
+      whipAt: s.whipAt,
+      fallAt: s.fallAt,
+      objective: s.objective,
+    })),
+    sutureObjective: sutureObjective(state),
     player: {
       x: player.x,
       y: player.y,

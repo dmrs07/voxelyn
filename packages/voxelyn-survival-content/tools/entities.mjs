@@ -1,4 +1,5 @@
 import { box, collapse, renderVoxels } from './voxel.mjs';
+import { STITCHER_SPECS } from './stitchers.mjs';
 import {
   ANCHOR_X as PROSPECTOR_ANCHOR_X,
   ANCHOR_Y as PROSPECTOR_ANCHOR_Y,
@@ -3879,6 +3880,7 @@ const base = (
 const eightWay = (spec) => ({ ...spec, directions: 8, authoredDirs: DIRS8 });
 
 export const ENTITY_SPECS = [
+  ...STITCHER_SPECS,
   base(
     'player-prospector',
     PROSPECTOR_FRAME_WIDTH,

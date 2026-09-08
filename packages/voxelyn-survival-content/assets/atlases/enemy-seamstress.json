@@ -1,0 +1,151 @@
+{
+  "id": "enemy-seamstress",
+  "version": 1,
+  "atlas": "enemy-seamstress.png",
+  "normalAtlas": "enemy-seamstress.normal.png",
+  "normalScale": 2,
+  "frameWidth": 176,
+  "frameHeight": 122,
+  "columns": 22,
+  "anchorX": 88,
+  "anchorY": 88,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.8,
+    "h": 1.8
+  },
+  "footprint": {
+    "w": 2,
+    "h": 2,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 6,
+      "fps": 8,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "special": 14,
+      "hit": 20,
+      "die": 22
+    },
+    "dl": {
+      "idle": 27,
+      "walk": 31,
+      "attack": 37,
+      "special": 41,
+      "hit": 47,
+      "die": 49
+    },
+    "ur": {
+      "idle": 54,
+      "walk": 58,
+      "attack": 64,
+      "special": 68,
+      "hit": 74,
+      "die": 76
+    },
+    "ul": {
+      "idle": 81,
+      "walk": 85,
+      "attack": 91,
+      "special": 95,
+      "hit": 101,
+      "die": 103
+    },
+    "r": {
+      "idle": 108,
+      "walk": 112,
+      "attack": 118,
+      "special": 122,
+      "hit": 128,
+      "die": 130
+    },
+    "d": {
+      "idle": 135,
+      "walk": 139,
+      "attack": 145,
+      "special": 149,
+      "hit": 155,
+      "die": 157
+    },
+    "l": {
+      "idle": 162,
+      "walk": 166,
+      "attack": 172,
+      "special": 176,
+      "hit": 182,
+      "die": 184
+    },
+    "u": {
+      "idle": 189,
+      "walk": 193,
+      "attack": 199,
+      "special": 203,
+      "hit": 209,
+      "die": 211
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "Cerzideira: eight-direction mineral arthropod, suspended hollow silk ribcage, eight articulated load-bearing legs, paired asymmetrical needle forelimbs, open dorsal fan; existing camera-rotation face raster for diagonal anti-corduroy",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

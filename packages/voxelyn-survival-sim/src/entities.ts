@@ -1,3 +1,4 @@
+import { sewSuture, stitcherStep, seamstressStride } from './sutures.js';
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
@@ -447,6 +448,22 @@ export type ArchetypeDef = {
 };
 
 export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
+  stitcher: {
+    hp: 58,
+    speed: 2.7,
+    radius: 0.36,
+    contactDamage: 9,
+    contactCooldown: 28,
+    aggroRange: 9,
+  },
+  seamstress: {
+    hp: 780,
+    speed: 2.8,
+    radius: 0.72,
+    contactDamage: 20,
+    contactCooldown: 28,
+    aggroRange: 18,
+  },
   stalker: {
     hp: 26,
     speed: 5.2,
@@ -968,6 +985,10 @@ export const damageEntity = (
   hazard = false,
 ): void => {
   if (!ent.alive) return;
+  if (ent.archetype === 'seamstress') {
+    const support = state.sutures.find((s) => s.id + 1 === ent.mood && s.phase === 'taut');
+    amount *= state.tick < ent.stunnedUntil ? 1.5 : support ? 0.55 : 1;
+  }
   // O Leviata FORA DE VISTA nao e alvo: submerso, ou com a cabeca ainda por
   // baixo da lamina, nenhum caminho de dano o toca — nem tiro, nem fogo, nem
   // descarga. Nao e armadura (armadura ensina "guarde a municao e espere");
@@ -1470,6 +1491,8 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
     case 'pummel':
     case 'freeze':
     case 'massive_shock':
+    case 'stitch':
+    case 'tether':
       return action;
     case 'erupt':
       return 'erupt';
@@ -1797,6 +1820,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     });
   }
 
+  if (action.kind === 'stitch') {
+    sewSuture(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'tether') return;
   if (action.kind === 'pulse') {
     // O SOLISTA nao arma a sala: ele foi expulso da formacao e perdeu o papel
     // de operar a Catedral. O que sobrou dele e a descarga curta de perto.
@@ -7554,7 +7582,8 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // Cavalo e Diamandis sao conduzidos passo a passo (a recuperacao E a
       // acao); todo o resto gasta aqui o impulso que o `release` deixou — ver
       // `driftByVelocity`.
-      if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
+      if (enemy.archetype === 'seamstress') seamstressStride(state, enemy, dt, events);
+      else if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
       else if (enemy.archetype === 'diamandis') diamandisDrillStride(state, enemy, events);
       // O ARCO do Devorador entra aqui pela mesma razao dos dois acima: durante
       // o voo a ACAO conduz o corpo. Gated no humor porque a outra acao dele —
@@ -7675,6 +7704,10 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // COVEIRO SUCATEIRO: se ha peca solta para recolher, e isso que ele faz.
     // Roda antes do fluxo comum porque ele LARGA o jogador para trabalhar —
     // ver `undertakerSalvageStep`.
+    if (enemy.archetype === 'stitcher' || enemy.archetype === 'seamstress') {
+      stitcherStep(state, enemy, player, dt, events);
+      continue;
+    }
     if (enemy.archetype === 'undertaker' && undertakerSalvageStep(state, enemy, dt, events)) {
       continue;
     }

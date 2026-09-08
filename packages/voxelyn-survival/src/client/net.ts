@@ -43,6 +43,8 @@ type FrameEntities = {
 };
 
 type BossFrame = {
+  sutures: SurvivalState['sutures'];
+  sutureRewardsMask: number;
   protectiveBubbles: Array<{ x: number; y: number; radius: number }>;
   leviathanShockAt: number;
   leviathanShockRecoverAt: number;
@@ -59,6 +61,8 @@ type BossFrame = {
  * com interpolacao de entidades. Testavel em Node contra o SurvivalServer.
  */
 const EMPTY_BOSS_FRAME: BossFrame = {
+  sutures: [],
+  sutureRewardsMask: 0,
   protectiveBubbles: [],
   leviathanShockAt: -1,
   leviathanShockRecoverAt: -1,
@@ -70,6 +74,12 @@ const EMPTY_BOSS_FRAME: BossFrame = {
 };
 
 const applyBossFrame = (state: SurvivalState, boss: BossFrame): void => {
+  state.sutures = boss.sutures.map((s) => ({
+    ...s,
+    cells: [...s.cells],
+    slabCells: [...s.slabCells],
+  }));
+  state.sutureRewardsMask = boss.sutureRewardsMask;
   state.bossRuntime.protectiveBubbles = boss.protectiveBubbles.map((b) => ({ ...b }));
   state.bossRuntime.leviathanShockAt = boss.leviathanShockAt;
   state.bossRuntime.leviathanShockRecoverAt = boss.leviathanShockRecoverAt;
@@ -500,6 +510,12 @@ export class NetClient {
     // esta sendo desenhado (ver `BossFrame`). Servidor antigo: sem Sondagem
     // marcada e sem viagem — o chefe e desenhado pelo humor do snapshot.
     this.latestBoss = {
+      sutures: (world.sutures ?? []).map((s) => ({
+        ...s,
+        cells: [...s.cells],
+        slabCells: [...s.slabCells],
+      })),
+      sutureRewardsMask: world.sutureRewardsMask ?? 0,
       protectiveBubbles: (world.protectiveBubbles ?? []).map((bubble) => ({ ...bubble })),
       leviathanShockAt: world.leviathanShockAt ?? -1,
       leviathanShockRecoverAt: world.leviathanShockRecoverAt ?? -1,

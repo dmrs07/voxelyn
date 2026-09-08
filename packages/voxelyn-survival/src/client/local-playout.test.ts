@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TICK_MS, createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
+import { TICK_MS, createRun, createSutures, emptyCommand, stepRun } from '@voxelyn/survival-sim';
 import type { SurvivalState, Vec2 } from '@voxelyn/survival-sim';
 import { LocalPlayout } from './local-playout';
 
@@ -83,6 +83,32 @@ const steps = (positions: Array<{ x: number; y: number }>): number[] => {
 const FRAME_60_HZ = 1000 / 60;
 
 describe('LocalPlayout: o movimento desenhado a 60 Hz', () => {
+  it('a amarra desenhada pertence ao mesmo tick do corpo, sem alias com a simulacao', () => {
+    const state = createRun({ seed: 42 }),
+      playout = new LocalPlayout();
+    state.sutures = createSutures([
+      {
+        id: 0,
+        a: 10,
+        b: 16,
+        cells: [11, 12, 13, 14, 15],
+        slabCells: [12, 13, 14],
+        kind: 'roof',
+        objective: true,
+      },
+    ]);
+    playout.capture(state);
+    state.tick++;
+    state.sutures[0].phase = 'cut';
+    state.sutures[0].whipAt = state.tick + 16;
+    playout.capture(state);
+    const previous = playout.sample(state, 0.1)!;
+    expect(previous.sutures[0].phase).toBe('taut');
+    state.tick++;
+    playout.capture(state);
+    expect(playout.sample(state, 0.1)!.sutures[0].whipAt).toBe(state.tick + 15);
+    expect(previous.sutures[0].cells).not.toBe(state.sutures[0].cells);
+  });
   /**
    * O defeito, medido. Sem interpolacao o corpo desenhado e o do ultimo tick
    * inteiro, entao a 60 Hz ele fica parado em dois de cada tres quadros — e o

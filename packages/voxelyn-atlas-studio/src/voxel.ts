@@ -36,6 +36,10 @@ export const RAMPS: Record<string, [string, string, string]> = {
   electric: ['electric', 'mist', 'rock'],
   loot: ['loot', 'brass', 'rockShadow'],
   player: ['player', 'bone', 'rust'],
+  // Novas rampas no fim preservam os desempates da quantizacao de modelos existentes.
+  silk: ['chalk', 'bone', 'brass'],
+  chitin: ['mist', 'rockLight', 'rockShadow'],
+  sutureResin: ['bone', 'brass', 'char'],
 };
 
 export const SHADOW_OF: Record<string, string> = {

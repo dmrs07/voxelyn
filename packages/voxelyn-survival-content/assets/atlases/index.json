@@ -2,6 +2,8 @@
   "version": 3,
   "generated": "deterministic-code-v3-layered-player",
   "ids": [
+    "enemy-stitcher",
+    "enemy-seamstress",
     "player-prospector",
     "enemy-stalker",
     "enemy-spitter",

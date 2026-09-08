@@ -5,6 +5,9 @@ import {
   breakSolid,
   CART_WINDUP_TICKS,
   createRun,
+  createSutures,
+  cutSuture,
+  SOLID_SUTURE_ANCHOR,
   emptyCommand,
   LEYLINE_CHARGE_TICKS,
   lineageOf,
@@ -49,6 +52,43 @@ class Loop {
 }
 
 describe('NetClient <-> SurvivalServer (in-process)', () => {
+  it('suturas preservam carga, prazos e recompensa no snapshot e na reconexao', () => {
+    const loop = new Loop(),
+      client = loop.connect('costura');
+    client.connect();
+    loop.advance(3);
+    const room = loop.server.roomForClient('costura')!,
+      state = room.state,
+      w = state.config.width;
+    const cells = [20, 21, 22, 23, 24].map((x) => 20 * w + x);
+    const a = cells[0] - 1,
+      b = cells[4] + 1;
+    state.solid[a] = state.solid[b] = SOLID_SUTURE_ANCHOR;
+    for (const cell of cells) {
+      state.solid[cell] = 0;
+      state.surface[cell] = 0;
+    }
+    state.sutures = createSutures([
+      { id: 0, a, b, cells, slabCells: cells.slice(1, 4), kind: 'roof', objective: true },
+    ]);
+    loop.advance(4);
+    expect(client.sampleRenderState(loop['now'])!.sutures[0].phase).toBe('taut');
+    cutSuture(state, state.sutures[0], []);
+    state.sutureRewardsMask = 1 << state.sector;
+    loop.advance(4);
+    const view = client.sampleRenderState(loop['now'])!;
+    expect(view.sutures).toEqual(state.sutures);
+    expect(view.sutures[0].cells).not.toBe(state.sutures[0].cells);
+    const token = client.resumeToken;
+    loop.server.removeConnection('costura');
+    const resumed = loop.connect('costura-2');
+    resumed.connect(token!);
+    loop.advance(2);
+    const restored = resumed.sampleRenderState(loop['now'])!;
+    expect(restored.sutures).toEqual(state.sutures);
+    expect(restored.sutures[0].whipAt).toBeGreaterThan(state.tick);
+    expect(restored.sutureRewardsMask).toBe(state.sutureRewardsMask);
+  });
   it('handshake reconstroi o estado renderavel com os dois players', () => {
     const loop = new Loop();
     const a = loop.connect('A');
@@ -151,7 +191,9 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     loop.advance(1 + 3);
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.players[0].stunnedUntil).toBe(room.state.players[0].stunnedUntil);
-    expect(view.enemies.find((candidate) => candidate.id === enemy.id)?.stunnedUntil).toBe(enemy.stunnedUntil);
+    expect(view.enemies.find((candidate) => candidate.id === enemy.id)?.stunnedUntil).toBe(
+      enemy.stunnedUntil,
+    );
   });
 
   it('reconnect por resume token restaura o cliente ao mesmo slot', () => {
@@ -253,7 +295,7 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
         worldHeight: 96,
         mapHash: 'deadbeef',
       }),
-      0
+      0,
     );
     expect(diverged).toContain('mapHash'); // antes: seguia renderizando terreno errado
   });
@@ -295,7 +337,7 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
         events: [],
         contamination: 0,
       }),
-      0
+      0,
     );
     expect(diverged).toContain('incoerente');
   });
@@ -441,18 +483,20 @@ describe('telegrafo do carrinho em co-op', () => {
     const reference = createRun({ seed: seedIndustrial, sector: 2, playerCount: 2 });
     expect(reference.railTracks.length).toBeGreaterThan(0);
     const client = new NetClient(() => {});
-    client.receive(JSON.stringify({
-      t: 'welcome',
-      versions: CURRENT_VERSIONS,
-      playerId: 1,
-      resumeToken: 'tk',
-      roomCode: 'SALA',
-      seed: seedIndustrial,
-      sector: 2,
-      worldWidth: reference.config.width,
-      worldHeight: reference.config.height,
-      mapHash: '', // vazio: pula a validacao de mapa neste teste de unidade
-    }));
+    client.receive(
+      JSON.stringify({
+        t: 'welcome',
+        versions: CURRENT_VERSIONS,
+        playerId: 1,
+        resumeToken: 'tk',
+        roomCode: 'SALA',
+        seed: seedIndustrial,
+        sector: 2,
+        worldWidth: reference.config.width,
+        worldHeight: reference.config.height,
+        mapHash: '', // vazio: pula a validacao de mapa neste teste de unidade
+      }),
+    );
     const mirror = (client as unknown as { state: { railTracks: RailTrack[] } }).state;
     return { client, track: mirror.railTracks[0] };
   };
@@ -468,19 +512,21 @@ describe('telegrafo do carrinho em co-op', () => {
   it('railTimers do snapshot rearmam o firingAt do tramo espelhado', () => {
     const { client, track } = connect();
     expect(track.firingAt).toBe(0);
-    client.receive(JSON.stringify({
-      t: 'snapshot',
-      serverTick: 400,
-      ackSeq: 0,
-      phase: 'running',
-      entities: [],
-      projectiles: [],
-      removedEntities: [],
-      chunkDiffs: [],
-      contamination: 0,
-      events: [],
-      world: worldWith([{ readyAt: 0, firingAt: 400 + CART_WINDUP_TICKS }]),
-    }));
+    client.receive(
+      JSON.stringify({
+        t: 'snapshot',
+        serverTick: 400,
+        ackSeq: 0,
+        phase: 'running',
+        entities: [],
+        projectiles: [],
+        removedEntities: [],
+        chunkDiffs: [],
+        contamination: 0,
+        events: [],
+        world: worldWith([{ readyAt: 0, firingAt: 400 + CART_WINDUP_TICKS }]),
+      }),
+    );
     // O aviso do espelho e TICK-based, como no solo: o renderer le
     // state.railTracks e compara com o tick da linha de render.
     expect(track.firingAt).toBe(400 + CART_WINDUP_TICKS);
@@ -492,7 +538,10 @@ describe('telegrafo do carrinho em co-op', () => {
     // O espelho so deixa o relogio andar para frente — o aviso expira sozinho
     // quando a linha de render cruza o firingAt antigo.
     const { client, track } = connect();
-    const snapshotWith = (serverTick: number, timers: Array<{ readyAt: number; firingAt: number }>) =>
+    const snapshotWith = (
+      serverTick: number,
+      timers: Array<{ readyAt: number; firingAt: number }>,
+    ) =>
       JSON.stringify({
         t: 'snapshot',
         serverTick,
@@ -515,18 +564,20 @@ describe('telegrafo do carrinho em co-op', () => {
 
   it('reconexao NO MEIO do aviso recupera o telegrafo pelo full_resync', () => {
     const { client, track } = connect();
-    client.receive(JSON.stringify({
-      t: 'full_resync',
-      serverTick: 410,
-      seed: seedIndustrial,
-      sector: 2,
-      chunkDiffs: [],
-      entities: [],
-      projectiles: [],
-      you: null,
-      world: worldWith([{ readyAt: 3, firingAt: 424 }]),
-      authHash: '',
-    }));
+    client.receive(
+      JSON.stringify({
+        t: 'full_resync',
+        serverTick: 410,
+        seed: seedIndustrial,
+        sector: 2,
+        chunkDiffs: [],
+        entities: [],
+        projectiles: [],
+        you: null,
+        world: worldWith([{ readyAt: 3, firingAt: 424 }]),
+        authHash: '',
+      }),
+    );
     expect(track.firingAt).toBe(424);
     expect(track.readyAt).toBe(3);
   });
@@ -547,18 +598,20 @@ describe('telegrafo da leyline em co-op', () => {
     expect(reference.stratum).toBe('prismatic');
     expect(reference.leylineSegments.length).toBeGreaterThan(0);
     const client = new NetClient(() => {});
-    client.receive(JSON.stringify({
-      t: 'welcome',
-      versions: CURRENT_VERSIONS,
-      playerId: 1,
-      resumeToken: 'tk',
-      roomCode: 'SALA',
-      seed: seedMineral,
-      sector: 2,
-      worldWidth: reference.config.width,
-      worldHeight: reference.config.height,
-      mapHash: '',
-    }));
+    client.receive(
+      JSON.stringify({
+        t: 'welcome',
+        versions: CURRENT_VERSIONS,
+        playerId: 1,
+        resumeToken: 'tk',
+        roomCode: 'SALA',
+        seed: seedMineral,
+        sector: 2,
+        worldWidth: reference.config.width,
+        worldHeight: reference.config.height,
+        mapHash: '',
+      }),
+    );
     const mirror = (client as unknown as { state: { leylineSegments: LeylineSegment[] } }).state;
     expect(mirror.leylineSegments.length).toBe(reference.leylineSegments.length);
     return { client, seg: mirror.leylineSegments[0] };
@@ -591,7 +644,9 @@ describe('telegrafo da leyline em co-op', () => {
   it('leylineClocks do snapshot rearmam o aviso do segmento espelhado', () => {
     const { client, seg } = connect();
     expect(seg.dischargeAt).toBe(0);
-    client.receive(snapshotWith(400, [{ dischargeAt: 400 + LEYLINE_CHARGE_TICKS, refractoryUntil: 0 }]));
+    client.receive(
+      snapshotWith(400, [{ dischargeAt: 400 + LEYLINE_CHARGE_TICKS, refractoryUntil: 0 }]),
+    );
     expect(seg.dischargeAt).toBe(400 + LEYLINE_CHARGE_TICKS);
   });
 
@@ -619,25 +674,27 @@ describe('telegrafo da leyline em co-op', () => {
     const source = mirror.leylineCircuit.sourceNode;
     expect(mirror.leylineNodes.every((n, i) => i === source || !n.routed)).toBe(true);
     const routing = mirror.leylineNodes.map((_, i) => i === 0);
-    client.receive(JSON.stringify({
-      t: 'snapshot',
-      serverTick: 400,
-      ackSeq: 0,
-      phase: 'running',
-      entities: [],
-      projectiles: [],
-      removedEntities: [],
-      chunkDiffs: [],
-      contamination: 0,
-      events: [],
-      world: {
-        salvageSites: [],
-        coreTaken: false,
-        bossAwake: false,
-        wellOffers: [],
-        leylineRouting: routing,
-      },
-    }));
+    client.receive(
+      JSON.stringify({
+        t: 'snapshot',
+        serverTick: 400,
+        ackSeq: 0,
+        phase: 'running',
+        entities: [],
+        projectiles: [],
+        removedEntities: [],
+        chunkDiffs: [],
+        contamination: 0,
+        events: [],
+        world: {
+          salvageSites: [],
+          coreTaken: false,
+          bossAwake: false,
+          wellOffers: [],
+          leylineRouting: routing,
+        },
+      }),
+    );
     expect(mirror.leylineNodes[0].routed).toBe(true);
     // O snapshot e a VERDADE do rele: ele sobrescreve inclusive a nascente,
     // senao um espelho que reconecta divergiria do servidor por causa de um

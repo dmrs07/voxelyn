@@ -1,4 +1,12 @@
 import {
+  SOLID_SUTURE_ANCHOR,
+  SOLID_SUTURE_CRACKED,
+  SOLID_STITCHED_ROCK,
+  SURF_MINERAL_SILK,
+  sutureObjective,
+} from '@voxelyn/survival-sim';
+import { appendSutureDraws } from './suture-presentation';
+import {
   depthIntensity,
   LEYLINE_CHARGE_TICKS,
   LEYLINE_NODE_INTERACT_RADIUS,
@@ -356,6 +364,9 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
   // vivem na tabela e nao na pele por estrato. Indices 15/16 do atlas v5.
   [SOLID_LEYLINE]: 15,
   [SOLID_LEYLINE_NODE]: 16,
+  [SOLID_SUTURE_ANCHOR]: 17,
+  [SOLID_SUTURE_CRACKED]: 18,
+  [SOLID_STITCHED_ROCK]: 19,
 };
 
 /**
@@ -408,6 +419,7 @@ export const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_ICE_FRACTURED]: 16,
   [SURF_ICE_CRITICAL]: 17,
   [SURF_DEEP_WATER]: 18,
+  [SURF_MINERAL_SILK]: 20,
 };
 
 /**
@@ -471,6 +483,7 @@ export const SURFACE_FALLBACK: Record<number, string> = {
   // O buraco: mais escuro que a agua rasa (#2e3a4d) e que qualquer gelo. O
   // unico chao do jogo em que entrar mata sem golpe nenhum.
   [SURF_DEEP_WATER]: '#141b28',
+  [SURF_MINERAL_SILK]: '#e2d9c7',
 };
 
 /** A cor de recuo da agua profunda do AQUIFERO: mais negra que a da Cripta. */
@@ -503,6 +516,7 @@ const STRATUM_LABEL_KEY = {
 const OCCUPATION_LABEL_KEY = {
   mycelial: 'biome.occupation.mycelial',
   aurix: 'biome.occupation.aurix',
+  stitchers: 'biome.occupation.stitchers',
 } as const satisfies Record<Exclude<OccupationId, 'none'>, string>;
 
 /** "CATEDRAL PRISMÁTICA · CICATRIZ AURIX", ou so o estrato quando limpa. */
@@ -2903,6 +2917,7 @@ export class SurvivalRenderer {
     // mesma chave de sumario, e a nota da segunda morte apareceria ja carimbada
     // — a run inteira sem o unico momento em que a tela diz o que ela valeu.
     if (state.phase === 'running') this.endScreenKey = '';
+    this.sprites.retainEncounter(state.sectorBoss.archetype);
     this.worldWidth = state.config.width; // FX por indice de celula seguem o mundo real
     void alpha;
     const ctx = this.ctx;
@@ -4243,6 +4258,7 @@ export class SurvivalRenderer {
         });
       }
     }
+    appendSutureDraws(ctx, state, items, toScreen, z, brightness);
     // AS CICATRIZES do feixe: onde a linha esteve, apagando.
     this.diamandisBeam.step(nowMs);
     for (const mark of this.diamandisBeam.scorches) {
@@ -4457,6 +4473,8 @@ export class SurvivalRenderer {
       // baixo. Todo o resto (sprite da cabeca, barra, sombra) continua cortado.
       const headDark = b <= 0.05;
       if (headDark && enemy.archetype !== 'white_devourer') continue;
+      if (enemy.archetype === 'stitcher' || enemy.archetype === 'seamstress')
+        this.sprites.requestPart(`enemy-${enemy.archetype}`);
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       let presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // O DIAMANDIS EM FRENESI, fora do desenho: a fumaca nasce por segundo e
@@ -5005,7 +5023,13 @@ export class SurvivalRenderer {
           const drawY = bodyY + (dip?.drop ?? 0) - swimLift;
           // O corpo sacode; o chao nao. Ver `frenzyTwitch`.
           const bodyX = sx + twitch.dx * z;
-          const bodyDrawY = drawY + twitch.dy * z;
+          const silkLift =
+            enemy.archetype === 'seamstress' &&
+            (enemy.mood ?? 0) > 0 &&
+            enemy.stunnedUntil <= state.tick
+              ? 4 * z
+              : 0;
+          const bodyDrawY = drawY + twitch.dy * z - silkLift;
           // AS PECAS DO DIAMANDIS em volta do chassi, na ordem do encaixe: as
           // de tras entram antes do corpo, as da frente depois. Sem o manifest
           // do chassi (atlas ainda carregando) nao ha pecas — e o corpo cai no
@@ -8049,6 +8073,11 @@ export class SurvivalRenderer {
       hudObjectiveMaxWidth(vw / hudScale(vw, vh)),
       (text) => ctx.measureText(text).width,
     ).slice(0, HUD_OBJECTIVE_MAX_LINES);
+    const suturedCargo = sutureObjective(state);
+    if (suturedCargo.total > 0 && !suturedCargo.rewarded)
+      objectiveLines.push(
+        t('suture.objective', { done: suturedCargo.done, total: suturedCargo.total }),
+      );
     if (objectiveKey !== this.objectiveKey) {
       // A diretiva TROCOU: e o unico momento em que ela precisa puxar o olho.
       // Depois disso ela e a linha mais lenta do painel, e um texto que grita

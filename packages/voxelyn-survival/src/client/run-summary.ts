@@ -36,6 +36,8 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   frost_wraith: 'enemy.frost_wraith',
   sulfur_bomber: 'enemy.sulfur_bomber',
   undertaker: 'enemy.undertaker',
+  stitcher: 'enemy.stitcher',
+  seamstress: 'enemy.seamstress',
   diamandis: 'enemy.diamandis',
   white_devourer: 'enemy.white_devourer',
   devourer_brood: 'enemy.devourer_brood',
@@ -72,6 +74,16 @@ export const formatDuration = (ticks: number): string => {
 export const describeCause = (cause: DamageCause | null): CauseText => {
   if (!cause) return { headline: t('summary.cause.none.headline'), lesson: '' };
   switch (cause.kind) {
+    case 'suture_whip':
+      return {
+        headline: t('summary.cause.suture_whip.headline'),
+        lesson: t('summary.cause.suture_whip.lesson'),
+      };
+    case 'suture_fall':
+      return {
+        headline: t('summary.cause.suture_fall.headline'),
+        lesson: t('summary.cause.suture_fall.lesson'),
+      };
     case 'enemy_contact':
       return {
         headline: t('summary.cause.contact.headline', {
