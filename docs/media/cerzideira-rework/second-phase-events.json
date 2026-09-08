@@ -27,7 +27,7 @@
       "y": 92.5
     },
     {
-      "tick": 81,
+      "tick": 87,
       "t": "suture",
       "phase": "taut",
       "id": 4,
@@ -35,7 +35,7 @@
       "y": 94.5
     },
     {
-      "tick": 85,
+      "tick": 97,
       "t": "suture",
       "phase": "taut",
       "id": 5,
@@ -43,7 +43,7 @@
       "y": 92.5
     },
     {
-      "tick": 89,
+      "tick": 107,
       "t": "suture",
       "phase": "taut",
       "id": 6,
@@ -51,7 +51,7 @@
       "y": 91.5
     },
     {
-      "tick": 93,
+      "tick": 117,
       "t": "suture",
       "phase": "taut",
       "id": 7,
@@ -59,7 +59,7 @@
       "y": 88.5
     },
     {
-      "tick": 98,
+      "tick": 127,
       "t": "suture",
       "phase": "taut",
       "id": 8,
@@ -67,7 +67,7 @@
       "y": 84.5
     },
     {
-      "tick": 102,
+      "tick": 137,
       "t": "suture",
       "phase": "taut",
       "id": 9,
@@ -75,7 +75,7 @@
       "y": 93.5
     },
     {
-      "tick": 106,
+      "tick": 147,
       "t": "suture",
       "phase": "taut",
       "id": 10,
@@ -83,7 +83,7 @@
       "y": 91.5
     },
     {
-      "tick": 110,
+      "tick": 157,
       "t": "suture",
       "phase": "taut",
       "id": 11,
@@ -91,236 +91,60 @@
       "y": 89.5
     },
     {
-      "tick": 114,
+      "tick": 167,
       "t": "suture",
       "phase": "taut",
       "id": 12,
-      "x": 74.5,
-      "y": 85.5
+      "x": 86.5,
+      "y": 92.5
     },
     {
-      "tick": 119,
+      "tick": 177,
       "t": "suture",
       "phase": "taut",
       "id": 13,
       "x": 86.5,
-      "y": 92.5
+      "y": 94.5
     },
     {
-      "tick": 123,
+      "tick": 187,
       "t": "suture",
       "phase": "taut",
       "id": 14,
-      "x": 86.5,
-      "y": 94.5
+      "x": 84.5,
+      "y": 92.5
     },
     {
-      "tick": 127,
+      "tick": 197,
       "t": "suture",
       "phase": "taut",
       "id": 15,
-      "x": 83.5,
-      "y": 92.5
-    },
-    {
-      "tick": 131,
-      "t": "suture",
-      "phase": "taut",
-      "id": 16,
-      "x": 83.5,
-      "y": 90.5
-    },
-    {
-      "tick": 135,
-      "t": "suture",
-      "phase": "taut",
-      "id": 17,
-      "x": 85.5,
-      "y": 89.5
-    },
-    {
-      "tick": 140,
-      "t": "suture",
-      "phase": "taut",
-      "id": 18,
-      "x": 87.5,
-      "y": 90.5
-    },
-    {
-      "tick": 144,
-      "t": "suture",
-      "phase": "taut",
-      "id": 19,
-      "x": 89.5,
-      "y": 93.5
-    },
-    {
-      "tick": 148,
-      "t": "suture",
-      "phase": "taut",
-      "id": 20,
-      "x": 79.5,
-      "y": 92.5
-    },
-    {
-      "tick": 152,
-      "t": "suture",
-      "phase": "taut",
-      "id": 21,
-      "x": 79.5,
-      "y": 89.5
-    },
-    {
-      "tick": 157,
-      "t": "suture",
-      "phase": "taut",
-      "id": 22,
-      "x": 82.5,
-      "y": 86.5
-    },
-    {
-      "tick": 161,
-      "t": "suture",
-      "phase": "taut",
-      "id": 23,
-      "x": 85.5,
-      "y": 84.5
-    },
-    {
-      "tick": 165,
-      "t": "suture",
-      "phase": "taut",
-      "id": 24,
-      "x": 89.5,
-      "y": 85.5
-    },
-    {
-      "tick": 169,
-      "t": "suture",
-      "phase": "taut",
-      "id": 25,
-      "x": 92.5,
-      "y": 87.5
-    },
-    {
-      "tick": 173,
-      "t": "suture",
-      "phase": "taut",
-      "id": 26,
-      "x": 84.5,
-      "y": 92.5
-    },
-    {
-      "tick": 178,
-      "t": "suture",
-      "phase": "taut",
-      "id": 27,
       "x": 84.5,
       "y": 90.5
-    },
-    {
-      "tick": 182,
-      "t": "suture",
-      "phase": "taut",
-      "id": 28,
-      "x": 86.5,
-      "y": 90.5
-    },
-    {
-      "tick": 186,
-      "t": "suture",
-      "phase": "taut",
-      "id": 29,
-      "x": 87.5,
-      "y": 92.5
-    },
-    {
-      "tick": 190,
-      "t": "suture",
-      "phase": "taut",
-      "id": 30,
-      "x": 87.5,
-      "y": 94.5
-    },
-    {
-      "tick": 194,
-      "t": "suture",
-      "phase": "taut",
-      "id": 31,
-      "x": 81.5,
-      "y": 91.5
-    },
-    {
-      "tick": 199,
-      "t": "suture",
-      "phase": "taut",
-      "id": 32,
-      "x": 82.5,
-      "y": 89.5
-    },
-    {
-      "tick": 203,
-      "t": "suture",
-      "phase": "taut",
-      "id": 33,
-      "x": 86.5,
-      "y": 87.5
     },
     {
       "tick": 207,
       "t": "suture",
       "phase": "taut",
-      "id": 34,
-      "x": 89.5,
-      "y": 89.5
+      "id": 16,
+      "x": 86.5,
+      "y": 90.5
     },
     {
-      "tick": 211,
+      "tick": 217,
       "t": "suture",
       "phase": "taut",
-      "id": 35,
-      "x": 91.5,
+      "id": 17,
+      "x": 87.5,
       "y": 92.5
     },
     {
-      "tick": 215,
+      "tick": 227,
       "t": "suture",
       "phase": "taut",
-      "id": 36,
-      "x": 76.5,
-      "y": 94.5
-    },
-    {
-      "tick": 220,
-      "t": "suture",
-      "phase": "taut",
-      "id": 37,
-      "x": 75.5,
-      "y": 91.5
-    },
-    {
-      "tick": 224,
-      "t": "suture",
-      "phase": "taut",
-      "id": 38,
-      "x": 78.5,
-      "y": 84.5
-    },
-    {
-      "tick": 228,
-      "t": "suture",
-      "phase": "taut",
-      "id": 39,
-      "x": 84.5,
-      "y": 80.5
-    },
-    {
-      "tick": 232,
-      "t": "suture",
-      "phase": "taut",
-      "id": 40,
+      "id": 18,
       "x": 87.5,
-      "y": 80.5
+      "y": 94.5
     },
     {
       "tick": 247,
@@ -339,7 +163,7 @@
       "y": 92.5
     },
     {
-      "tick": 395,
+      "tick": 371,
       "t": "suture",
       "phase": "snap",
       "id": -32,
@@ -348,7 +172,7 @@
       "radius": 0.55
     },
     {
-      "tick": 397,
+      "tick": 373,
       "t": "suture",
       "phase": "snap",
       "id": -31,
@@ -357,7 +181,7 @@
       "radius": 0.55
     },
     {
-      "tick": 399,
+      "tick": 375,
       "t": "suture",
       "phase": "snap",
       "id": -33,
@@ -366,7 +190,7 @@
       "radius": 0.55
     },
     {
-      "tick": 400,
+      "tick": 376,
       "t": "suture",
       "phase": "snap",
       "id": -29,
@@ -375,7 +199,7 @@
       "radius": 0.55
     },
     {
-      "tick": 401,
+      "tick": 377,
       "t": "suture",
       "phase": "snap",
       "id": -30,
@@ -384,7 +208,7 @@
       "radius": 0.55
     },
     {
-      "tick": 401,
+      "tick": 377,
       "t": "suture",
       "phase": "snap",
       "id": -34,

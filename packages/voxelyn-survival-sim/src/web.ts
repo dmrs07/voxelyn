@@ -28,7 +28,11 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 export const isWebStrand = (s: SutureRecipe): boolean => s.kind === 'web';
 
 /** As celulas de chao entre dois pontos; para na primeira parede. */
-const rasterize = (state: SurvivalState, from: Vec2, to: Vec2): number[] => {
+const rasterize = (
+  state: SurvivalState,
+  from: Vec2,
+  to: Vec2,
+): { cells: number[]; blocked: boolean } => {
   const w = state.config.width,
     h = state.config.height;
   const cells: number[] = [];
@@ -38,12 +42,12 @@ const rasterize = (state: SurvivalState, from: Vec2, to: Vec2): number[] => {
     const t = i / steps;
     const x = Math.floor(from.x + (to.x - from.x) * t),
       y = Math.floor(from.y + (to.y - from.y) * t);
-    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) return { cells, blocked: true };
     const c = y * w + x;
-    if (state.solid[c] !== SOLID_NONE) break;
+    if (state.solid[c] !== SOLID_NONE) return { cells, blocked: true };
     if (cells[cells.length - 1] !== c) cells.push(c);
   }
-  return cells;
+  return { cells, blocked: false };
 };
 
 /** A faixa pegajosa: as celulas de chao a ate `WEB_STICKY_REACH` do segmento. */
@@ -85,7 +89,7 @@ const strandsAlong = (
     travelled += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
     const last = i === points.length - 1;
     if (travelled < length(points[start]) && !last) continue;
-    const cells = rasterize(state, points[start], points[i]);
+    const { cells, blocked } = rasterize(state, points[start], points[i]);
     if (cells.length >= 2)
       out.push({
         a: cells[0],
@@ -95,6 +99,9 @@ const strandsAlong = (
         kind: 'web',
         objective: false,
       });
+    // Preserve the visible prefix, but never resume this arm beyond its first
+    // obstacle, even when the prefix was too short to produce a strand.
+    if (blocked) return;
     start = i;
     travelled = 0;
   }

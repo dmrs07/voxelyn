@@ -1024,7 +1024,10 @@ export const PROTOCOL_VERSION = 37;
 //     fios inteiros; cortar um fio abre a passagem no mesmo tick. A morte
 //     dela dissolve a teia. Posicoes, suturas e auxiliares mudaram: um replay
 //     de 71 com a Cerzideira nao bate.
-export const SIMULATION_VERSION = 72;
+// 73: Stop each web spoke and spiral at its first wall or map boundary, keeping
+//     only the visible prefix. Detached strands beyond obstacles no longer slow
+//     players or create repair jobs, so Cerzideira replays from 72 can diverge.
+export const SIMULATION_VERSION = 73;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

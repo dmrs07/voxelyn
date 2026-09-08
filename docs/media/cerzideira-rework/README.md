@@ -24,7 +24,7 @@ Esta imagem usa estados da simulação, atlas publicados e a função de desenho
 
 Na metade da vida a Cerzideira interrompe o que estiver fazendo, prende-se a um fio vertical e sobe até sair da tela, com aviso sonoro próprio. A câmera fica na arena. Acontece uma vez por encontro.
 
-- **Teia.** Fora de vista ela tece, fio a fio, uma teia inspirada na espiral de Fibonacci: cinco raios de sustentação no ângulo de ouro, do centro até as paredes, e dois braços de espiral de razão de ouro por cima. A tecelagem inicial dura 8 s e começa pelos raios; cada fio nasce com som. A geometria para nas paredes da câmara. A volta é marcada na subida: cortar fios enquanto ela está fora não a segura lá em cima.
+- **Teia.** Fora de vista ela tece, fio a fio, uma teia inspirada na espiral de Fibonacci: cinco raios de sustentação no ângulo de ouro, do centro até as paredes, e dois braços de espiral de razão de ouro por cima. A tecelagem inicial dura 8 s e começa pelos raios; cada fio nasce com som. Cada raio ou braço da espiral termina na primeira parede ou borda do mapa, preservando o trecho visível antes dela, sem reaparecer em espaços do outro lado. Os braços sem obstáculos continuam normalmente. A volta é marcada na subida: cortar fios enquanto ela está fora não a segura lá em cima.
 - **Retorno.** Ela desce no centro da teia, olhos vermelhos, e entra em frenesi: perseguição a 5,2 tiles/s, puxadas com preparo de 12 ticks (10 quando encadeadas), e uma leva de até oito auxiliares, com dois Costureiros, reposta a cada 6 s dentro do teto. Os avisos no chão continuam os mesmos.
 - **Teia pegajosa.** Sob um fio inteiro (faixa de um tile para cada lado), o Prospector anda a 0,62 da velocidade; a esquiva continua. Cerzideira, crias e Costureiros andam normalmente. Cada fio é cortado pelas interações existentes (tiro cruzando o fio, fogo), com som de rompimento, e a faixa dele deixa de pegar no mesmo tick. Fios cortados ficam pontilhados no chão.
 - **Costureiros reconstruindo.** No frenesi, os Costureiros convocados priorizam o fio cortado mais próximo: vão até ele e dão três pontos visíveis (cerca de 5 s), com a costura crescendo de uma ponta à outra. Cada fio volta quando o próprio reparo termina. Matar ou interromper o Costureiro deixa a passagem aberta; com o jogador a menos de 3 tiles, ele briga em vez de costurar.
@@ -44,6 +44,7 @@ WASD move, mouse mira/dispara e Espaço esquiva. Nas ferramentas da arena, o pai
 pnpm build:survival
 pnpm test:survival
 node packages/voxelyn-survival/scripts/preview-seamstress-rework.mjs
+node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs
 node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs /tmp/cerzideira-preview
 ```
 
@@ -65,4 +66,12 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 37, simulação 72, conteúdo 37.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 37, simulação 73, conteúdo 37.
+
+### Correção da revisão do PR #215
+
+O traçado agora informa quando encontrou uma parede ou a borda do mapa. O braço termina ali, mesmo quando o trecho restante é curto demais para virar um fio. Isso elimina fios desconectados, faixas pegajosas e reparos indevidos além da parede.
+
+Os cinco testes de regressão falharam antes da correção e passaram depois: paredes internas a quatro distâncias do centro, preservação do trecho visível e continuidade dos braços livres. A validação da correção passou em 44 testes de simulação (teia, Cerzideira e suturas), 73 de protocolo, compilação TypeScript da simulação e do protocolo, lint e formatação dos arquivos alterados.
+
+A prancha, os eventos da segunda fase e o ZIP jogável foram regenerados. Na arena da seed 36, a teia agora tem 16 fios, pois os braços param nos obstáculos internos. O pacote inclui a segunda fase e esta correção; o balanceamento em jogo continua dependendo de playtest com jogadores.
