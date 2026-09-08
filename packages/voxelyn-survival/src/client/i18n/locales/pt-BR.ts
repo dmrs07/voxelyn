@@ -806,6 +806,8 @@ export const PT_BR = {
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
   'sim.ceilingCollapsing': 'O teto cede. A câmara está desabando.',
   'sim.delugeRising': 'O lençol está subindo — o setor inteiro vai submergir.',
+  'sim.devourerHunger':
+    'O Devorador está faminto. As crateras ficam abertas — e a boca vem atrás de você.',
   'sim.furnaceUnstable': 'O constructo perdeu a forma — a sala virou fogo.',
   'sim.furnaceCooled': 'O Coração parou. O calor foi embora com ele.',
   'sim.siegeCollapsed': 'O cerco desaba com o Guardião.',

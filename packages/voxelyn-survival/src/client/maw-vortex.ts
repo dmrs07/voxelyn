@@ -26,6 +26,7 @@ import {
   DEVOURER_MAW_RADIUS,
   PLAYER_SPEED,
 } from '@voxelyn/survival-sim';
+import { blobRadius, fbm01 } from './noise';
 
 /**
  * Quantos graos o vortice carrega de uma vez, NA QUALIDADE ALTA.
@@ -462,4 +463,105 @@ export const mawCloud = (i: number, seconds: number, reach: number): MawCloud =>
     radius: base * (0.62 + 0.5 * up) * (1 - 0.45 * p),
     alpha: Math.max(0, fade) * (0.4 + 0.6 * up),
   };
+};
+
+// ---------------------------------------------------------------------------
+// A FORMA DA NUVEM — ruido de Perlin no lugar de elipses.
+// ---------------------------------------------------------------------------
+// `mawCloud` diz ONDE a nuvem esta e quao grande ela e; nada disso muda. O
+// que muda e o que se desenha ali. Tres elipses concentricas davam um borrao
+// redondo, e um borrao redondo e a coisa que areia em suspensao nunca e:
+// poeira tem franjas, rasga, estica no sentido em que esta sendo puxada. A
+// forma sai de `noise.ts` — o mesmo Perlin deterministico das explosoes —
+// para dois clientes da mesma sala verem a mesma nuvem.
+
+/** Quantos vertices tem o contorno de uma nuvem. */
+export const MAW_CLOUD_VERTICES = 12;
+/**
+ * Quanto o contorno ondula (fracao do raio, para cada lado). A 0,42 a nuvem
+ * tem franjas fundas sem virar uma estrela: o ruido tem poucos lobos por
+ * volta (ver `blobRadius`), entao o que se ve sao duas ou tres saliencias
+ * rasgadas, e nao um serrilhado.
+ */
+export const MAW_CLOUD_RAGGED = 0.42;
+/**
+ * O quanto a nuvem ESTICA no sentido do fluxo, contra o sentido atravessado.
+ *
+ * E a unica parte da forma que fala da mecanica: uma nuvem redonda diz
+ * "estou aqui", uma nuvem alongada na direcao do centro diz "estou indo para
+ * la". 1,55 e o bastante para o olho ler a direcao numa mancha de meio tile e
+ * pouco o bastante para ela nao virar um risco — os riscos ja existem, e sao
+ * os graos.
+ */
+export const MAW_CLOUD_STRETCH = 1.55;
+/** Quao rapido a franja ferve, em unidades de ruido por segundo. */
+const CLOUD_BOIL = 1.4;
+
+export type MawCloudShape = {
+  /** O contorno, em tiles a partir do CENTRO DA NUVEM, fechado (o ultimo liga ao primeiro). */
+  points: ReadonlyArray<{ dx: number; dy: number }>;
+  /** 0,55..1: a densidade da nuvem — um segundo ruido, para umas serem mais ralas que outras. */
+  density: number;
+};
+
+/**
+ * O SENTIDO DO FLUXO na posicao de uma nuvem: para onde a areia esta indo
+ * ali. E a tangente da espiral dos graos — para dentro com o passo da
+ * espiral (ver MAW_SPIRAL_PITCH_RAD) — e nao a reta ate o centro, porque a
+ * nuvem esta na mesma correnteza que os graos e tem de esticar na mesma
+ * direcao que eles riscam.
+ */
+export const mawFlowAt = (dx: number, dy: number): { x: number; y: number } => {
+  const r = Math.hypot(dx, dy);
+  if (r < 1e-6) return { x: 1, y: 0 };
+  const inX = -dx / r;
+  const inY = -dy / r;
+  // A espiral avanca no angulo conforme o raio cai (`mawSpiralAngle` cresce
+  // com `ln(reach / r)`): a tangente do movimento e a rotacao de 90 graus do
+  // vetor para fora, no sentido positivo.
+  const tX = -dy / r;
+  const tY = dx / r;
+  const c = Math.cos(MAW_SPIRAL_PITCH_RAD);
+  const sn = Math.sin(MAW_SPIRAL_PITCH_RAD);
+  return { x: inX * c + tX * sn, y: inY * c + tY * sn };
+};
+
+/**
+ * O CONTORNO da nuvem `i` no instante `seconds`, para a posicao e o raio que
+ * `mawCloud` deu a ela.
+ *
+ * Um circulo unitario deformado tres vezes: esticado ao longo do fluxo
+ * (MAW_CLOUD_STRETCH), com o raio de cada vertice modulado por Perlin
+ * (`blobRadius`, que fecha a forma porque o angulo entra como um ponto num
+ * circulo do plano do ruido), e escalado pelo raio da nuvem. O tempo entra no
+ * ruido e nao na geometria: a franja FERVE enquanto a nuvem viaja, sem que o
+ * contorno pule entre dois quadros.
+ *
+ * Pura em (i, seconds, puff): dois clientes desenham o mesmo rasgo.
+ */
+export const mawCloudShape = (
+  i: number,
+  seconds: number,
+  puff: { dx: number; dy: number; radius: number },
+  vertices = MAW_CLOUD_VERTICES
+): MawCloudShape => {
+  const flow = mawFlowAt(puff.dx, puff.dy);
+  const perp = { x: -flow.y, y: flow.x };
+  // Semente por nuvem: um primo grande espalha as tabelas de permutacao.
+  const seed = 7919 * (i + 1);
+  const points: Array<{ dx: number; dy: number }> = [];
+  for (let k = 0; k < vertices; k++) {
+    const angle = (k / vertices) * Math.PI * 2;
+    const ragged = blobRadius(angle, seconds * CLOUD_BOIL, seed, MAW_CLOUD_RAGGED, 1.9);
+    const u = Math.cos(angle) * MAW_CLOUD_STRETCH * ragged;
+    const v = Math.sin(angle) * ragged;
+    points.push({
+      dx: (flow.x * u + perp.x * v) * puff.radius,
+      dy: (flow.y * u + perp.y * v) * puff.radius,
+    });
+  }
+  // A densidade sai de OUTRA regiao do ruido, lenta: uma nuvem rala continua
+  // rala pelo tempo que leva para atravessar o disco.
+  const density = 0.55 + 0.45 * fbm01(seconds * 0.35 + i * 0.31, i * 1.7 + 11.3, seed + 1, 2);
+  return { points, density };
 };

@@ -1107,7 +1107,21 @@ export const DIAMANDIS_SALVAGE_CREW_CAP = 4;
  * ser silica solta, e de calor virar silica solta em vidro. Quem entende
  * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
  */
-export const DEVOURER_HP = 760;
+/**
+ * Era 760. Com 760 o encontro cabia em DUAS janelas: 7,5 s de boca a 56 de
+ * DPS do bolt basico (14 a cada 5 ticks) sao 420 por janela, e a segunda ja
+ * fechava a conta com folga. Uma luta de duas janelas nao tem onde pendurar
+ * uma virada — a fase 2 (ver DEVOURER_HUNGER_HP_FRACTION) chegaria no meio da
+ * segunda janela e acabaria antes de ensinar alguma coisa.
+ *
+ * 1500 poe a metade em 750, que e uma janela e meia de dano limpo: a Fome
+ * abre no fim do segundo ciclo e a luta ainda pede mais dois inteiros dela.
+ * Fica entre o Coracao (900) e o Diamandis (1400), que sao os dois chefes com
+ * escada de fim de luta, e abaixo do Leviata (4000), que compensa a couraça
+ * de submerso com massa. `hp`/`maxHp` viajam no snapshot e no hash: um replay
+ * anterior nao bate.
+ */
+export const DEVOURER_HP = 1500;
 /** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
 export const DEVOURER_BURROW_SPEED = 4.6;
 /**
@@ -1466,6 +1480,105 @@ export const DEVOURER_SLAM_RADIUS = 3.8;
  * estava dentro.
  */
 export const DEVOURER_SLAM_DAMAGE = 10;
+
+// ---------------------------------------------------------------------------
+// A FOME — a segunda fase.
+// ---------------------------------------------------------------------------
+/**
+ * A fracao de vida em que a FOME comeca (`BOSS_PHASE_HUNGER`). Uma vez, sem
+ * volta, como todas as escadas de chefe deste jogo.
+ *
+ * O que ela responde: o vortice era UM golpe, sempre no mesmo lugar do ciclo,
+ * sempre com a mesma forma — e um golpe que se repete identico por quatro
+ * janelas e uma leitura que o jogador termina de fazer na segunda. A Fome nao
+ * troca a boca por outra coisa; ela tira da boca as duas promessas que a
+ * tornavam confortavel depois de aprendida: que o chao fora do disco e
+ * neutro, e que o centro fica onde nasceu.
+ *
+ * Metade, e nao 45% ou 30%: e a marca que o Diamandis (reator) e o Guardiao
+ * (matilha) ja usam, e o encontro ganha em ter UMA convencao de "agora e
+ * outra luta" que o jogador reconhece de outros estratos.
+ */
+export const DEVOURER_HUNGER_HP_FRACTION = 0.5;
+/**
+ * O SUMIDOURO: o que a cratera do pouso deixa para tras na Fome.
+ *
+ * O estrato se chama Sumidouros de Silica e ate aqui nenhum sumidouro
+ * existia — o nome era paisagem. Na Fome cada queda da rajada abre um: o chao
+ * em volta da cratera continua cedendo depois que o corpo saiu, e por
+ * DEVOURER_SINKHOLE_TICKS ele puxa e come areia como uma boca pequena, sem
+ * garganta.
+ *
+ * O que isso muda na leitura da rajada: hoje "sair da cratera" e o fim da
+ * resposta a um arco. Com o sumidouro, sair da cratera e o COMECO — o chao
+ * de onde voce saiu inclina de volta para ela, e o proximo arco chega com o
+ * jogador ainda pagando o anterior. E durante a boca, tres sumidouros vivos
+ * em volta da camara sao tres inclinacoes somadas a do vortice: o lugar de
+ * onde se atira deixa de ser uma escolha feita uma vez.
+ *
+ * 13 s cobrem a rajada inteira mais a boca (dois vaos de 2,25 s, dois voos,
+ * 2,45 s de silencio e 7,5 s de janela dao pouco mais de 16 s do primeiro
+ * pouso ao fechamento): o primeiro sumidouro morre no meio da janela e o
+ * terceiro atravessa ela inteira. Nenhum sobrevive ate a rajada seguinte —
+ * o setor nao acumula, ele se renova a cada ciclo.
+ */
+export const DEVOURER_SINKHOLE_TICKS = 260;
+/**
+ * Quantos sumidouros podem existir ao mesmo tempo. Um por arco da rajada, e
+ * nenhum a mais: se um chefe recomposto ou um resync pousasse uma quarta vez
+ * antes de o primeiro morrer, o mais velho cede a vaga.
+ */
+export const DEVOURER_SINKHOLE_MAX = 3;
+/**
+ * Ate onde o sumidouro chega, em tiles. Menos da metade da boca (7,5): ele e
+ * uma inclinacao no chao em volta da cratera, nao uma segunda boca. Coincide
+ * quase com o anel da onda de choque (3,8), que e a area que o jogador acabou
+ * de aprender a evacuar — o sumidouro e o custo de ter parado logo ali.
+ */
+export const DEVOURER_SINKHOLE_RADIUS = 3.6;
+/**
+ * Quanto tempo ele leva para abrir de todo, e para fechar no fim.
+ *
+ * Um segundo e meio, contra 4,5 s da boca: ele nasce de uma cratera que ja
+ * esta la, e o aviso ja foi dado pelo pouso. Fecha na mesma rampa ao
+ * contrario, porque um puxao que sumisse num tick faria o corpo tropecar.
+ */
+export const DEVOURER_SINKHOLE_SPOOL_TICKS = 30;
+/**
+ * A sucao do sumidouro na borda e no centro, em tiles por segundo.
+ *
+ * O CENTRO fica ABAIXO da caminhada (4,6) de proposito, e ha um teste que
+ * cobra isso em todo raio: um sumidouro sozinho nunca prende ninguem. Ele
+ * nao existe para matar — nao tem garganta — e sim para SOMAR: dois tiles de
+ * atraso na saida de uma cratera enquanto o arco seguinte cai, ou um tile a
+ * mais para dentro da linha do sem-volta quando a boca esta perto. E uma
+ * ladeira, e a resposta a uma ladeira continua sendo andar — so que andar
+ * passou a custar tempo, e tempo e o que a rajada cobra.
+ *
+ * Sobre vidro ele agarra a mesma fracao que a boca (DEVOURER_MAW_GLASS_GRIP):
+ * uma unica regra de chao para as duas sucoes, porque as duas sao a mesma
+ * coisa em tamanhos diferentes.
+ */
+export const DEVOURER_SINKHOLE_PULL_EDGE = 0.5;
+export const DEVOURER_SINKHOLE_PULL_CORE = 3.4;
+/**
+ * A BOCA ANDA. Na Fome, depois de abrir de todo, o vortice se desloca para o
+ * jogador mais perto, em tiles por segundo.
+ *
+ * E a segunda promessa que a Fome retira: a de que o centro fica onde nasceu.
+ * Com o centro fixo, a resposta otima a boca era resolvida uma vez — parar a
+ * 7,6 tiles, ou atras de uma quina, e segurar o gatilho ate o relogio virar.
+ * O que sobrava era esperar. A 1,2 tile/s a boca corre um quarto da caminhada:
+ * quem esta a distancia continua a distancia andando para tras, e quem esta
+ * atras de uma quina continua protegido ate a quina deixar de estar entre os
+ * dois. A cobertura nao some, ela passa a ter prazo.
+ *
+ * So depois da rampa (mawIntensity = 1): os primeiros 4,5 s da janela sao
+ * identicos aos da fase 1, para o que o jogador aprendeu continuar valendo, e
+ * nos 3 s finais ela anda no maximo 3,6 tiles. A linha do sem-volta continua
+ * sendo um lugar — um lugar que se move devagar o bastante para ser lido.
+ */
+export const DEVOURER_MAW_CREEP = 1.2;
 
 // ---------------------------------------------------------------------------
 // A NINHADA — as minhoquinhas.

@@ -171,6 +171,10 @@ import {
   DEVOURER_MAW_BITE_DAMAGE,
   DEVOURER_MAW_BITE_RADIUS,
   DEVOURER_MAW_PULL_STEP,
+  DEVOURER_HUNGER_HP_FRACTION,
+  DEVOURER_MAW_CREEP,
+  DEVOURER_SINKHOLE_MAX,
+  DEVOURER_SINKHOLE_TICKS,
   DEVOURER_STALK_CIRCLE,
   DEVOURER_STALK_RANGE,
   DEVOURER_TRAIL_WIDTH,
@@ -372,7 +376,7 @@ import { insideAnyBubble, isPoolCore, leviathanTargetable } from './leviathan.js
 import { applyFreezeDose } from './frost.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
-import { mawPull, mawReach } from './maw.js';
+import { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
 import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
@@ -402,6 +406,7 @@ import {
   BOSS_PHASE_DELUGE,
   BOSS_PHASE_OVERHEAT,
   BOSS_PHASE_CHOIR,
+  BOSS_PHASE_HUNGER,
   RESONANT_WILD,
   RESONANT_CHOIR,
   RESONANT_SOLOIST,
@@ -1159,7 +1164,11 @@ export const damageEntity = (
   // A MAE CAIU: a ninhada vai junto. Ver `devourerBroodEnds` — sem isto, o que
   // sobra na camara limpa sao catorze filhotes orfaos ocupando vaga do teto de
   // inimigos e parando bala.
-  if (ent.archetype === 'white_devourer') devourerBroodEnds(state, events);
+  if (ent.archetype === 'white_devourer') {
+    devourerBroodEnds(state, events);
+    // E o chao para de ceder: os sumidouros eram a fome dele, nao do estrato.
+    state.bossRuntime.sinkholes.length = 0;
+  }
   if (state.sectorBoss.entityId === ent.id && isBossArchetype(ent.archetype)) {
     markSectorBossDown(state, state.sector);
     // O SELO CEDEU. Evento proprio, e nao o `death` reinterpretado: o cliente
@@ -3769,6 +3778,7 @@ const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent
   enemy.action = undefined;
   devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
   devourerSlam(state, enemy, events);
+  devourerOpenSinkhole(state, enemy);
   // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
   // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: a BOCA abre.
   //
@@ -3888,6 +3898,7 @@ const devourerMawStep = (state: SurvivalState, enemy: Entity, events: SemanticEv
   if (reach <= 0) return;
 
   devourerMawIntake(state, enemy, reach);
+  devourerMawCreep(state, enemy);
 
   // TUDO e puxado, e o "tudo" e literal: jogador e bicho, com a mesma conta.
   //
@@ -3981,19 +3992,43 @@ const devourerMawDrag = (
 ): void => {
   const dist = distTo(enemy, victim);
   if (dist > reach || dist <= 0.0001) return;
+  const onGlass = standsOnGlass(state, victim);
+  const speed = mawPull(dist, state.tick, state.bossRuntime.mawOpenedAt, onGlass);
+  dragBody(state, victim, enemy.x, enemy.y, speed);
+};
+
+/** O corpo esta com os pes sobre vidro? A unica pergunta que o chao responde ao arrasto. */
+const standsOnGlass = (state: SurvivalState, victim: Entity): boolean => {
   const w = state.config.width;
   const fx = Math.floor(victim.x);
   const fy = Math.floor(victim.y);
-  const onGlass =
+  return (
     fx >= 0 &&
     fy >= 0 &&
     fx < w &&
     fy < state.config.height &&
-    state.surface[fy * w + fx] === SURF_GLASS;
-  const speed = mawPull(dist, state.tick, state.bossRuntime.mawOpenedAt, onGlass);
+    state.surface[fy * w + fx] === SURF_GLASS
+  );
+};
+
+/**
+ * UM TICK de arrasto de um corpo para um centro, a `speed` tiles por segundo.
+ *
+ * Extraido da boca porque os sumidouros da Fome puxam do MESMO jeito — em
+ * sub-passos que consultam a colisao, parando na primeira quina. Duas copias
+ * disto acabariam discordando sobre o que uma parede vale, e a parede e a
+ * unica saida da sucao que nao gasta esquiva.
+ */
+const dragBody = (
+  state: SurvivalState,
+  victim: Entity,
+  cx: number,
+  cy: number,
+  speed: number,
+): void => {
   if (speed <= 0) return;
   const travel = speed / TICK_HZ;
-  const dir = normalized(enemy.x - victim.x, enemy.y - victim.y);
+  const dir = normalized(cx - victim.x, cy - victim.y);
   const steps = Math.max(1, Math.ceil(travel / DEVOURER_MAW_PULL_STEP));
   const step = travel / steps;
   for (let s = 0; s < steps; s++) {
@@ -4036,6 +4071,168 @@ const devourerMawBite = (state: SurvivalState, enemy: Entity, events: SemanticEv
     if (distTo(enemy, victim) > DEVOURER_MAW_BITE_RADIUS) continue;
     damageEntity(state, victim, DEVOURER_MAW_BITE_DAMAGE, events, cause);
   }
+};
+
+// ---------------------------------------------------------------------------
+// A FOME — a segunda fase do Devorador (BOSS_PHASE_HUNGER)
+// ---------------------------------------------------------------------------
+
+/**
+ * A FOME comeca na metade da vida, uma vez e sem volta — a mesma escada do
+ * reator do Diamandis e do colapso do Coracao, e pelo mesmo motivo: uma
+ * escada que desce nao e uma escada.
+ *
+ * Ela nao muda o ciclo. Rajada, silencio e boca continuam na mesma ordem, com
+ * os mesmos tempos, e tudo o que o jogador aprendeu na primeira metade
+ * continua verdadeiro. O que muda sao DUAS promessas laterais que a primeira
+ * metade fazia sem dizer: que o chao fora do disco e neutro (agora as crateras
+ * ficam abertas, ver `devourerOpenSinkhole`) e que o centro da boca fica onde
+ * nasceu (agora ela anda, ver `devourerMawCreep`).
+ */
+const devourerHunger = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  if ((state.bossRuntime.phasesFired & BOSS_PHASE_HUNGER) !== 0) return;
+  if (enemy.maxHp <= 0 || enemy.hp / enemy.maxHp > DEVOURER_HUNGER_HP_FRACTION) return;
+  state.bossRuntime.phasesFired |= BOSS_PHASE_HUNGER;
+  events.push({
+    t: 'boss_phase',
+    archetype: 'white_devourer',
+    phase: BOSS_PHASE_HUNGER,
+    x: enemy.x,
+    y: enemy.y,
+  });
+  events.push({ t: 'message', key: 'sim.devourerHunger' });
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 4 });
+};
+
+const devourerHungry = (state: SurvivalState): boolean =>
+  (state.bossRuntime.phasesFired & BOSS_PHASE_HUNGER) !== 0;
+
+/**
+ * A CRATERA FICA ABERTA. Na Fome, cada pouso da rajada deixa um sumidouro
+ * onde o corpo caiu: o chao continua cedendo depois que ele saiu.
+ *
+ * Nasce no tick do pouso e cresce dali (ver `sinkholeReach`): no instante da
+ * queda ele ainda nao puxa nada, e o primeiro segundo e o que a cratera sempre
+ * foi — dano no impacto e nada mais. Quem saiu correndo continua saindo; quem
+ * parou na borda descobre que a borda inclina.
+ *
+ * O teto e por contagem, e o mais velho cede a vaga: um chefe recomposto por
+ * resync que pousasse quatro vezes antes de o primeiro morrer nao acumula
+ * sumidouros para sempre.
+ */
+const devourerOpenSinkhole = (state: SurvivalState, enemy: Entity): void => {
+  if (!devourerHungry(state)) return;
+  const holes = state.bossRuntime.sinkholes;
+  holes.push({ x: enemy.x, y: enemy.y, at: state.tick });
+  while (holes.length > DEVOURER_SINKHOLE_MAX) holes.shift();
+};
+
+/**
+ * A BOCA ANDA. Depois de abrir de todo, na Fome, o vortice se desloca para o
+ * jogador mais perto, devagar (DEVOURER_MAW_CREEP).
+ *
+ * So com a rampa completa: os primeiros 4,5 s da janela sao a janela de
+ * sempre, e a linha do sem-volta continua sendo um lugar fixo enquanto o
+ * jogador a le. Ela so passa a se mover quando ja esta inteira na tela.
+ *
+ * Sem `moveEntity`, como o mergulho: a boca e o corpo POR BAIXO do chao, e
+ * parede nao vale para ele. A moldura do mapa vale. A cara segue o
+ * deslocamento, para o cliente nao ver uma cratera andando de lado.
+ */
+const devourerMawCreep = (state: SurvivalState, enemy: Entity): void => {
+  if (!devourerHungry(state)) return;
+  if (mawIntensity(state.tick, state.bossRuntime.mawOpenedAt) < 1) return;
+  let target: Entity | null = null;
+  let best = Infinity;
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    const d = distTo(enemy, player);
+    if (d < best) {
+      best = d;
+      target = player;
+    }
+  }
+  if (!target || best <= 0.0001) return;
+  const step = Math.min(best, DEVOURER_MAW_CREEP / TICK_HZ);
+  const dir = normalized(target.x - enemy.x, target.y - enemy.y);
+  enemy.x = Math.max(1.5, Math.min(state.config.width - 1.5, enemy.x + dir.x * step));
+  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + dir.y * step));
+  enemy.facing = { ...dir };
+};
+
+/**
+ * OS SUMIDOUROS, um tick: os mortos saem da lista, os vivos comem a areia do
+ * seu disco e puxam todo corpo que esta nele.
+ *
+ * Roda sempre, fora do laco de inimigos e depois dele — como o teto do
+ * Coracao (`stepCollapse`), e pelo mesmo motivo: eles sao CHAO, nao uma
+ * decisao do chefe. Atordoar o Devorador, ou ele estar no ar, nao fecha uma
+ * cratera que ja abriu. E puxam onde o jogador TERMINOU o tick, para o
+ * arrasto nao disputar com o passo dele.
+ *
+ * A mesma ordem da boca: areia primeiro (o disco limpo e o telegrafo do
+ * alcance), corpos depois. Sem mordida: um sumidouro nao tem garganta.
+ */
+export const stepSinkholes = (state: SurvivalState): void => {
+  const holes = state.bossRuntime.sinkholes;
+  if (holes.length === 0) return;
+  let write = 0;
+  for (let read = 0; read < holes.length; read++) {
+    const hole = holes[read];
+    if (state.tick - hole.at >= DEVOURER_SINKHOLE_TICKS) continue;
+    holes[write++] = hole;
+  }
+  holes.length = write;
+  for (const hole of holes) {
+    const reach = sinkholeReach(state.tick, hole.at);
+    if (reach <= 0) continue;
+    sinkholeIntake(state, hole.x, hole.y, reach);
+    for (const victim of state.players) {
+      if (!victim.alive || !state.playerExtras[victim.slot ?? 0].joined) continue;
+      sinkholeDrag(state, hole, victim, reach);
+    }
+    for (const victim of state.enemies) {
+      if (!victim.alive || isBossArchetype(victim.archetype)) continue;
+      sinkholeDrag(state, hole, victim, reach);
+    }
+  }
+};
+
+/**
+ * A areia do disco do sumidouro vira chao limpo, como na boca — e pelo mesmo
+ * motivo de desenho (a borda limpa e o alcance) e de pressao (silica engolida
+ * nao vitrifica mais). Na Fome o chefe come o contra-jogo mais rapido, e e
+ * isso que a Fome e. O vidro nao e tocado.
+ */
+const sinkholeIntake = (state: SurvivalState, cx: number, cy: number, reach: number): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = Math.ceil(reach);
+  const ox = Math.floor(cx);
+  const oy = Math.floor(cy);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const x = ox + dx;
+      const y = oy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+      if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > reach) continue;
+      const i = y * w + x;
+      if (state.surface[i] !== SURF_SILT) continue;
+      setSurface(state, i, SURF_NONE, 0);
+    }
+  }
+};
+
+const sinkholeDrag = (
+  state: SurvivalState,
+  hole: { x: number; y: number; at: number },
+  victim: Entity,
+  reach: number,
+): void => {
+  const dist = Math.hypot(hole.x - victim.x, hole.y - victim.y);
+  if (dist > reach || dist <= 0.0001) return;
+  const speed = sinkholePull(dist, state.tick, hole.at, standsOnGlass(state, victim));
+  dragBody(state, victim, hole.x, hole.y, speed);
 };
 
 /**
@@ -7572,6 +7769,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // telegrafo de golpe, e a JANELA DE DANO do chefe. Atordoar para encurtar a
     // propria janela de dano nao e uma jogada — e o `continue` diz o resto, que
     // e que de boca aberta ele nao faz mais nada nenhum.
+    // A FOME e decidida ANTES da boca e antes dos portoes, e tem de ser: a
+    // vida dele cai justamente de boca aberta, e uma escada que so fosse lida
+    // no fluxo de IA esperaria a janela fechar para anunciar o que a janela
+    // causou.
+    if (enemy.archetype === 'white_devourer') devourerHunger(state, enemy, events);
     if (enemy.archetype === 'white_devourer' && enemy.mood === DEVOURER_MAW) {
       enemy.action = undefined;
       devourerMawTick(state, enemy, events);

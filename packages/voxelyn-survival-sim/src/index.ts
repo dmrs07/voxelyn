@@ -128,7 +128,7 @@ export {
 // varredura da Fornalha: o vortice e DERIVADO e nao transmitido — o cliente
 // refaz a mesma conta da simulacao, a partir do unico tick que viaja
 // (`bossRuntime.mawOpenedAt`), e chega no mesmo alcance e na mesma forca.
-export { mawIntensity, mawPull, mawReach } from './maw.js';
+export { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
 export { hasLineOfSight } from './pathing.js';
 export {
   FREEZE_THAW_RELEASE_AT,

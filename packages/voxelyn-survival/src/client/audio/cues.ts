@@ -13,6 +13,7 @@
 import {
   BOSS_PHASE_OVERHEAT,
   BOSS_PHASE_REACTOR,
+  BOSS_PHASE_HUNGER,
   BOSS_PHASE_SUMMON,
   BOSS_PHASE_UNSTABLE,
   SOLID_CRYSTAL,
@@ -535,6 +536,12 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
           if (ev.phase === BOSS_PHASE_OVERHEAT) return [{ voice: 'furnaceCrack', x, y, scale: 1 }];
           if (ev.phase === BOSS_PHASE_UNSTABLE)
             return [{ voice: 'furnaceUnstable', x, y, scale: 1 }];
+          return [];
+        case 'white_devourer':
+          // A FOME: o estrato cedendo. E o unico sting de fase do encontro e
+          // o unico som dele que nao vem de um golpe — e por isso soa como o
+          // chao, e nao como o corpo.
+          if (ev.phase === BOSS_PHASE_HUNGER) return [{ voice: 'devourerHunger', x, y, scale: 1 }];
           return [];
         case 'guardian':
           // A matilha: a massa se deslocando de novo — o mesmo subgrave do

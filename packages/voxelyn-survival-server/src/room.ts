@@ -526,6 +526,13 @@ export class GameRoom {
       leviathanSurfaceAt: this.state.bossRuntime.leviathanSurfaceAt,
       // A BOCA em um numero. O cliente refaz o vortice inteiro a partir dele.
       mawOpenedAt: this.state.bossRuntime.mawOpenedAt,
+      // OS SUMIDOUROS da Fome, pela mesma economia: dois numeros e um tick por
+      // cratera aberta, e o cliente refaz o campo inteiro.
+      sinkholes: this.state.bossRuntime.sinkholes.map((hole) => ({
+        x: round3(hole.x),
+        y: round3(hole.y),
+        at: hole.at,
+      })),
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.

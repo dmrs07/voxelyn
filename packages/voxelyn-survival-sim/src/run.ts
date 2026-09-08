@@ -140,6 +140,7 @@ import {
   isStoneEnemy,
   spawnEnemy,
   stepCollapse,
+  stepSinkholes,
   stunEntity,
   surfaceSpeedMul,
   updateEnemies,
@@ -3391,6 +3392,9 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   // O teto DEPOIS dos projeteis e do movimento: a estalactite cobra onde o
   // jogador terminou o tick, e nao onde ele estava quando ela foi marcada.
   stepCollapse(state, events);
+  // OS SUMIDOUROS pelo mesmo motivo e no mesmo lugar do teto: eles sao chao,
+  // nao decisao do chefe, e puxam onde o jogador TERMINOU o tick.
+  stepSinkholes(state);
   applyCellHazards(state, events);
   stepContamination(state, events);
   // A REDE DE SEGURANCA DO BURACO. `applyIceLoad` ja cobre o caminho comum
@@ -3736,6 +3740,17 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // depois, com um jogador devorado de um lado e a tres tiles do centro do
   // outro.
   mix(state.bossRuntime.mawOpenedAt);
+  // OS SUMIDOUROS da Fome. Cada um decide, tick a tick, a posicao de todo
+  // corpo no seu disco e quanta areia ja comeu: duas simulacoes que
+  // discordassem de um deles parecem iguais no pouso e divergem um arco
+  // depois, com um jogador dentro da cratera seguinte de um lado e fora dela
+  // do outro.
+  mix(state.bossRuntime.sinkholes.length);
+  for (const hole of state.bossRuntime.sinkholes) {
+    mix(Math.round(hole.x * 1000));
+    mix(Math.round(hole.y * 1000));
+    mix(hole.at);
+  }
   // O DILUVIO. Tres numeros que valem por uma camada de mundo inteira: eles
   // decidem, celula a celula, o que esta submerso — e submerso decide por onde
   // o chefe nada, onde ele emerge e quanto uma descarga cobra. Fora do hash,

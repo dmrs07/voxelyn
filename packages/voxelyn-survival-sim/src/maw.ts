@@ -23,6 +23,11 @@ import {
   DEVOURER_MAW_PULL_FALLOFF,
   DEVOURER_MAW_RADIUS,
   DEVOURER_MAW_SPOOL_TICKS,
+  DEVOURER_SINKHOLE_PULL_CORE,
+  DEVOURER_SINKHOLE_PULL_EDGE,
+  DEVOURER_SINKHOLE_RADIUS,
+  DEVOURER_SINKHOLE_SPOOL_TICKS,
+  DEVOURER_SINKHOLE_TICKS,
 } from './constants.js';
 
 /**
@@ -86,5 +91,52 @@ export const mawPull = (d: number, tick: number, mawOpenedAt: number, onGlass: b
   const raw =
     DEVOURER_MAW_PULL_EDGE +
     (DEVOURER_MAW_PULL_CORE - DEVOURER_MAW_PULL_EDGE) * Math.pow(t, DEVOURER_MAW_PULL_FALLOFF);
+  return onGlass ? raw * DEVOURER_MAW_GLASS_GRIP : raw;
+};
+
+// ---------------------------------------------------------------------------
+// OS SUMIDOUROS — a Fome (BOSS_PHASE_HUNGER)
+// ---------------------------------------------------------------------------
+// A mesma economia da boca, em escala menor: a simulacao guarda ONDE e QUANDO
+// cada cratera ficou aberta (`bossRuntime.sinkholes`) e as duas pontas
+// integram o mesmo campo a partir disso. Nenhum raio, nenhuma forca viaja.
+
+/**
+ * Ate onde o sumidouro chega no tick `tick`, tendo aberto em `at`.
+ *
+ * Um trapezio no tempo: sobe em DEVOURER_SINKHOLE_SPOOL_TICKS, fica no raio
+ * cheio, e desce na mesma rampa nos ultimos ticks antes de morrer. Zero antes
+ * de abrir e zero depois de morrer — quem consulta um sumidouro morto recebe
+ * "nao ha sumidouro", que e a leitura certa para um que a lista ja deveria
+ * ter apagado.
+ */
+export const sinkholeReach = (tick: number, at: number): number => {
+  const elapsed = tick - at;
+  if (elapsed <= 0 || elapsed >= DEVOURER_SINKHOLE_TICKS) return 0;
+  const remaining = DEVOURER_SINKHOLE_TICKS - elapsed;
+  const ramp = Math.min(elapsed, remaining, DEVOURER_SINKHOLE_SPOOL_TICKS);
+  return DEVOURER_SINKHOLE_RADIUS * (ramp / DEVOURER_SINKHOLE_SPOOL_TICKS);
+};
+
+/**
+ * A sucao de um sumidouro a uma distancia `d` do centro, em tiles por
+ * segundo, JA descontado o alcance do instante.
+ *
+ * A MESMA curva da boca (borda, centro, expoente e vidro), com outros
+ * numeros de borda e centro: o sumidouro e a boca em tamanho menor, e um
+ * jogador que aprendeu a forma de uma ja sabe a forma da outra. `t` mede
+ * contra o raio CHEIO pelo mesmo motivo de `mawPull` — o campo tem uma forma
+ * so, e o que a rampa muda e ate onde ele chegou.
+ *
+ * Nao ha garganta: o centro e o maximo, e o maximo e menor que a caminhada.
+ */
+export const sinkholePull = (d: number, tick: number, at: number, onGlass: boolean): number => {
+  const reach = sinkholeReach(tick, at);
+  if (reach <= 0 || d > reach) return 0;
+  const t = Math.max(0, Math.min(1, (DEVOURER_SINKHOLE_RADIUS - d) / DEVOURER_SINKHOLE_RADIUS));
+  const raw =
+    DEVOURER_SINKHOLE_PULL_EDGE +
+    (DEVOURER_SINKHOLE_PULL_CORE - DEVOURER_SINKHOLE_PULL_EDGE) *
+      Math.pow(t, DEVOURER_MAW_PULL_FALLOFF);
   return onGlass ? raw * DEVOURER_MAW_GLASS_GRIP : raw;
 };

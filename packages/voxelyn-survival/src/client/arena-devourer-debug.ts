@@ -19,7 +19,9 @@
 // pediu. Um cenario que forcasse `leapToX/leapToY` provaria apenas que a
 // atribuicao funciona.
 import {
+  BOSS_PHASE_HUNGER,
   DEVOURER_BURROWED,
+  DEVOURER_HUNGER_HP_FRACTION,
   DEVOURER_LEAPS_PER_CYCLE,
   DEVOURER_MAW,
   DEVOURER_MAW_TICKS,
@@ -46,6 +48,10 @@ export type DevourerScenario =
   // Estados que valem olhar de perto com o atlas novo.
   | 'maw'
   | 'burrow'
+  // A FOME: a vida cai abaixo da metade e a simulacao vira a fase sozinha
+  // no tick seguinte — o cenario nao escreve o bit, pelo mesmo principio dos
+  // saltos: o que se quer ver e a virada acontecendo pelo caminho de verdade.
+  | 'hunger'
   | 'reset';
 
 export const DEVOURER_SCENARIOS: readonly DevourerScenario[] = [
@@ -59,6 +65,7 @@ export const DEVOURER_SCENARIOS: readonly DevourerScenario[] = [
   'hopU',
   'maw',
   'burrow',
+  'hunger',
   'reset',
 ];
 
@@ -204,8 +211,24 @@ export const applyDevourerScenario = (
       boss.nextActionAt = state.tick + 600;
       break;
     }
+    case 'hunger': {
+      // Abaixo da metade, e de volta ao comeco do ciclo: a rajada seguinte
+      // e a primeira com crateras que ficam abertas, e a boca no fim dela e a
+      // primeira que anda.
+      boss.hp = Math.floor(boss.maxHp * (DEVOURER_HUNGER_HP_FRACTION - 0.05));
+      boss.mood = DEVOURER_BURROWED;
+      boss.action = undefined;
+      state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
+      state.bossRuntime.mawOpenedAt = -1;
+      boss.nextActionAt = state.tick + 20;
+      restoreSand(state, Math.floor(boss.x), Math.floor(boss.y));
+      break;
+    }
     case 'reset': {
       boss.hp = boss.maxHp;
+      // A Fome nao volta atras em jogo; no painel, reiniciar e reiniciar.
+      state.bossRuntime.phasesFired &= ~BOSS_PHASE_HUNGER;
+      state.bossRuntime.sinkholes.length = 0;
       boss.mood = DEVOURER_BURROWED;
       boss.action = undefined;
       state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;

@@ -405,6 +405,16 @@ export type WorldFlags = {
    */
   mawOpenedAt?: number;
   /**
+   * Os SUMIDOUROS da Fome do Devorador: onde cada cratera da rajada ficou
+   * aberta e o tick em que abriu. Alcance e forca sao derivados dos dois nas
+   * duas pontas (`sinkholeReach`/`sinkholePull` na simulacao), pela mesma
+   * economia de `mawOpenedAt`. Quase sempre vazio: so existem na segunda fase
+   * e morrem a cada ciclo. Quem reconecta com tres deles abertos seria puxado
+   * por um chao que, para ele, estaria parado. Ausente em servidores
+   * anteriores a Fome: lista vazia.
+   */
+  sinkholes?: Array<{ x: number; y: number; at: number }>;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

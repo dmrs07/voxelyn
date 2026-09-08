@@ -47,6 +47,7 @@ import {
   DEVOURER_MAW,
   DEVOURER_MAW_BITE_RADIUS,
   mawReach,
+  sinkholeReach,
   CANARY_DEAD_AT,
   CONTAMINATION_WAVES,
   TICK_HZ,
@@ -120,7 +121,14 @@ import {
   type EntityAnimState,
   PropBank,
 } from './sprites';
-import { MAW_CLOUDS, MAW_NO_RETURN_RADIUS, MAW_STREAKS, mawCloud, mawStreak } from './maw-vortex';
+import {
+  MAW_CLOUDS,
+  MAW_NO_RETURN_RADIUS,
+  MAW_STREAKS,
+  mawCloud,
+  mawCloudShape,
+  mawStreak,
+} from './maw-vortex';
 import { PAL } from './palette';
 import { BossHealthBarPresentation, drawBossHealthBar, usesMonumentalBar } from './boss-health-bar';
 import { bossHealthBarLayout } from './boss-health-bar-layout';
@@ -581,7 +589,16 @@ const drawBiomeVeil = (
  * um `fill` por nuvem sem mudar a leitura, e as nuvens ja escalam com o preset
  * de qualidade junto com os riscos.
  */
-const CLOUD_LOBES = [1, 0.68, 0.36] as const;
+/**
+ * As duas camadas de uma nuvem de areia: o contorno inteiro, ralo, e um miolo
+ * menor e mais cheio. Substituem os tres lobos elipticos de antes — a forma
+ * agora vem do ruido (`mawCloudShape`), e duas copias dela bastam para a
+ * opacidade crescer para o centro sem um gradiente por quadro.
+ */
+const CLOUD_LAYERS = [
+  { scale: 1, alpha: 1 },
+  { scale: 0.58, alpha: 1.35 },
+] as const;
 
 /**
  * O TREMOR das duas travessias do Devorador: a areia se abrindo e a areia se
@@ -3668,171 +3685,31 @@ export class SurvivalRenderer {
         (e) => e.alive && e.archetype === 'white_devourer' && e.mood === DEVOURER_MAW,
       );
       const reach = maw ? mawReach(state.tick, openedAt) : 0;
+      const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
+      const seconds = nowMs / 1000;
       if (maw && reach > 0.05) {
-        const [mx, my] = toScreen(maw.x, maw.y);
-        // O FATOR DA PROJECAO, e ele nao e cosmetico.
-        //
-        // Um circulo de raio R no mundo vira, nesta isometrica, uma elipse de
-        // semi-eixos `R * TILE_W/2 * raiz(2)` e `R * TILE_H/2 * raiz(2)`: o
-        // extremo horizontal esta em (R/raiz2, -R/raiz2), onde `x - y` vale
-        // `R * raiz(2)` e nao R. Sem a raiz, o anel sai a 71% do raio que ele
-        // anuncia — e ai a areia aparece girando FORA dele, que foi exatamente
-        // como o defeito se manifestou.
-        //
-        // Um anel que promete um raio diferente do raio que agarra e pior que
-        // anel nenhum, porque o jogador confia nele para decidir onde ficar.
-        // A fracao com que TODO efeito deste cliente segue o preset de qualidade.
-        // As duas camadas do vortice — a poeira e os riscos — a usam.
-        const fxScale = this.quality.maxFx / PRESETS.high.maxFx;
-        const ISO = Math.SQRT2;
-        const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
-        const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
-        const seconds = nowMs / 1000;
-        ctx.save();
-
-        // 1. A GARGANTA: a unica coisa preenchida do desenho, e escura. Ela nao
-        //    pulsa nem gira — e o lugar para onde tudo o mais aponta, e um
-        //    centro que se mexe deixaria de ser um centro.
-        //
-        //    So aparece quando ela EXISTE, pela mesma condicao que a simulacao
-        //    usa para cobrar (`reach >= BITE_RADIUS`). Desenhar a garganta antes
-        //    disso mostraria uma sentenca no chao durante o unico segundo da
-        //    janela em que pisar ali e inofensivo — e o jogador esta em cima
-        //    dela nesse segundo, porque a queda do arco foi mirada nele.
-        if (reach >= DEVOURER_MAW_BITE_RADIUS) {
-          ctx.fillStyle = 'rgba(14,10,8,0.62)';
-          ctx.beginPath();
-          ctx.ellipse(
-            mx,
-            my,
-            ringX(DEVOURER_MAW_BITE_RADIUS),
-            ringY(DEVOURER_MAW_BITE_RADIUS),
-            0,
-            0,
-            Math.PI * 2,
-          );
-          ctx.fill();
-        }
-
-        // 2. A BORDA: ate onde a sucao chega NESTE tick. Cresce com a janela,
-        //    entao o anel avancando pelo chao e o cronometro dela.
-        ctx.strokeStyle = 'rgba(201,180,140,0.42)';
-        ctx.lineWidth = Math.max(1, z * 0.7);
-        ctx.beginPath();
-        ctx.ellipse(mx, my, ringX(reach), ringY(reach), 0, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. A LINHA DO SEM-VOLTA, so depois que a boca cresceu ate ela. E a
-        //    unica informacao do encontro que o jogador nao teria como medir:
-        //    dali para dentro andar para tras deixa de bastar, e a resposta
-        //    passa a ser esquiva, vidro ou uma quina. Vermelha e mais forte que
-        //    a borda porque as duas dizem coisas de gravidade diferente.
-        if (reach > MAW_NO_RETURN_RADIUS) {
-          ctx.strokeStyle = 'rgba(217,59,76,0.5)';
-          ctx.lineWidth = Math.max(1, z * 0.55);
-          ctx.beginPath();
-          ctx.ellipse(
-            mx,
-            my,
-            ringX(MAW_NO_RETURN_RADIUS),
-            ringY(MAW_NO_RETURN_RADIUS),
-            0,
-            0,
-            Math.PI * 2,
-          );
-          ctx.stroke();
-        }
-
-        // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a
-        //    cortina que a boca levanta, com os graos passando por cima. Ela
-        //    anda pelo MESMO caminho e mais devagar, e e o que da volume ao
-        //    disco — sem ela o efeito e um punhado de riscos sobre chao limpo.
-        {
-          const clouds = Math.max(4, Math.round(MAW_CLOUDS * fxScale));
-          ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
-          for (let i = 0; i < clouds; i++) {
-            const puff = mawCloud(i, seconds, reach);
-            if (puff.alpha <= 0.01) continue;
-            const [cxp, cyGround] = toScreen(maw.x + puff.dx, maw.y + puff.dy);
-            // A ALTURA do rolo vira deslocamento de tela aqui, e nao em
-            // `maw-vortex.ts`: aquele arquivo e geometria de mundo e nao
-            // conhece o zoom. `LEAP_PEAK_PX` e a mesma escala com que o arco do
-            // chefe converte altura nesta lamina — um tile de altura, um tile
-            // de subida na tela —, e usar duas escalas de altura no mesmo
-            // encontro faria a poeira e o corpo dele discordarem do que e alto.
-            const cyp = cyGround - puff.liftTiles * LEAP_PEAK_PX * z;
-            // TRES LOBOS CONCENTRICOS por nuvem, e nao uma elipse.
-            //
-            // Uma elipse unica tem CONTORNO, e contorno e a unica coisa que
-            // poeira nao tem: na primeira captura cada nuvem lia como uma
-            // sombra chapada no chao. Empilhando tres discos que encolhem com o
-            // mesmo alfa baixo, a opacidade cresce para o centro e a borda
-            // desaparece — o mesmo que um gradiente radial daria, sem alocar um
-            // por nuvem a cada quadro.
-            for (const lobe of CLOUD_LOBES) {
-              ctx.globalAlpha = puff.alpha * 0.075;
-              ctx.beginPath();
-              ctx.ellipse(
-                cxp,
-                cyp,
-                ringX(puff.radius * lobe),
-                ringY(puff.radius * lobe),
-                0,
-                0,
-                Math.PI * 2,
-              );
-              ctx.fill();
-            }
-          }
-        }
-
-        // 5. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
-        //    celula e o chao limpo chega pelo diff de chunks; o que falta, e o
-        //    que estes riscos entregam, e o CAMINHO — a materia indo para
-        //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
-        ctx.strokeStyle = SURFACE_FALLBACK[SURF_SILT];
-        ctx.lineWidth = Math.max(1, z * 0.5);
-        // A CONTAGEM SEGUE O PRESET, pela mesma fracao que o resto dos efeitos
-        // deste cliente usa (`maxFx / PRESETS.high.maxFx`): 145 no alto, 72 no
-        // medio, 29 no baixo.
-        //
-        // Sem isto o vortice era o unico efeito da tela que o governador de
-        // qualidade nao conseguia aliviar — e ele nasceu justamente do quadro
-        // mais caro do encontro, com o chefe, a fauna arrastada e o disco de
-        // terreno mudando ao mesmo tempo. Um efeito que ignora o preset nao e
-        // caro: e imune a solucao.
-        //
-        // `count` vai junto porque e ele que espalha as fases dos graos ao longo
-        // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
-        // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
-        // nao um fluxo.
-        const streaks = Math.max(12, Math.round(MAW_STREAKS * fxScale));
-        for (let i = 0; i < streaks; i++) {
-          const grain = mawStreak(i, seconds, reach, streaks);
-          if (grain.alpha <= 0.01) continue;
-          // Segmento a segmento, com a CABECA mais forte que a cauda.
-          //
-          // Uma polilinha de alfa unico e uma linha, e uma linha nao tem ponta:
-          // ela diz onde a areia esta e nao para onde ela vai. Com o rastro
-          // apagando para tras, cada grao vira uma seta — e o conjunto delas e o
-          // que anuncia o centro sem desenhar nada apontando para ele.
-          //
-          // A polilinha continua existindo pelo motivo de sempre: o caminho e
-          // uma espiral, e ligar as duas pontas em reta corta a curva pela
-          // corda.
-          for (let k = 1; k < grain.path.length; k++) {
-            const a = grain.path[k - 1];
-            const b = grain.path[k];
-            const [ax, ay] = toScreen(maw.x + a.dx, maw.y + a.dy);
-            const [bx, by] = toScreen(maw.x + b.dx, maw.y + b.dy);
-            ctx.globalAlpha = grain.alpha * (0.16 + 0.74 * (k / (grain.path.length - 1)));
-            ctx.beginPath();
-            ctx.moveTo(ax, ay);
-            ctx.lineTo(bx, by);
-            ctx.stroke();
-          }
-        }
-        ctx.restore();
+        this.drawSandVortex(ctx, toScreen, z, maw.x, maw.y, reach, seconds, fxScale, 'maw');
+      }
+      // OS SUMIDOUROS da Fome: as crateras da rajada que ficaram abertas.
+      // O MESMO desenho da boca em escala menor, sem garganta e sem a linha do
+      // sem-volta — porque a sucao deles nunca vence a caminhada, e uma linha
+      // que promete "dali para dentro andar nao basta" seria mentira aqui. O
+      // alcance sai de `sinkholeReach`, a mesma conta que a simulacao usa para
+      // puxar: o anel nao pode prometer um raio diferente do raio que agarra.
+      for (const hole of state.bossRuntime.sinkholes) {
+        const holeReach = sinkholeReach(state.tick, hole.at);
+        if (holeReach <= 0.05) continue;
+        this.drawSandVortex(
+          ctx,
+          toScreen,
+          z,
+          hole.x,
+          hole.y,
+          holeReach,
+          seconds,
+          fxScale,
+          'sinkhole',
+        );
       }
     }
 
@@ -7021,6 +6898,206 @@ export class SurvivalRenderer {
    * linha 37 px baixa demais, e o verme aparecia inteiro, de pe, desenhado por
    * cima do chao a frente dele. Ver `DEVOURER_BELOW_ANCHOR_PX`.
    */
+  /**
+   * UM VORTICE DE AREIA no chao: a boca do Devorador, ou um sumidouro da Fome.
+   *
+   * Um desenho so para os dois, e de proposito: o sumidouro E a boca em
+   * tamanho menor (a mesma curva de sucao, ver `sinkholePull`), e um jogador
+   * que aprendeu a ler uma tem de reconhecer a outra de relance. O que os
+   * separa e o que o sumidouro NAO tem — garganta e linha do sem-volta — e a
+   * densidade, porque tres deles vivos ao mesmo tempo com a densidade da boca
+   * encheriam a camara de poeira.
+   *
+   * Nada aqui e transmitido. O centro e o alcance vem de quem chama, e os
+   * dois saem do estado autoritativo pelas MESMAS funcoes que a simulacao usa
+   * para puxar.
+   */
+  private drawSandVortex(
+    ctx: CanvasRenderingContext2D,
+    toScreen: (x: number, y: number) => [number, number],
+    z: number,
+    cx: number,
+    cy: number,
+    reach: number,
+    seconds: number,
+    fxScale: number,
+    kind: 'maw' | 'sinkhole',
+  ): void {
+    const [mx, my] = toScreen(cx, cy);
+    // O FATOR DA PROJECAO, e ele nao e cosmetico.
+    //
+    // Um circulo de raio R no mundo vira, nesta isometrica, uma elipse de
+    // semi-eixos `R * TILE_W/2 * raiz(2)` e `R * TILE_H/2 * raiz(2)`: o
+    // extremo horizontal esta em (R/raiz2, -R/raiz2), onde `x - y` vale
+    // `R * raiz(2)` e nao R. Sem a raiz, o anel sai a 71% do raio que ele
+    // anuncia — e ai a areia aparece girando FORA dele, que foi exatamente
+    // como o defeito se manifestou.
+    //
+    // Um anel que promete um raio diferente do raio que agarra e pior que
+    // anel nenhum, porque o jogador confia nele para decidir onde ficar.
+    const ISO = Math.SQRT2;
+    const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
+    const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
+    const isMaw = kind === 'maw';
+    // O sumidouro e mais ralo em tudo: e uma inclinacao no chao, nao a boca.
+    const thin = isMaw ? 1 : 0.45;
+    ctx.save();
+
+    // 1. A GARGANTA: a unica coisa preenchida do desenho, e escura. Ela nao
+    //    pulsa nem gira — e o lugar para onde tudo o mais aponta, e um
+    //    centro que se mexe deixaria de ser um centro.
+    //
+    //    So aparece quando ela EXISTE, pela mesma condicao que a simulacao
+    //    usa para cobrar (`reach >= BITE_RADIUS`). Desenhar a garganta antes
+    //    disso mostraria uma sentenca no chao durante o unico segundo da
+    //    janela em que pisar ali e inofensivo — e o jogador esta em cima
+    //    dela nesse segundo, porque a queda do arco foi mirada nele.
+    //
+    //    O sumidouro nao tem garganta, e por isso nao a desenha: um centro
+    //    escuro numa sucao que nao mata prometeria uma sentenca que nao vem.
+    if (isMaw && reach >= DEVOURER_MAW_BITE_RADIUS) {
+      ctx.fillStyle = 'rgba(14,10,8,0.62)';
+      ctx.beginPath();
+      ctx.ellipse(
+        mx,
+        my,
+        ringX(DEVOURER_MAW_BITE_RADIUS),
+        ringY(DEVOURER_MAW_BITE_RADIUS),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+
+    // 2. A BORDA: ate onde a sucao chega NESTE tick. Cresce com a janela,
+    //    entao o anel avancando pelo chao e o cronometro dela.
+    ctx.strokeStyle = isMaw ? 'rgba(201,180,140,0.42)' : 'rgba(201,180,140,0.26)';
+    ctx.lineWidth = Math.max(1, z * (isMaw ? 0.7 : 0.5));
+    ctx.beginPath();
+    ctx.ellipse(mx, my, ringX(reach), ringY(reach), 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3. A LINHA DO SEM-VOLTA, so depois que a boca cresceu ate ela. E a
+    //    unica informacao do encontro que o jogador nao teria como medir:
+    //    dali para dentro andar para tras deixa de bastar, e a resposta
+    //    passa a ser esquiva, vidro ou uma quina. Vermelha e mais forte que
+    //    a borda porque as duas dizem coisas de gravidade diferente.
+    //
+    //    So a boca tem uma: no sumidouro a caminhada vence em todo raio.
+    if (isMaw && reach > MAW_NO_RETURN_RADIUS) {
+      ctx.strokeStyle = 'rgba(217,59,76,0.5)';
+      ctx.lineWidth = Math.max(1, z * 0.55);
+      ctx.beginPath();
+      ctx.ellipse(
+        mx,
+        my,
+        ringX(MAW_NO_RETURN_RADIUS),
+        ringY(MAW_NO_RETURN_RADIUS),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+    }
+
+    // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a
+    //    cortina que a boca levanta, com os graos passando por cima. Ela
+    //    anda pelo MESMO caminho e mais devagar, e e o que da volume ao
+    //    disco — sem ela o efeito e um punhado de riscos sobre chao limpo.
+    {
+      const clouds = Math.max(isMaw ? 4 : 2, Math.round(MAW_CLOUDS * fxScale * thin));
+      ctx.fillStyle = SURFACE_FALLBACK[SURF_SILT];
+      for (let i = 0; i < clouds; i++) {
+        const puff = mawCloud(i, seconds, reach);
+        if (puff.alpha <= 0.01) continue;
+        // A ALTURA do rolo vira deslocamento de tela aqui, e nao em
+        // `maw-vortex.ts`: aquele arquivo e geometria de mundo e nao
+        // conhece o zoom. `LEAP_PEAK_PX` e a mesma escala com que o arco do
+        // chefe converte altura nesta lamina — um tile de altura, um tile
+        // de subida na tela —, e usar duas escalas de altura no mesmo
+        // encontro faria a poeira e o corpo dele discordarem do que e alto.
+        const lift = puff.liftTiles * LEAP_PEAK_PX * z;
+        // A FORMA sai do ruido de Perlin (`mawCloudShape`), e nao de uma
+        // elipse. Tres discos concentricos davam um borrao redondo, e areia
+        // em suspensao nunca e redonda: ela rasga, tem franja, e ESTICA no
+        // sentido em que esta sendo puxada — que e a unica coisa que uma
+        // mancha no chao pode dizer sobre a mecanica. O contorno e projetado
+        // ponto a ponto pelo mesmo `toScreen` do resto da cena, para a nuvem
+        // achatar na isometrica como o chao achata.
+        //
+        // DUAS CAMADAS do mesmo contorno, a de dentro menor e um pouco mais
+        // cheia, com alfas baixos: e o que tira o contorno da nuvem sem um
+        // gradiente radial por quadro. Poeira nao tem borda; ela tem miolo.
+        const shape = mawCloudShape(i, seconds, puff);
+        const base = puff.alpha * shape.density * (isMaw ? 0.1 : 0.075);
+        for (const layer of CLOUD_LAYERS) {
+          ctx.globalAlpha = base * layer.alpha;
+          ctx.beginPath();
+          for (let k = 0; k < shape.points.length; k++) {
+            const pt = shape.points[k];
+            const [px, py] = toScreen(
+              cx + puff.dx + pt.dx * layer.scale,
+              cy + puff.dy + pt.dy * layer.scale,
+            );
+            if (k === 0) ctx.moveTo(px, py - lift);
+            else ctx.lineTo(px, py - lift);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // 5. A AREIA CAINDO PARA DENTRO. A simulacao come a silica celula a
+    //    celula e o chao limpo chega pelo diff de chunks; o que falta, e o
+    //    que estes riscos entregam, e o CAMINHO — a materia indo para
+    //    dentro, dizendo de que lado esta o centro e o quanto ele puxa ali.
+    ctx.strokeStyle = SURFACE_FALLBACK[SURF_SILT];
+    ctx.lineWidth = Math.max(1, z * 0.5);
+    // A CONTAGEM SEGUE O PRESET, pela mesma fracao que o resto dos efeitos
+    // deste cliente usa (`maxFx / PRESETS.high.maxFx`): 145 no alto, 72 no
+    // medio, 29 no baixo.
+    //
+    // Sem isto o vortice era o unico efeito da tela que o governador de
+    // qualidade nao conseguia aliviar — e ele nasceu justamente do quadro
+    // mais caro do encontro, com o chefe, a fauna arrastada e o disco de
+    // terreno mudando ao mesmo tempo. Um efeito que ignora o preset nao e
+    // caro: e imune a solucao.
+    //
+    // `count` vai junto porque e ele que espalha as fases dos graos ao longo
+    // do caminho. Desenhar 29 indices de um total de 145 sem baixar o total
+    // poria os 29 sobreviventes no mesmo trecho da espiral — um pelotao, e
+    // nao um fluxo.
+    const streaks = Math.max(isMaw ? 12 : 6, Math.round(MAW_STREAKS * fxScale * thin));
+    for (let i = 0; i < streaks; i++) {
+      const grain = mawStreak(i, seconds, reach, streaks);
+      if (grain.alpha <= 0.01) continue;
+      // Segmento a segmento, com a CABECA mais forte que a cauda.
+      //
+      // Uma polilinha de alfa unico e uma linha, e uma linha nao tem ponta:
+      // ela diz onde a areia esta e nao para onde ela vai. Com o rastro
+      // apagando para tras, cada grao vira uma seta — e o conjunto delas e o
+      // que anuncia o centro sem desenhar nada apontando para ele.
+      //
+      // A polilinha continua existindo pelo motivo de sempre: o caminho e
+      // uma espiral, e ligar as duas pontas em reta corta a curva pela
+      // corda.
+      for (let k = 1; k < grain.path.length; k++) {
+        const a = grain.path[k - 1];
+        const b = grain.path[k];
+        const [ax, ay] = toScreen(cx + a.dx, cy + a.dy);
+        const [bx, by] = toScreen(cx + b.dx, cy + b.dy);
+        ctx.globalAlpha = grain.alpha * (0.16 + 0.74 * (k / (grain.path.length - 1)));
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   private devourerSandLine(sy: number, spriteZoom: number): number {
     return sy + DEVOURER_BELOW_ANCHOR_PX * spriteZoom;
   }

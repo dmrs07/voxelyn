@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOSS_ARCHETYPES,
+  BOSS_PHASE_HUNGER,
   BOSS_PHASE_OVERHEAT,
   BOSS_PHASE_REACTOR,
   BOSS_PHASE_UNSTABLE,
@@ -451,6 +452,25 @@ describe('Devorador e Guardiao: presenca', () => {
     );
     expect(open[0].voice).toBe('devourerMawOpen');
     expect(close[0].voice).toBe('devourerMawClose');
+  });
+
+  it('a Fome tem um sting proprio, e e o unico som de fase do Devorador', () => {
+    const hunger = cuesForEvent(
+      { t: 'boss_phase', archetype: 'white_devourer', phase: BOSS_PHASE_HUNGER, x: 3, y: 4 },
+      ctx,
+    );
+    expect(hunger).toHaveLength(1);
+    expect(hunger[0].voice).toBe('devourerHunger');
+    expect(hunger[0].x).toBe(3);
+    expect(VOICE_SPECS.devourerHunger.priority).toBeGreaterThanOrEqual(10);
+    expect(VOICE_RENDERERS.devourerHunger).toBeTypeOf('function');
+    // Um bit que nao e dele nao soa: a tabela nao inventa fase.
+    expect(
+      cuesForEvent(
+        { t: 'boss_phase', archetype: 'white_devourer', phase: 1 << 1, x: 0, y: 0 },
+        ctx,
+      ),
+    ).toHaveLength(0);
   });
 
   it('o Guardiao desloca massa: passo, lasca e rangido sao textura; o golpe nao', () => {

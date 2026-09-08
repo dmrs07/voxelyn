@@ -2115,6 +2115,49 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
       q: 2,
     });
   },
+  // A FOME. O estrato cedendo de uma vez: um subgrave que DESCE e nao volta
+  // (o chao afundando), placas de silica estalando por cima em cadencia
+  // irregular, e no fim uma inspiracao longa e cavernosa — a mesma familia
+  // da boca abrindo (bandpass caindo), mais funda e mais lenta, porque o que
+  // esta abrindo agora nao e uma boca, e o setor.
+  devourerHunger: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'sine',
+      from: 70,
+      to: 24,
+      peak: 0.7,
+      decay: 1.6,
+      attack: 0.03,
+    });
+    for (const [i, gap] of [0.08, 0.21, 0.29, 0.47, 0.62].entries()) {
+      burst(ctx, out, t0 + gap, noise, {
+        peak: 0.42 - i * 0.04,
+        decay: 0.07 + (i % 2) * 0.03,
+        type: 'bandpass',
+        from: 1900 - i * 180,
+        to: 700,
+        q: 4,
+        attack: 0.004,
+      });
+    }
+    burst(ctx, out, t0 + 0.55, noise, {
+      peak: 0.45,
+      decay: 1.1,
+      type: 'bandpass',
+      from: 520,
+      to: 160,
+      q: 3,
+      attack: 0.35,
+    });
+    tone(ctx, out, t0 + 0.6, {
+      type: 'sawtooth',
+      from: 60,
+      to: 32,
+      peak: 0.2,
+      decay: 1.0,
+      attack: 0.3,
+    });
+  },
   // Presa e vulneravel: respiracao irregular e seca — a criatura fora do
   // elemento dela. Entra DEPOIS da boca abrir, para nao disputar com ela.
   devourerVulnerable: (ctx, out, t0, noise) => {

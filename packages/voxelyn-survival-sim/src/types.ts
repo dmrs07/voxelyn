@@ -674,6 +674,12 @@ export type SectorBossState = {
  */
 /** Uma bolha protetora: centro e RAIO SEGURO (ver constants.ts). */
 export type ProtectiveBubble = { x: number; y: number; radius: number };
+/**
+ * Um SUMIDOURO da Fome do Devorador: onde a cratera ficou aberta e o tick em
+ * que abriu. Alcance e forca sao derivados dos dois (ver `sinkholeReach` e
+ * `sinkholePull` em maw.ts), pela mesma economia da boca.
+ */
+export type Sinkhole = { x: number; y: number; at: number };
 
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
@@ -802,6 +808,17 @@ export type BossRuntime = {
    * Dano sem sinal e o unico invariante de combate que este projeto nao quebra.
    */
   mawOpenedAt: number;
+  /**
+   * Os SUMIDOUROS da Fome: as crateras da rajada que ficaram abertas, puxando.
+   * Vazio fora da segunda fase e vazio de novo a cada ciclo — cada um morre
+   * DEVOURER_SINKHOLE_TICKS depois de nascer.
+   *
+   * Entram no hash: cada um decide, tick a tick, a posicao de todo corpo no
+   * seu disco e quanta areia ja comeu. Viajam em `WorldFlags` pela mesma razao
+   * que `mawOpenedAt`: quem reconecta com tres deles abertos seria puxado por
+   * um chao que, para ele, estaria parado.
+   */
+  sinkholes: Sinkhole[];
   /**
    * O DILUVIO: o tick em que a lamina comecou a subir, e de onde.
    *
@@ -1085,6 +1102,14 @@ export const BOSS_PHASE_DELUGE = 1 << 4;
  * — ou seja, por um recurso finito que o jogador tambem pode gastar antes.
  */
 export const BOSS_PHASE_CHOIR = 1 << 5;
+/**
+ * A FOME do Devorador Branco, na metade da vida. Uma vez, sem volta.
+ *
+ * As duas coisas que ela muda vivem em `bossRuntime.sinkholes` (as crateras
+ * da rajada passam a ficar abertas, puxando) e no passo da boca (o vortice
+ * anda depois de abrir). Ver DEVOURER_HUNGER_HP_FRACTION.
+ */
+export const BOSS_PHASE_HUNGER = 1 << 6;
 
 /**
  * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
@@ -2160,6 +2185,8 @@ export type SimMessageKey =
   /** O constructo perdeu a forma: a sala inteira virou fogo. */
   | 'sim.furnaceUnstable'
   | 'sim.delugeRising'
+  /** A Fome do Devorador: as crateras ficam abertas e a boca passa a andar. */
+  | 'sim.devourerHunger'
   /** O Coracao caiu e o calor foi embora com ele. */
   | 'sim.furnaceCooled'
   /** O poco nao abre: o dono do setor ainda esta de pe. */

@@ -194,6 +194,8 @@ export type VoiceId =
   | 'devourerMawClose'
   | 'devourerVulnerable'
   | 'devourerBroodSwallowed'
+  // A FOME: a virada na metade da vida — o estrato inteiro cedendo de uma vez.
+  | 'devourerHunger'
   // Arquicantor: cristal AFINADO, acordes e ressonancia. Um motivo de tres
   // notas: o idle e uma; a preparacao, duas; o ataque completa a frase — e o
   // ataque perigoso termina num tritono, sem resolucao.
@@ -559,6 +561,9 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   devourerMawClose: { priority: 8, gain: 0.6, minIntervalMs: 0, spatial: true },
   devourerVulnerable: { priority: 9, gain: 0.45, minIntervalMs: 0, spatial: true },
   devourerBroodSwallowed: { priority: 2, gain: 0.22, minIntervalMs: 90, spatial: true },
+  // Uma vez por encontro, e a coisa mais importante que soa nele depois do
+  // despertar: prioridade de sting de fase, como o reator do Diamandis.
+  devourerHunger: { priority: 10, gain: 0.8, minIntervalMs: 0, spatial: true },
 
   // Arquicantor. A nota isolada e a ressonancia dos cristais sao vocalizacao
   // (5); a frase de preparacao e telegrafo (10); o acorde e o tritono sao
