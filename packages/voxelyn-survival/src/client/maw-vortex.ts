@@ -650,11 +650,11 @@ export const sinkholeCrestShape = (
 // mesmos riscos, sem nunca se rasgar numa costura.
 
 /** Quantas celulas cabem no RAIO do veu, na qualidade alta. Escalado pelo preset. */
-export const MAW_VEIL_CELLS = 26;
+export const MAW_VEIL_CELLS = 20;
 /**
  * A textura e mais grossa que os graos e mais fina que as nuvens: cerca de
- * tres nodulos por raio. Menos e um blob; mais e granulado que compete com os
- * riscos.
+ * cinco nodulos por raio. Menos e um blob; mais e granulado que compete com
+ * os riscos.
  */
 const VEIL_SCALE_RADIAL = 5.5;
 const VEIL_SCALE_ANGULAR = 4.2;
@@ -668,41 +668,97 @@ const VEIL_THRESHOLD = 0.38;
  * uma mancha mais ou menos densa.
  */
 const VEIL_GRAIN_SCALE = 3.1;
+/**
+ * O PERIODO do veu, em travessias do disco. O campo se repete depois de
+ * quatro travessias (cerca de 8,6 s) — e o que permite guarda-lo numa tabela
+ * finita. Ninguem le uma repeticao de areia a oito segundos de distancia.
+ */
+const VEIL_PERIOD = 4;
+/** A resolucao da tabela: amostras no angulo e no progresso (por periodo inteiro). */
+const VEIL_TABLE_A = 96;
+const VEIL_TABLE_M = 192;
 
 /**
- * O RUIDO do veu em (dx, dy), em [0, 1], JA em coordenadas de espiral.
+ * A TABELA DO VEU: o ruido do corpo e o do grao, pre-calculados sobre as
+ * coordenadas materiais da espiral — angulo desenrolado por progresso — e
+ * lidos por interpolacao bilinear a cada quadro.
  *
- * `m` e o progresso da garganta ate a borda pela lei do raio (`r^Q` linear no
- * tempo, a mesma dos graos) deslocado pelo relogio: o campo escorre para
- * dentro na velocidade da poeira (MAW_FALL_SECONDS * MAW_CLOUD_DRAG por
- * travessia). `a` e o angulo com a espiral desenrolada — o mesmo termo de
- * `mawSpiralAngle` — para os nodulos se alinharem aos riscos. O angulo entra
- * como um ponto num circulo do plano do ruido, e por isso nao ha costura em
- * volta nenhuma; `m` desliza esse circulo pelo plano.
+ * Por que uma tabela, e nao Perlin por celula: o veu tem ate ~1.600 celulas
+ * na boca e ~300 em cada sumidouro, e cada uma custava sete oitavas de Perlin
+ * por quadro. Isso era varios milissegundos de CPU antes de o canvas entrar,
+ * e o quadro da Fome ja e o mais caro do encontro. Como o campo e funcao SO
+ * de (angulo, progresso + tempo), ele cabe inteiro numa tabela: o tempo vira
+ * um deslocamento no eixo do progresso, e o quadro le em vez de calcular.
  *
- * Invariante que o teste guarda: um ponto levado pelo fluxo (o raio caindo
- * pela lei, o angulo girando pelo passo) le o MESMO valor um instante depois.
+ * As duas coordenadas entram como PONTOS EM CIRCULOS do plano do ruido (o
+ * angulo num circulo, o progresso em outro, com o raio escolhido para manter
+ * a mesma frequencia espacial de antes). E o que faz a tabela ser periodica
+ * nos dois eixos sem costura — sem isso, o wrap no fim do periodo seria uma
+ * linha de descontinuidade varrendo o disco a cada oito segundos.
+ *
+ * Construida uma vez, sob demanda (~18 mil amostras, dezenas de
+ * milissegundos): ver `mawVeilWarm`, que o cliente chama no primeiro quadro
+ * em que o Devorador aparece — antes de a boca abrir — para o custo cair num
+ * quadro tranquilo e nao no que abre a janela.
  */
-export const mawVeilNoise = (dx: number, dy: number, seconds: number, reach: number): number => {
-  const r = Math.hypot(dx, dy);
-  if (r <= 1e-6 || reach <= 1e-6) return 0;
-  const inner = mawInnerRadius(reach);
-  const outerQ = Math.pow(reach, SINK_Q);
-  const innerQ = Math.pow(inner, SINK_Q);
-  const span = Math.max(1e-6, outerQ - innerQ);
-  const progress = (Math.pow(r, SINK_Q) - innerQ) / span;
-  const m = progress + seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG);
-  const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
-  const x = Math.cos(a) * VEIL_SCALE_ANGULAR + m * VEIL_SCALE_RADIAL;
-  const y = Math.sin(a) * VEIL_SCALE_ANGULAR + m * 0.35;
-  // Cinco oitavas com ganho alto: as finas pesam o bastante para o corpo do
-  // veu ja ter grao, e nao so a forma.
-  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 5, 2, 0.62)));
+const veilTable = new Float32Array(VEIL_TABLE_A * VEIL_TABLE_M * 2);
+/** Quantas linhas (de progresso) da tabela ja foram calculadas. */
+let veilRowsBuilt = 0;
+
+/** Calcula UMA linha da tabela: todos os angulos para um progresso. */
+const buildVeilRow = (mi: number): void => {
+  // O raio do circulo do progresso: um periodo inteiro percorre 2*pi*R, que
+  // tem de valer o mesmo que a reta antiga percorria (S_r por travessia).
+  const rm = (VEIL_SCALE_RADIAL * VEIL_PERIOD) / (Math.PI * 2);
+  const phase = (mi / VEIL_TABLE_M) * Math.PI * 2;
+  const mx = Math.cos(phase) * rm;
+  const my = Math.sin(phase) * rm;
+  for (let ai = 0; ai < VEIL_TABLE_A; ai++) {
+    const a = (ai / VEIL_TABLE_A) * Math.PI * 2;
+    const x = Math.cos(a) * VEIL_SCALE_ANGULAR + mx;
+    const y = Math.sin(a) * VEIL_SCALE_ANGULAR + my;
+    const k = (mi * VEIL_TABLE_A + ai) * 2;
+    // Cinco oitavas com ganho alto no corpo: as finas pesam o bastante para
+    // o veu ja ter grao, e nao so a forma.
+    veilTable[k] = Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 5, 2, 0.62)));
+    veilTable[k + 1] = Math.max(
+      0,
+      Math.min(1, 0.5 + 0.5 * fbm2(x * VEIL_GRAIN_SCALE, y * VEIL_GRAIN_SCALE, 9191, 2, 2, 0.7))
+    );
+  }
+};
+
+/** Quantas linhas um `mawVeilWarm` constroi por chamada: ~2 ms de Perlin, longe do orcamento do quadro. */
+export const MAW_VEIL_WARM_ROWS = 8;
+
+/**
+ * Avanca a construcao da tabela em ate `rows` linhas. Idempotente e gratis
+ * depois de pronta.
+ *
+ * Em FATIAS porque a tabela inteira custa dezenas de milissegundos — tres
+ * quadros —, e um engasgo desses no primeiro quadro do chefe seria lido como
+ * o jogo travando na hora em que ele aparece. Oito linhas por quadro fecham
+ * a tabela em 24 quadros (0,4 s), e a primeira boca so abre depois de tres
+ * arcos, dez segundos depois. Se alguem ler antes de ela fechar (um cenario
+ * de arena que abre a boca no primeiro quadro), a leitura termina o resto
+ * sozinha — ver `veilRead`.
+ *
+ * Devolve se a tabela esta completa.
+ */
+export const mawVeilWarm = (rows = MAW_VEIL_WARM_ROWS): boolean => {
+  const until = Math.min(VEIL_TABLE_M, veilRowsBuilt + rows);
+  while (veilRowsBuilt < until) buildVeilRow(veilRowsBuilt++);
+  return veilRowsBuilt >= VEIL_TABLE_M;
 };
 
 /**
- * As MESMAS coordenadas materiais do veu, para o grao viajar junto com ele.
- * Extraido para as duas amostras nao poderem discordar da espiral.
+ * As coordenadas MATERIAIS de um ponto do disco: o angulo desenrolado pela
+ * espiral (em voltas, [0, 1)) e o progresso pela lei do sumidouro deslocado
+ * pelo relogio (em periodos, [0, 1)).
+ *
+ * Um ponto que viaja pelo caminho dos graos tem as duas constantes — e o
+ * invariante que faz a textura escorrer em vez de ficar parada com o disco
+ * passando por cima.
  */
 const veilCoords = (dx: number, dy: number, seconds: number, reach: number): [number, number] => {
   const r = Math.hypot(dx, dy);
@@ -713,37 +769,95 @@ const veilCoords = (dx: number, dy: number, seconds: number, reach: number): [nu
   const progress = (Math.pow(r, SINK_Q) - innerQ) / span;
   const m = progress + seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG);
   const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
-  return [Math.cos(a) * VEIL_SCALE_ANGULAR + m * VEIL_SCALE_RADIAL, Math.sin(a) * VEIL_SCALE_ANGULAR + m * 0.35];
+  const au = a / (Math.PI * 2);
+  const mu = m / VEIL_PERIOD;
+  return [au - Math.floor(au), mu - Math.floor(mu)];
+};
+
+/** Leitura bilinear da tabela, com wrap nos dois eixos. `channel` 0 = corpo, 1 = grao. */
+const veilRead = (au: number, mu: number, channel: 0 | 1): number => {
+  if (veilRowsBuilt < VEIL_TABLE_M) mawVeilWarm(VEIL_TABLE_M);
+  const table = veilTable;
+  const fa = au * VEIL_TABLE_A;
+  const fm = mu * VEIL_TABLE_M;
+  const a0 = Math.floor(fa) % VEIL_TABLE_A;
+  const m0 = Math.floor(fm) % VEIL_TABLE_M;
+  const a1 = (a0 + 1) % VEIL_TABLE_A;
+  const m1 = (m0 + 1) % VEIL_TABLE_M;
+  const ta = fa - Math.floor(fa);
+  const tm = fm - Math.floor(fm);
+  const v00 = table[(m0 * VEIL_TABLE_A + a0) * 2 + channel];
+  const v10 = table[(m0 * VEIL_TABLE_A + a1) * 2 + channel];
+  const v01 = table[(m1 * VEIL_TABLE_A + a0) * 2 + channel];
+  const v11 = table[(m1 * VEIL_TABLE_A + a1) * 2 + channel];
+  const top = v00 + (v10 - v00) * ta;
+  const bottom = v01 + (v11 - v01) * ta;
+  return top + (bottom - top) * tm;
 };
 
 /**
- * O GRAO em (dx, dy), em [0, 1]: fino, advectado pelo mesmo fluxo. Quem
- * desenha usa-o para escolher o tom da celula e temperar a opacidade.
+ * O RUIDO do corpo do veu em (dx, dy), em [0, 1], nas coordenadas da espiral.
+ *
+ * Invariante que o teste guarda: um ponto levado pelo fluxo (o raio caindo
+ * pela lei, o angulo girando pelo passo) le o MESMO valor um instante depois.
  */
+export const mawVeilNoise = (dx: number, dy: number, seconds: number, reach: number): number => {
+  if (Math.hypot(dx, dy) <= 1e-6 || reach <= 1e-6) return 0;
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  return veilRead(au, mu, 0);
+};
+
+/** O GRAO em (dx, dy), em [0, 1]: fino, advectado pelo mesmo fluxo. */
 export const mawVeilGrain = (dx: number, dy: number, seconds: number, reach: number): number => {
   if (Math.hypot(dx, dy) <= 1e-6 || reach <= 1e-6) return 0.5;
-  const [x, y] = veilCoords(dx, dy, seconds, reach);
-  return Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x * VEIL_GRAIN_SCALE, y * VEIL_GRAIN_SCALE, 9191, 2, 2, 0.7)));
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  return veilRead(au, mu, 1);
 };
 
+export type MawVeilSample = {
+  /** A opacidade da celula, em [0, 1]. */
+  alpha: number;
+  /** O tom da areia: 0 escura, 1 base, 2 clara. */
+  tone: 0 | 1 | 2;
+};
+
+/** Abaixo disto o grao e areia escura; acima de `VEIL_TONE_LIGHT`, clara. */
+const VEIL_TONE_DARK = 0.4;
+const VEIL_TONE_LIGHT = 0.62;
+
 /**
- * A OPACIDADE do veu numa celula, em [0, 1]: o ruido com limiar (os rasgos)
- * vezes a janela do disco — some na garganta, onde nao pode haver poeira por
- * cima da sentenca, e some na borda, para o veu nao ter contorno.
+ * UMA CELULA do veu: opacidade e tom, com UMA leitura das coordenadas e das
+ * duas tabelas. E o que o desenho chama por celula; `mawVeilAlpha` e
+ * `mawVeilGrain` separados existem para os testes dizerem cada coisa por si.
+ *
+ * A opacidade e o corpo com limiar (os rasgos), temperado pelo grao em
+ * +-35%, vezes a janela do disco — some na garganta, onde nao pode haver
+ * poeira por cima da sentenca, e some na borda, para o veu nao ter contorno.
  */
-export const mawVeilAlpha = (dx: number, dy: number, seconds: number, reach: number): number => {
+export const mawVeilSample = (
+  dx: number,
+  dy: number,
+  seconds: number,
+  reach: number
+): MawVeilSample => {
   const r = Math.hypot(dx, dy);
-  if (reach <= 1e-6 || r >= reach) return 0;
+  if (reach <= 1e-6 || r >= reach || r <= 1e-6) return { alpha: 0, tone: 1 };
   const inner = mawInnerRadius(reach);
-  if (r <= inner) return 0;
-  const n = mawVeilNoise(dx, dy, seconds, reach);
-  // O grao tempera a opacidade em +-35%: celulas vizinhas com o mesmo corpo
-  // de nuvem saem diferentes, que e o pontilhado da areia.
-  const grain = 0.65 + 0.7 * mawVeilGrain(dx, dy, seconds, reach);
-  const body = Math.max(0, (n - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD)) * grain;
+  if (r <= inner) return { alpha: 0, tone: 1 };
   const t = (r - inner) / Math.max(1e-6, reach - inner);
   // Rente as duas bordas o veu apaga em rampa curta; no meio do disco vale
   // inteiro. A da garganta e mais curta: a areia acumula perto dela.
   const window = Math.min(1, t / 0.12, (1 - t) / 0.28);
-  return body * Math.max(0, window);
+  if (window <= 0) return { alpha: 0, tone: 1 };
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  const body = Math.max(0, (veilRead(au, mu, 0) - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD));
+  if (body <= 0) return { alpha: 0, tone: 1 };
+  const grain = veilRead(au, mu, 1);
+  const alpha = body * (0.65 + 0.7 * grain) * window;
+  const tone: 0 | 1 | 2 = grain < VEIL_TONE_DARK ? 0 : grain > VEIL_TONE_LIGHT ? 2 : 1;
+  return { alpha: Math.min(1, alpha), tone };
 };
+
+/** A opacidade sozinha, para os testes de forma. */
+export const mawVeilAlpha = (dx: number, dy: number, seconds: number, reach: number): number =>
+  mawVeilSample(dx, dy, seconds, reach).alpha;

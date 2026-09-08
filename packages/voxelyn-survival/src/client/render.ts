@@ -129,8 +129,8 @@ import {
   mawCloud,
   mawCloudShape,
   mawStreak,
-  mawVeilAlpha,
-  mawVeilGrain,
+  mawVeilSample,
+  mawVeilWarm,
   sinkholeCrestShape,
   sinkholeRamp,
 } from './maw-vortex';
@@ -1932,6 +1932,12 @@ export class SurvivalRenderer {
    * quadros anteriores sabe. Ver devourer-spine.ts.
    */
   private readonly devourerSpines = new DevourerSpines();
+  /**
+   * Os doze baldes do veu de areia (tres tons x quatro faixas de alfa),
+   * reutilizados quadro a quadro para o desenho nao alocar por vortice. Cada
+   * um e uma lista chata de (dx, dy) em tiles.
+   */
+  private readonly veilBuckets: number[][] = Array.from({ length: 12 }, () => []);
   /** Os corpos dos Leviatas em cena (ver leviathan-body.ts). */
   private readonly leviathanBodies = new LeviathanBodies();
   /**
@@ -4335,6 +4341,10 @@ export class SurvivalRenderer {
       // entrega quando nao da para ve-lo, e apaga-lo junto com o sprite seria
       // apagar o unico aviso que sobra.
       if (enemy.archetype === 'white_devourer') {
+        // A tabela do veu de areia e construida no primeiro quadro em que o
+        // chefe existe — mergulhado, num quadro tranquilo — e nao no que abre
+        // a boca. Idempotente: custa uma comparacao depois da primeira vez.
+        mawVeilWarm();
         const aloft = enemy.mood === DEVOURER_AIRBORNE;
         const was = this.devourerAloft.get(enemy.id);
         if (was !== undefined && was !== aloft) {
@@ -7083,45 +7093,66 @@ export class SurvivalRenderer {
     //     garganta. Vem ANTES das manchas e dos riscos porque e o fundo dos
     //     dois: a areia em suspensao que cobre o disco, com regioes densas e
     //     rasgos, e que se move junto com os graos porque e amostrada nas
-    //     coordenadas da espiral (ver `mawVeilNoise`).
+    //     coordenadas da espiral (ver `mawVeilSample`).
     //
-    //     Uma grade de celulas projetadas no chao, cada uma um losango
-    //     pintado com a opacidade do campo naquele ponto. A resolucao segue o
-    //     preset: 18 celulas por raio no alto, menos nos outros — e no
-    //     sumidouro, metade, porque ele e menor e sao tres.
+    //     Uma grade de celulas projetadas no chao. O ruido NAO e calculado
+    //     aqui: vem de uma tabela pre-computada em coordenadas materiais
+    //     (`maw-vortex.ts`), lida por interpolacao — o quadro paga trigonometria
+    //     e leituras, nao oitavas de Perlin. E as celulas nao sao pintadas uma
+    //     a uma: sao AGRUPADAS por tom (tres areias) e por faixa de opacidade
+    //     (quatro), e cada grupo e um unico caminho preenchido — doze `fill`
+    //     por vortice em vez de um por celula. Foi o que a revisao pediu:
+    //     milhares de caminhos por quadro estouravam o orcamento da Fome, que
+    //     ja e o quadro mais caro do encontro.
+    //
+    //     A resolucao segue o preset: 20 celulas por raio no alto, menos nos
+    //     outros — e no sumidouro, metade, porque ele e menor e sao tres.
     {
       const cellsPerRadius = Math.max(
         5,
-        Math.round(MAW_VEIL_CELLS * Math.sqrt(fxScale) * (isMaw ? 1 : 0.6)),
+        Math.round(MAW_VEIL_CELLS * Math.sqrt(fxScale) * (isMaw ? 1 : 0.5)),
       );
       const cell = reach / cellsPerRadius;
       const half = cell * 0.5;
       const peak = isMaw ? 0.4 : 0.3;
+      // Doze baldes: tom * 4 + faixa de alfa. Cada balde acumula os losangos
+      // das suas celulas num caminho so.
+      const buckets = this.veilBuckets;
+      for (const path of buckets) path.length = 0;
       for (let gy = -cellsPerRadius; gy < cellsPerRadius; gy++) {
         for (let gx = -cellsPerRadius; gx < cellsPerRadius; gx++) {
           const dx = (gx + 0.5) * cell;
           const dy = (gy + 0.5) * cell;
-          const a = mawVeilAlpha(dx, dy, seconds, reach);
-          if (a <= 0.02) continue;
-          // TRES AREIAS, escolhidas pelo grao: escura, base e clara. E o
-          // pontilhado que faz o veu ler como areia e nao como fumaca —
-          // fumaca tem um tom, areia tem graos de tons diferentes.
-          const g = mawVeilGrain(dx, dy, seconds, reach);
-          ctx.fillStyle =
-            g < 0.4 ? VEIL_SAND_DARK : g > 0.62 ? VEIL_SAND_LIGHT : SURFACE_FALLBACK[SURF_SILT];
+          const sample = mawVeilSample(dx, dy, seconds, reach);
+          if (sample.alpha <= 0.05) continue;
+          const band = Math.min(3, Math.floor(sample.alpha * 4));
+          buckets[sample.tone * 4 + band].push(dx, dy);
+        }
+      }
+      for (let bucket = 0; bucket < buckets.length; bucket++) {
+        const cells = buckets[bucket];
+        if (cells.length === 0) continue;
+        const tone = Math.floor(bucket / 4);
+        const band = bucket % 4;
+        ctx.fillStyle =
+          tone === 0 ? VEIL_SAND_DARK : tone === 2 ? VEIL_SAND_LIGHT : SURFACE_FALLBACK[SURF_SILT];
+        // O centro da faixa: 0,125 / 0,375 / 0,625 / 0,875 do pico.
+        ctx.globalAlpha = peak * ((band + 0.5) / 4);
+        ctx.beginPath();
+        for (let k = 0; k < cells.length; k += 2) {
+          const dx = cells[k];
+          const dy = cells[k + 1];
           const [x0, y0] = toScreen(cx + dx - half, cy + dy - half);
           const [x1, y1] = toScreen(cx + dx + half, cy + dy - half);
           const [x2, y2] = toScreen(cx + dx + half, cy + dy + half);
           const [x3, y3] = toScreen(cx + dx - half, cy + dy + half);
-          ctx.globalAlpha = a * peak;
-          ctx.beginPath();
           ctx.moveTo(x0, y0);
           ctx.lineTo(x1, y1);
           ctx.lineTo(x2, y2);
           ctx.lineTo(x3, y3);
           ctx.closePath();
-          ctx.fill();
         }
+        ctx.fill();
       }
     }
 
