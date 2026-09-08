@@ -117,6 +117,9 @@ export type NearbyEnemy = {
   alerted: boolean;
   summonerId?: number;
   silkFlight?: { toX: number; toY: number; landAt: number; impactAt: number; anchor?: number };
+  /** Cerzideira: etapa da segunda fase (0 chao, 1 subindo, 2 fora, 3 descendo, 4 frenesi) e o tick da volta. */
+  silkStage?: number;
+  silkReturnAt?: number;
 };
 
 export type NearbyProjectile = {
@@ -236,6 +239,8 @@ export const buildAgentSnapshot = (
     alerted: e.alertedUntil > state.tick,
     summonerId: e.summonerId,
     silkFlight: e.action?.silkFlight ? { ...e.action.silkFlight } : undefined,
+    silkStage: e.silk?.stage,
+    silkReturnAt: e.silk?.returnAt,
   }));
 
   const sortedProjectiles = [...state.projectiles].sort(

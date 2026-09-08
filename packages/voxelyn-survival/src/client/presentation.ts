@@ -6,6 +6,8 @@ import {
   HEAT_MAX,
   TICK_HZ,
   SILK_STRIKE_OFFSET,
+  SEAMSTRESS_STAGE_ASCENDING,
+  SEAMSTRESS_STAGE_DESCENDING,
   moduleHasCapacity,
   type Entity,
   type EntityActionKind,
@@ -702,6 +704,19 @@ export class EntityPresentation {
       return {
         anim: base.anim,
         elapsedMs: nowMs - base.animStartMs,
+        facingX: aim.x,
+        facingY: aim.y,
+      };
+    }
+
+    // A CERZIDEIRA NO FIO VERTICAL: subindo ou descendo, as pernas recolhidas
+    // do voo, com o relogio da etapa. Fora da tela ela nem e desenhada.
+    const silkStage = entity.archetype === 'seamstress' ? (entity.silk?.stage ?? 0) : 0;
+    if (silkStage === SEAMSTRESS_STAGE_ASCENDING || silkStage === SEAMSTRESS_STAGE_DESCENDING) {
+      const aim = bodyFacing();
+      return {
+        anim: 'fly',
+        elapsedMs: Math.max(0, ((state.tick - entity.silk!.stageAt) / TICK_HZ) * 1000),
         facingX: aim.x,
         facingY: aim.y,
       };

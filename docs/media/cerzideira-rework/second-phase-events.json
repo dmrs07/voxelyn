@@ -1,0 +1,220 @@
+{
+  "seed": 36,
+  "sector": 7,
+  "events": [
+    {
+      "tick": 31,
+      "t": "boss_state",
+      "archetype": "seamstress",
+      "state": "ascend",
+      "x": 85.5,
+      "y": 91.29999999999998
+    },
+    {
+      "tick": 31,
+      "t": "boss_phase",
+      "archetype": "seamstress",
+      "phase": 1,
+      "x": 85.5,
+      "y": 91.29999999999998
+    },
+    {
+      "tick": 77,
+      "t": "suture",
+      "phase": "taut",
+      "id": 3,
+      "x": 86.5,
+      "y": 92.5
+    },
+    {
+      "tick": 87,
+      "t": "suture",
+      "phase": "taut",
+      "id": 4,
+      "x": 90.5,
+      "y": 94.5
+    },
+    {
+      "tick": 97,
+      "t": "suture",
+      "phase": "taut",
+      "id": 5,
+      "x": 84.5,
+      "y": 92.5
+    },
+    {
+      "tick": 107,
+      "t": "suture",
+      "phase": "taut",
+      "id": 6,
+      "x": 85.5,
+      "y": 91.5
+    },
+    {
+      "tick": 117,
+      "t": "suture",
+      "phase": "taut",
+      "id": 7,
+      "x": 87.5,
+      "y": 88.5
+    },
+    {
+      "tick": 127,
+      "t": "suture",
+      "phase": "taut",
+      "id": 8,
+      "x": 89.5,
+      "y": 84.5
+    },
+    {
+      "tick": 137,
+      "t": "suture",
+      "phase": "taut",
+      "id": 9,
+      "x": 85.5,
+      "y": 93.5
+    },
+    {
+      "tick": 147,
+      "t": "suture",
+      "phase": "taut",
+      "id": 10,
+      "x": 84.5,
+      "y": 91.5
+    },
+    {
+      "tick": 157,
+      "t": "suture",
+      "phase": "taut",
+      "id": 11,
+      "x": 81.5,
+      "y": 89.5
+    },
+    {
+      "tick": 167,
+      "t": "suture",
+      "phase": "taut",
+      "id": 12,
+      "x": 86.5,
+      "y": 92.5
+    },
+    {
+      "tick": 177,
+      "t": "suture",
+      "phase": "taut",
+      "id": 13,
+      "x": 86.5,
+      "y": 94.5
+    },
+    {
+      "tick": 187,
+      "t": "suture",
+      "phase": "taut",
+      "id": 14,
+      "x": 84.5,
+      "y": 92.5
+    },
+    {
+      "tick": 197,
+      "t": "suture",
+      "phase": "taut",
+      "id": 15,
+      "x": 84.5,
+      "y": 90.5
+    },
+    {
+      "tick": 207,
+      "t": "suture",
+      "phase": "taut",
+      "id": 16,
+      "x": 86.5,
+      "y": 90.5
+    },
+    {
+      "tick": 217,
+      "t": "suture",
+      "phase": "taut",
+      "id": 17,
+      "x": 87.5,
+      "y": 92.5
+    },
+    {
+      "tick": 227,
+      "t": "suture",
+      "phase": "taut",
+      "id": 18,
+      "x": 87.5,
+      "y": 94.5
+    },
+    {
+      "tick": 247,
+      "t": "boss_state",
+      "archetype": "seamstress",
+      "state": "descend",
+      "x": 85.5,
+      "y": 92.5
+    },
+    {
+      "tick": 271,
+      "t": "boss_state",
+      "archetype": "seamstress",
+      "state": "frenzy",
+      "x": 85.5,
+      "y": 92.5
+    },
+    {
+      "tick": 371,
+      "t": "suture",
+      "phase": "snap",
+      "id": -32,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    },
+    {
+      "tick": 373,
+      "t": "suture",
+      "phase": "snap",
+      "id": -31,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    },
+    {
+      "tick": 375,
+      "t": "suture",
+      "phase": "snap",
+      "id": -33,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    },
+    {
+      "tick": 376,
+      "t": "suture",
+      "phase": "snap",
+      "id": -29,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    },
+    {
+      "tick": 377,
+      "t": "suture",
+      "phase": "snap",
+      "id": -30,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    },
+    {
+      "tick": 377,
+      "t": "suture",
+      "phase": "snap",
+      "id": -34,
+      "x": 90.5,
+      "y": 94.5,
+      "radius": 0.55
+    }
+  ]
+}

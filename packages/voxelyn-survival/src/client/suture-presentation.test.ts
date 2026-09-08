@@ -82,15 +82,59 @@ describe('apresentacao da amarra e do golpe', () => {
       return ctx.calls;
     };
     const before = draw();
-    expect(before).toContain('moveTo:146.0,117.0'); // radius 1.1 at the strike point
+    // Radius 1.1 at the strike point: the needle reaches 1.6 beyond the landing.
+    expect(before).toContain('moveTo:146.0,109.0');
     expect(before).toContain('lineTo:155.0,91.0'); // selected anchor B
     queen.x = 14;
     queen.y = 15;
     state.tick = 133;
     const flight = draw();
-    expect(flight).toContain('moveTo:146.0,117.0');
+    expect(flight).toContain('moveTo:146.0,109.0');
     expect(flight).toContain('lineTo:155.0,91.0');
     state.tick = 144;
     expect(draw()).not.toContain('lineTo:155.0,91.0'); // released support after impact
+  });
+
+  it('a teia desenha a faixa pegajosa so sob fios inteiros e a costura em andamento nos cortados', () => {
+    const { state } = fixture();
+    const w = state.config.width;
+    const cells = [20, 21, 22].map((x) => 30 * w + x);
+    state.sutures.push(
+      ...createSutures([
+        {
+          id: 7,
+          a: cells[0],
+          b: cells[2],
+          cells,
+          slabCells: [...cells, 31 * w + 21],
+          kind: 'web',
+          objective: false,
+        },
+      ]),
+    );
+    const strand = state.sutures.find((s) => s.id === 7)!;
+    strand.phase = 'taut';
+    strand.tension = 100;
+    const draw = () => {
+      const ctx = fakeContext(),
+        items: { depth: number; draw: () => void }[] = [];
+      appendSutureDraws(ctx, state, items, project, 2, () => 1, 0);
+      items.forEach((i) => i.draw());
+      return ctx.calls;
+    };
+    const intact = draw();
+    // Quatro celulas de faixa preenchidas, e o fio de (20.5,30.5) a (22.5,30.5) a 3 px do chao.
+    expect(intact.filter((c) => c === 'fill:').length).toBe(4);
+    expect(intact).toContain('moveTo:205.0,299.0');
+    expect(intact).toContain('lineTo:225.0,299.0');
+    strand.phase = 'loose';
+    strand.tension = 34;
+    const cut = draw();
+    expect(cut.filter((c) => c === 'fill:').length).toBe(0);
+    expect(cut.some((c) => c.startsWith('setLineDash:'))).toBe(true);
+    // A costura: 34% do caminho, de a para b.
+    expect(cut).toContain('lineTo:211.8,299.0');
+    strand.phase = 'spent';
+    expect(draw().some((c) => c === 'moveTo:205.0,299.0')).toBe(false);
   });
 });

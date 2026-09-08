@@ -1,6 +1,7 @@
 import { suturePoint, SUTURE_FALL_WARNING, type SurvivalState } from '@voxelyn/survival-sim';
 import { drawVoxel } from './voxel-draw';
 import { appendSilkThreatDraws } from './silk-presentation';
+import { appendSeamstressThreadDraws, appendWebDraws } from './web-presentation';
 type DrawItem = { depth: number; draw: () => void };
 type Project = (x: number, y: number) => [number, number];
 const SUPPORT_COLOR = '#e0a45b';
@@ -15,8 +16,10 @@ export const appendSutureDraws = (
   brightness: (x: number, y: number) => number,
   nowMs = 0,
 ): void => {
+  // A teia da segunda fase tem desenho proprio (web-presentation.ts).
+  appendWebDraws(ctx, state, items, project, z, brightness, nowMs);
   for (const s of state.sutures) {
-    if (s.encounter || s.phase === 'spent') continue;
+    if (s.encounter || s.phase === 'spent' || s.kind === 'web') continue;
     const horizontal =
       Math.floor(s.a / state.config.width) === Math.floor(s.b / state.config.width);
     const loaded = false;
@@ -105,6 +108,9 @@ export const appendSutureDraws = (
     }
   }
   for (const enemy of state.enemies)
-    if (enemy.alive && brightness(enemy.x, enemy.y) > 0.05)
+    if (enemy.alive && brightness(enemy.x, enemy.y) > 0.05) {
       appendSilkThreatDraws(ctx, state, enemy, items, project, z, nowMs);
+      if (enemy.archetype === 'seamstress')
+        appendSeamstressThreadDraws(ctx, state, enemy, items, project, z, nowMs);
+    }
 };

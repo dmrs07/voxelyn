@@ -327,7 +327,17 @@ await writeFile(
   JSON.stringify({ seed: 36, sector: 7, events }, null, 2) + '\n',
 );
 const metrics = [];
-for (const scenario of ['idle', 'stationary_shoot', 'circle_shoot', 'cut_every_tether']) {
+// Os dois ultimos sao as RESPOSTAS que a luta promete: cortar o fio e atacar
+// na janela; sair da marca quando o aviso aparece. Sem eles o arquivo medida
+// regressao de auxiliares e terreno, nao a luta.
+for (const scenario of [
+  'idle',
+  'stationary_shoot',
+  'circle_shoot',
+  'cut_every_tether',
+  'cut_and_shoot',
+  'dodge_mark_shoot',
+]) {
   const s = engine.createArenaRun({
     boss: 'seamstress',
     maxHp: 100,
@@ -346,9 +356,20 @@ for (const scenario of ['idle', 'stationary_shoot', 'circle_shoot', 'cut_every_t
       dy = q.y - s.player.y,
       distance = Math.hypot(dx, dy) || 1;
     cmd.aim = { x: dx / distance, y: dy / distance };
-    cmd.fire = scenario === 'stationary_shoot' || scenario === 'circle_shoot';
+    cmd.fire = /shoot/.test(scenario);
     if (scenario === 'circle_shoot') cmd.move = { x: -dy / distance, y: dx / distance };
-    if (scenario === 'cut_every_tether' && engine.silkSupported(q, s.tick)) {
+    if (scenario === 'dodge_mark_shoot') {
+      // Parado atirando; ao ver a marca da agulhada, sai dela em linha reta.
+      const f = q.action?.silkFlight;
+      if (f && f.anchor !== undefined && s.tick < f.impactAt) {
+        const hit = engine.silkStrike(q);
+        const ax = s.player.x - hit.x,
+          ay = s.player.y - hit.y,
+          away = Math.hypot(ax, ay) || 1;
+        if (away < hit.radius + s.player.radius + 1.5) cmd.move = { x: ax / away, y: ay / away };
+      }
+    }
+    if (/^cut/.test(scenario) && engine.silkSupported(q, s.tick)) {
       const anchor = engine.suturePoint(s, q.action.silkFlight.anchor);
       const dx = anchor.x - q.x,
         dy = anchor.y - q.y,

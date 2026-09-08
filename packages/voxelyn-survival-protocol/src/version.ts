@@ -238,7 +238,10 @@
 //     antigo trata a ausencia como lista vazia, mas o bump da simulacao
 //     (67) ja recusa o par de qualquer jeito.
 // 36: locked silk flights, impact ticks, helper ownership and chamber sutures.
-export const PROTOCOL_VERSION = 36;
+// 37: `SilkEncounter` ganha `stage`, `stageAt` e `returnAt` (a segunda fase da
+//     Cerzideira) e `Suture.kind` aceita `web`. Um cliente antigo desenharia a
+//     rainha no chao enquanto o servidor a tem fora da tela.
+export const PROTOCOL_VERSION = 37;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1002,7 +1005,29 @@ export const PROTOCOL_VERSION = 36;
 // 69: Cerzideira hunts above terrain, strikes once on arrival and summons jumping helpers.
 // 70: Retry Stitcher layouts without two usable chamber supports. The seeded terrain
 //     can change, so replays and reconnects must use the same generation contract.
-export const SIMULATION_VERSION = 70;
+// 71: O CORTE DO FIO ATIVO passa a ser intencional — so tiros que cruzam o fio
+//     com 30 graus ou mais, a 1,5 tile ou mais do corpo (`cutsTether`); antes,
+//     como ela puxa para um apoio ao lado do jogador, todo tiro no corpo ja
+//     saia encostado no fio e a derrubava sem ninguem mirar nele. A agulhada
+//     alcanca 1,6 tile e o pouso e escolhido para que ela caia na marca
+//     travada (metade dos golpes errava um alvo parado). Sem golpe de contato
+//     por 24 ticks depois do impacto: sair da marca vira resposta completa.
+//     Escolhas, pousos e quedas mudaram: um replay de 70 com a Cerzideira nao
+//     bate.
+// 72: A SEGUNDA FASE DA CERZIDEIRA. Na metade da vida ela interrompe o ataque,
+//     sobe pelo fio vertical e sai da tela (`silk.stage`, `stageAt`,
+//     `returnAt`, no hash). Fora de vista tece uma TEIA em espiral de ouro
+//     com raios de sustentacao — suturas `kind: 'web'`, sem ancoras, sem
+//     chicote — fio a fio, e volta no tick marcado na subida, em frenesi:
+//     mais rapida, puxadas mais curtas, oito auxiliares com dois Costureiros
+//     que priorizam refazer os fios cortados. O Prospector anda a 0,62 sobre
+//     fios inteiros; cortar um fio abre a passagem no mesmo tick. A morte
+//     dela dissolve a teia. Posicoes, suturas e auxiliares mudaram: um replay
+//     de 71 com a Cerzideira nao bate.
+// 73: Stop each web spoke and spiral at its first wall or map boundary, keeping
+//     only the visible prefix. Detached strands beyond obstacles no longer slow
+//     players or create repair jobs, so Cerzideira replays from 72 can diverge.
+export const SIMULATION_VERSION = 73;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

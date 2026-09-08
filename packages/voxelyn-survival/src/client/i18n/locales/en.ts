@@ -332,6 +332,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Hatches from the Darner. Crouches, marks its landing and jumps. Leave the mark and punish its recovery.',
   'seamstress.hint': 'Cut the tether · dodge the mark',
   'seamstress.exposed': 'ABDOMEN EXPOSED · attack now',
+  'seamstress.aloft': 'SHE CLIMBED · the web forms: read the bands',
+  'seamstress.frenzy': 'FRENZY · cut the web to open a lane · kill the menders',
   'enemy.stitcher': 'Stitcher',
   'enemy.seamstress': 'The Darner',
   'bestiary.name.stitcher': 'Stitcher',

@@ -231,6 +231,8 @@ const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
 
 const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
   guardian: { step: 'guardianStep', strain: 'guardianStrain', chip: 'guardianChip' },
+  // A subida e a descida pelo fio dividem a voz; o frenesi tem a propria.
+  seamstress: { ascend: 'silkAscend', descend: 'silkAscend', frenzy: 'silkFrenzy' },
   white_devourer: {
     burrow: 'devourerBurrow',
     maw_open: 'devourerMawOpen',

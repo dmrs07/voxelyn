@@ -56,6 +56,8 @@ export type VoiceId =
   | 'silkTension'
   | 'silkSnap'
   | 'silkFall'
+  | 'silkAscend'
+  | 'silkFrenzy'
   | 'oreGained'
   // --- mundo --------------------------------------------------------------
   | 'explosion'
@@ -414,6 +416,10 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   silkTension: { priority: 9, gain: 0.35, minIntervalMs: 150, spatial: true },
   silkSnap: { priority: 9, gain: 0.5, minIntervalMs: 80, spatial: true },
   silkFall: { priority: 9, gain: 0.55, minIntervalMs: 100, spatial: true },
+  // A subida e a descida pelo fio (a mesma voz, ao contrario) e o grito do
+  // frenesi: momentos de chefe, prioridade de telegrafo.
+  silkAscend: { priority: 9, gain: 0.6, minIntervalMs: 200, spatial: true },
+  silkFrenzy: { priority: 10, gain: 0.8, minIntervalMs: 500, spatial: false },
   oreGained: { priority: 3, gain: 0.28, minIntervalMs: 90, spatial: true },
 
   explosion: { priority: 8, gain: 0.75, minIntervalMs: 70, spatial: true },

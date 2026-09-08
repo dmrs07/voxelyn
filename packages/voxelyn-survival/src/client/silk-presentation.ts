@@ -3,6 +3,7 @@ import {
   silkLift,
   silkSupported,
   silkStrike,
+  SILK_CUT_EXPOSED_FROM,
   type Entity,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -71,24 +72,53 @@ export const appendSilkThreatDraws = (
   const anchor = suturePoint(state, f.anchor);
   const [ax, ay] = project(anchor.x, anchor.y);
   const [ex, ey] = project(enemy.x, enemy.y);
+  // Onde o fio passa a ser CORTAVEL: a mesma distancia do corpo que a
+  // simulacao exige do tiro (`cutsTether`). O trecho colado ao corpo e
+  // desenhado escuro, o exposto claro — o jogador mira no claro.
+  const cable = Math.hypot(anchor.x - enemy.x, anchor.y - enemy.y) || 1;
+  const split = Math.min(1, SILK_CUT_EXPOSED_FROM / cable);
+  const [sx, sy] = project(
+    enemy.x + (anchor.x - enemy.x) * split,
+    enemy.y + (anchor.y - enemy.y) * split,
+  );
   items.push({
     // Above internal terrain, like the suspended body, with its mark on the support.
     depth: Math.max(anchor.x + anchor.y, enemy.x + enemy.y) + 2,
     draw: () => {
       ctx.save();
       const lift = 14 + silkLift(enemy, state.tick);
+      const splitLift = lift + (17 - lift) * split;
       ctx.lineWidth = 4 * z;
       ctx.strokeStyle = '#302920';
       ctx.beginPath();
       ctx.moveTo(ex, ey - lift * z);
       ctx.lineTo(ax, ay - 17 * z);
       ctx.stroke();
+      // O trecho protegido, do abdome ate a marca de corte.
       ctx.lineWidth = 2 * z;
-      ctx.strokeStyle = '#f2dec0';
+      ctx.strokeStyle = '#8a7a62';
       ctx.beginPath();
       ctx.moveTo(ex, ey - lift * z);
+      ctx.lineTo(sx, sy - splitLift * z);
+      ctx.stroke();
+      // O trecho exposto, ate a ancora.
+      ctx.strokeStyle = '#f2dec0';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - splitLift * z);
       ctx.lineTo(ax, ay - 17 * z);
       ctx.stroke();
+      // Um no marca onde o corte comeca a valer. Losango, e nao arco: as
+      // pranchas de revisao desenham com um canvas minimo, sem `arc`.
+      const ky = sy - splitLift * z,
+        k = 1.8 * z;
+      ctx.fillStyle = '#f2dec0';
+      ctx.beginPath();
+      ctx.moveTo(sx, ky - k);
+      ctx.lineTo(sx + k, ky);
+      ctx.lineTo(sx, ky + k);
+      ctx.lineTo(sx - k, ky);
+      ctx.closePath();
+      ctx.fill();
       const pulse = 0.5 + 0.5 * Math.sin(nowMs / 130);
       ctx.strokeStyle = '#efaf66';
       ctx.lineWidth = (1.5 + pulse) * z;

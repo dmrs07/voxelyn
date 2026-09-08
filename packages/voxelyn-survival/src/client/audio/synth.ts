@@ -356,6 +356,42 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     burst(ctx, out, t0, noise, { peak: 0.65, decay: 0.06, type: 'highpass', from: 3000, to: 900 });
     tone(ctx, out, t0, { type: 'triangle', from: 720, to: 90, peak: 0.45, decay: 0.2 });
   },
+  // A SUBIDA pelo fio: a seda esticando num glissando longo, com o atrito das
+  // patas no fio por baixo. Serve a descida tambem — o mesmo fio, o mesmo som.
+  silkAscend: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, {
+      type: 'triangle',
+      from: 160,
+      to: 1100,
+      peak: 0.3,
+      decay: 0.9,
+      attack: 0.2,
+    });
+    tone(ctx, out, t0 + 0.05, {
+      type: 'sine',
+      from: 240,
+      to: 1650,
+      peak: 0.16,
+      decay: 0.85,
+      attack: 0.2,
+    });
+    for (let i = 0; i < 6; i++)
+      burst(ctx, out, t0 + 0.08 + i * 0.12, noise, {
+        peak: 0.1,
+        decay: 0.09,
+        type: 'bandpass',
+        from: 1400 + i * 300,
+        to: 2600 + i * 300,
+      });
+  },
+  // O FRENESI: um guincho de quitina — dente de serra caindo, o estouro de
+  // seda em cima, e um baque grave do pouso por baixo.
+  silkFrenzy: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sawtooth', from: 1200, to: 380, peak: 0.42, decay: 0.42 });
+    tone(ctx, out, t0 + 0.02, { type: 'square', from: 900, to: 290, peak: 0.2, decay: 0.4 });
+    burst(ctx, out, t0, noise, { peak: 0.55, decay: 0.12, type: 'highpass', from: 2400, to: 700 });
+    tone(ctx, out, t0 + 0.06, { type: 'sine', from: 110, to: 40, peak: 0.6, decay: 0.34 });
+  },
   silkFall: (ctx, out, t0, noise) => {
     tone(ctx, out, t0, { type: 'sine', from: 100, to: 36, peak: 0.65, decay: 0.38 });
     for (let i = 0; i < 4; i++)

@@ -7,7 +7,9 @@ import {
   silkLanding,
   silkContact,
   silkStrike,
+  seamstressTargetable,
 } from './seamstress.js';
+import { dissolveWeb } from './web.js';
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
@@ -1017,6 +1019,8 @@ export const damageEntity = (
 ): void => {
   if (!ent.alive) return;
   if (ent.archetype === 'seamstress') {
+    // Fora da tela (segunda fase) nao ha corpo: nenhum caminho de dano a toca.
+    if (!seamstressTargetable(ent)) return;
     const support = silkSupported(ent, state.tick);
     amount *= state.tick < ent.stunnedUntil ? 1.5 : support ? 0.55 : 1;
   }
@@ -1194,6 +1198,8 @@ export const damageEntity = (
     ent.action = undefined;
     for (const helper of state.enemies)
       if (helper.alive && helper.summonerId === ent.id) silkMaintenance(state, helper, events);
+    // E a teia vai com ela: o chao deixa de pegar no mesmo tick.
+    dissolveWeb(state);
   }
   if (ent.archetype === 'white_devourer') {
     devourerBroodEnds(state, events);

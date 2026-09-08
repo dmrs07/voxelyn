@@ -124,6 +124,8 @@ import {
   stepCells,
 } from './cells.js';
 import { leviathanCovers, leviathanTargetable } from './leviathan.js';
+import { seamstressTargetable } from './seamstress.js';
+import { webSpeedMul } from './web.js';
 import {
   explosiveArmedByDistance,
   impactSolid,
@@ -260,9 +262,12 @@ const playerSurfaceSpeedMul = (
   player: Entity,
   tuning: PlayerTuning,
 ): number => {
+  // A TEIA da Cerzideira pega o Prospector, e nao e liquido: nao passa pelo
+  // desconto de `liquidSlowScale`. Fios cortados nao pegam (ver web.ts).
+  const web = webSpeedMul(state, player);
   const base = surfaceSpeedMul(state, player);
-  if (base >= 1) return base;
-  return 1 - (1 - base) * tuning.liquidSlowScale;
+  if (base >= 1) return base * web;
+  return (1 - (1 - base) * tuning.liquidSlowScale) * web;
 };
 
 const makePlayer = (slot: number, x: number, y: number, tuning: PlayerTuning): Entity => ({
@@ -2620,7 +2625,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
         // Um missil nao persegue o que nao se ve.
-        if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+        if (
+          (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) ||
+          (enemy.archetype === 'seamstress' && !seamstressTargetable(enemy))
+        ) {
           continue;
         }
         const d = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
@@ -2942,7 +2950,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         if (proj.kind === 'cart') {
           for (const enemy of state.enemies) {
             if (!enemy.alive) continue;
-            if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+            if (
+              (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) ||
+              (enemy.archetype === 'seamstress' && !seamstressTargetable(enemy))
+            ) {
               continue;
             }
             if (proj.hits?.includes(enemy.id)) continue;
@@ -2967,7 +2978,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           // pela posicao dele sem gastar carga, atordoar, curar nem morrer.
           // `damageEntity` ja o recusava, mas so depois de tudo isso ter sido
           // cobrado — um tiro que some no lugar de um bicho invisivel.
-          if (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) {
+          if (
+            (enemy.archetype === 'sheet_leviathan' && !leviathanTargetable(enemy, state.tick)) ||
+            (enemy.archetype === 'seamstress' && !seamstressTargetable(enemy))
+          ) {
             continue;
           }
           const discHits = proj.disc
@@ -3848,6 +3862,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
         'broodAt',
         'repositionUntil',
         'comboLeft',
+        'stage',
+        'stageAt',
+        'returnAt',
       ] as const)
         mix(Math.round(enemy.silk[key] * 1000));
     } else mix(0);

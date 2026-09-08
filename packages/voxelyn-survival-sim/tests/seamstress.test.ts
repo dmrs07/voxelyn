@@ -11,8 +11,10 @@ import {
 import {
   createSutures,
   cutSuture,
+  cutsTether,
   hitSutures,
   loadedSutureAnchor,
+  SILK_CUT_EXPOSED_FROM,
   stepSutures,
   stitcherStep,
   sutureObjective,
@@ -21,13 +23,27 @@ import {
 } from '../src/sutures';
 import {
   dropSeamstress,
+  SEAMSTRESS_ASCEND_TICKS,
+  SEAMSTRESS_CONTACT_GRACE,
+  SEAMSTRESS_DESCEND_TICKS,
   SEAMSTRESS_DROP_TICKS,
+  SEAMSTRESS_STAGE_ALOFT,
+  SEAMSTRESS_STAGE_ASCENDING,
+  SEAMSTRESS_STAGE_DESCENDING,
+  SEAMSTRESS_STAGE_FRENZY,
+  SILK_FRENZY_HELPER_CAP,
+  SILK_FRENZY_STITCHERS,
+  seamstressTargetable,
   silkLift,
   silkCanLand,
   silkLanding,
+  silkStrike,
+  SILK_NEEDLE_REACH,
+  SILK_STRIKE_RADIUS,
   summonSilkBrood,
 } from '../src/seamstress';
 import { SOLID_NONE, SOLID_ROCK, SOLID_SUTURE_ANCHOR } from '../src/constants';
+import { isWebStrand, webCovers, webSpeedMul, WEB_SLOW } from '../src/web';
 import type { Entity, SemanticEvent, SurvivalState } from '../src/types';
 
 const fixture = (players = 1) => {
@@ -196,6 +212,80 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     expect(hp - queen.hp).toBe(30);
     expect(until(state, 132).some((e) => e.t === 'hit' || e.t === 'boss_attack')).toBe(false);
   });
+  it('only a transversal shot across the exposed stretch cuts the active tether', () => {
+    const body = { x: 10, y: 20 },
+      anchor = { x: 20, y: 20 };
+    // De baixo do fio, mirando no corpo: colinear, nao conta.
+    expect(cutsTether({ x: 16, y: 20.05 }, { x: 15, y: 20.02 }, body, anchor)).toBe(false);
+    // Rasante a 15 graus, tambem nao.
+    expect(cutsTether({ x: 16, y: 20.5 }, { x: 14, y: 19.96 }, body, anchor)).toBe(false);
+    // Cruzando de lado, mas colado ao corpo: protegido.
+    expect(cutsTether({ x: 11, y: 19 }, { x: 11, y: 21 }, body, anchor)).toBe(false);
+    // Cruzando de lado no trecho exposto: corta.
+    expect(
+      cutsTether(
+        { x: 10 + SILK_CUT_EXPOSED_FROM, y: 19 },
+        { x: 10 + SILK_CUT_EXPOSED_FROM, y: 21 },
+        body,
+        anchor,
+      ),
+    ).toBe(true);
+    expect(cutsTether({ x: 15, y: 22 }, { x: 16, y: 18 }, body, anchor)).toBe(true);
+    // Na simulacao: o tiro de quem esta debaixo do fio, no corpo dela, nao a derruba.
+    const { state, queen } = fixture();
+    arm(state, queen);
+    until(state, 109);
+    const under = { x: queen.x + 4, y: queen.y + 0.1 };
+    hitSutures(state, under, { x: queen.x + 3.2, y: queen.y + 0.08 }, [], 0);
+    expect(queen.action).toBeDefined();
+    hitSutures(
+      state,
+      { x: queen.x + 3, y: queen.y - 1 },
+      { x: queen.x + 3, y: queen.y + 1 },
+      [],
+      0,
+    );
+    expect(queen.action).toBeUndefined();
+  });
+  it('lands so the needle falls on the locked mark, and refuses supports that cannot reach it', () => {
+    const { state, queen } = fixture();
+    // Alvo parado fora da linha do fio, dentro do alcance da agulha.
+    state.player.x = 16.3;
+    state.player.y = 21.7;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('tether');
+    const hit = silkStrike(queen);
+    expect(Math.hypot(hit.x - state.player.x, hit.y - state.player.y)).toBeLessThan(
+      SILK_STRIKE_RADIUS - 0.1,
+    );
+    const f = queen.action!.silkFlight!;
+    expect(Math.hypot(f.toX - state.player.x, f.toY - state.player.y)).toBeCloseTo(
+      SILK_NEEDLE_REACH,
+      1,
+    );
+    // Alvo mais longe da linha do que a agulha alcanca: nenhum apoio serve, ela caca a pe.
+    const again = fixture();
+    again.state.player.x = 16.3;
+    again.state.player.y = 23.5;
+    stitcherStep(again.state, again.queen, again.state.player, 0.05, []);
+    expect(again.queen.action).toBeUndefined();
+  });
+  it('gives no contact strike right after a landing: leaving the mark is a full answer', () => {
+    const { state, queen } = fixture();
+    state.player.x = 17.5;
+    state.player.y = 20.5;
+    stitcherStep(state, queen, state.player, 0.05, []);
+    expect(queen.action?.kind).toBe('tether');
+    const f = queen.action!.silkFlight!;
+    expect(queen.contactReadyAt).toBe(f.impactAt + SEAMSTRESS_CONTACT_GRACE);
+    // O jogador sai da marca (de lado) e fica a menos de 2 tiles do pouso.
+    state.player.x = f.toX + 0.5;
+    state.player.y = f.toY + 1.8;
+    state.sutures = [];
+    until(state, f.impactAt + SEAMSTRESS_CONTACT_GRACE - 1);
+    expect(state.player.hp).toBe(state.player.maxHp);
+    expect(queen.action?.kind ?? 'none').not.toBe('contact');
+  });
   it.each(['support breaks', 'stun', 'landing blocked'])(
     'settles safely if %s changes in flight',
     (reason) => {
@@ -248,9 +338,11 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
       expect(state.player.hp).toBe(state.player.maxHp);
     },
   );
-  it('chains different supports below half HP and repositions after a drop', () => {
+  it('chains different supports in frenzy and repositions after a drop', () => {
     const { state, queen } = fixture();
     queen.hp = queen.maxHp * 0.45;
+    queen.silk!.stage = SEAMSTRESS_STAGE_FRENZY;
+    queen.silk!.broodAt = state.tick + 1000;
     stitcherStep(state, queen, state.player, 0.05, []);
     const first = queen.action!.silkFlight!.anchor;
     expect(queen.silk!.comboLeft).toBe(1);
@@ -260,7 +352,7 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     state.player.x = 14;
     stitcherStep(state, queen, state.player, 0.05, []);
     expect(queen.action!.silkFlight!.anchor).not.toBe(first);
-    expect(queen.action!.releaseAt - state.tick).toBe(12);
+    expect(queen.action!.releaseAt - state.tick).toBe(10);
     dropSeamstress(state, queen, []);
     expect(queen.silk!.comboLeft).toBe(0);
     state.tick = queen.stunnedUntil;
@@ -294,6 +386,200 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
       expect(until(state, 119).filter((e) => e.t === 'hit')).toHaveLength(0);
     },
   );
+  /** Leva o encontro ate o frenesi pelo fluxo real, com o jogador longe da rainha. */
+  const toFrenzy = (state: SurvivalState, queen: Entity): SemanticEvent[] => {
+    state.player.x = 30.5;
+    state.player.y = 30.5;
+    state.playerExtra.iframesUntil = 100000;
+    queen.hp = queen.maxHp * 0.45;
+    const events: SemanticEvent[] = [];
+    for (let n = 0; n < 600 && queen.silk!.stage !== SEAMSTRESS_STAGE_FRENZY; n++) {
+      state.tick++;
+      updateEnemies(state, events);
+    }
+    return events;
+  };
+
+  it('sobe uma unica vez na metade da vida, tece a teia fora da tela e volta no tick marcado', () => {
+    const { state, queen } = fixture();
+    state.player.x = 30.5;
+    state.player.y = 30.5;
+    state.playerExtra.iframesUntil = 100000;
+    arm(state, queen);
+    queen.hp = queen.maxHp * 0.45;
+    const events: SemanticEvent[] = [];
+    state.tick++;
+    updateEnemies(state, events);
+    // Interrompe a puxada e sobe: um unico aviso proprio.
+    expect(queen.action).toBeUndefined();
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_ASCENDING);
+    expect(events.filter((e) => e.t === 'boss_state' && e.state === 'ascend')).toHaveLength(1);
+    expect(silkLift(queen, state.tick)).toBeGreaterThanOrEqual(38);
+    const ascendAt = queen.silk!.stageAt;
+    until(state, ascendAt + SEAMSTRESS_ASCEND_TICKS);
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_ALOFT);
+    expect(seamstressTargetable(queen)).toBe(false);
+    const hp = queen.hp;
+    damageEntity(state, queen, 200, []);
+    expect(queen.hp).toBe(hp);
+    const web = state.sutures.filter(isWebStrand);
+    expect(web.length).toBeGreaterThan(12);
+    expect(web.every((s) => s.phase === 'spent')).toBe(true);
+    const returnAt = queen.silk!.returnAt;
+    expect(returnAt).toBeGreaterThan(state.tick + 100);
+    // A teia cresce fio a fio, com o som de cada um.
+    const half = until(state, Math.floor((state.tick + returnAt) / 2));
+    const woven = web.filter((s) => s.phase === 'taut').length;
+    expect(woven).toBeGreaterThan(0);
+    expect(woven).toBeLessThan(web.length);
+    expect(half.filter((e) => e.t === 'suture' && e.phase === 'taut').length).toBe(woven);
+    // Cortar tudo o que ja existe nao adia a volta.
+    for (const s of web) if (s.phase === 'taut') cutSuture(state, s, [], 0);
+    expect(web.filter((s) => s.phase === 'loose')).toHaveLength(woven);
+    const back = until(state, returnAt);
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_DESCENDING);
+    expect(back.some((e) => e.t === 'boss_state' && e.state === 'descend')).toBe(true);
+    expect(silkCanLand(state, queen, queen.x, queen.y)).toBe(true);
+    const landed = until(state, queen.silk!.stageAt + SEAMSTRESS_DESCEND_TICKS);
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_FRENZY);
+    expect(landed.filter((e) => e.t === 'boss_state' && e.state === 'frenzy')).toHaveLength(1);
+    expect(seamstressTargetable(queen)).toBe(true);
+    // A leva da descida: crias e Costureiros, dentro do teto.
+    const helpers = state.enemies.filter((e) => e.alive && e.summonerId === queen.id);
+    expect(helpers.length).toBeGreaterThan(4);
+    expect(helpers.length).toBeLessThanOrEqual(SILK_FRENZY_HELPER_CAP);
+    expect(helpers.filter((e) => e.archetype === 'stitcher').length).toBeGreaterThanOrEqual(1);
+    expect(helpers.filter((e) => e.archetype === 'stitcher').length).toBeLessThanOrEqual(
+      SILK_FRENZY_STITCHERS,
+    );
+    expect(helpers.filter((e) => e.archetype === 'seamstress_brood').length).toBeGreaterThan(3);
+    // Uma vez por encontro: cair mais ainda nao a manda de volta para cima.
+    queen.hp = queen.maxHp * 0.2;
+    const again = until(state, state.tick + 60);
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_FRENZY);
+    expect(again.some((e) => e.t === 'boss_state' && e.state === 'ascend')).toBe(false);
+  });
+
+  it('a teia pega o Prospector sobre fios inteiros; cortar abre a passagem e um Costureiro a refaz', () => {
+    const { state, queen } = fixture();
+    toFrenzy(state, queen);
+    expect(queen.silk!.stage).toBe(SEAMSTRESS_STAGE_FRENZY);
+    const web = state.sutures.filter(isWebStrand);
+    // Um fio cuja faixa cobre alguma celula que nenhum outro fio inteiro cobre.
+    const alone = (s: Suture): number | undefined =>
+      s.slabCells.find(
+        (c) =>
+          !web.some((o) => o !== s && o.phase === 'taut' && o.slabCells.includes(c)) &&
+          state.solid[c] === SOLID_NONE,
+      );
+    const strand = web.find((s) => s.phase === 'taut' && alone(s) !== undefined)!;
+    expect(strand).toBeDefined();
+    const cell = alone(strand)!;
+    const p = suturePoint(state, cell);
+    state.player.x = p.x;
+    state.player.y = p.y;
+    expect(webCovers(state, cell)).toBe(true);
+    expect(webSpeedMul(state, state.player)).toBe(WEB_SLOW);
+    // Inimigos andam normalmente por cima.
+    expect(webSpeedMul(state, queen)).toBe(1);
+    // O tiro corta: sem chicote, sem queda, e a passagem abre no mesmo tick.
+    const a = suturePoint(state, strand.cells[0]),
+      b = suturePoint(state, strand.cells[strand.cells.length - 1]);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      dx = b.x - a.x,
+      dy = b.y - a.y,
+      len = Math.hypot(dx, dy) || 1;
+    const cutEvents: SemanticEvent[] = [];
+    hitSutures(
+      state,
+      { x: mid.x - dy / len, y: mid.y + dx / len },
+      { x: mid.x + dy / len, y: mid.y - dx / len },
+      cutEvents,
+      0,
+    );
+    expect(strand.phase).toBe('loose');
+    expect(strand.whipAt).toBe(-1);
+    expect(cutEvents.some((e) => e.t === 'suture' && e.phase === 'snap')).toBe(true);
+    expect(webSpeedMul(state, state.player)).toBe(1);
+    // Um Costureiro convocado vai refazer: chega, costura visivelmente e o fio volta.
+    for (const e of state.enemies) if (e.summonerId === queen.id) e.alive = false;
+    queen.silk!.broodAt = state.tick + 100000;
+    queen.nextActionAt = state.tick + 100000;
+    const near = silkLanding(state, { ...queen, radius: 0.36 }, { x: a.x + 2.5, y: a.y }, 3)!;
+    const worker = spawnEnemy(state, 'stitcher', near.x - 0.5, near.y - 0.5, false);
+    worker.summonerId = queen.id;
+    worker.alertedUntil = state.tick + 100000;
+    state.player.x = 40.5;
+    state.player.y = 40.5;
+    let sewing = 0;
+    for (let n = 0; n < 200 && strand.phase !== 'taut'; n++) {
+      state.tick++;
+      updateEnemies(state, []);
+      if (worker.action?.kind === 'stitch' && worker.action.target === strand.id) sewing++;
+    }
+    expect(sewing).toBeGreaterThan(40);
+    expect(strand.phase).toBe('taut');
+    expect(strand.tension).toBe(100);
+    state.player.x = p.x;
+    state.player.y = p.y;
+    expect(webSpeedMul(state, state.player)).toBe(WEB_SLOW);
+  });
+
+  it('matar o Costureiro no meio da costura deixa o fio aberto; ameacado, ele larga o trabalho', () => {
+    const { state, queen } = fixture();
+    toFrenzy(state, queen);
+    const strand = state.sutures.find((s) => isWebStrand(s) && s.phase === 'taut')!;
+    cutSuture(state, strand, [], 0);
+    for (const e of state.enemies) if (e.summonerId === queen.id) e.alive = false;
+    queen.silk!.broodAt = state.tick + 100000;
+    queen.nextActionAt = state.tick + 100000;
+    const a = suturePoint(state, strand.cells[0]);
+    const near = silkLanding(state, { ...queen, radius: 0.36 }, { x: a.x + 2.5, y: a.y }, 3)!;
+    const worker = spawnEnemy(state, 'stitcher', near.x - 0.5, near.y - 0.5, false);
+    worker.summonerId = queen.id;
+    worker.alertedUntil = state.tick + 100000;
+    state.player.x = 40.5;
+    state.player.y = 40.5;
+    for (
+      let n = 0;
+      n < 200 && !(worker.action?.kind === 'stitch' && worker.action.target === strand.id);
+      n++
+    ) {
+      state.tick++;
+      updateEnemies(state, []);
+    }
+    expect(worker.action?.kind).toBe('stitch');
+    damageEntity(state, worker, 10000, []);
+    expect(worker.alive).toBe(false);
+    until(state, state.tick + 60);
+    expect(strand.phase).toBe('loose');
+    expect(strand.tension).toBeLessThan(100);
+    // Outro Costureiro, com o jogador em cima dele: briga em vez de costurar.
+    const second = spawnEnemy(state, 'stitcher', near.x - 0.5, near.y - 0.5, false);
+    second.summonerId = queen.id;
+    second.alertedUntil = state.tick + 100000;
+    state.player.x = second.x + 2;
+    state.player.y = second.y;
+    until(state, state.tick + 40);
+    expect(second.action?.kind === 'stitch' && second.action.target === strand.id).toBe(false);
+  });
+
+  it('a morte da Cerzideira encerra os auxiliares e dissolve a teia', () => {
+    const { state, queen } = fixture();
+    toFrenzy(state, queen);
+    const strand = state.sutures.find((s) => isWebStrand(s) && s.phase === 'taut')!;
+    const p = suturePoint(state, strand.cells[1] ?? strand.cells[0]);
+    state.player.x = p.x;
+    state.player.y = p.y;
+    expect(webSpeedMul(state, state.player)).toBe(WEB_SLOW);
+    expect(state.enemies.some((e) => e.alive && e.summonerId === queen.id)).toBe(true);
+    damageEntity(state, queen, 100000, []);
+    expect(queen.alive).toBe(false);
+    expect(state.enemies.some((e) => e.alive && e.summonerId === queen.id)).toBe(false);
+    expect(state.sutures.filter(isWebStrand).every((s) => s.phase === 'spent')).toBe(true);
+    expect(webSpeedMul(state, state.player)).toBe(1);
+  });
+
   it('hashes locked targets, anchor, deadlines, ownership and encounter cadence', () => {
     const a = fixture(),
       b = fixture();
@@ -308,5 +594,11 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     }
     b.queen.silk!.lunges++;
     expect(hashAuthoritativeState(b.state)).not.toBe(baseline);
+    b.queen.silk!.lunges--;
+    for (const key of ['stage', 'stageAt', 'returnAt'] as const) {
+      b.queen.silk![key]++;
+      expect(hashAuthoritativeState(b.state), key).not.toBe(baseline);
+      b.queen.silk![key]--;
+    }
   });
 });
