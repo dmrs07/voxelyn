@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
-import { impactSolid } from '../src/materials';
+import { damageEntity, spawnEnemy, startAction, updateEnemies } from '../src/entities';
+import { impactSolid, impactSurface } from '../src/materials';
 import { breakSolid } from '../src/cells';
 import {
   createSutures,
@@ -21,14 +21,15 @@ import {
   SOLID_STITCHED_ROCK,
   SURF_FIRE,
   SURF_DEEP_WATER,
+  SURF_MINERAL_SILK,
 } from '../src/constants';
 import { sectorBiome, sectorProfile } from '../src/strata';
 import { generateWorld } from '../src/worldgen';
 import { sectorSeed } from '../src/sectors';
-import type { SemanticEvent, SutureRecipe } from '../src/types';
+import type { Entity, SemanticEvent, SurvivalState, SutureRecipe } from '../src/types';
 
-const fixture = (kind: 'roof' | 'gate' = 'roof') => {
-  const state = createRun({ seed: 1 });
+const fixture = (kind: 'roof' | 'gate' = 'roof', playerCount = 1) => {
+  const state = createRun({ seed: 1, playerCount });
   state.solid.fill(SOLID_NONE);
   state.surface.fill(0);
   state.enemies = [];
@@ -48,10 +49,40 @@ const fixture = (kind: 'roof' | 'gate' = 'roof') => {
   };
   state.solid[recipe.a] = state.solid[recipe.b] = SOLID_SUTURE_ANCHOR;
   state.sutures = createSutures([recipe]);
+  for (const i of cells) state.surface[i] = SURF_MINERAL_SILK;
   state.player.x = 12.5;
   state.player.y = 12.5;
   state.playerExtra.iframesUntil = 0;
   return state;
+};
+
+const beginPass = (state: SurvivalState, queen: Entity): void => {
+  queen.x = 8.5;
+  queen.y = 20.5;
+  startAction(state, queen, 'tether', { x: 1, y: 0 }, 2, 30, [], 0);
+  queen.nextActionAt = queen.action!.endsAt + 100;
+};
+
+const passFixture = (playerCount = 1) => {
+  const state = fixture('roof', playerCount);
+  state.players.forEach((p, slot) => {
+    p.x = 12.5 + slot * 4;
+    p.y = 20.5;
+    state.playerExtras[slot].iframesUntil = 0;
+  });
+  const queen = spawnEnemy(state, 'seamstress', 8, 20, false);
+  beginPass(state, queen);
+  return { state, queen };
+};
+
+const finishPass = (state: SurvivalState, queen: Entity): SemanticEvent[] => {
+  const events: SemanticEvent[] = [];
+  const end = queen.action!.endsAt;
+  while (state.tick < end) {
+    state.tick++;
+    updateEnemies(state, events);
+  }
+  return events;
 };
 
 describe('Colônia dos Costureiros', () => {
@@ -264,6 +295,88 @@ describe('Colônia dos Costureiros', () => {
     stitcherStep(state, queen, state.player, 0.05, events);
     expect(events.filter((e) => e.t === 'boss_phase')).toHaveLength(1);
   });
+
+  it('a puxada causa um unico impacto de 20 por passagem e rearma na proxima', () => {
+    const { state, queen } = passFixture();
+    const hp = state.player.hp;
+    const first = finishPass(state, queen);
+    expect(state.player.hp).toBe(hp - 20);
+    expect(first.filter((e) => e.t === 'hit' && e.target === state.player.id)).toHaveLength(1);
+    beginPass(state, queen);
+    const second = finishPass(state, queen);
+    expect(state.player.hp).toBe(hp - 40);
+    expect(second.filter((e) => e.t === 'hit' && e.target === state.player.id)).toHaveLength(1);
+  });
+
+  it('cada parceiro pode receber um impacto, mesmo em pontos diferentes da puxada', () => {
+    const { state, queen } = passFixture(2);
+    const hp = state.players.map((p) => p.hp);
+    const events = finishPass(state, queen);
+    state.players.forEach((p, slot) => {
+      expect(p.hp).toBe(hp[slot] - 20);
+      expect(events.filter((e) => e.t === 'hit' && e.target === p.id)).toHaveLength(1);
+    });
+  });
+
+  it('esquivar do primeiro contato evita dano tardio quando os iframes terminam', () => {
+    const { state, queen } = passFixture();
+    state.player.x = 9.5;
+    state.playerExtra.iframesUntil = queen.action!.releaseAt + 1;
+    const hp = state.player.hp;
+    const events = finishPass(state, queen);
+    expect(state.player.hp).toBe(hp);
+    expect(events.filter((e) => e.t === 'hit')).toHaveLength(0);
+  });
+
+  it('o hash distingue uma puxada que ja resolveu contato sem mudar o HP', () => {
+    const a = passFixture(),
+      b = passFixture();
+    expect(hashAuthoritativeState(a.state)).toBe(hashAuthoritativeState(b.state));
+    b.queen.action!.contactedSlots = 1;
+    expect(a.state.player.hp).toBe(b.state.player.hp);
+    expect(hashAuthoritativeState(a.state)).not.toBe(hashAuthoritativeState(b.state));
+  });
+
+  it.each(['zero hp', 'dead', 'downed', 'not joined'])(
+    'a puxada ignora um jogador %s sem registrar dano',
+    (condition) => {
+      const { state, queen } = passFixture();
+      if (condition === 'zero hp') state.player.hp = 0;
+      if (condition === 'dead') state.player.alive = false;
+      if (condition === 'downed') state.playerExtra.downed = true;
+      if (condition === 'not joined') state.playerExtra.joined = false;
+      const before = state.stats.damageTakenTenths;
+      const events = finishPass(state, queen);
+      expect(events.filter((e) => e.t === 'hit')).toHaveLength(0);
+      expect(state.stats.damageTakenTenths).toBe(before);
+    },
+  );
+
+  it.each(['flamethrower', 'thermal impact'])(
+    '%s acende a seda mineral e solta a carga com os avisos normais',
+    (source) => {
+      const state = fixture(),
+        events: SemanticEvent[] = [],
+        s = state.sutures[0];
+      if (source === 'flamethrower') {
+        state.player.y = 9.5;
+        state.playerExtra.ability = 'flamethrower';
+        const command = emptyCommand();
+        command.ability = true;
+        command.aim = { x: 0, y: 1 };
+        events.push(...stepRun(state, [command]).events);
+      } else {
+        impactSurface(state, 12, 12, 'thermal', events);
+        stepSutures(state, events);
+      }
+      expect(state.surface[s.cells[2]]).toBe(SURF_FIRE);
+      expect(s.phase).toBe('cut');
+      expect(s.whipAt).toBe(state.tick + 16);
+      expect(s.fallAt).toBe(state.tick + 32);
+      expect(events.some((e) => e.t === 'suture' && e.phase === 'cut')).toBe(true);
+      expect(events.some((e) => e.t === 'suture' && e.phase === 'fall')).toBe(false);
+    },
+  );
 
   it('fire and explosion damage can release a seam; the reward is paid only once', () => {
     const state = fixture(),

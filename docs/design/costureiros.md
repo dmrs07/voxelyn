@@ -24,15 +24,16 @@ Cada setor recebe até 12 suturas. A receita substitui apenas material de parede
 
 ## Regras de combate
 
-| Ação                                       | Resultado                                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Cortar fio frouxo                          | Interrompe o trabalho sem chicote ou queda.                                                |
-| Cortar fio tensionado                      | Aviso no chão; chicote após 16 ticks (0,8 s), causando 18 de dano.                         |
-| Soltar carga suspensa                      | Cruz no chão; queda após 32 ticks (1,6 s), causando 34 de dano.                            |
-| Atirar na âncora                           | Primeiro impacto racha; segundo rompe. Destruição por outras fontes também solta a sutura. |
-| Incendiar a faixa do fio                   | Solta a sutura.                                                                            |
-| Matar o operário                           | Interrompe a costura pendente; a obra já concluída permanece.                              |
-| Cortar o suporte carregado pela Cerzideira | Cancela a puxada, derruba o corpo e o expõe por 60 ticks (3 s).                            |
+| Ação                                         | Resultado                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Cortar fio frouxo                            | Interrompe o trabalho sem chicote ou queda.                                                       |
+| Cortar fio tensionado                        | Aviso no chão; chicote após 16 ticks (0,8 s), causando 18 de dano.                                |
+| Soltar carga suspensa                        | Cruz no chão; queda após 32 ticks (1,6 s), causando 34 de dano.                                   |
+| Atirar na âncora                             | Primeiro impacto racha; segundo rompe. Destruição por outras fontes também solta a sutura.        |
+| Incendiar a faixa do fio                     | Chama ou impacto térmico acende a seda mineral e solta a sutura, preservando os avisos.           |
+| Ser atravessado por uma puxada da Cerzideira | Um impacto de 20 por jogador em cada puxada. Esquivar evita também dano tardio na mesma passagem. |
+| Matar o operário                             | Interrompe a costura pendente; a obra já concluída permanece.                                     |
+| Cortar o suporte carregado pela Cerzideira   | Cancela a puxada, derruba o corpo e o expõe por 60 ticks (3 s).                                   |
 
 Chicote e queda atingem Prospectores e criaturas. Colisão do tiro usa o segmento percorrido, incluindo disparos paralelos ao fio e à amarra diagonal da Cerzideira. O corte não consome carga adicional de módulo.
 
@@ -43,6 +44,10 @@ A Cerzideira resiste a impactos enquanto sustentada (0,55× dano). Derrubada, re
 ![Sequência de corte](../media/costureiros/04-corte-chicote-queda.png)
 
 A imagem é um ensaio da simulação com posições controladas e paredes em corte. Usa os atlas e o desenhador de suturas do jogo; não é uma captura do navegador.
+
+![Fogo soltando a carga](../media/costureiros/05-fogo-solta-a-carga.png)
+
+Nesta prévia, o corte começa pela ignição de uma célula de seda mineral gerada no setor. A simulação produz os mesmos avisos de chicote e queda.
 
 ## Prévia jogável e reprodução
 
@@ -56,6 +61,7 @@ Com as dependências instaladas, a partir da raiz:
 node packages/voxelyn-survival-content/tools/generate.mjs enemy-stitcher enemy-seamstress terrain-blocks surface-tiles world-props
 node packages/voxelyn-survival-content/tools/preview-stitchers.mjs docs/media/costureiros
 node packages/voxelyn-survival/scripts/preview-costureiros-simulation.mjs
+node packages/voxelyn-survival/scripts/preview-costureiros-simulation.mjs docs/media/costureiros --fire
 node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs
 ```
 
@@ -63,7 +69,7 @@ node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs
 
 O estado de suturas, seus prazos e a máscara de recompensas entram no hash autoritativo, snapshots, resync e estados de apresentação solo/co-op. A sutura desenhada acompanha o tick do corpo, em vez do snapshot mais recente recebido. O snapshot MCP expõe geometria, fase, prazos e objetivo.
 
-Versões: protocolo 34, simulação 65, conteúdo 35. Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
+Versões: protocolo 34, simulação 66, conteúdo 35. Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
 
 Os atlas novos carregam sob demanda. Ao trocar de encontro, o cliente libera os atlas opcionais e mapas de faces do boss anterior, incluindo pedidos ainda em andamento. Os limites existentes de 160 MiB no boot e 48 MiB sob demanda foram mantidos; o validador mede o conjunto comum mais o maior encontro residente.
 

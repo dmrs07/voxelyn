@@ -3825,6 +3825,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
       // faria dois estados com o mesmo HP/geada aceitarem o mesmo hash agora e
       // divergirem quando os iframes acabassem antes da recovery.
       mix(enemy.action.landed === true ? 1 : 0);
+      mix(enemy.action.contactedSlots ?? 0);
     }
   }
   for (const proj of state.projectiles) {

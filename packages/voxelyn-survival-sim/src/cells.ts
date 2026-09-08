@@ -34,6 +34,7 @@ import {
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
+  SURF_MINERAL_SILK,
   SURF_GAS,
   SURF_NONE,
   SURF_DEEP_WATER,
@@ -401,7 +402,7 @@ export const heatFungalCell = (state: SurvivalState, i: number, directHeat = fal
  * - fungo umido apenas entra em secagem;
  * - gas vira um flash curtissimo;
  * - esporos queimam/esterilizam sem explodir;
- * - biofluido usa a combustao normal.
+ * - biofluido e seda mineral usam a combustao normal.
  */
 export const igniteCell = (state: SurvivalState, i: number, events: SemanticEvent[]): boolean => {
   const surf = state.surface[i];
@@ -423,7 +424,7 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
     announceIgnite(state, i, events);
     return true;
   }
-  if (surf === SURF_BIOFLUID) {
+  if (surf === SURF_BIOFLUID || surf === SURF_MINERAL_SILK) {
     setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
     announceIgnite(state, i, events);
     return true;

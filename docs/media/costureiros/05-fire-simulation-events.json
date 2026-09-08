@@ -1,0 +1,44 @@
+{
+  "seed": 36,
+  "sector": 7,
+  "sutureId": 0,
+  "events": [
+    {
+      "t": "ignite",
+      "x": 76,
+      "y": 87
+    },
+    {
+      "t": "suture",
+      "phase": "cut",
+      "id": 0,
+      "x": 76.5,
+      "y": 91.5
+    },
+    {
+      "t": "action_end",
+      "entity": 24
+    },
+    {
+      "t": "boss_vulnerable",
+      "archetype": "seamstress",
+      "x": 78.5,
+      "y": 89.5,
+      "open": true
+    },
+    {
+      "t": "suture",
+      "phase": "snap",
+      "id": 0,
+      "x": 76.5,
+      "y": 91.5
+    },
+    {
+      "t": "suture",
+      "phase": "fall",
+      "id": 0,
+      "x": 76.5,
+      "y": 91.5
+    }
+  ]
+}

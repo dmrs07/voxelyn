@@ -583,6 +583,8 @@ export type EntityAction = {
    * So os botes de espreitador o escrevem.
    */
   landed?: true;
+  /** Slots que ja cruzaram esta puxada, inclusive por esquiva. Reinicia por acao. */
+  contactedSlots?: number;
 };
 
 export type Entity = {

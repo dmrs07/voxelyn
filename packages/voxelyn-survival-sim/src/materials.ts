@@ -1,4 +1,9 @@
-import { SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED, SOLID_STITCHED_ROCK } from './constants.js';
+import {
+  SOLID_SUTURE_ANCHOR,
+  SOLID_SUTURE_CRACKED,
+  SOLID_STITCHED_ROCK,
+  SURF_MINERAL_SILK,
+} from './constants.js';
 // Como cada CLASSE de projetil reage com cada MATERIAL.
 //
 // Por que existe: a taxonomia de materiais ja estava no mundo — rocha, frágil,
@@ -435,7 +440,7 @@ export const impactSurface = (
     return false;
   }
 
-  if (surface === SURF_BIOFLUID && cls === 'thermal') {
+  if ((surface === SURF_BIOFLUID || surface === SURF_MINERAL_SILK) && cls === 'thermal') {
     igniteCell(state, i, events);
     return false;
   }

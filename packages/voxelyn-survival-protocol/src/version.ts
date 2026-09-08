@@ -966,7 +966,12 @@ export const PROTOCOL_VERSION = 34;
 //     contra 4,6 do Prospector, a fuga continua possivel e passa a ser
 //     merecida. `DIAMANDIS_HP` 880 -> 1400 para o quarto ato caber. Dano,
 //     alcance e velocidade do chefe mudaram: um replay de 63 nao bate.
-export const SIMULATION_VERSION = 65;
+// 65: A COLONIA DOS COSTUREIROS, suturas, cargas e Cerzideira entram na geracao
+//     e na simulacao autoritativa.
+// 66: A puxada registra contato por slot e por acao, inclusive esquivas, para
+//     nao repetir dano durante a sobreposicao. Seda mineral responde a chama
+//     e impacto termico. O latch da puxada entra no hash; replays de 65 divergem.
+export const SIMULATION_VERSION = 66;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

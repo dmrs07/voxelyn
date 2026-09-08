@@ -444,18 +444,29 @@ export const seamstressStride = (
   dt: number,
   events: SemanticEvent[],
 ): void => {
-  if (enemy.action?.kind !== 'tether' || enemy.action.phase === 'windup') return;
-  moveEntity(state, enemy, enemy.action.direction.x * 8 * dt, enemy.action.direction.y * 8 * dt);
-  for (const p of state.players)
+  const action = enemy.action;
+  if (action?.kind !== 'tether' || action.phase === 'windup') return;
+  moveEntity(state, enemy, action.direction.x * 8 * dt, action.direction.y * 8 * dt);
+  for (const p of state.players) {
+    const slot = p.slot ?? 0,
+      extra = state.playerExtras[slot],
+      bit = 1 << slot;
     if (
       p.alive &&
-      state.playerExtras[p.slot ?? 0].joined &&
+      p.hp > 0 &&
+      extra.joined &&
+      !extra.downed &&
+      !((action.contactedSlots ?? 0) & bit) &&
       Math.hypot(p.x - enemy.x, p.y - enemy.y) < p.radius + enemy.radius
     ) {
+      // Resolve cada parceiro uma vez por puxada. Uma esquiva tambem consome
+      // o contato: iframes terminando durante a sobreposicao nao cobram de novo.
+      action.contactedSlots = (action.contactedSlots ?? 0) | bit;
       damageEntity(state, p, 20, events, {
         kind: 'enemy_contact',
         archetype: 'seamstress',
         elite: false,
       });
     }
+  }
 };

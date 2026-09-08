@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const out = resolve(process.argv[2] ?? resolve(root, 'docs/media/costureiros'));
+const useFire = process.argv.includes('--fire');
 await mkdir(out, { recursive: true });
 const temp = await mkdtemp(resolve(tmpdir(), 'costureiros-review-'));
 const entry = resolve(temp, 'engine.mjs');
@@ -35,7 +36,11 @@ const state = engine.createArenaRun({
 });
 const queen = state.enemies.find((e) => e.archetype === 'seamstress');
 const suture = state.sutures
-  .filter((s) => s.kind === 'roof')
+  .filter(
+    (s) =>
+      s.kind === 'roof' &&
+      (!useFire || s.cells.some((i) => state.surface[i] === engine.SURF_MINERAL_SILK)),
+  )
   .sort((a, b) => {
     const pa = engine.suturePoint(state, a.cells[0]),
       pb = engine.suturePoint(state, b.cells[0]);
@@ -54,17 +59,23 @@ const frames = [];
 const events = [];
 for (const [label, tick] of [
   ['AMARRA SOB CARGA', 100],
-  ['CORTE / AVISO', 100],
+  [useFire ? 'FOGO / AVISO' : 'CORTE / AVISO', 100],
   ['CHICOTE / 0,8 s', 116],
   ['QUEDA / 1,6 s', 132],
 ]) {
-  if (frames.length === 1) engine.cutSuture(state, suture, events, 0);
+  if (frames.length === 1) {
+    if (useFire) {
+      const cell = suture.cells.find((i) => state.surface[i] === engine.SURF_MINERAL_SILK);
+      engine.igniteCell(state, cell, events);
+    } else engine.cutSuture(state, suture, events, 0);
+  }
   state.tick = tick;
   engine.stepSutures(state, events);
   frames.push({ state: structuredClone(state), label });
 }
 const atlasDir = resolve(root, 'packages/voxelyn-survival-content/assets/atlases');
 const terrain = JSON.parse(await readFile(resolve(atlasDir, 'terrain-blocks.json'), 'utf8'));
+const surfaces = JSON.parse(await readFile(resolve(atlasDir, 'surface-tiles.json'), 'utf8'));
 const defs = new Map();
 const sprite = async (id, index, m, scale = 0.5) => {
   const key = id + '-' + index;
@@ -146,6 +157,28 @@ for (const [n, frame] of frames.entries()) {
       ctx.output.push(
         `<path d="M${sx},${sy - 8}l16,8 -16,8 -16,-8Z" fill="${solid ? '#17202c' : '#202d37'}" stroke="#283540" stroke-width=".4"/>`,
       );
+      if (useFire && !solid) {
+        const surface = frame.state.surface[y * w + x];
+        const kind =
+          surface === engine.SURF_FIRE ? 4 : surface === engine.SURF_MINERAL_SILK ? 20 : -1;
+        if (kind >= 0) {
+          const offset = surfaces.kinds
+            .slice(0, kind)
+            .reduce((sum, k) => sum + k.frames * surfaces.variants * surfaces.lightLevels, 0);
+          const animation = surfaces.kinds[kind];
+          const phase = animation.frameMs
+            ? Math.floor((frame.state.tick * 50) / animation.frameMs) % animation.frames
+            : 0;
+          const key = await sprite(
+            'surface-tiles',
+            offset + phase * surfaces.lightLevels + 5,
+            surfaces,
+          );
+          ctx.output.push(
+            `<use href="#${key}" x="${sx - surfaces.originX * 0.5}" y="${sy - surfaces.originY * 0.5}"/>`,
+          );
+        }
+      }
       // Front walls are cut away to expose cable height and floor warnings.
       if (solid && (x + y < center.x + center.y + 1 || solid >= 15)) {
         const kind = solid === 15 ? 17 : solid === 16 ? 18 : solid === 17 ? 19 : 0;
@@ -190,7 +223,9 @@ for (const [n, frame] of frames.entries()) {
   boards.push(ctx.output.join(''));
   const desc = [
     'A carga pende do fio. O corpo da Cerzideira usa uma amarra.',
-    'O corte derruba a Cerzideira; marcas indicam chicote e queda.',
+    useFire
+      ? 'O fogo acende a seda, solta a carga e derruba a Cerzideira.'
+      : 'O corte derruba a Cerzideira; marcas indicam chicote e queda.',
     'O fio chicoteia. As cruzes continuam avisando a queda da massa.',
     'A carga cai. A Cerzideira continua exposta até completar 3 s.',
   ][n];
@@ -199,10 +234,13 @@ for (const [n, frame] of frames.entries()) {
   );
 }
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1376" height="1100"><style>text{font-family:DejaVu Sans,sans-serif;fill:#ddd5c6}.label{font-size:18px}.small{font-size:15px}.tiny{font-size:13px;fill:#95a5b6}</style><defs>${[...defs.values()].join('')}</defs><rect width="1376" height="1100" fill="#0d131c"/><text x="28" y="44" font-size="28">COSTUREIROS / cortar muda o combate</text><text x="28" y="78" class="small">Ensaio da simulação · seed 36 · atlas e desenho de suturas reais · cenário em corte</text>${boards.join('')}<text x="28" y="1080" class="tiny">Prévia de mecânica, sem captura de navegador. Perigos também atingem criaturas. Posições controladas para leitura.</text></svg>`;
-await sharp(Buffer.from(svg)).png().toFile(resolve(out, '04-corte-chicote-queda.png'));
+const filename = useFire ? '05-fogo-solta-a-carga' : '04-corte-chicote-queda';
+await sharp(Buffer.from(svg))
+  .png()
+  .toFile(resolve(out, filename + '.png'));
 await writeFile(
-  resolve(out, '04-simulation-events.json'),
+  resolve(out, useFire ? '05-fire-simulation-events.json' : '04-simulation-events.json'),
   JSON.stringify({ seed: 36, sector: 7, sutureId: suture.id, events }, null, 2) + '\n',
 );
 await rm(temp, { recursive: true, force: true });
-console.log(resolve(out, '04-corte-chicote-queda.png'));
+console.log(resolve(out, filename + '.png'));
