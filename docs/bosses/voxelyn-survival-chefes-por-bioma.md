@@ -944,6 +944,63 @@ manifest antigo ela falha em `(1, 1)`, `dl` contra `d`. Em
 `tests/devourer-coil.test.ts`, a da âncora **recalcula o deslocamento** a partir
 dos quadros crus e cobra a igualdade — com o 32 ela falha.
 
+### O CORDUROY dos rumos de meio passo, e o fim dele
+
+Com os anéis em oito rumos ficou visível uma coisa que já estava lá desde o
+Diamandis: nos quatro rumos de meio passo (`r`/`d`/`l`/`u`) os corpos vinham
+**listrados** — ripas verticais claras e escuras alternadas. O chassi do
+Diamandis lia como um paliçado, e as pernas dele como dois pentes.
+
+**Não era sombra.** Desligando `shadedRamp` inteiro — sem oclusão, sem quina
+acesa — as listras continuavam idênticas. Era a forma: o caminho antigo girava o
+**modelo** 45° e o re-amostrava na mesma grade, e a grade só aceita 90°. A 45°
+todo plano vira escada de um voxel, e o carimbo de cubo então mostra o topo de
+uma coluna e só a lateral da vizinha.
+
+A correção está na §2.5 da Art Bible: quem gira passa a ser a **câmera**, e o
+desenho vira preenchimento de quadrilátero de face. Girar o modelo por α e girar
+a câmera por α dão a mesma imagem — a rotação entra somada dentro do seno e do
+cosseno da projeção —, então a grade fica intacta e um plano continua plano.
+
+Vale para os **nove atlas de oito rumos**: chassi, braço, broca, rampa e mastro
+do Diamandis; cabeça e anel do Devorador; cauda e asas do Leviatã. Só os quatro
+rumos de meio passo mudam de pixel — os de quarto de volta continuam byte a byte
+iguais, porque continuam no carimbo de cubo.
+
+Três medidas que fecham a conta:
+
+- **Consistência de paleta.** Antes, cinco dos nove atlas usavam nos rumos de
+  meio passo cores que **não aparecem em rumo nenhum** de quarto de volta: tops
+  expostos a mais e frestas fundas demais, ambos inventados pela escada. Depois,
+  oito dos nove com zero cores fora, e o nono (`part-diamandis-rack`) com a mesma
+  uma de antes.
+- **Memória.** Boot inalterado em 166.159.264 bytes. PNG total caiu de 3.532.242
+  para **3.395.427** — superfície lisa comprime melhor que ruído.
+- **Quadros.** Dois precisaram crescer, porque sem a escada o desenho projeta um
+  pixel mais para os lados: a âncora do braço foi de 27 para 29, e a rampa foi de
+  60 para 62 de largura (âncora 30). Nos dois, âncora de render e âncora
+  publicada saem do mesmo objeto, então a peça não sai do lugar na tela.
+
+Três defeitos meus no caminho, todos achados por medida e não por leitura:
+
+- **A frente saía no tom mais escuro.** Nesses rumos a única lateral visível fica
+  exatamente de frente (screen-x zero), e eu resolvia o empate para o `right` da
+  rampa. O funil de minério do Diamandis — a única faixa clara do chassi — virava
+  um navy chapado nos quatro rumos.
+- **Faces de um voxel sumiam.** Uma face girada mede ~2,8 × 1,4 px e pode não
+  conter centro de pixel nenhum. O mastro perdeu o topo de todas as hastes de
+  `loot`, e o defeito apareceu como uma cor a menos no manifest (`#ffd166`).
+- **A âncora do anel, de novo.** O rasterizador novo mudou o deslocamento do
+  `fitSpriteToMargin` de −1 para 0, então a âncora publicada teve de ir de 33
+  para 34. É a terceira vez que esse deslocamento muda debaixo de um número
+  escrito à mão; `tests/devourer-coil.test.ts` o recalcula em vez de repetir, e
+  foi ele que pegou.
+
+O que se perde: os rumos de meio passo ficam mais **lisos**. A textura que a
+escada dava era ruído, não informação — mas num corpo sem geometria própria (o
+anel é um tubo liso) o resultado limpo lê mais chapado que o listrado. No
+Diamandis, que tem geometria de sobra, não há disputa.
+
 ### Documentos do Devorador
 
 | Gatilho                     | Documento                                                                                                                                                                                  | ID           |

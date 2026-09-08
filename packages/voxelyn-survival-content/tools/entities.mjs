@@ -2644,11 +2644,14 @@ export const DEVOURER_COIL_FRAME = { w: 70, h: 58, ax: 34, ay: 49 };
  * `fitSpriteToMargin` recentraliza a uniao de TODOS os quadros no frame, e a
  * ancora publicada tem de acompanhar esse deslocamento.
  *
- * O deslocamento depende da uniao, entao ele MUDA quando se acrescenta rumo ou
- * se mexe na largura: com quatro rumos em 64 px ele era -2 e a ancora publicada
- * era 32 - 2 = 30; com oito rumos em 70 px ele e -1, e a ancora e 34 - 1 = 33.
- * Manter o 32 - 2 de antes deslocaria a fila inteira de dez aneis um pixel para
- * fora da linha da cabeca, em todos os rumos.
+ * O deslocamento depende da uniao, entao ele MUDA quando se acrescenta rumo, se
+ * mexe na largura OU se troca o rasterizador: com quatro rumos em 64 px ele era
+ * -2 e a ancora publicada era 32 - 2 = 30; com oito rumos em 70 px passou a -1;
+ * e com o meio passo desenhado por faces ele e 0, entao a ancora e 34. Carregar
+ * o numero de antes desloca a fila inteira de dez aneis um pixel para fora da
+ * linha da cabeca, em todos os rumos, sem nada reclamar — foi o que aconteceu
+ * duas vezes, e e por isso que `tests/devourer-coil.test.ts` recalcula o
+ * deslocamento em vez de repetir o numero.
  */
 const devourerCoilFrame = (dir, anim, f) =>
   renderVoxels(
@@ -3568,7 +3571,13 @@ const diamandisFrame = (dir, anim, f) =>
 // nao recentraliza). Os quadros sao os menores que enquadram as oito rotacoes
 // de todas as poses com 2px de margem.
 /** O quadro do braco: pequeno, porque um manipulador e pequeno. */
-export const DIAMANDIS_ARM_FRAME = { w: 58, h: 50, ax: 27, ay: 12 };
+// A ancora foi de 27 para 29 quando o meio passo passou a ser desenhado por
+// faces: sem a escada da re-amostragem o braco projeta um pixel mais para a
+// ESQUERDA em `l/attack/2`, e a validacao cobra 2 px de margem. Mover a ancora
+// (e nao alargar o quadro) porque ela e o ENCAIXE: o render e o manifest leem
+// deste mesmo objeto, entao os dois andam juntos e a peca nao sai do lugar na
+// tela.
+export const DIAMANDIS_ARM_FRAME = { w: 58, h: 50, ax: 29, ay: 12 };
 const diamandisArmFrame = (dir, anim, f) =>
   renderVoxels(
     diamandisArmModel(anim, f),
@@ -3581,7 +3590,10 @@ const diamandisArmFrame = (dir, anim, f) =>
 
 export const DIAMANDIS_PART_FRAMES = {
   drill: { w: 128, h: 68, ax: 62, ay: 32 },
-  rack: { w: 60, h: 76, ax: 28, ay: 38 },
+  // 62 e nao 60, e a ancora acompanha: pela mesma razao do braco, a rampa
+  // projeta mais para os lados sem a escada, e aqui os dois lados apertaram ao
+  // mesmo tempo — nenhuma ancora dentro de 60 deixava 2 px nos dois.
+  rack: { w: 62, h: 76, ax: 30, ay: 38 },
   mast: { w: 56, h: 80, ax: 26, ay: 41 },
 };
 const diamandisPartFrame = (part) => (dir, anim, f) => {
@@ -4292,7 +4304,7 @@ export const ENTITY_SPECS = [
       'part-white-devourer-coil',
       70,
       58,
-      33,
+      34,
       47,
       { w: 0.64, h: 0.64 },
       { w: 0.6, h: 0.6, offsetX: 0, offsetY: 0 },

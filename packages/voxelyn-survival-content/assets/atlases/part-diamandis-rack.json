@@ -4,10 +4,10 @@
   "atlas": "part-diamandis-rack.png",
   "normalAtlas": "part-diamandis-rack.normal.png",
   "normalScale": 2,
-  "frameWidth": 60,
+  "frameWidth": 62,
   "frameHeight": 76,
   "columns": 51,
-  "anchorX": 28,
+  "anchorX": 30,
   "anchorY": 38,
   "directions": 8,
   "authoredDirs": [
@@ -35,7 +35,6 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
-    "#2e3a4d",
     "#6e4a33",
     "#7ab8ff",
     "#7b8ba3",
