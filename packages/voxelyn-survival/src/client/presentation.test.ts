@@ -538,4 +538,38 @@ describe('EntityPresentation', () => {
       expect(presented.anim.upper.facingY).toBe(-1);
     }
   });
+
+  it('a Cerzideira no fio vertical usa a pose de voo com o relogio da etapa', () => {
+    const presentation = new EntityPresentation();
+    const entity = {
+      id: 10,
+      archetype: 'seamstress',
+      facing: { x: 1, y: 0 },
+      stunnedUntil: 0,
+      silk: { stage: 1, stageAt: 100 },
+    };
+    const up = presentation.animationFor(
+      entity as never,
+      { tick: 110 } as never,
+      baseAnim('idle') as never,
+      0,
+    );
+    expect(up.anim).toBe('fly');
+    expect(up.elapsedMs).toBe(500);
+    const down = presentation.animationFor(
+      { ...entity, silk: { stage: 3, stageAt: 300 } } as never,
+      { tick: 306 } as never,
+      baseAnim('idle') as never,
+      0,
+    );
+    expect(down.anim).toBe('fly');
+    expect(down.elapsedMs).toBe(300);
+    const frenzy = presentation.animationFor(
+      { ...entity, silk: { stage: 4, stageAt: 400 } } as never,
+      { tick: 410 } as never,
+      baseAnim('walk') as never,
+      0,
+    );
+    expect(frenzy.anim).toBe('walk');
+  });
 });

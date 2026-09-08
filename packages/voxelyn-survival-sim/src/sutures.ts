@@ -84,8 +84,9 @@ const walkLaneClear = (state: SurvivalState, queen: Entity, to: Vec2): boolean =
 };
 const anchorExists = (state: SurvivalState, i: number): boolean =>
   state.solid[i] === SOLID_SUTURE_ANCHOR || state.solid[i] === SOLID_SUTURE_CRACKED;
+// Um fio da teia nao tem ancoras: e sustentado pela propria teia.
 const usable = (state: SurvivalState, s: Suture): boolean =>
-  anchorExists(state, s.a) && anchorExists(state, s.b);
+  s.kind === 'web' || (anchorExists(state, s.a) && anchorExists(state, s.b));
 const signal = (
   state: SurvivalState,
   s: Suture,
@@ -118,6 +119,17 @@ export const cutSuture = (
   slot = -1,
 ): boolean => {
   if (s.encounter || s.phase === 'cut' || s.phase === 'spent') return false;
+  if (s.kind === 'web') {
+    // Um fio da teia rompe sem chicote nem queda: ele so deixa de existir ate
+    // que um Costureiro o refaca. `loose` e exatamente o estado que os
+    // Costureiros procuram — o corte ja e o pedido de reparo.
+    if (s.phase !== 'taut') return false;
+    s.phase = 'loose';
+    s.tension = 0;
+    s.cutBySlot = slot;
+    signal(state, s, 'snap', events);
+    return true;
+  }
   const loaded = s.phase === 'taut';
   s.phase = 'cut';
   s.closeAt = -1;
@@ -226,8 +238,10 @@ export const sewSuture = (state: SurvivalState, enemy: Entity, events: SemanticE
     summonSilkBrood(state, enemy, events);
     return;
   }
-  if (enemy.summonerId !== undefined) return;
   const s = state.sutures.find((s) => !s.encounter && s.id === enemy.action?.target);
+  // Auxiliares convocados so costuram a TEIA: as suturas da colonia sao dos
+  // operarios dela.
+  if (enemy.summonerId !== undefined && s?.kind !== 'web') return;
   if (!s || !usable(state, s) || s.phase === 'cut') return;
   if (s.phase === 'spent') return;
   s.tension = Math.min(100, s.tension + 34);
@@ -367,6 +381,38 @@ export const approach = (
   if (!walkBodyBlocked(state, enemy, enemy.x, enemy.y + stepY)) moveEntity(state, enemy, 0, stepY);
 };
 
+/**
+ * Um Costureiro indo trabalhar numa sutura: anda ate ela e, a menos de 1,4
+ * tile com linha de visao, da um ponto (18 ticks de preparo, 8 de descanso,
+ * 32 ate o proximo). Tres pontos completam o fio — sao ~5 s de costura
+ * visivel, o tempo de o jogador decidir se interrompe. Compartilhado pelos
+ * operarios da colonia e pelos auxiliares que refazem a teia.
+ */
+export const sewJob = (
+  state: SurvivalState,
+  enemy: Entity,
+  seam: Suture,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const p = suturePoint(state, seam.cells[0]);
+  const distance = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+  if (distance < 1.4 && hasLineOfSight(state, enemy.x, enemy.y, p.x, p.y)) {
+    const len = distance || 1;
+    startAction(
+      state,
+      enemy,
+      'stitch',
+      { x: (p.x - enemy.x) / len, y: (p.y - enemy.y) / len },
+      18,
+      8,
+      events,
+      seam.id,
+    );
+    enemy.nextActionAt = state.tick + 32;
+  } else approach(state, enemy, p, dt, enemy.summonerId !== undefined ? 3.2 : 2.7);
+};
+
 export const stitcherStep = (
   state: SurvivalState,
   enemy: Entity,
@@ -392,21 +438,7 @@ export const stitcherStep = (
     .sort((a, b) => distance(a) - distance(b) || a.id - b.id);
   const seam = candidates[0];
   if (seam && (!player || Math.hypot(player.x - enemy.x, player.y - enemy.y) > 2)) {
-    const p = suturePoint(state, seam.cells[0]);
-    if (distance(seam) < 1.4 && hasLineOfSight(state, enemy.x, enemy.y, p.x, p.y)) {
-      const len = Math.hypot(p.x - enemy.x, p.y - enemy.y) || 1;
-      startAction(
-        state,
-        enemy,
-        'stitch',
-        { x: (p.x - enemy.x) / len, y: (p.y - enemy.y) / len },
-        18,
-        8,
-        events,
-        seam.id,
-      );
-      enemy.nextActionAt = state.tick + 32;
-    } else approach(state, enemy, p, dt, 2.7);
+    sewJob(state, enemy, seam, dt, events);
     return;
   }
   if (!player) return;

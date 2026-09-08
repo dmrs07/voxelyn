@@ -340,6 +340,8 @@ export const PT_BR = {
     'Sai do abdome da Cerzideira. Agacha, marca o pouso e salta. Saia da marca e ataque durante a recuperação.',
   'seamstress.hint': 'Corte o fio · esquive da marca',
   'seamstress.exposed': 'ABDOME EXPOSTO · ataque agora',
+  'seamstress.aloft': 'ELA SUBIU · a teia se forma: leia as faixas',
+  'seamstress.frenzy': 'FRENESI · corte a teia para abrir passagem · mate quem costura',
   'enemy.stitcher': 'Costureiro',
   'enemy.seamstress': 'A Cerzideira',
   'bestiary.name.stitcher': 'Costureiro',

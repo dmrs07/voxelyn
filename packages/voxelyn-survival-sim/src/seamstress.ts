@@ -8,7 +8,8 @@ import {
 } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
-import { approach, suturePoint } from './sutures.js';
+import { approach, sewJob, suturePoint } from './sutures.js';
+import { spinWeb, weaveWeb, webRepairJobs } from './web.js';
 import {
   SEAMSTRESS_CHAMBER_RADIUS as CHAMBER_RADIUS,
   sutureInSeamstressChamber,
@@ -41,6 +42,44 @@ export const SILK_NEEDLE_REACH = 1.6;
  * todas as puxadas terminava com 19 de vida por causa desse contato.
  */
 export const SEAMSTRESS_CONTACT_GRACE = 24;
+
+// ---------------------------------------------------------------------------
+// A SEGUNDA FASE: sobe, tece, desce em frenesi.
+//
+// Na metade da vida ela larga o que estiver fazendo, prende-se a um fio
+// vertical e sobe ate sair da tela. Fora de vista, tece a teia (web.ts) fio a
+// fio; quando a tecelagem inicial termina, desce no centro da teia com os
+// olhos vermelhos, mais rapida, e traz uma leva de crias e Costureiros. A
+// volta e marcada na subida (`returnAt`): cortar fios nao a segura la em cima.
+// Acontece uma vez por encontro — `stage` so anda para a frente.
+// ---------------------------------------------------------------------------
+export const SEAMSTRESS_STAGE_GROUND = 0;
+export const SEAMSTRESS_STAGE_ASCENDING = 1;
+export const SEAMSTRESS_STAGE_ALOFT = 2;
+export const SEAMSTRESS_STAGE_DESCENDING = 3;
+export const SEAMSTRESS_STAGE_FRENZY = 4;
+/** A subida ate sumir (1,5 s) e a descida ate pousar (1,2 s). */
+export const SEAMSTRESS_ASCEND_TICKS = 30;
+export const SEAMSTRESS_DESCEND_TICKS = 24;
+/** Frenesi: perseguicao mais rapida, puxadas mais curtas, mais auxiliares. */
+export const SEAMSTRESS_FRENZY_SPEED = 5.2;
+export const SILK_FRENZY_HELPER_CAP = 8;
+export const SILK_FRENZY_STITCHERS = 2;
+export const SILK_FRENZY_WAVE_INTERVAL = 120;
+/** Altura, em pixels de zoom 1, a partir da qual o corpo esta fora da tela. */
+export const SEAMSTRESS_OFFSCREEN_LIFT = 320;
+
+export const seamstressStage = (queen: Entity): number => queen.silk?.stage ?? 0;
+export const seamstressFrenzied = (queen: Entity): boolean =>
+  seamstressStage(queen) === SEAMSTRESS_STAGE_FRENZY;
+/** Fora da tela nao ha corpo para acertar: nem tiro, nem missil, nem fogo. */
+export const seamstressTargetable = (queen: Entity): boolean => {
+  const stage = seamstressStage(queen);
+  return stage !== SEAMSTRESS_STAGE_ALOFT && stage !== SEAMSTRESS_STAGE_DESCENDING;
+};
+/** Nem desenhada: o que fica dela e o fio e a teia crescendo. */
+export const seamstressHidden = (queen: Entity): boolean =>
+  seamstressStage(queen) === SEAMSTRESS_STAGE_ALOFT;
 /** The same footprint is used by the authoritative hit and the ground marker. */
 export const silkStrike = (enemy: Entity): Vec2 & { radius: number } => {
   const queen = enemy.archetype === 'seamstress',
@@ -140,6 +179,9 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
     broodAt: 0,
     repositionUntil: 0,
     comboLeft: 0,
+    stage: SEAMSTRESS_STAGE_GROUND,
+    stageAt: 0,
+    returnAt: -1,
   };
   for (const s of state.sutures) {
     if (!sutureInSeamstressChamber(s, state.config.width, queen)) continue;
@@ -172,6 +214,18 @@ export const silkSupported = (enemy: Entity, tick: number): boolean =>
 
 /** Height in renderer pixels at zoom 1; flight and its ground shadow share one clock. */
 export const silkLift = (enemy: Entity, tick: number): number => {
+  // A subida e a descida da segunda fase: o corpo no fio vertical, do chao
+  // ate fora da tela e de volta. O mesmo relogio serve ao sprite e a sombra.
+  const silk = enemy.silk;
+  if (silk && silk.stage === SEAMSTRESS_STAGE_ASCENDING) {
+    const p = Math.min(1, Math.max(0, (tick - silk.stageAt) / SEAMSTRESS_ASCEND_TICKS));
+    return 38 + p * p * (SEAMSTRESS_OFFSCREEN_LIFT - 38);
+  }
+  if (silk && silk.stage === SEAMSTRESS_STAGE_ALOFT) return SEAMSTRESS_OFFSCREEN_LIFT;
+  if (silk && silk.stage === SEAMSTRESS_STAGE_DESCENDING) {
+    const p = Math.min(1, Math.max(0, (tick - silk.stageAt) / SEAMSTRESS_DESCEND_TICKS));
+    return (1 - p) * (1 - p) * SEAMSTRESS_OFFSCREEN_LIFT;
+  }
   const a = enemy.action,
     f = a?.silkFlight;
   if (!a || !f || tick < a.releaseAt || tick >= f.landAt) return 0;
@@ -204,7 +258,7 @@ export const dropSeamstress = (
   queen.stunnedUntil = state.tick + SEAMSTRESS_DROP_TICKS;
   queen.nextActionAt = queen.stunnedUntil;
   if (queen.silk) {
-    queen.silk.repositionUntil = queen.stunnedUntil + 14;
+    queen.silk.repositionUntil = queen.stunnedUntil + (seamstressFrenzied(queen) ? 6 : 14);
     queen.silk.comboLeft = 0;
   }
   events.push({ t: 'action_end', entity: queen.id });
@@ -308,7 +362,9 @@ const pull = (
   // The mark must sit inside the strike disc: a lunge that would miss a
   // standing target is not offered — she hunts on foot instead.
   if (!choice || choice.score > SILK_STRIKE_RADIUS - 0.1) return false;
-  const second = queen.hp < queen.maxHp / 2;
+  // A segunda fase E o frenesi: as puxadas encadeiam dois apoios e o preparo
+  // encurta (20 -> 12 -> 10 ticks), mas nunca abaixo do que da para ler.
+  const second = seamstressFrenzied(queen);
   const chained = second && encounter.comboLeft > 0;
   encounter.comboLeft = chained ? 0 : second ? 1 : 0;
   encounter.lastAnchor = choice.anchor;
@@ -317,9 +373,9 @@ const pull = (
     state,
     queen,
     choice.to,
-    chained ? 12 : second ? 16 : 20,
+    chained ? 10 : second ? 12 : 20,
     SEAMSTRESS_FLIGHT_SPEED,
-    second && !chained ? 6 : 14,
+    second && !chained ? 4 : second ? 8 : 14,
     events,
     player.id,
     choice.anchor,
@@ -335,11 +391,17 @@ export const summonSilkBrood = (
   events: SemanticEvent[],
 ): void => {
   const encounter = queen.silk;
-  if (!encounter || encounter.lunges < 2) return;
+  if (!encounter || (encounter.lunges < 2 && !seamstressFrenzied(queen))) return;
+  const frenzy = seamstressFrenzied(queen);
   const living = state.enemies.filter((e) => e.alive && e.summonerId === queen.id);
   const kinds: Array<'stitcher' | 'seamstress_brood'> = [];
-  if (!living.some((e) => e.archetype === 'stitcher')) kinds.push('stitcher');
-  while (kinds.length + living.length < SILK_HELPER_CAP) kinds.push('seamstress_brood');
+  // No frenesi a leva e maior (oito no total, dois Costureiros para refazer a
+  // teia); a reposicao continua espacada, para a luta continuar legivel.
+  const cap = frenzy ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP;
+  const workers = frenzy ? SILK_FRENZY_STITCHERS : 1;
+  for (let n = living.filter((e) => e.archetype === 'stitcher').length; n < workers; n++)
+    kinds.push('stitcher');
+  while (kinds.length + living.length < cap) kinds.push('seamstress_brood');
   for (const [n, kind] of kinds.entries()) {
     if (state.enemies.filter((e) => e.alive).length >= MAX_ENEMIES) break;
     const a = (queen.id + encounter.lunges + n * 2) * 2.399963229728653;
@@ -360,7 +422,115 @@ export const summonSilkBrood = (
     // Hatching/arrival is visible and harmless; the first pounce gets its own warning.
     startAction(state, helper, 'stitch', queen.facing, 12 + n * 3, 8, events);
   }
-  encounter.broodAt = state.tick + (queen.hp < queen.maxHp / 2 ? 100 : 160);
+  encounter.broodAt = state.tick + (frenzy ? SILK_FRENZY_WAVE_INTERVAL : 160);
+};
+
+/**
+ * A SUBIDA: larga o que estiver fazendo e prende-se ao fio vertical. Roda
+ * de `silkMaintenance`, antes das acoes, porque a IA nao decide nada durante
+ * uma puxada — e a transicao tem de interromper a puxada, nao esperar por ela.
+ */
+const beginAscent = (state: SurvivalState, queen: Entity, events: SemanticEvent[]): void => {
+  const encounter = queen.silk!;
+  if (encounter.stage !== SEAMSTRESS_STAGE_GROUND) return;
+  // INTERROMPE o ataque: uma puxada no ar pousa onde couber; a amarra solta.
+  if (queen.action?.silkFlight) {
+    const f = queen.action.silkFlight;
+    const at =
+      silkLanding(state, queen, queen, 6) ??
+      silkLanding(state, queen, { x: f.fromX, y: f.fromY }, 12);
+    if (at) {
+      queen.x = at.x;
+      queen.y = at.y;
+    }
+  }
+  if (queen.action) events.push({ t: 'action_end', entity: queen.id });
+  queen.action = undefined;
+  queen.mood = 0;
+  queen.vx = queen.vy = 0;
+  queen.stunnedUntil = 0;
+  encounter.comboLeft = 0;
+  encounter.repositionUntil = 0;
+  encounter.stage = SEAMSTRESS_STAGE_ASCENDING;
+  encounter.stageAt = state.tick;
+  queen.nextActionAt = state.tick + SEAMSTRESS_ASCEND_TICKS;
+  events.push({
+    t: 'boss_state',
+    archetype: 'seamstress',
+    state: 'ascend',
+    x: queen.x,
+    y: queen.y,
+  });
+};
+
+/**
+ * A maquina da segunda fase. Devolve `true` enquanto ela e quem manda no
+ * corpo (subindo, fora, descendo); no chao e no frenesi devolve `false` e o
+ * fluxo de caca segue.
+ */
+const seamstressPhaseStep = (
+  state: SurvivalState,
+  queen: Entity,
+  events: SemanticEvent[],
+): boolean => {
+  const encounter = queen.silk!;
+  if (encounter.stage === SEAMSTRESS_STAGE_GROUND) {
+    if (queen.hp >= queen.maxHp / 2) return false;
+    beginAscent(state, queen, events);
+    return true;
+  }
+  if (encounter.stage === SEAMSTRESS_STAGE_ASCENDING) {
+    if (state.tick < encounter.stageAt + SEAMSTRESS_ASCEND_TICKS) return true;
+    encounter.stage = SEAMSTRESS_STAGE_ALOFT;
+    encounter.stageAt = state.tick;
+    // A teia nasce agora, com a volta ja marcada no fim da tecelagem inicial.
+    encounter.returnAt = spinWeb(state, { x: encounter.x, y: encounter.y }, state.tick) + 10;
+    return true;
+  }
+  if (encounter.stage === SEAMSTRESS_STAGE_ALOFT) {
+    weaveWeb(state, events);
+    if (state.tick < encounter.returnAt) return true;
+    const center = { x: encounter.x, y: encounter.y };
+    const at =
+      silkLanding(state, queen, center, 4) ??
+      silkLanding(state, queen, center, Math.max(state.config.width, state.config.height));
+    if (at) {
+      queen.x = at.x;
+      queen.y = at.y;
+    }
+    encounter.stage = SEAMSTRESS_STAGE_DESCENDING;
+    encounter.stageAt = state.tick;
+    events.push({
+      t: 'boss_state',
+      archetype: 'seamstress',
+      state: 'descend',
+      x: queen.x,
+      y: queen.y,
+    });
+    return true;
+  }
+  if (encounter.stage === SEAMSTRESS_STAGE_DESCENDING) {
+    // Fios que ficaram para tras na agenda (nunca acontece, mas e barato).
+    weaveWeb(state, events);
+    if (state.tick < encounter.stageAt + SEAMSTRESS_DESCEND_TICKS) return true;
+    encounter.stage = SEAMSTRESS_STAGE_FRENZY;
+    encounter.stageAt = state.tick;
+    encounter.lastAnchor = -1;
+    events.push({
+      t: 'boss_state',
+      archetype: 'seamstress',
+      state: 'frenzy',
+      x: queen.x,
+      y: queen.y,
+    });
+    // A leva da descida: sai junto com ela, e a reposicao segue espacada.
+    encounter.broodAt = state.tick;
+    summonSilkBrood(state, queen, events);
+    queen.nextActionAt = state.tick + 16;
+    queen.contactReadyAt = state.tick + SEAMSTRESS_CONTACT_GRACE;
+    return true;
+  }
+  return false;
 };
 
 export const seamstressStep = (
@@ -387,22 +557,19 @@ export const seamstressStep = (
     state.bossRuntime.phasesFired |= 1;
     events.push({ t: 'boss_phase', archetype: 'seamstress', phase: 1, x: queen.x, y: queen.y });
   }
+  if (seamstressPhaseStep(state, queen, events)) return;
   if (state.tick < queen.nextActionAt) return;
+  const speed = seamstressFrenzied(queen) ? SEAMSTRESS_FRENZY_SPEED : SEAMSTRESS_GROUND_SPEED;
   if (state.tick < encounter.repositionUntil) {
     const d = unit(player.x - queen.x, player.y - queen.y);
-    approach(
-      state,
-      queen,
-      { x: queen.x - d.y * 3, y: queen.y + d.x * 3 },
-      dt,
-      SEAMSTRESS_GROUND_SPEED,
-    );
+    approach(state, queen, { x: queen.x - d.y * 3, y: queen.y + d.x * 3 }, dt, speed);
     return;
   }
+  const helperCap = seamstressFrenzied(queen) ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP;
   if (
-    encounter.lunges >= 2 &&
+    (encounter.lunges >= 2 || seamstressFrenzied(queen)) &&
     state.tick >= encounter.broodAt &&
-    state.enemies.filter((e) => e.alive && e.summonerId === queen.id).length < SILK_HELPER_CAP &&
+    state.enemies.filter((e) => e.alive && e.summonerId === queen.id).length < helperCap &&
     encounter.comboLeft === 0
   ) {
     startAction(state, queen, 'stitch', queen.facing, 18, 12, events);
@@ -424,7 +591,7 @@ export const seamstressStep = (
       player.id,
     );
     queen.contactReadyAt = queen.action!.endsAt + 6;
-  } else approach(state, queen, player, dt, SEAMSTRESS_GROUND_SPEED);
+  } else approach(state, queen, player, dt, speed);
 };
 
 export const silkHelperStep = (
@@ -437,6 +604,19 @@ export const silkHelperStep = (
   if (!player || state.tick < enemy.nextActionAt) return;
   const brood = enemy.archetype === 'seamstress_brood';
   const d = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+  // COSTUREIROS NO FRENESI refazem a teia antes de brigar: o fio cortado mais
+  // perto e o trabalho, a menos que o jogador esteja em cima deles. E a
+  // decisao que a fase oferece — matar quem costura mantem a passagem aberta.
+  if (!brood && d >= 3) {
+    const mother = state.enemies.find((e) => e.alive && e.id === enemy.summonerId);
+    if (mother && seamstressFrenzied(mother)) {
+      const job = webRepairJobs(state, enemy)[0];
+      if (job) {
+        sewJob(state, enemy, job, dt, events);
+        return;
+      }
+    }
+  }
   if (d < 1.25) {
     const retreat =
       d > 0.01
@@ -510,6 +690,16 @@ export const silkMaintenance = (
     });
     return true;
   }
+  // A METADE DA VIDA interrompe ate uma puxada em voo: a subida e decidida
+  // aqui, antes das acoes, e nao no passo de IA que uma acao suspende.
+  if (
+    enemy.archetype === 'seamstress' &&
+    enemy.silk &&
+    state.bossRuntime.awake &&
+    enemy.silk.stage === SEAMSTRESS_STAGE_GROUND &&
+    enemy.hp < enemy.maxHp / 2
+  )
+    beginAscent(state, enemy, events);
   if (
     enemy.archetype === 'seamstress' &&
     state.tick === enemy.stunnedUntil &&

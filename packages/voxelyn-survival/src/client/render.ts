@@ -5,8 +5,12 @@ import {
   SURF_MINERAL_SILK,
   sutureObjective,
   silkLift,
+  seamstressFrenzied,
+  seamstressHidden,
+  SEAMSTRESS_STAGE_ALOFT,
 } from '@voxelyn/survival-sim';
 import { appendSutureDraws } from './suture-presentation';
+import { drawSeamstressEyes } from './web-presentation';
 import {
   depthIntensity,
   LEYLINE_CHARGE_TICKS,
@@ -2630,6 +2634,20 @@ export class SurvivalRenderer {
           });
           break;
         case 'boss_state': {
+          // A CERZIDEIRA subindo, descendo e entrando em frenesi: um clarao
+          // no ponto do fio e um solavanco; o frenesi e vermelho, como os olhos.
+          if (ev.archetype === 'seamstress') {
+            if (ev.state === 'ascend') {
+              this.addFlash(ev.x, ev.y, 1.6, 0.5, nowMs, 320, PAL.mist);
+              this.shake = { power: 3, until: nowMs + 160 };
+            } else if (ev.state === 'descend') {
+              this.shake = { power: 2, until: nowMs + 200 };
+            } else if (ev.state === 'frenzy') {
+              this.addFlash(ev.x, ev.y, 2.6, 0.9, nowMs, 420, '#ff3b30');
+              this.shake = { power: 7, until: nowMs + 420 };
+            }
+            break;
+          }
           // A BROCA COMO MAQUINA (drill-machine.ts): o impacto no que ela nao
           // come e UM solavanco forte de camera (pelo ajuste do jogador, como
           // todo tremor), luz curta, fragmentos e poeira no ponto exato de
@@ -4368,6 +4386,9 @@ export class SurvivalRenderer {
         enemy.archetype === 'seamstress_brood'
       )
         this.sprites.requestPart(`enemy-${enemy.archetype.replaceAll('_', '-')}`);
+      // FORA DA TELA (segunda fase): nem corpo, nem sombra. O que fica dela e
+      // o fio vertical e a teia crescendo (web-presentation.ts).
+      if (enemy.archetype === 'seamstress' && seamstressHidden(enemy)) continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       let presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       // O DIAMANDIS EM FRENESI, fora do desenho: a fumaca nasce por segundo e
@@ -4847,9 +4868,35 @@ export class SurvivalRenderer {
           depth: enemy.x + enemy.y - 0.2,
           draw: () => {
             const [sx, sy] = toScreen(enemy.x, enemy.y);
-            drawShadow(sx, sy, enemy.radius * TILE_W * 0.9 * z * (1 - silkHeight / 100), 0.5);
+            drawShadow(
+              sx,
+              sy,
+              enemy.radius * TILE_W * 0.9 * z * Math.max(0.15, 1 - silkHeight / 100),
+              0.5,
+            );
           },
         });
+      // OS OLHOS VERMELHOS do frenesi, por cima do corpo: dois pontos na
+      // cabeca, a 0,75 tile a frente do centro no rumo dela.
+      if (enemy.archetype === 'seamstress' && seamstressFrenzied(enemy)) {
+        items.push({
+          depth: enemy.x + enemy.y + (silkHeight > 0 ? 3.01 : 0.01),
+          draw: () => {
+            const [hx, hy] = toScreen(
+              enemy.x + enemy.facing.x * 0.75,
+              enemy.y + enemy.facing.y * 0.75,
+            );
+            drawSeamstressEyes(
+              ctx,
+              hx,
+              hy - (headLiftPx + 21 + silkHeight) * z,
+              enemy.facing.x,
+              z,
+              nowMs,
+            );
+          },
+        });
+      }
       items.push({
         depth: enemy.x + enemy.y + (silkHeight > 0 ? 3 : 0),
         draw: () => {
@@ -8174,7 +8221,15 @@ export class SurvivalRenderer {
     const silkQueen = state.enemies.find((e) => e.alive && e.archetype === 'seamstress');
     if (silkQueen && state.bossRuntime.awake)
       objectiveLines.push(
-        t(silkQueen.stunnedUntil > state.tick ? 'seamstress.exposed' : 'seamstress.hint'),
+        t(
+          silkQueen.stunnedUntil > state.tick
+            ? 'seamstress.exposed'
+            : (silkQueen.silk?.stage ?? 0) === SEAMSTRESS_STAGE_ALOFT
+              ? 'seamstress.aloft'
+              : seamstressFrenzied(silkQueen)
+                ? 'seamstress.frenzy'
+                : 'seamstress.hint',
+        ),
       );
     else if (suturedCargo.total > 0 && !suturedCargo.rewarded)
       objectiveLines.push(

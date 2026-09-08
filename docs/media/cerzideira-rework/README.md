@@ -18,6 +18,22 @@ Esta imagem usa estados da simulação, atlas publicados e a função de desenho
 - A geração exige dois apoios utilizáveis na câmara. Tentativas sem eles são refeitas pela sequência determinística existente; isso corrige a câmara sem apoios da seed 66 e a câmara com um único apoio da seed 177, setor 3.
 - O atlas da Cerzideira mantém oito direções autoradas, sem espelhamento, e o raster de câmera das diagonais. A cria tem modelo próprio; os três corpos têm pose de voo.
 
+## Segunda fase: sobe, tece, desce em frenesi
+
+![Segunda fase](./02-segunda-fase-teia.png)
+
+Na metade da vida a Cerzideira interrompe o que estiver fazendo, prende-se a um fio vertical e sobe até sair da tela, com aviso sonoro próprio. A câmera fica na arena. Acontece uma vez por encontro.
+
+- **Teia.** Fora de vista ela tece, fio a fio, uma teia inspirada na espiral de Fibonacci: cinco raios de sustentação no ângulo de ouro, do centro até as paredes, e dois braços de espiral de razão de ouro por cima. A tecelagem inicial dura 8 s e começa pelos raios; cada fio nasce com som. A geometria para nas paredes da câmara. A volta é marcada na subida: cortar fios enquanto ela está fora não a segura lá em cima.
+- **Retorno.** Ela desce no centro da teia, olhos vermelhos, e entra em frenesi: perseguição a 5,2 tiles/s, puxadas com preparo de 12 ticks (10 quando encadeadas), e uma leva de até oito auxiliares, com dois Costureiros, reposta a cada 6 s dentro do teto. Os avisos no chão continuam os mesmos.
+- **Teia pegajosa.** Sob um fio inteiro (faixa de um tile para cada lado), o Prospector anda a 0,62 da velocidade; a esquiva continua. Cerzideira, crias e Costureiros andam normalmente. Cada fio é cortado pelas interações existentes (tiro cruzando o fio, fogo), com som de rompimento, e a faixa dele deixa de pegar no mesmo tick. Fios cortados ficam pontilhados no chão.
+- **Costureiros reconstruindo.** No frenesi, os Costureiros convocados priorizam o fio cortado mais próximo: vão até ele e dão três pontos visíveis (cerca de 5 s), com a costura crescendo de uma ponta à outra. Cada fio volta quando o próprio reparo termina. Matar ou interromper o Costureiro deixa a passagem aberta; com o jogador a menos de 3 tiles, ele briga em vez de costurar.
+- **Fim.** A morte da Cerzideira encerra os auxiliares e dissolve a teia.
+
+Os fios são suturas `kind: 'web'`: cortes, reparos, hash, snapshot e reconexão reutilizam a infraestrutura das suturas. O estado da fase vive em `silk.stage`, `stageAt` e `returnAt`, no hash e nos snapshots. Fora da tela ela não é alvo de nada. As oito direções autoradas e o raster de câmera das diagonais ficam como estão; os olhos vermelhos são desenhados pelo cliente sobre o sprite, porque o orçamento sob demanda dos atlas não comporta outra animação de oito rumos.
+
+Prancha: `node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs` gera a imagem acima e `second-phase-events.json`, a partir da simulação real (seed 36): subida, espiral se formando, retorno com olhos vermelhos, passagem aberta pelo jogador, Costureiro reconstruindo um fio e uma puxada do frenesi.
+
 ## Jogar e reproduzir
 
 Baixe [cerzideira-preview.zip](./cerzideira-preview.zip), extraia e abra `index.html`. Selecione **A Cerzideira**. O pacote inclui a arena, a simulação e o renderer do jogo.
@@ -49,4 +65,4 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 36, simulação 71, conteúdo 37.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 37, simulação 72, conteúdo 37.

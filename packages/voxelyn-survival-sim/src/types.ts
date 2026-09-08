@@ -609,6 +609,21 @@ export type SilkEncounter = {
   broodAt: number;
   repositionUntil: number;
   comboLeft: number;
+  /**
+   * A SEGUNDA FASE, em etapas (ver `SEAMSTRESS_STAGE_*` em seamstress.ts):
+   * 0 caca no chao; 1 subindo pelo fio vertical; 2 fora da tela, tecendo a
+   * teia; 3 descendo; 4 frenesi. Anda so para a frente e uma unica vez por
+   * encontro — e o que permite a quem reconecta desenhar a mesma coisa.
+   */
+  stage: number;
+  /** Tick em que a etapa atual comecou: e o relogio da subida e da descida. */
+  stageAt: number;
+  /**
+   * Tick da volta, fixado na SUBIDA. A descida e decidida pelo fim da
+   * tecelagem inicial, nao pelo estado da teia: cortar fios enquanto ela esta
+   * fora nao a segura la em cima.
+   */
+  returnAt: number;
 };
 
 export type Entity = {
@@ -1049,6 +1064,10 @@ export type BossMoment =
   // Magnetarca: a polaridade que acabou de valer.
   | 'attract'
   | 'repel'
+  // Cerzideira: a subida pelo fio vertical, a descida e o frenesi.
+  | 'ascend'
+  | 'descend'
+  | 'frenzy'
   // Arquicantor: a nota isolada do idle; uma camada de cristal respondendo.
   | 'idle_note'
   | 'resonance'
@@ -2239,8 +2258,18 @@ export type SutureRecipe = {
   a: number;
   b: number;
   cells: number[];
+  /**
+   * Nas suturas da colonia, as celulas da carga suspensa. Nos fios da TEIA
+   * (`kind: 'web'`), a faixa pegajosa do fio: as celulas a ate um tile dele,
+   * onde o Prospector anda devagar enquanto o fio esta inteiro.
+   */
   slabCells: number[];
-  kind: 'gate' | 'roof';
+  /**
+   * `gate` fecha uma passagem, `roof` sustenta carga, `web` e um fio da teia
+   * da segunda fase da Cerzideira: sem ancoras, sem chicote nem queda,
+   * cortavel e reparavel pelos Costureiros.
+   */
+  kind: 'gate' | 'roof' | 'web';
   objective: boolean;
 };
 
