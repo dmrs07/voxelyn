@@ -71,6 +71,11 @@
       "fps": 12,
       "loop": false
     },
+    "downed": {
+      "frames": 3,
+      "fps": 4,
+      "loop": true
+    },
     "die": {
       "frames": 5,
       "fps": 10,
@@ -84,63 +89,71 @@
       "attack": 10,
       "special": 14,
       "hit": 20,
-      "die": 22
+      "downed": 22,
+      "die": 25
     },
     "dl": {
-      "idle": 27,
-      "walk": 31,
-      "attack": 37,
-      "special": 41,
-      "hit": 47,
-      "die": 49
+      "idle": 30,
+      "walk": 34,
+      "attack": 40,
+      "special": 44,
+      "hit": 50,
+      "downed": 52,
+      "die": 55
     },
     "ur": {
-      "idle": 54,
-      "walk": 58,
-      "attack": 64,
-      "special": 68,
-      "hit": 74,
-      "die": 76
+      "idle": 60,
+      "walk": 64,
+      "attack": 70,
+      "special": 74,
+      "hit": 80,
+      "downed": 82,
+      "die": 85
     },
     "ul": {
-      "idle": 81,
-      "walk": 85,
-      "attack": 91,
-      "special": 95,
-      "hit": 101,
-      "die": 103
+      "idle": 90,
+      "walk": 94,
+      "attack": 100,
+      "special": 104,
+      "hit": 110,
+      "downed": 112,
+      "die": 115
     },
     "r": {
-      "idle": 108,
-      "walk": 112,
-      "attack": 118,
-      "special": 122,
-      "hit": 128,
-      "die": 130
+      "idle": 120,
+      "walk": 124,
+      "attack": 130,
+      "special": 134,
+      "hit": 140,
+      "downed": 142,
+      "die": 145
     },
     "d": {
-      "idle": 135,
-      "walk": 139,
-      "attack": 145,
-      "special": 149,
-      "hit": 155,
-      "die": 157
+      "idle": 150,
+      "walk": 154,
+      "attack": 160,
+      "special": 164,
+      "hit": 170,
+      "downed": 172,
+      "die": 175
     },
     "l": {
-      "idle": 162,
-      "walk": 166,
-      "attack": 172,
-      "special": 176,
-      "hit": 182,
-      "die": 184
+      "idle": 180,
+      "walk": 184,
+      "attack": 190,
+      "special": 194,
+      "hit": 200,
+      "downed": 202,
+      "die": 205
     },
     "u": {
-      "idle": 189,
-      "walk": 193,
-      "attack": 199,
-      "special": 203,
-      "hit": 209,
-      "die": 211
+      "idle": 210,
+      "walk": 214,
+      "attack": 220,
+      "special": 224,
+      "hit": 230,
+      "downed": 232,
+      "die": 235
     }
   },
   "generation": {

@@ -24,12 +24,19 @@ export const stitcherModel = (anim, frame, queen = false) => {
   const moving = anim === 'walk';
   const sewing = anim === 'special';
   const striking = anim === 'attack';
+  // DERRUBADA: a pose da janela de dano. As pernas cedem para fora, o corpo
+  // desce ate quase o chao e o abdome tomba para a frente, com a costura
+  // ventral (o ponto fraco) virada para quem olha. O jogador ganha 1,5x de
+  // dano nesse intervalo; sem uma pose propria a vantagem era invisivel — o
+  // corpo continuava de pe, imovel, e lia como um congelamento.
+  const downed = anim === 'downed';
+  const struggle = downed ? [0, 1, 0.5][frame % 3] : 0;
   const pull = sewing ? [0, 0.5, 1.5, 2, 1, 0][frame % 6] : 0;
   const thrust = striking ? [-0.5, -1, 2, 0.5][frame % 4] : 0;
   const breath = anim === 'idle' ? [0, 0.5, 0.5, 0][frame % 4] : 0;
   const hurt = anim === 'hit' ? [1, 0][frame % 2] : 0;
   const scale = queen ? 1.4 : 1;
-  const z = (queen ? 4.5 : 2.5) + breath - hurt;
+  const z = downed ? 1 + struggle * 0.5 : (queen ? 4.5 : 2.5) + breath - hurt;
   const b = [];
 
   // Low thorax, pinched waist, raised OPEN abdomen. The negative space is
@@ -37,8 +44,9 @@ export const stitcherModel = (anim, frame, queen = false) => {
   b.push(box(-1.5, -3, z, 3, 4, 2, 'chitin'));
   b.push(box(-1, -2.5, z + 1.5, 2, 3, 1, 'silk'));
   b.push(box(-0.5, 0.5, z + 0.5, 1, 2, 1, 'chitin'));
-  const cageWidth = queen ? 3.5 : 2.5;
-  const cageHeight = queen ? 5 : 3;
+  // Derrubada, a gaiola de seda abre mais larga e mais baixa: tombou.
+  const cageWidth = (queen ? 3.5 : 2.5) * (downed ? 1.3 : 1);
+  const cageHeight = downed ? 2.5 : queen ? 5 : 3;
   for (const side of [-1, 1]) {
     limb(b, [side, 1.5, z + 0.5], [side * cageWidth, 3, z + 2], 1, 'chitin');
     limb(b, [side * cageWidth, 3, z + 2], [side * 1.5, 5, z + cageHeight], 1, 'silk');
@@ -50,7 +58,9 @@ export const stitcherModel = (anim, frame, queen = false) => {
   }
   b.push(box(-0.5, 4.5, z + 1.5, 1, 1, 2, 'sutureResin'));
   // A tiny deep wound marks the weak ventral seam, never a luminous eye.
-  b.push(box(-0.5, -2, z - 0.5, 1, 2, 1, 'blood'));
+  // Derrubada, a costura ventral fica exposta: maior, e virada para a frente.
+  if (downed) b.push(box(-1, -3, z - 0.5, 2, 3, 1.5, 'blood'));
+  else b.push(box(-0.5, -2, z - 0.5, 1, 2, 1, 'blood'));
 
   // Three walking pairs on a worker, four on the queen. Feet remain planted
   // in idle; walking alternates the support triangles instead of bobbing the
@@ -61,8 +71,17 @@ export const stitcherModel = (anim, frame, queen = false) => {
     for (const side of [-1, 1]) {
       const gait = moving ? Math.sin(phase + p * Math.PI + (side < 0 ? Math.PI : 0)) : 0;
       const reach = (queen ? 5.5 : 4) + (p === 0 ? 0.5 : 0);
-      const knee = [side * reach, y - 0.5 + gait * 0.5, z + 1.5];
-      const foot = [side * (reach + 1), y + (p - 1) * 0.75 + gait, Math.max(0.5, gait)];
+      // Derrubada: joelhos no chao, abertos para fora; as pernas de um lado
+      // e do outro se debatem em quadros alternados.
+      const kick = downed ? struggle * ((p + (side < 0 ? 1 : 0)) % 2) : 0;
+      // O alcance nao cresce: o quadro do atlas e a uniao medida das poses de
+      // pe, e uma perna mais aberta que a caminhada nao caberia nele.
+      const knee = downed
+        ? [side * (reach + 0.5), y - 0.5, 0.75 + kick]
+        : [side * reach, y - 0.5 + gait * 0.5, z + 1.5];
+      const foot = downed
+        ? [side * (reach + 1), y + (p - 1) * 0.75, 0.5]
+        : [side * (reach + 1), y + (p - 1) * 0.75 + gait, Math.max(0.5, gait)];
       limb(b, [side * 1.5, y, z + 0.5], knee, 0.75, 'chitin');
       limb(b, knee, foot, 0.5, 'silk');
       b.push(box(knee[0] - 0.5, knee[1] - 0.5, knee[2] - 0.5, 1, 1, 1, 'sutureResin'));
@@ -76,8 +95,13 @@ export const stitcherModel = (anim, frame, queen = false) => {
   for (const side of [-1, 1]) {
     limb(b, [side * 0.5, -4, z + 2], [side * 1.5, -5.5, z + 2.5], 0.5, 'silk');
     const draw = side < 0 ? pull : -pull * 0.25;
-    const elbow = [side * (3 + pull * 0.5), -4 - thrust * 0.25, z + 2 + draw];
-    const needle = [side * (1.5 + pull * 0.5), -7 - thrust + draw, z - 0.5];
+    // Derrubada, as agulhas caem abertas para os lados, com a ponta no chao.
+    const elbow = downed
+      ? [side * 4, -4, z + 1]
+      : [side * (3 + pull * 0.5), -4 - thrust * 0.25, z + 2 + draw];
+    const needle = downed
+      ? [side * 4.5, -5, 2.5]
+      : [side * (1.5 + pull * 0.5), -7 - thrust + draw, z - 0.5];
     limb(b, [side * 1.5, -2, z + 1], elbow, 0.75, 'chitin');
     limb(b, elbow, needle, 0.5, 'silk');
     limb(b, needle, [needle[0], needle[1] - 1.5, needle[2] - 1], 0.5, 'silk');
@@ -112,14 +136,18 @@ export const stitcherModel = (anim, frame, queen = false) => {
   return anim === 'die' ? collapse(scaled, Math.min(1, frame / 4)) : scaled;
 };
 
-const animations = {
+const animations = (queen) => ({
   idle: { frames: 4, fps: 6, loop: true },
   walk: { frames: 6, fps: 10, loop: true },
   attack: { frames: 4, fps: 10, loop: false },
   special: { frames: 6, fps: 8, loop: false },
   hit: { frames: 2, fps: 12, loop: false },
+  // So a rainha cai: e a unica que o jogador derruba cortando o apoio. Tres
+  // quadros lentos, em laco — um corpo se debatendo no chao, nao um golpe.
+  // Cada quadro custa oito rumos; tres e o que cabe no orcamento sob demanda.
+  ...(queen ? { downed: { frames: 3, fps: 4, loop: true } } : {}),
   die: { frames: 5, fps: 10, loop: false },
-};
+});
 
 const spec = (queen) => {
   // Union measured across every animation in every authored direction,
@@ -140,7 +168,7 @@ const spec = (queen) => {
     flipPairs: {},
     hitbox: { w: queen ? 1.8 : 0.72, h: queen ? 1.8 : 0.8 },
     footprint: { w: queen ? 2 : 1, h: queen ? 2 : 1, offsetX: 0, offsetY: 0 },
-    animations,
+    animations: animations(queen),
     draw: (dir, anim, frame) =>
       renderVoxels(stitcherModel(anim, frame, queen), DIR_INDEX[dir], w, h, ax, ay),
     prompt: queen
