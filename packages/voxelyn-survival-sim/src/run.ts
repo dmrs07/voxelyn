@@ -151,6 +151,7 @@ import {
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import { ascend, descend, populateSector, sectorSeed } from './sectors.js';
+import { coopPack, isCoop } from './coop.js';
 import {
   clearCoreTaken,
   coreUnlocked,
@@ -2327,6 +2328,11 @@ const stepPlayer = (
           y: site.terminal.y,
           completesAtTick: site.scanEndsAt,
         });
+        // O ALARME do terminal: seis casas em volta, e mais quatro que so o
+        // co-op alcanca. Sem as extras, uma leva de tier 3 com dois jogadores
+        // (cinco corpos virando sete) esgotaria o anel e os ultimos nasceriam
+        // sobre os primeiros — o solo continua consumindo apenas o prefixo de
+        // seis, na ordem de sempre.
         const offsets = [
           [-3, 0],
           [3, 0],
@@ -2334,10 +2340,19 @@ const stepPlayer = (
           [0, 3],
           [-2, -2],
           [2, 2],
+          [2, -2],
+          [-2, 2],
+          [-4, 0],
+          [4, 0],
         ] as const;
+        const alarm = coopPack(state, 2 + site.tier);
+        // O anel do solo tem SEIS casas, e a rotacao por `site.id` gira dentro
+        // delas: alargar o modulo para dez mudaria a casa de onde cada bicho de
+        // uma run solo sempre saiu.
+        const ring = isCoop(state) ? offsets.length : 6;
         let spawned = 0;
-        for (let i = 0; i < offsets.length && spawned < 2 + site.tier; i++) {
-          const [dx, dy] = offsets[(i + site.id) % offsets.length];
+        for (let i = 0; i < ring && spawned < alarm; i++) {
+          const [dx, dy] = offsets[(i + site.id) % ring];
           const x = site.terminal.x + dx;
           const y = site.terminal.y + dy;
           if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1)
@@ -3160,8 +3175,13 @@ const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void =
  * sem que ninguem percebesse.
  */
 const spawnContaminationWave = (state: SurvivalState, count: number): void => {
-  let spawned = 0;
-  for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
+  // A leva cresce com o time (ver coop.ts), e o numero de TENTATIVAS cresce
+  // junto: o teto de 80 foi dimensionado para levas de dois a quatro num anel
+  // estreito, e uma leva maior sob o mesmo teto simplesmente nasceria pela
+  // metade — a escala existiria no papel e nao no setor.
+  const target = coopPack(state, count);
+  const attempts = 80 + 20 * (target - count);
+  for (let attempt = 0, spawned = 0; attempt < attempts && spawned < target; attempt++) {
     const x = state.rng.nextInt(state.config.width);
     const y = state.rng.nextInt(state.config.height);
     const i = y * state.config.width + x;

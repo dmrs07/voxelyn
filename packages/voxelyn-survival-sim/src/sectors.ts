@@ -27,6 +27,7 @@ import { clearFreeze } from './frost.js';
 import {
   CHUNK,
   CONTAMINATION_CARRYOVER,
+  ENEMY_MIN_SPAWN_DIST,
   HORSE_SPAWN_CHANCE,
   MAX_ENEMIES,
   MINER_ORE_SEARCH,
@@ -52,6 +53,7 @@ import {
   circleBlocked,
   spawnEnemy,
 } from './entities.js';
+import { coopDensity, coopElites, coopPack } from './coop.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { isIceSurface } from './constants.js';
@@ -222,6 +224,56 @@ const signatureHome = (
 };
 
 /**
+ * A vaga EXTRA que o co-op pede, derivada de um ponto de spawn do worldgen.
+ *
+ * O worldgen entrega vinte e dois pontos e nao pode entregar mais: a escolha
+ * deles consome `rng` no meio da geracao do terreno, e pedir trinta e dois
+ * deslocaria toda tirada seguinte — suturas, veios, trilhos. O mapa da seed X
+ * deixaria de ser o mapa da seed X assim que um segundo jogador entrasse, e o
+ * cliente, que regenera o mundo localmente a partir da seed, desenharia OUTRO
+ * setor. As vagas extras nascem entao aqui, DEPOIS do terreno pronto: varredura
+ * em anel a partir de um ponto ja aprovado, sem RNG nenhuma.
+ *
+ * As tres guardas sao as mesmas que o ponto original teve de passar, mais uma:
+ * chao aberto, corpo inteiro cabendo (o mesmo `circleBlocked` do movimento) e
+ * longe da entrada — ninguem nasce em cima do time no primeiro tick —, e a
+ * reserva de celula, para dois corpos derivados do mesmo ponto nao nascerem
+ * empilhados.
+ *
+ * `null` quando o anel inteiro esta ocupado ou fechado: a vaga simplesmente nao
+ * e preenchida. Setor apertado entrega menos corpos extras, e isso e melhor que
+ * um corpo dentro da pedra.
+ */
+const derivedSpawnPoint = (
+  state: SurvivalState,
+  origin: { x: number; y: number },
+  radius: number,
+  taken: Set<number>,
+): { x: number; y: number } | null => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 2; r <= 7; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = origin.x + dx;
+        const y = origin.y + dy;
+        if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) continue;
+        const i = y * w + x;
+        if (taken.has(i)) continue;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (Math.hypot(x + 0.5 - state.entry.x, y + 0.5 - state.entry.y) < ENEMY_MIN_SPAWN_DIST)
+          continue;
+        if (circleBlocked(state, x + 0.5, y + 0.5, radius)) continue;
+        taken.add(i);
+        return { x, y };
+      }
+    }
+  }
+  return null;
+};
+
+/**
  * Popula inimigos e o CHEFE (se houver) do setor.
  *
  * `bossSpawn` e o ponto que o worldgen reservou com folga para um corpo grande.
@@ -238,8 +290,14 @@ export const populateSector = (
   // ecossistema. A profundidade continua endurecendo a composicao la dentro.
   const biome = { stratum: state.stratum, occupation: state.occupation, lineage: state.lineage };
   const mix = biomeMix(biome, state.sector);
-  // Um elite por setor, no meio da lista: cedo demais e o jogador ainda nao tem
-  // com o que responder, tarde demais e ele ja passou pelo setor.
+  // Um elite por JOGADOR, o primeiro no meio da lista: cedo demais e o jogador
+  // ainda nao tem com o que responder, tarde demais e ele ja passou pelo setor.
+  //
+  // O primeiro indice continua saindo de `spawns.length` e nao do orcamento —
+  // o setor de um jogador tem de ficar identico ao que sempre foi, ate a vaga.
+  // Os elites de co-op entram DEPOIS dele, espalhados pelo resto da lista, para
+  // o segundo destaque nao nascer colado no primeiro e os dois virarem um
+  // encontro so.
   const eliteIndex = Math.floor(spawns.length / 2);
   // O CHEFE deste setor, resolvido por posicao (ultimo setor ou setor de
   // Nucleo) e por bioma (quem e). `null` = setor sem dono, e a maioria e.
@@ -250,7 +308,17 @@ export const populateSector = (
   state.sectorBoss = resolveSectorBoss(state, state.sector);
   const bossArchetype = state.sectorBoss.archetype;
   const bossHere = bossArchetype !== null;
-  const budget = Math.min(spawns.length, MAX_ENEMIES - (bossHere ? 1 : 0));
+  // A DENSIDADE passa pelo tamanho do time antes do teto da arena. O teto
+  // continua sendo `MAX_ENEMIES` e ele nao e negociavel: mineradores, ninhada
+  // de chefe e ondas de contaminacao nascem do mesmo orcamento, e estourar aqui
+  // esvaziaria tudo o que vem depois.
+  const budget = Math.min(coopDensity(state, spawns.length), MAX_ENEMIES - (bossHere ? 1 : 0));
+  const eliteIndices = new Set<number>([eliteIndex]);
+  for (let k = 1; k < coopElites(state); k++) {
+    let idx = Math.floor((budget * (2 * k + 1)) / (2 * coopElites(state)));
+    while (idx < budget && eliteIndices.has(idx)) idx++;
+    if (idx < budget) eliteIndices.add(idx);
+  }
 
   // O Cavalo OCUPA a vaga do elite em vez de somar um inimigo.
   //
@@ -279,41 +347,85 @@ export const populateSector = (
   // `taken` de populateMiners: vale durante a povoacao e nao existe depois.
   const signatureHomes = new Set<number>();
   if (signature) {
-    const pack = SIGNATURE_PACK[signature] ?? 1;
+    // O bando cresce com o time pelo mesmo motivo que a leva de contaminacao
+    // cresce: ele e o encontro AUTORAL do estrato, e um lago que dois jogadores
+    // limpam em duas rajadas nao apresenta a Lampreia a ninguem.
+    const pack = coopPack(state, SIGNATURE_PACK[signature] ?? 1);
     for (let k = 1; k <= pack; k++) {
       let idx = Math.floor((budget * k) / (pack + 1));
       // A vaga do elite tem dono; a assinatura desliza uma casa em vez de sumir.
-      if (idx === eliteIndex) idx = idx + 1 < budget ? idx + 1 : Math.max(0, idx - 1);
+      if (eliteIndices.has(idx)) idx = idx + 1 < budget ? idx + 1 : Math.max(0, idx - 1);
       signatureIndices.add(idx);
     }
   }
 
+  // Celulas ja prometidas a alguem. Comeca com os proprios pontos do worldgen
+  // (uma vaga derivada nao pode cair sobre uma vaga original ainda por
+  // preencher) e vale so durante a povoacao, como o `taken` de populateMiners.
+  const takenCells = new Set<number>();
+  for (const spawn of spawns) takenCells.add(spawn.y * state.config.width + spawn.x);
+
   let workerHome = 0;
   for (let i = 0; i < budget; i++) {
-    if (i === eliteIndex && horseHere) {
-      // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
-      // cavalo ficaria cercado do fogo que so a investida dele devia acender.
-      spawnEnemy(state, 'fungal_horse', spawns[i].x, spawns[i].y, false);
+    // As vagas alem das do worldgen reaproveitam os mesmos pontos como ORIGEM e
+    // procuram chao livre em volta. O ciclo por `% spawns.length` espalha os
+    // corpos extras pelo setor inteiro em vez de amontoa-los no comeco da lista.
+    const origin = spawns[i % spawns.length];
+    const derived = i >= spawns.length;
+    const isHorse = i === eliteIndex && horseHere;
+    const isSignature = !!signature && signatureIndices.has(i) && !eliteIndices.has(i);
+    // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
+    // cavalo ficaria cercado do fogo que so a investida dele devia acender.
+    const archetype = isHorse
+      ? 'fungal_horse'
+      : isSignature
+        ? (signature as EnemyArchetype)
+        : mix[i % mix.length];
+    const elite = !isHorse && !isSignature && eliteIndices.has(i);
+    const at = derived
+      ? derivedSpawnPoint(state, origin, ARCHETYPES[archetype].radius, takenCells)
+      : origin;
+    // Anel fechado: esta vaga extra nao existe. Ver `derivedSpawnPoint`.
+    if (!at) continue;
+    if (isSignature) {
+      const home = signatureHome(state, archetype, at.x, at.y, signatureHomes);
+      takenCells.add(Math.floor(home.y) * state.config.width + Math.floor(home.x));
+      spawnEnemy(state, archetype, home.x, home.y, false);
       continue;
     }
-    if (signature && signatureIndices.has(i) && i !== eliteIndex) {
-      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y, signatureHomes);
-      spawnEnemy(state, signature, home.x, home.y, false);
-      continue;
-    }
-    const archetype = mix[i % mix.length];
     const sites = state.sutures.filter((s) => s.phase === 'loose');
     const home =
       archetype === 'stitcher' && sites.length
         ? suturePoint(state, sites[workerHome++ % sites.length].cells[0])
         : null;
-    spawnEnemy(
-      state,
-      archetype,
-      home ? Math.floor(home.x) : spawns[i].x,
-      home ? Math.floor(home.y) : spawns[i].y,
-      i === eliteIndex,
-    );
+    let bodyX = home ? Math.floor(home.x) : at.x;
+    let bodyY = home ? Math.floor(home.y) : at.y;
+    // O COSTUREIRO extra procura a propria casa quando a sutura ja tem dono.
+    //
+    // Os Costureiros nascem na sutura que vao remendar, em rodizio pelas
+    // suturas soltas; com mais vagas que suturas, o rodizio da a volta e o
+    // segundo nasce EM CIMA do primeiro. E defeito antigo (o solo ja o tem
+    // quando o bioma sorteia muitos Costureiros), mas a densidade de co-op o
+    // multiplicaria — 32 vagas girando sobre as mesmas duas ou tres suturas.
+    // So a vaga EXTRA desvia: corrigir o rodizio inteiro mudaria o setor de
+    // quem joga sozinho, e essa e outra conversa, com outro replay atras.
+    if (derived && takenCells.has(bodyY * state.config.width + bodyX)) {
+      const spot = derivedSpawnPoint(
+        state,
+        { x: bodyX, y: bodyY },
+        ARCHETYPES[archetype].radius,
+        takenCells,
+      );
+      if (!spot) continue;
+      bodyX = spot.x;
+      bodyY = spot.y;
+    }
+    // A celula do corpo entra na reserva ASSIM QUE ELE NASCE, e nao so quando
+    // ela veio de `derivedSpawnPoint`: a assinatura e o Costureiro escolhem a
+    // propria casa (lago, gelo, sutura) longe do ponto de origem, e uma vaga
+    // extra derivada depois cairia sobre ela sem saber que ali ja mora alguem.
+    takenCells.add(bodyY * state.config.width + bodyX);
+    spawnEnemy(state, archetype, bodyX, bodyY, elite);
   }
 
   // A camara recebe o chefe QUE O BIOMA PEDE: ocupacao forte primeiro

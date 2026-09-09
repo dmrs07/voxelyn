@@ -1,6 +1,7 @@
 import { SOLID_NONE, SOLID_STITCHED_ROCK, TICK_HZ, MAX_ENEMIES } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
+import { coopPack } from './coop.js';
 import { approach, suturePoint } from './sutures.js';
 import { maintainWebRepair, webRepairFirst } from './web-repair.js';
 import { registerWebJunctions, WEB_ANCHOR_HP } from './web-supports.js';
@@ -499,7 +500,12 @@ export const summonSilkBrood = (
   const kinds: Array<'stitcher' | 'seamstress_brood'> = [];
   // No frenesi a leva e maior (oito no total, dois Costureiros para refazer a
   // teia); a reposicao continua espacada, para a luta continuar legivel.
-  const cap = frenzy ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP;
+  // O TETO da ninhada e o que a Cerzideira cobra por permanencia, e ele passa
+  // pelo tamanho do time: com dois canos, quatro filhotes morrem entre uma
+  // investida e outra e a teia volta inteira sem que ninguem tenha decidido
+  // nada. Os COSTUREIROS nao escalam junto — eles refazem a teia, e mais mao de
+  // obra encheria a arena de fio em vez de encher de bicho.
+  const cap = coopPack(state, frenzy ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP);
   const workers = frenzy ? SILK_FRENZY_STITCHERS : 1;
   for (let n = living.filter((e) => e.archetype === 'stitcher').length; n < workers; n++)
     kinds.push('stitcher');
@@ -668,7 +674,10 @@ export const seamstressStep = (
     approach(state, queen, { x: queen.x - d.y * 3, y: queen.y + d.x * 3 }, dt, speed);
     return;
   }
-  const helperCap = seamstressFrenzied(queen) ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP;
+  const helperCap = coopPack(
+    state,
+    seamstressFrenzied(queen) ? SILK_FRENZY_HELPER_CAP : SILK_HELPER_CAP,
+  );
   if (
     (encounter.lunges >= 2 || seamstressFrenzied(queen)) &&
     state.tick >= encounter.broodAt &&
