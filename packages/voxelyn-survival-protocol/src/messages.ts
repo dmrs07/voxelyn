@@ -1,5 +1,6 @@
 import type {
   AbilityId,
+  EchoUnlock,
   ActiveModule,
   EnemyArchetype,
   EntityActionKind,
@@ -181,6 +182,7 @@ export type ViewerState = {
    * `channelingUntil + cooldown`, o mesmo instante que a liquidacao vai gravar.
    */
   channelingUntil: number;
+  thermalGuardUntil: number;
   /**
    * A habilidade EQUIPADA. Os timers acima nao bastam: a duracao do radial e a
    * projecao do canal saem do cooldown DESTA habilidade, e o espelho local do
@@ -263,6 +265,7 @@ export type SalvageSiteFlags = {
  */
 export type WellOfferFlags = {
   ability: AbilityId;
+  unlock: EchoUnlock;
   x: number;
   y: number;
   takenBy: number | null;

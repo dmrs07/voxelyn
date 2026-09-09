@@ -1,3 +1,5 @@
+import { drawAbilityGlyph } from './ability-icons';
+import { drawArcChain, ARC_FLASH_MS } from './arc-chain';
 import {
   SOLID_SUTURE_ANCHOR,
   SOLID_SUTURE_CRACKED,
@@ -784,6 +786,7 @@ const VOICE_CAPTION_COLOR = '#4fd6c9';
  * ser voxels de verdade em VoxelParticles.ring.
  */
 export type Fx =
+  | { kind: 'arc'; hops: Array<{ x: number; y: number }>; life: number; maxLife: number }
   | {
       kind: 'ring';
       x: number;
@@ -2519,6 +2522,17 @@ export class SurvivalRenderer {
           }
           break;
         case 'pulse':
+          if (ev.ability)
+            this.fxList.push({
+              kind: 'ring',
+              x: ev.x,
+              y: ev.y,
+              r: 0.15,
+              maxR: ev.radius,
+              color: abilityPresentation(ev.ability).color,
+              life: 340,
+              maxLife: 340,
+            });
           // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
           // sem tingir nada, que e a diferenca visivel entre ele e uma detonacao.
           //
@@ -2555,21 +2569,14 @@ export class SurvivalRenderer {
           this.addFlash(ev.x, ev.y, 1.2, 0.7, nowMs, 150, PAL.biolum);
           break;
         case 'arc_chain': {
-          // Um anel curto em cada salto. A LINHA entre eles nao e desenhada: o
-          // arco ja resolveu tudo num tick, e um raio persistente prometeria uma
-          // duracao que a simulacao nao tem.
-          for (const hop of ev.hops) {
-            this.fxList.push({
-              kind: 'ring',
-              x: hop.x,
-              y: hop.y,
-              r: 0.1,
-              maxR: 0.8,
-              color: PAL.electric,
-              life: 220,
-              maxLife: 220,
-            });
-          }
+          this.fxList.push({
+            kind: 'arc',
+            hops: ev.hops.map((p) => ({ ...p })),
+            life: ARC_FLASH_MS,
+            maxLife: ARC_FLASH_MS,
+          });
+          for (const hop of ev.hops.slice(1))
+            this.addFlash(hop.x, hop.y, 1.2, 0.55, nowMs, 160, PAL.electric);
           break;
         }
         case 'well_offers':
@@ -6448,7 +6455,9 @@ export class SurvivalRenderer {
     }
     for (const fx of this.fxList) {
       const t = 1 - fx.life / fx.maxLife;
-      if (fx.kind === 'ring') {
+      if (fx.kind === 'arc') {
+        drawArcChain(ctx, fx.hops, t * fx.maxLife, toScreen, z, prefersReducedMotion());
+      } else if (fx.kind === 'ring') {
         const [sx, sy] = toScreen(fx.x, fx.y);
         const r = (fx.r + (fx.maxR - fx.r) * t) * TILE_W * 0.5 * z;
         ctx.strokeStyle = fx.color;
@@ -7882,6 +7891,7 @@ export class SurvivalRenderer {
     }
     ctx.restore();
 
+    drawAbilityGlyph(ctx, offer.ability, sx, sy - 43 * z, 13 * z, presentation.color);
     const label = reachable
       ? t('ability.offer.use', { ability: presentation.label })
       : presentation.label;
@@ -9243,7 +9253,17 @@ export class SurvivalRenderer {
         ctx.stroke();
 
         const iconColor = b.pressed ? PAL.loot : 'rgba(232,241,255,0.9)';
-        const drewIcon = this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
+        const drewIcon =
+          b.id === 'ability'
+            ? drawAbilityGlyph(
+                ctx,
+                state.playerExtra.ability,
+                b.cx,
+                b.cy,
+                b.r * 1.2,
+                abilityPresentation(state.playerExtra.ability).color,
+              )
+            : this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
         if (!drewIcon) {
           ctx.fillStyle = iconColor;
           ctx.beginPath();

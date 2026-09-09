@@ -1,3 +1,4 @@
+import { drawAbilityGlyph } from './ability-icons';
 // A BARRA DE COMANDOS do desktop: as teclas e as recargas, sempre na tela.
 //
 // ---------------------------------------------------------------------------
@@ -470,6 +471,16 @@ export class DesktopControlBar {
       ctx.fillText(cap, capX + cw / 2, capY + capH - 4 * scale);
       capX += cw + 4 * scale;
     });
+
+    if (control.id === 'ability')
+      drawAbilityGlyph(
+        ctx,
+        state.playerExtra.ability,
+        x + w - 13 * scale,
+        y + 12 * scale,
+        16 * scale,
+        abilityPresentation(state.playerExtra.ability).color,
+      );
 
     // ROTULO, ja resolvido pelo chamador — e a MESMA string que dimensionou o
     // compartimento, que e a unica forma de a largura e o texto concordarem.

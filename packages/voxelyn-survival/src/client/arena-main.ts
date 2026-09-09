@@ -101,10 +101,21 @@ const FROST_SCENARIO_LABELS: Record<FrostScenario, string> = {
 const ABILITY_LABELS: Record<AbilityId, string> = {
   pulse: 'Pulso Cinético',
   flamethrower: 'Sopro (lança-chamas)',
+  seismic: 'Onda Sísmica',
+  slipstream: 'Passo de Fuga',
+  vent: 'Respiro de Emergência',
   seeker: 'Perseguidor',
   arc: 'Arco Condutivo',
 };
-const ABILITY_ORDER: readonly AbilityId[] = ['pulse', 'flamethrower', 'seeker', 'arc'];
+const ABILITY_ORDER: readonly AbilityId[] = [
+  'pulse',
+  'flamethrower',
+  'seeker',
+  'arc',
+  'seismic',
+  'slipstream',
+  'vent',
+];
 
 const MODULE_LABELS: Record<ModuleId, string> = {
   piercing: 'Perfurante',

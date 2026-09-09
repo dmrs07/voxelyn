@@ -546,6 +546,7 @@ export class NetClient {
     // funcionando, e o pior que acontece e o co-op nao mostrar Eco nenhum.
     state.wellOffers = (world.wellOffers ?? []).map((offer) => ({
       ability: offer.ability,
+      unlock: { ...offer.unlock },
       x: offer.x,
       y: offer.y,
       takenBy: offer.takenBy,
@@ -854,6 +855,7 @@ export class NetClient {
       ex.dodgeCooldownUntil = this.viewer.dodgeCooldownUntil;
       ex.abilityCooldownUntil = this.viewer.abilityCooldownUntil;
       ex.channelingUntil = this.viewer.channelingUntil;
+      ex.thermalGuardUntil = this.viewer.thermalGuardUntil;
       // A habilidade equipada viaja junto: os timers sozinhos nao bastam — a
       // duracao do radial e a projecao do canal saem do cooldown DELA, e o
       // espelho local nascia com `pulse` e nunca sabia da troca no poco.

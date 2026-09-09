@@ -6,6 +6,7 @@ import {
   SOLID_NONE,
   SOLID_ROCK,
   SURF_FIRE,
+  SURF_BIOFLUID,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_ICE,
@@ -57,7 +58,9 @@ const cellAt = (state: SurvivalState, dx: number, dy: number): number =>
   Math.floor(state.player.y + dy) * state.config.width + Math.floor(state.player.x + dx);
 
 const flameCones = (events: SemanticEvent[]): Extract<SemanticEvent, { t: 'flame_cone' }>[] =>
-  events.filter((event): event is Extract<SemanticEvent, { t: 'flame_cone' }> => event.t === 'flame_cone');
+  events.filter(
+    (event): event is Extract<SemanticEvent, { t: 'flame_cone' }> => event.t === 'flame_cone',
+  );
 
 describe('sopro termico canalizado', () => {
   it('abre um canal com a duracao configurada, cobravel num unico ponto', () => {
@@ -92,6 +95,7 @@ describe('sopro termico canalizado', () => {
 
   it('mirando para longe de DR, o fogo nasce na direcao da mira', () => {
     const state = withFlamethrower(0xf13);
+    state.surface[cellAt(state, 0, 2)] = SURF_BIOFLUID;
     stepRun(state, [castCommand({ x: 0, y: 1 })]);
     expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_FIRE);
     expect(state.surface[cellAt(state, 2, 0)]).toBe(SURF_NONE);
@@ -100,9 +104,11 @@ describe('sopro termico canalizado', () => {
 
   it('o jato SEGUE o stick de mira no meio da canalizacao', () => {
     const state = withFlamethrower(0xf14);
+    state.surface[cellAt(state, 2, 0)] = SURF_BIOFLUID;
+    state.surface[cellAt(state, 0, 2)] = SURF_BIOFLUID;
     stepRun(state, [castCommand({ x: 1, y: 0 })]);
     expect(state.surface[cellAt(state, 2, 0)]).toBe(SURF_FIRE);
-    expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_NONE);
+    expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_BIOFLUID);
 
     // Gira a mira para o sul no meio do canal: as proximas emissoes obedecem.
     const south = emptyCommand();
@@ -115,6 +121,7 @@ describe('sopro termico canalizado', () => {
 
   it('stick de mira neutro reusa a ultima mira valida, nunca DR', () => {
     const state = withFlamethrower(0xf15);
+    state.surface[cellAt(state, 0, -2)] = SURF_BIOFLUID;
     stepRun(state, [castCommand({ x: 0, y: -1 })]);
     // Solta o stick: as emissoes seguintes continuam para o norte.
     for (let tick = 0; tick < 10; tick++) stepRun(state, [emptyCommand()]);
@@ -137,8 +144,13 @@ describe('sopro termico canalizado', () => {
     // E o CORPO tambem nao: durante o canal, mover nao gira o tronco — a regra
     // "andar vira o rumo do corpo" so vale fora do sopro.
     expect(state.player.facing).toEqual({ x: 0, y: 1 });
-    // O fogo continua nascendo ao sul da posicao ATUAL do jogador.
-    expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_FIRE);
+    // O jato segue a posicao ATUAL, mesmo sem combustivel no piso.
+    const cones = flameCones(stepRun(state, [emptyCommand()]).events);
+    expect(cones).toHaveLength(0); // odd emission tick
+    const next = flameCones(stepRun(state, [emptyCommand()]).events);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({ x: state.player.x, dx: 0, dy: 1 });
+    expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_NONE);
   });
 
   it('bloqueia bolts durante o canal sem consumir cooldown, calor ou modulos', () => {
@@ -246,12 +258,14 @@ describe('sopro termico canalizado', () => {
 
   it('paredes bloqueiam a chama: celulas antes queimam, celulas atras ficam intactas', () => {
     const state = withFlamethrower(0xf1a);
+    state.surface[cellAt(state, 1, 0)] = SURF_BIOFLUID;
+    state.surface[cellAt(state, 3, 0)] = SURF_BIOFLUID;
     state.solid[cellAt(state, 2, 0)] = SOLID_ROCK;
     stepRun(state, [castCommand({ x: 1, y: 0 })]);
 
     expect(state.surface[cellAt(state, 1, 0)]).toBe(SURF_FIRE);
-    // Atras da rocha, dentro do alcance nominal do cone: nada.
-    expect(state.surface[cellAt(state, 3, 0)]).toBe(SURF_NONE);
+    // Behind the wall even combustible ground remains intact.
+    expect(state.surface[cellAt(state, 3, 0)]).toBe(SURF_BIOFLUID);
 
     // O evento reporta o recorte: o raio central para na parede.
     const cones = flameCones(stepRun(state, [emptyCommand()]).events);

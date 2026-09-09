@@ -29,6 +29,7 @@ import type { PlayerCommand } from '@voxelyn/survival-sim';
 /** Bytes por comando no formato nao comprimido. */
 export const COMMAND_BYTES = 5;
 
+const FLAG_ECHO_CHOICE = 1 << 7;
 const FLAG_FIRE = 1 << 0;
 const FLAG_ABILITY = 1 << 1;
 const FLAG_DODGE = 1 << 2;
@@ -81,11 +82,13 @@ export const quantizeCommand = (cmd: PlayerCommand): PlayerCommand => {
     interact: cmd.interact,
     purge: cmd.purge,
     choose: cmd.choose,
+    ...(cmd.choiceKind === 'echo' ? { choiceKind: 'echo' as const } : {}),
   };
 };
 
 const packFlags = (cmd: PlayerCommand): number => {
   let flags = 0;
+  if (cmd.choiceKind === 'echo') flags |= FLAG_ECHO_CHOICE;
   if (cmd.fire) flags |= FLAG_FIRE;
   if (cmd.ability) flags |= FLAG_ABILITY;
   if (cmd.dodge) flags |= FLAG_DODGE;
@@ -95,7 +98,10 @@ const packFlags = (cmd: PlayerCommand): number => {
   return flags;
 };
 
-type CommandFlags = Pick<PlayerCommand, 'fire' | 'ability' | 'dodge' | 'interact' | 'purge' | 'choose'>;
+type CommandFlags = Pick<
+  PlayerCommand,
+  'fire' | 'ability' | 'dodge' | 'interact' | 'purge' | 'choose' | 'choiceKind'
+>;
 
 const unpackFlags = (flags: number): CommandFlags | null => {
   const choose = (flags >> CHOOSE_SHIFT) & 0b11;
@@ -109,6 +115,7 @@ const unpackFlags = (flags: number): CommandFlags | null => {
     interact: (flags & FLAG_INTERACT) !== 0,
     purge: (flags & FLAG_PURGE) !== 0,
     choose: choose === 0 ? null : ((choose - 1) as 0 | 1),
+    ...((flags & FLAG_ECHO_CHOICE) !== 0 ? { choiceKind: 'echo' as const } : {}),
   };
 };
 

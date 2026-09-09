@@ -177,6 +177,8 @@ export {
 } from './materials.js';
 
 export {
+  canChooseEcho,
+  echoUnlock,
   ABILITY_DEFINITIONS,
   ABILITY_SHAPE,
   STARTING_ABILITY,

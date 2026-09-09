@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_VERSIONS, ClientWorldMirror, type ServerMessage } from '@voxelyn/survival-protocol';
+import {
+  CURRENT_VERSIONS,
+  ClientWorldMirror,
+  type ServerMessage,
+} from '@voxelyn/survival-protocol';
 import { createRun, type SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalServer } from '../src/server';
 
@@ -91,7 +95,15 @@ describe('servidor autoritativo de co-op', () => {
     room.state.players[0].hp = 40;
 
     // mensagem forjada afirmando hp/dano/itens/kills
-    h.cmd('A', 1, { ...move(0, 0), hp: 9999, maxHp: 9999, damage: 9999, killed: [10, 11], purgeCells: 99, activeModules: ['siphon', 'explosive'] });
+    h.cmd('A', 1, {
+      ...move(0, 0),
+      hp: 9999,
+      maxHp: 9999,
+      damage: 9999,
+      killed: [10, 11],
+      purgeCells: 99,
+      activeModules: ['siphon', 'explosive'],
+    });
     h.tick(3);
 
     const p = room.state.players[0];
@@ -123,7 +135,12 @@ describe('servidor autoritativo de co-op', () => {
     const room = h.server.roomForClient('A')!;
     // cliente A gera o mundo estatico localmente pela mesma seed
     const local: SurvivalState = createRun({ seed: room.seed, playerCount: 2 });
-    const mirror = new ClientWorldMirror(local.config.width, local.config.height, local.solid, local.surface);
+    const mirror = new ClientWorldMirror(
+      local.config.width,
+      local.config.height,
+      local.solid,
+      local.surface,
+    );
 
     // ambos atiram e se movem, destruindo cenario
     for (let t = 0; t < 120; t++) {
@@ -186,16 +203,24 @@ describe('servidor autoritativo de co-op', () => {
     h.tick();
     expect(room.state.wellOffers.length).toBeGreaterThan(0);
 
-    const snapshot = h.drain('A')
+    const snapshot = h
+      .drain('A')
       .find((m): m is Extract<ServerMessage, { t: 'snapshot' }> => m.t === 'snapshot');
     expect(snapshot?.world?.wellOffers).toHaveLength(room.state.wellOffers.length);
     expect(snapshot?.world?.wellOffers?.[0].ability).toBe(room.state.wellOffers[0].ability);
     expect(snapshot?.world?.wellOffers?.[0].takenBy).toBeNull();
+    expect(snapshot?.world?.wellOffers?.[0].unlock).toEqual({
+      kind: 'fire',
+      amount: 30,
+      required: 1,
+      slot: 0,
+    });
 
     // Reconexao tambem: o full_resync tem de trazer as ofertas, senao quem cai
     // perto do poco volta sem enxergar a escolha que ainda esta la.
     const full = room.buildFullResync(room.slots[0]);
     expect(full.world.wellOffers).toHaveLength(room.state.wellOffers.length);
+    expect(full.world.wellOffers[0].unlock).toEqual(room.state.wellOffers[0].unlock);
   });
 
   it('o `you` transporta a habilidade equipada e os timers privados de recarga', () => {
@@ -216,7 +241,10 @@ describe('servidor autoritativo de co-op', () => {
     room.state.playerExtra.channelingUntil = room.state.tick + 40;
     h.tick(2);
 
-    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
+    const snap = h
+      .drain('A')
+      .filter((m) => m.t === 'snapshot')
+      .pop();
     if (snap?.t !== 'snapshot' || !snap.you) throw new Error('snapshot sem viewer');
     const extra = room.state.playerExtra;
     expect(snap.you.ability).toBe('flamethrower');
@@ -240,7 +268,10 @@ describe('servidor autoritativo de co-op', () => {
     room.state.playerExtra.frostbitten = true;
     h.tick(1);
 
-    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
+    const snap = h
+      .drain('A')
+      .filter((m) => m.t === 'snapshot')
+      .pop();
     if (snap?.t !== 'snapshot' || !snap.you) throw new Error('snapshot sem viewer');
     expect(snap.you.freeze).toBe(640);
     expect(snap.you.frostbitten).toBe(true);
@@ -267,7 +298,8 @@ describe('servidor autoritativo de co-op', () => {
     expect(full?.t).toBe('full_resync');
     if (full?.t === 'full_resync') {
       mirror.apply(full.chunkDiffs);
-      for (let i = 0; i < room.state.solid.length; i++) expect(mirror.solid[i]).toBe(room.state.solid[i]);
+      for (let i = 0; i < room.state.solid.length; i++)
+        expect(mirror.solid[i]).toBe(room.state.solid[i]);
     }
   });
 
@@ -357,8 +389,13 @@ describe('servidor autoritativo de co-op', () => {
 
     expect(['extracted', 'extracted_with_core']).toContain(room.state.phase);
     // o snapshot final reflete a fase terminal para os dois
-    const lastA = h.drain('A').filter((m) => m.t === 'snapshot').pop();
-    expect(lastA?.t === 'snapshot' && ['extracted', 'extracted_with_core'].includes(lastA.phase)).toBe(true);
+    const lastA = h
+      .drain('A')
+      .filter((m) => m.t === 'snapshot')
+      .pop();
+    expect(
+      lastA?.t === 'snapshot' && ['extracted', 'extracted_with_core'].includes(lastA.phase),
+    ).toBe(true);
   });
 
   it('slot desconectado fica reservado ao token: um novo cliente NAO o herda', () => {
@@ -400,8 +437,13 @@ describe('servidor autoritativo de co-op', () => {
 
     h.tick(3);
     // snapshots expoem apenas o player em jogo
-    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
-    expect(snap?.t === 'snapshot' && snap.entities.filter((e) => e.kind === 'player').length).toBe(1);
+    const snap = h
+      .drain('A')
+      .filter((m) => m.t === 'snapshot')
+      .pop();
+    expect(snap?.t === 'snapshot' && snap.entities.filter((e) => e.kind === 'player').length).toBe(
+      1,
+    );
 
     // extracao com um unico jogador em jogo nao espera "todos na saida"
     room.state.leftEntryZone = true;
@@ -475,7 +517,9 @@ describe('servidor autoritativo de co-op', () => {
     h.tick(20);
     const snaps = h.drain('A').filter((m) => m.t === 'snapshot');
     expect(snaps.length).toBeGreaterThan(0);
-    const withPlayers = snaps.find((s) => s.t === 'snapshot' && s.entities.filter((e) => e.kind === 'player').length === 2);
+    const withPlayers = snaps.find(
+      (s) => s.t === 'snapshot' && s.entities.filter((e) => e.kind === 'player').length === 2,
+    );
     expect(withPlayers).toBeDefined();
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
@@ -753,7 +797,8 @@ describe('servidor autoritativo de co-op', () => {
     const first = h.drain('A').filter((m) => m.t === 'snapshot');
     const withWorld = first.find((s) => s.t === 'snapshot' && s.world);
     expect(withWorld).toBeDefined();
-    if (withWorld?.t === 'snapshot') expect(withWorld.world!.salvageSites[0].cacheOpened).toBe(true);
+    if (withWorld?.t === 'snapshot')
+      expect(withWorld.world!.salvageSites[0].cacheOpened).toBe(true);
 
     // sem novas mudancas, as flags nao viajam de novo (delta, nao estado por tick)
     h.tick(10);
@@ -766,6 +811,6 @@ describe('servidor autoritativo de co-op', () => {
     const resync = h.drain('A').find((m) => m.t === 'full_resync');
     expect(resync).toBeDefined();
     if (resync?.t === 'full_resync') expect(resync.world.salvageSites[0].cacheOpened).toBe(true);
-      expect(resync.you.pendingModuleChoice).toBeNull();
+    expect(resync.you.pendingModuleChoice).toBeNull();
   });
 });

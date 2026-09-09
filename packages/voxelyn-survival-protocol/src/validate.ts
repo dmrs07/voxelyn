@@ -34,6 +34,8 @@ export const validatePlayerCommand = (raw: unknown): ValidationResult<PlayerComm
   const choose = c.choose;
   const validChoose = choose === 0 || choose === 1 || choose === null || choose === undefined;
 
+  // A malformed echo index must never be normalised into the KEEP action.
+  if (c.choiceKind === 'echo' && !validChoose) return { ok: false, reason: 'echo choice invalida' };
   const value: PlayerCommand = {
     move: { x: clampUnit(move.x as number), y: clampUnit(move.y as number) },
     aim: { x: clampBig(aim.x as number), y: clampBig(aim.y as number) },
@@ -43,6 +45,7 @@ export const validatePlayerCommand = (raw: unknown): ValidationResult<PlayerComm
     interact: isBool(c.interact) ? c.interact : false,
     purge: isBool(c.purge) ? c.purge : false,
     choose: validChoose ? ((choose ?? null) as 0 | 1 | null) : null,
+    ...(c.choiceKind === 'echo' ? { choiceKind: 'echo' as const } : {}),
   };
   return { ok: true, value };
 };
@@ -149,7 +152,7 @@ export class RateLimiter {
 
   constructor(
     private readonly maxPerWindow: number,
-    private readonly windowMs: number
+    private readonly windowMs: number,
   ) {}
 
   /** Retorna true se permitido; false se estourou o limite. */

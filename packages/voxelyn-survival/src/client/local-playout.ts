@@ -174,7 +174,7 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     leylineCircuit: { ...state.leylineCircuit, reached: [...state.leylineCircuit.reached] },
     stratumSubverted: state.stratumSubverted,
     salvageSites: state.salvageSites.map((s) => ({ ...s })),
-    wellOffers: state.wellOffers.map((o) => ({ ...o })),
+    wellOffers: state.wellOffers.map((o) => ({ ...o, unlock: { ...o.unlock } })),
     // Raso por campo e fundo nas listas que a simulacao reescreve (bolhas,
     // bacias, marcas); `path` e derivado e continua compartilhado.
     bossRuntime: {

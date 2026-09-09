@@ -1,3 +1,4 @@
+import { EchoChoicePanel } from './echo-choice';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, emptyCommand, runDepthForGeneration, stepRun } from '@voxelyn/survival-sim';
 import type {
@@ -224,6 +225,7 @@ let contractRun: DeathEchoContract | null = null;
 if (IDENTITY_STING_URL) void audio.prepareIdentitySting(IDENTITY_STING_URL);
 
 const renderer = new SurvivalRenderer(canvas);
+const echoChoice = new EchoChoicePanel();
 const deathEchoes = new DeathEchoController();
 /**
  * Setor cujo pool ja foi pedido nesta run.
@@ -267,6 +269,7 @@ const renderState = (
   if (state.phase === 'running') requestPool(state);
   renderer.setDeathEchoes(deathEchoes.sync(state, nowMs));
   renderer.render(state, alpha, inputState, nowMs);
+  echoChoice.update(state, inputState.usingTouch, pauseMenu.isOpen);
 };
 const input = new SurvivalInput(canvas);
 const cooldownOverlay = new TouchCooldownOverlay(canvas);
@@ -350,6 +353,7 @@ const veilSound = (): void => audio.ui('deployStatic');
 type PreparedRun = { firstFrame: () => void; start: () => void };
 
 const backToMenu = (): void => {
+  echoChoice.hide();
   runInProgress = false;
   activeRunKind = 'none';
   liveRun = null;
@@ -1089,6 +1093,7 @@ const mountOptions = (slot: HTMLDivElement): void => {
  * pelo menu depois de a aba ter ficado escondida nao conta duas vezes.
  */
 const abandonRun = (): void => {
+  echoChoice.hide();
   const state = liveRun;
   // So run de verdade entra no funil de abandono; ver `activeRunKind`.
   if (activeRunKind === 'standard' && state && state.phase === 'running' && state.tick >= 20) {
@@ -1139,6 +1144,7 @@ const pauseMenu = new PauseMenu(canvas, {
     });
   },
   onOpen: () => {
+    echoChoice.hide();
     // No solo a pausa e real e o loop congela; no co-op ela e so a overlay, e o
     // comando enviado ao servidor vira neutro (o Prospector para de andar e de
     // atirar, como se o jogador tivesse tirado as maos — que foi o que ele fez).
@@ -1390,6 +1396,14 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
       // resolvido, entao a trilha inteira e invisivel para a simulacao. No
       // co-op ela nao existe: la todo mundo desce G-00 de fabrica.
       applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
+      const echoCommand = echoChoice.consume();
+      if (echoCommand)
+        Object.assign(raw, echoCommand, {
+          fire: false,
+          ability: false,
+          interact: false,
+          purge: false,
+        });
       // O recorder fica NO CAMINHO, e nao ao lado: `capture` devolve o comando
       // quantizado, e e esse que a simulacao recebe. Gravar de um lado e
       // simular de outro produziria um log que, re-simulado no servidor,
@@ -1857,6 +1871,14 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         cmd.choose = queuedChoice;
         queuedChoice = null;
       }
+      const echoCommand = menuOpen ? null : echoChoice.consume();
+      if (echoCommand)
+        Object.assign(cmd, echoCommand, {
+          fire: false,
+          ability: false,
+          interact: false,
+          purge: false,
+        });
       if (cmd.interact) deathEchoes.pressInteract();
       net.setCommand(cmd);
       // Uma sondagem por segundo, e nao uma por quadro: a medida serve para o
