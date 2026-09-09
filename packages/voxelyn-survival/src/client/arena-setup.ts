@@ -22,6 +22,8 @@ import {
   SOLID_NONE,
   SOLID_FRAGILE,
   SOLID_ROCK,
+  SOLID_SUTURE_ANCHOR,
+  SOLID_SUTURE_CRACKED,
   isPipe,
   isIceSurface,
   iceCrackStage,
@@ -375,6 +377,15 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   state.railTracks = state.railTracks.filter((t) => dist[t.y * w + t.x] >= 0);
   state.enemies.sort((a, b) => Number(b === boss) - Number(a === boss));
   state.sutures = keptSutures;
+  // The pre-game crop turns some generated anchors into structural rock.
+  // Only the anchors that actually survived belong to the repairable encounter.
+  if (boss.silk?.supports)
+    boss.silk.supports = boss.silk.supports.filter(
+      (s) =>
+        s.kind !== 'anchor' ||
+        state.solid[s.cell] === SOLID_SUTURE_ANCHOR ||
+        state.solid[s.cell] === SOLID_SUTURE_CRACKED,
+    );
   state.salvageSites = [];
   state.wellOffers = [];
   // As ondas de contaminacao ja nasceram gastas: `stepContamination` so dispara

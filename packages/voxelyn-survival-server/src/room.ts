@@ -409,7 +409,8 @@ export class GameRoom {
         facingY: round3(e.facing.y),
         stunnedUntil: e.stunnedUntil,
         mood: e.mood,
-        silk: e.silk ? { ...e.silk } : undefined,
+        silk: e.silk ? { ...e.silk, supports: e.silk.supports?.map((s) => ({ ...s })) } : undefined,
+        webRepair: e.webRepair ? { ...e.webRepair } : undefined,
         summonerId: e.summonerId,
         action: e.action
           ? {

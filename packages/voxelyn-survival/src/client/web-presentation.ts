@@ -2,6 +2,9 @@ import {
   isWebStrand,
   seamstressHidden,
   silkLift,
+  webRepairProgress,
+  webSupports,
+  webSupportMaxHp,
   suturePoint,
   SEAMSTRESS_STAGE_ALOFT,
   SEAMSTRESS_STAGE_ASCENDING,
@@ -30,8 +33,8 @@ const WEB_LIFT = 3;
  * que o fio e cortado, porque e da integridade do fio que a simulacao le a
  * lentidao. O FIO e o alvo do tiro. O fio CORTADO fica como um fantasma
  * pontilhado (a passagem esta aberta) e, quando um Costureiro o refaz, a
- * costura cresce de uma ponta a outra na cor do reparo — tres pontos, cerca
- * de cinco segundos, o tempo de decidir se vale interromper.
+ * costura cresce de uma ponta a outra na cor do reparo, no mesmo relogio da
+ * barra acima do Costureiro: dois segundos para interromper um fio.
  */
 export const appendWebDraws = (
   ctx: CanvasRenderingContext2D,
@@ -110,8 +113,16 @@ export const appendWebDraws = (
           ctx.lineTo(bx, by - WEB_LIFT * z);
           ctx.stroke();
           ctx.setLineDash([]);
-          if (s.tension > 0) {
-            const t = s.tension / 100;
+          const progress = Math.max(
+            s.tension / 100,
+            ...state.enemies.map((e) =>
+              e.webRepair?.kind === 'strand' && e.webRepair.target === s.id
+                ? (webRepairProgress(state, e) ?? 0)
+                : 0,
+            ),
+          );
+          if (progress > 0) {
+            const t = progress;
             const pulse = 0.7 + 0.3 * Math.sin(nowMs / 90);
             ctx.globalAlpha = pulse;
             ctx.strokeStyle = REPAIR;
@@ -126,6 +137,70 @@ export const appendWebDraws = (
       },
     });
   }
+};
+
+/** Reinforced knots stay visible when broken, so their reconstruction has a clear target. */
+export const appendWebSupportDraws = (
+  ctx: CanvasRenderingContext2D,
+  state: SurvivalState,
+  items: DrawItem[],
+  project: Project,
+  z: number,
+  brightness: (x: number, y: number) => number,
+): void => {
+  for (const support of webSupports(state)) {
+    if (support.kind !== 'junction') continue;
+    if (
+      !state.sutures.some(
+        (s) =>
+          s.kind === 'web' && s.phase !== 'spent' && (s.a === support.cell || s.b === support.cell),
+      )
+    )
+      continue;
+    const p = suturePoint(state, support.cell);
+    if (brightness(p.x, p.y) <= 0.05) continue;
+    const [sx, sy] = project(p.x, p.y);
+    items.push({
+      depth: p.x + p.y - 0.1,
+      draw: () => {
+        ctx.save();
+        ctx.fillStyle = SILK_SHADOW;
+        ctx.fillRect(sx - 3 * z, sy - 6 * z, 6 * z, 6 * z);
+        ctx.fillStyle = support.hp === webSupportMaxHp(support) ? SILK : REPAIR;
+        // One pip per remaining impact; an empty frame identifies a broken knot.
+        for (let n = 0; n < support.hp; n++)
+          ctx.fillRect(sx + (n * 2 - 2.5) * z, sy - 5 * z, z, 4 * z);
+        ctx.restore();
+      },
+    });
+  }
+};
+
+/** A short amber channel bar above the head, driven by the authoritative action clock. */
+export const appendWebRepairDraws = (
+  ctx: CanvasRenderingContext2D,
+  state: SurvivalState,
+  worker: Entity,
+  items: DrawItem[],
+  project: Project,
+  z: number,
+): void => {
+  const progress = webRepairProgress(state, worker);
+  if (progress === null) return;
+  const [sx, sy] = project(worker.x, worker.y);
+  items.push({
+    depth: worker.x + worker.y + 1,
+    draw: () => {
+      ctx.save();
+      ctx.fillStyle = '#171c23';
+      ctx.fillRect(sx - 10 * z, sy - 36 * z, 20 * z, 5 * z);
+      ctx.fillStyle = '#65543c';
+      ctx.fillRect(sx - 9 * z, sy - 35 * z, 18 * z, 3 * z);
+      ctx.fillStyle = REPAIR;
+      ctx.fillRect(sx - 9 * z, sy - 35 * z, 18 * z * progress, 3 * z);
+      ctx.restore();
+    },
+  });
 };
 
 /**

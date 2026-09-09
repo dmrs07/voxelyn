@@ -3867,6 +3867,18 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
         'returnAt',
       ] as const)
         mix(Math.round(enemy.silk[key] * 1000));
+      mix(enemy.silk.supports?.length ?? 0);
+      for (const support of enemy.silk.supports ?? []) {
+        mix(support.cell);
+        mixString(support.kind);
+        mix(support.hp);
+      }
+    } else mix(0);
+    if (enemy.webRepair) {
+      mix(1);
+      mixString(enemy.webRepair.kind);
+      mix(enemy.webRepair.target);
+      mix(enemy.webRepair.at);
     } else mix(0);
     if (enemy.action) {
       mixString(enemy.action.kind);

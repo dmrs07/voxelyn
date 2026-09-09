@@ -716,7 +716,10 @@ export class NetClient {
           kind: 'enemy',
           archetype: snap.archetype as EnemyArchetype,
           mood: snap.mood,
-          silk: snap.silk ? { ...snap.silk } : undefined,
+          silk: snap.silk
+            ? { ...snap.silk, supports: snap.silk.supports?.map((s) => ({ ...s })) }
+            : undefined,
+          webRepair: snap.webRepair ? { ...snap.webRepair } : undefined,
           summonerId: snap.summonerId,
           // O espelho do cliente nao simula: `alertedUntil` so existe aqui para
           // satisfazer o tipo compartilhado com a sim. Zero e o valor honesto —

@@ -1,15 +1,10 @@
 import { SOLID_NONE, SOLID_STITCHED_ROCK, TICK_HZ, MAX_ENEMIES } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
-import { approach, sewJob, suturePoint } from './sutures.js';
-import {
-  chamberAnchors,
-  spinWeb,
-  supportHolds,
-  weaveWeb,
-  webJunctions,
-  webRepairJobs,
-} from './web.js';
+import { approach, suturePoint } from './sutures.js';
+import { maintainWebRepair, webRepairFirst } from './web-repair.js';
+import { registerWebJunctions, WEB_ANCHOR_HP } from './web-supports.js';
+import { chamberAnchors, spinWeb, supportHolds, weaveWeb, webJunctions } from './web.js';
 import {
   SEAMSTRESS_CHAMBER_RADIUS as CHAMBER_RADIUS,
   sutureInSeamstressChamber,
@@ -182,6 +177,11 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
     stage: SEAMSTRESS_STAGE_GROUND,
     stageAt: 0,
     returnAt: -1,
+    supports: chamberAnchors(state, queen).map((cell) => ({
+      cell,
+      kind: 'anchor',
+      hp: WEB_ANCHOR_HP,
+    })),
   };
   for (const s of state.sutures) {
     if (!sutureInSeamstressChamber(s, state.config.width, queen)) continue;
@@ -493,6 +493,7 @@ const seamstressPhaseStep = (
     encounter.stageAt = state.tick;
     // A teia nasce agora, com a volta ja marcada no fim da tecelagem inicial.
     encounter.returnAt = spinWeb(state, { x: encounter.x, y: encounter.y }, state.tick) + 10;
+    registerWebJunctions(state, queen);
     return true;
   }
   if (encounter.stage === SEAMSTRESS_STAGE_ALOFT) {
@@ -609,22 +610,12 @@ export const silkHelperStep = (
   dt: number,
   events: SemanticEvent[],
 ): void => {
-  if (!player || state.tick < enemy.nextActionAt) return;
+  if (state.tick < enemy.nextActionAt) return;
   const brood = enemy.archetype === 'seamstress_brood';
+  // Repairs remain the worker's first priority even with a player nearby.
+  if (!brood && webRepairFirst(state, enemy, dt, events)) return;
+  if (!player) return;
   const d = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-  // COSTUREIROS NO FRENESI refazem a teia antes de brigar: o fio cortado mais
-  // perto e o trabalho, a menos que o jogador esteja em cima deles. E a
-  // decisao que a fase oferece — matar quem costura mantem a passagem aberta.
-  if (!brood && d >= 3) {
-    const mother = state.enemies.find((e) => e.alive && e.id === enemy.summonerId);
-    if (mother && seamstressFrenzied(mother)) {
-      const job = webRepairJobs(state, enemy)[0];
-      if (job) {
-        sewJob(state, enemy, job, dt, events);
-        return;
-      }
-    }
-  }
   if (d < 1.25) {
     const retreat =
       d > 0.01
@@ -685,6 +676,7 @@ export const silkMaintenance = (
     enemy.hp = 0;
     enemy.alive = false;
     enemy.action = undefined;
+    enemy.webRepair = undefined;
     events.push({ t: 'action_end', entity: enemy.id });
     events.push({
       t: 'death',
@@ -698,6 +690,7 @@ export const silkMaintenance = (
     });
     return true;
   }
+  maintainWebRepair(state, enemy, events);
   // A METADE DA VIDA interrompe ate uma puxada em voo: a subida e decidida
   // aqui, antes das acoes, e nao no passo de IA que uma acao suspende.
   if (

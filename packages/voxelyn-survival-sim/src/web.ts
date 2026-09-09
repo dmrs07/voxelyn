@@ -12,6 +12,7 @@
 // os fios e o que a protege de novo.
 import { SOLID_NONE, SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED } from './constants.js';
 import { createSutures, suturePoint } from './sutures.js';
+import { webSupportAt } from './web-supports.js';
 import { WEB_ANCHOR_REACH, farWallAlong, nearbyReachable } from './suture-layout.js';
 import type { Entity, SemanticEvent, SurvivalState, Suture, SutureRecipe, Vec2 } from './types.js';
 
@@ -296,9 +297,16 @@ export const spinWeb = (state: SurvivalState, center: Vec2, from: number): numbe
 export const weaveWeb = (state: SurvivalState, events: SemanticEvent[]): void => {
   for (const s of state.sutures) {
     if (!isWebStrand(s) || s.phase !== 'spent' || s.resewAt < 0 || state.tick < s.resewAt) continue;
+    s.resewAt = -1;
+    // A knot destroyed during the ascent stays destroyed: later scheduled
+    // strands must wait for the workers instead of weaving across its gap.
+    if (webSupportAt(state, s.a)?.hp === 0 || webSupportAt(state, s.b)?.hp === 0) {
+      s.phase = 'loose';
+      s.tension = 0;
+      continue;
+    }
     s.phase = 'taut';
     s.tension = 100;
-    s.resewAt = -1;
     events.push({ t: 'suture', phase: 'taut', id: s.id, ...suturePoint(state, s.cells[0]) });
   }
 };
@@ -361,8 +369,8 @@ export const webJunctions = (state: SurvivalState): number[] => {
   const cells = new Set<number>();
   for (const s of state.sutures)
     if (isWebStrand(s) && s.phase === 'taut') {
-      cells.add(s.a);
-      cells.add(s.b);
+      if (webSupportAt(state, s.a)?.hp !== 0) cells.add(s.a);
+      if (webSupportAt(state, s.b)?.hp !== 0) cells.add(s.b);
     }
   return [...cells];
 };
@@ -374,5 +382,8 @@ export const webJunctions = (state: SurvivalState): number[] => {
  * locomocao dela, e o corte continua sendo a resposta.
  */
 export const supportHolds = (state: SurvivalState, cell: number): boolean =>
-  anchorLike(state, cell) ||
-  state.sutures.some((s) => isWebStrand(s) && s.phase === 'taut' && (s.a === cell || s.b === cell));
+  webSupportAt(state, cell)?.hp !== 0 &&
+  (anchorLike(state, cell) ||
+    state.sutures.some(
+      (s) => isWebStrand(s) && s.phase === 'taut' && (s.a === cell || s.b === cell),
+    ));

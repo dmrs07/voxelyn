@@ -351,13 +351,20 @@ it('clona os destinos de voo e a cadencia da Cerzideira sem alias entre ticks', 
     impactAt: 34,
     anchor: 100,
   };
+  queen.silk!.supports = [{ cell: 100, kind: 'anchor', hp: 3 }];
+  const worker = spawnEnemy(state, 'stitcher', 17, 15, false);
+  worker.webRepair = { kind: 'support', target: 100, at: 99 };
   const playout = new LocalPlayout();
   playout.capture(state);
   state.tick++;
   queen.silk!.lunges = 10;
   queen.action!.silkFlight.toX = 30;
+  queen.silk!.supports[0].hp = 6;
+  worker.webRepair.at = 101;
   playout.capture(state);
   const view = playout.sample(state, 0)!;
   expect(view.enemies[0].silk!.lunges).toBe(0);
   expect(view.enemies[0].action!.silkFlight!.toX).toBe(20.5);
+  expect(view.enemies[0].silk!.supports![0].hp).toBe(3);
+  expect(view.enemies.find((e) => e.id === worker.id)!.webRepair!.at).toBe(99);
 });

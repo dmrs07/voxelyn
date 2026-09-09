@@ -28,12 +28,14 @@ Na metade da vida a Cerzideira interrompe o que estiver fazendo, prende-se a um 
 - **Retorno.** Ela desce no centro da teia, olhos vermelhos, e entra em frenesi: perseguição a 5,2 tiles/s, puxadas com preparo de 12 ticks (10 quando encadeadas), e uma leva de até dez auxiliares, com três Costureiros, reposta a cada 4,5 s dentro do teto. As junções inteiras da teia são apoios de puxada: cortar os fios de uma junção enquanto ela está presa ali a derruba. Os avisos no chão continuam os mesmos.
 - **A teia a sustenta.** Com a integridade da teia (fios inteiros sobre fios tecidos) a 60% ou mais, ela leva 0,4x de dano, derrubada ou não. É a restrição da durabilidade dela na segunda fase: cortar a teia abre a fraqueza, e os Costureiros refazendo os fios a fecham. O HUD mostra a integridade. Vida 780 → 900.
 - **Teia pegajosa.** Sob um fio inteiro (faixa de 1,5 tile para cada lado), o Prospector anda a 0,62 da velocidade; a esquiva continua. Cerzideira, crias e Costureiros andam normalmente. Cada fio é cortado pelas interações existentes (tiro cruzando o fio, fogo), com som de rompimento, e a faixa dele deixa de pegar no mesmo tick. Fios cortados ficam pontilhados no chão.
-- **Crias e Costureiros.** As crias perseguem a 4,8 tiles/s (mais rápidas que o Prospector) e o salto causa 10 num raio de 0,7. No frenesi, os Costureiros convocados priorizam o fio cortado mais próximo: vão até ele e dão três pontos visíveis (cerca de 5 s), com a costura crescendo de uma ponta à outra. Cada fio volta quando o próprio reparo termina. Matar ou interromper o Costureiro deixa a passagem aberta; com o jogador a menos de 3 tiles, ele briga em vez de costurar.
+- **Apoios reforçados.** Âncoras da câmara resistem a seis impactos; junções da teia, a três impactos mirados. As marcas na junção mostram sua resistência restante. Destruir a junção rompe os fios ligados a ela; acertar um apoio ainda resistente não corta também a amarra da Cerzideira naquele ponto. Os trechos de fio entre junções continuam cortáveis com um tiro transversal. As âncoras da colônia mantêm sua regra anterior.
+- **Crias e Costureiros.** As crias perseguem a 4,8 tiles/s (mais rápidas que o Prospector) e o salto causa 10 num raio de 0,7. No frenesi, os Costureiros convocados reconstroem apoios destruídos, depois fios cortados e então apoios parcialmente danificados. Cada um reserva um trabalho acessível; os demais escolhem outros reparos. A proximidade do jogador não os distrai. Atacam quando não encontram reparo disponível.
+- **Reconstrução visível.** Uma barra âmbar acima da cabeça acompanha a canalização: 2 s por fio e 3 s por âncora ou junção, após chegar ao local. O reparo só se aplica ao completar a barra. Atordoar, matar ou afastar o operário do alvo interrompe o trabalho; a tentativa seguinte começa novamente. Âncoras destruídas permanecem registradas e podem voltar ao mesmo lugar, mas nunca se reconstrói uma parede dentro de um personagem. Os fios da junção são reparados depois do nó.
 - **Fim.** A morte da Cerzideira encerra os auxiliares e dissolve a teia.
 
 Os fios são suturas `kind: 'web'`: cortes, reparos, hash, snapshot e reconexão reutilizam a infraestrutura das suturas. A decisão que a fase oferece: atacar a Cerzideira exposta, controlar as crias, ou matar os Costureiros para manter a teia aberta e a fraqueza dela à mostra. O estado da fase vive em `silk.stage`, `stageAt` e `returnAt`, no hash e nos snapshots. Fora da tela ela não é alvo de nada. As oito direções autoradas e o raster de câmera das diagonais ficam como estão; os olhos vermelhos são desenhados pelo cliente sobre o sprite, porque o orçamento sob demanda dos atlas não comporta outra animação de oito rumos.
 
-Prancha: `node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs` gera a imagem acima e `second-phase-events.json`, a partir da simulação real (seed 36): subida, espiral se formando, retorno com olhos vermelhos, passagem aberta pelo jogador, Costureiro reconstruindo um fio e uma puxada do frenesi.
+Prancha: `node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs` gera a imagem acima e `second-phase-events.json`, a partir da simulação real (seed 36): subida, teia se formando, retorno com olhos vermelhos, passagem aberta pelo jogador, Costureiro reconstruindo um fio, uma puxada do frenesi, reconstrução de âncora a 50% e cancelamento por atordoamento. O JSON registra o trabalho e o progresso de cada operário nos quadros capturados.
 
 ## Jogar e reproduzir
 
@@ -67,7 +69,13 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões: protocolo 37, simulação 74, conteúdo 37.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões atuais: protocolo 38, simulação 75, conteúdo 37. Cliente e servidor precisam ser atualizados juntos.
+
+### Prioridade de reparo no PR #216
+
+Durabilidade e trabalhos reservados entram no hash e nos snapshots. As cópias de apresentação solo e de rede não compartilham os dados mutáveis da simulação. A reconexão recupera a mesma barra e os mesmos apoios danificados. O preparo da arena remove do cadastro de reparos as âncoras que o recorte converteu em paredes estruturais.
+
+Validação desta alteração: 66 testes de simulação, 66 do cliente (incluindo arena, apresentação e integração com o servidor) e 73 de protocolo; compilação TypeScript da simulação, protocolo, conteúdo, servidor e cliente; lint e formatação dos arquivos alterados. Prancha e ZIP jogável atualizados. Os valores de resistência e tempo de reparo são pontos de partida para o balanceamento com jogadores; não houve playtest interativo no navegador nesta rodada.
 
 ### Correção da revisão do PR #215
 

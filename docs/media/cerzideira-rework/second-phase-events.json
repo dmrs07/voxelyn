@@ -1,6 +1,79 @@
 {
   "seed": 36,
   "sector": 7,
+  "frames": [
+    {
+      "label": "SUBIDA / FIO VERTICAL",
+      "tick": 43,
+      "repairs": []
+    },
+    {
+      "label": "TEIA / ESPIRAL SE FORMANDO",
+      "tick": 205,
+      "repairs": []
+    },
+    {
+      "label": "RETORNO / OLHOS VERMELHOS",
+      "tick": 357,
+      "repairs": []
+    },
+    {
+      "label": "PASSAGEM ABERTA / FIOS CORTADOS",
+      "tick": 357,
+      "repairs": []
+    },
+    {
+      "label": "COSTUREIRO / RECONSTRUINDO UM FIO",
+      "tick": 431,
+      "repairs": [
+        {
+          "worker": 28,
+          "kind": "strand",
+          "target": 11,
+          "at": 8532,
+          "progress": null
+        },
+        {
+          "worker": 29,
+          "kind": "strand",
+          "target": 46,
+          "at": 8242,
+          "progress": 0.9
+        }
+      ]
+    },
+    {
+      "label": "FRENESI / PUXADA CURTA",
+      "tick": 436,
+      "repairs": [
+        {
+          "worker": 28,
+          "kind": "strand",
+          "target": 11,
+          "at": 8532,
+          "progress": null
+        }
+      ]
+    },
+    {
+      "label": "ANCORA / RECONSTRUCAO",
+      "tick": 496,
+      "repairs": [
+        {
+          "worker": 29,
+          "kind": "support",
+          "target": 8343,
+          "at": 8246,
+          "progress": 0.5
+        }
+      ]
+    },
+    {
+      "label": "INTERRUPCAO / PASSAGEM MANTIDA",
+      "tick": 497,
+      "repairs": []
+    }
+  ],
   "events": [
     {
       "tick": 31,
@@ -497,6 +570,22 @@
       "state": "frenzy",
       "x": 85.5,
       "y": 92.5
+    },
+    {
+      "tick": 435,
+      "t": "suture",
+      "phase": "taut",
+      "id": 46,
+      "x": 83.5,
+      "y": 86.5
+    },
+    {
+      "tick": 494,
+      "t": "suture",
+      "phase": "taut",
+      "id": 11,
+      "x": 83.5,
+      "y": 87.5
     }
   ]
 }

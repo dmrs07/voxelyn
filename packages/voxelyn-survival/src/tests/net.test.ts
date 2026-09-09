@@ -9,6 +9,9 @@ import {
   spawnEnemy,
   startAction,
   cutSuture,
+  registerWebJunctions,
+  SEAMSTRESS_STAGE_FRENZY,
+  webRepairProgress,
   SOLID_SUTURE_ANCHOR,
   emptyCommand,
   LEYLINE_CHARGE_TICKS,
@@ -54,6 +57,54 @@ class Loop {
 }
 
 describe('NetClient <-> SurvivalServer (in-process)', () => {
+  it('preserva apoios danificados e a barra de reparo em snapshots e reconexao', () => {
+    const loop = new Loop(),
+      client = loop.connect('reparo');
+    client.connect();
+    loop.advance(3);
+    const state = loop.server.roomForClient('reparo')!.state;
+    state.solid.fill(0);
+    state.surface.fill(0);
+    state.enemies = [];
+    state.sutures = [];
+    const anchor = state.config.width * 20 + 25;
+    state.solid[anchor] = SOLID_SUTURE_ANCHOR;
+    const queen = spawnEnemy(state, 'seamstress', 20, 20, false);
+    queen.silk!.stage = SEAMSTRESS_STAGE_FRENZY;
+    queen.silk!.broodAt = queen.nextActionAt = 100000;
+    queen.silk!.supports![0].hp = 2;
+    const cells = [21, 22, 23].map((x) => 22 * state.config.width + x);
+    state.sutures = createSutures([
+      { id: 0, a: cells[0], b: cells[2], cells, slabCells: cells, kind: 'web', objective: false },
+    ]);
+    registerWebJunctions(state, queen);
+    const worker = spawnEnemy(state, 'stitcher', 21, 21, false);
+    worker.summonerId = queen.id;
+    worker.nextActionAt = state.tick;
+    loop.advance(6);
+    const view = client.sampleRenderState(loop['now'])!;
+    const visible = view.enemies.find((e) => e.id === worker.id)!;
+    expect(visible.webRepair).toEqual(worker.webRepair);
+    expect(visible.webRepair).not.toBe(worker.webRepair);
+    expect(webRepairProgress(view, visible)).toBeGreaterThan(0);
+    expect(webRepairProgress(view, visible)).toBeLessThan(1);
+    const supports = view.enemies.find((e) => e.id === queen.id)!.silk!.supports!;
+    expect(supports).toEqual(queen.silk!.supports);
+    expect(supports[0]).not.toBe(queen.silk!.supports![0]);
+    const token = client.resumeToken!;
+    loop.server.removeConnection('reparo');
+    const resumed = loop.connect('reparo-2');
+    resumed.connect(token);
+    loop.advance(3);
+    const restored = resumed.sampleRenderState(loop['now'])!;
+    const restoredWorker = restored.enemies.find((e) => e.id === worker.id)!;
+    expect(restoredWorker.webRepair).toEqual(worker.webRepair);
+    expect(restored.enemies.find((e) => e.id === queen.id)!.silk!.supports).toEqual(
+      queen.silk!.supports,
+    );
+    expect(webRepairProgress(restored, restoredWorker)).toBeGreaterThan(0);
+  });
+
   it('suturas preservam carga, prazos e recompensa no snapshot e na reconexao', () => {
     const loop = new Loop(),
       client = loop.connect('costura');

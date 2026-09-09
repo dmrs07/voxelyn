@@ -534,7 +534,7 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     expect(webSpeedMul(state, state.player)).toBe(WEB_SLOW);
   });
 
-  it('matar o Costureiro no meio da costura deixa o fio aberto; ameacado, ele larga o trabalho', () => {
+  it('matar o Costureiro interrompe a costura; outro prioriza o reparo mesmo perto do jogador', () => {
     const { state, queen } = fixture();
     toFrenzy(state, queen);
     const strand = state.sutures.find((s) => isWebStrand(s) && s.phase === 'taut')!;
@@ -563,14 +563,14 @@ describe('Cerzideira: single support, arrival strike and jumping brood', () => {
     until(state, state.tick + 60);
     expect(strand.phase).toBe('loose');
     expect(strand.tension).toBeLessThan(100);
-    // Outro Costureiro, com o jogador em cima dele: briga em vez de costurar.
+    // Aproximar-se nao distrai o substituto: e preciso interromper a costura.
     const second = spawnEnemy(state, 'stitcher', near.x - 0.5, near.y - 0.5, false);
     second.summonerId = queen.id;
     second.alertedUntil = state.tick + 100000;
     state.player.x = second.x + 2;
     state.player.y = second.y;
     until(state, state.tick + 40);
-    expect(second.action?.kind === 'stitch' && second.action.target === strand.id).toBe(false);
+    expect(second.action?.kind === 'stitch' && second.action.target === strand.id).toBe(true);
   });
 
   it('no frenesi a teia a blinda ate ser cortada abaixo do limiar; a camara garante apoios em volta', () => {

@@ -241,7 +241,8 @@
 // 37: `SilkEncounter` ganha `stage`, `stageAt` e `returnAt` (a segunda fase da
 //     Cerzideira) e `Suture.kind` aceita `web`. Um cliente antigo desenharia a
 //     rainha no chao enquanto o servidor a tem fora da tela.
-export const PROTOCOL_VERSION = 37;
+// 38: support durability and worker repair assignments travel with entity snapshots.
+export const PROTOCOL_VERSION = 38;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1036,7 +1037,9 @@ export const PROTOCOL_VERSION = 37;
 //     de dano (`WEB_ARMOR`); vida 780 -> 900; crias a 4,8 tiles/s, salto de
 //     10 com raio 0,7; ate dez auxiliares com tres Costureiros, reposicao a
 //     cada 4,5 s. Replays de 73 com a Cerzideira nao batem.
-export const SIMULATION_VERSION = 74;
+// 75: reinforced web supports, persistent destroyed anchors and repair-first workers.
+//     Channel deadlines, support HP and assigned jobs determine future state.
+export const SIMULATION_VERSION = 75;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

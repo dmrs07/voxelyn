@@ -75,6 +75,11 @@ describe('createArenaRun', () => {
     });
     expect(state.enemies[0].archetype).toBe('seamstress');
     expect(state.enemies).toHaveLength(1);
+    const supports = state.enemies[0].silk!.supports!;
+    expect(supports.length).toBeGreaterThanOrEqual(2);
+    expect(
+      supports.every((s) => s.kind === 'anchor' && state.solid[s.cell] === SOLID_SUTURE_ANCHOR),
+    ).toBe(true);
     expect(
       state.sutures.every(
         (s) => s.encounter && s.whipAt === -1 && s.fallAt === -1 && s.closeAt === -1,
