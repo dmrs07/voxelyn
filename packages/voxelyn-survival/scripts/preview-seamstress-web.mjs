@@ -14,7 +14,7 @@ const temp = await mkdtemp(resolve(tmpdir(), 'cerzideira-web-'));
 const entry = resolve(temp, 'engine.mjs');
 await build({
   stdin: {
-    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
+    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export { stunEntity } from './packages/voxelyn-survival-sim/src/entities.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
     resolveDir: root,
   },
   bundle: true,
@@ -38,8 +38,8 @@ const state = engine.createArenaRun({
 });
 const queen = state.enemies.find((e) => e.archetype === 'seamstress');
 state.playerExtra.iframesUntil = 1e9;
-const capture = (label, description) =>
-  frames.push({ state: structuredClone(state), label, description });
+const capture = (label, description, focus) =>
+  frames.push({ state: structuredClone(state), label, description, focus });
 const step = () => {
   const result = engine.stepRun(state, [engine.emptyCommand()]);
   events.push(...result.events.map((e) => ({ tick: state.tick, ...e })));
@@ -97,6 +97,7 @@ for (let i = 0; i < 400 && !mender; i++) {
       e.archetype === 'stitcher' &&
       e.summonerId === queen.id &&
       e.action?.kind === 'stitch' &&
+      e.webRepair?.kind === 'strand' &&
       state.tick >= e.action.releaseAt - 4 &&
       web().some((s) => s.id === e.action.target),
   );
@@ -104,7 +105,7 @@ for (let i = 0; i < 400 && !mender; i++) {
 if (!mender) throw new Error('nenhum Costureiro chegou a costurar um fio da teia');
 capture(
   'COSTUREIRO / RECONSTRUINDO UM FIO',
-  'Tres pontos de costura visivel; matar ou interromper deixa a passagem aberta.',
+  'Barra sobre a cabeca: 2 s para refazer o fio. Interromper deixa a passagem aberta.',
 );
 // A leva do frenesi em acao.
 queen.nextActionAt = state.tick;
@@ -117,7 +118,77 @@ capture(
   'FRENESI / PUXADA CURTA',
   'Preparo de 12 ticks, crias saltando: os avisos continuam no chao.',
 );
-if (frames.length !== 6) throw new Error(`Expected six beats, got ${frames.length}`);
+// Um apoio destruido, recuperado pelos mesmos operarios e pela mesma IA.
+queen.action = undefined;
+queen.nextActionAt = queen.silk.broodAt = state.tick + 100000;
+for (const e of state.enemies)
+  if (e.summonerId === queen.id && e.archetype !== 'stitcher') {
+    e.action = undefined;
+    e.nextActionAt = state.tick + 100000;
+  }
+const workers = state.enemies.filter(
+  (e) => e.alive && e.archetype === 'stitcher' && e.summonerId === queen.id,
+);
+const damagedAnchor = queen.silk.supports
+  .filter((s) => s.kind === 'anchor' && s.hp > 0)
+  .sort((a, b) => {
+    const distance = (s) => {
+      const p = engine.suturePoint(state, s.cell);
+      return Math.min(...workers.map((e) => Math.hypot(e.x - p.x, e.y - p.y)));
+    };
+    return distance(a) - distance(b) || a.cell - b.cell;
+  })[0];
+if (!damagedAnchor) throw new Error('nenhuma ancora para o ensaio de reconstrucao');
+for (let n = 0; n < engine.WEB_ANCHOR_HP; n++)
+  engine.breakSolid(
+    state,
+    damagedAnchor.cell % state.config.width,
+    Math.floor(damagedAnchor.cell / state.config.width),
+    [],
+  );
+let anchorMender;
+for (let n = 0; n < 600 && !anchorMender; n++) {
+  step();
+  anchorMender = workers.find(
+    (e) =>
+      e.webRepair?.kind === 'support' &&
+      e.webRepair.target === damagedAnchor.cell &&
+      engine.webRepairProgress(state, e) >= 0.5,
+  );
+}
+if (!anchorMender)
+  throw new Error(
+    'nenhum Costureiro iniciou a reconstrucao da ancora: ' +
+      JSON.stringify({
+        tick: state.tick,
+        phase: state.phase,
+        anchor: damagedAnchor,
+        solid: state.solid[damagedAnchor.cell],
+        workers: workers.map((e) => ({
+          id: e.id,
+          x: e.x,
+          y: e.y,
+          alive: e.alive,
+          action: e.action,
+          job: e.webRepair,
+          next: e.nextActionAt,
+        })),
+      }),
+  );
+const focus = { x: anchorMender.x, y: anchorMender.y };
+capture(
+  'ANCORA / RECONSTRUCAO',
+  'Barra em 50%: a ancora so volta ao final dos 3 s de trabalho.',
+  focus,
+);
+engine.stunEntity(state, anchorMender, 60);
+step();
+capture(
+  'INTERRUPCAO / PASSAGEM MANTIDA',
+  'Atordoamento cancela a barra. A ancora permanece destruida.',
+  focus,
+);
+if (frames.length !== 8) throw new Error(`Expected eight beats, got ${frames.length}`);
 
 const atlasDir = resolve(root, 'packages/voxelyn-survival-content/assets/atlases');
 const terrain = JSON.parse(await readFile(resolve(atlasDir, 'terrain-blocks.json'), 'utf8'));
@@ -204,9 +275,10 @@ const w = state.config.width;
 for (const [n, frame] of frames.entries()) {
   const q = frame.state.enemies.find((e) => e.archetype === 'seamstress');
   const center =
-    q.silk.stage === S.SEAMSTRESS_STAGE_ALOFT
+    frame.focus ??
+    (q.silk.stage === S.SEAMSTRESS_STAGE_ALOFT
       ? { x: q.silk.x, y: q.silk.y }
-      : { x: (q.x + frame.state.player.x) / 2, y: (q.y + frame.state.player.y) / 2 };
+      : { x: (q.x + frame.state.player.x) / 2, y: (q.y + frame.state.player.y) / 2 });
   const ox = 28 + (n % 2) * 660,
     oy = 110 + Math.floor(n / 2) * 480;
   const project = (x, y) => [
@@ -334,7 +406,8 @@ for (const [n, frame] of frames.entries()) {
     `<text x="${ox + 20}" y="${oy + 412}" class="small">${frame.description}</text><text x="${ox + 20}" y="${oy + 435}" class="tiny">tick ${frame.state.tick} · etapa ${q.silk.stage} · fios ${frame.state.sutures.filter((s) => s.kind === 'web' && s.phase === 'taut').length}/${frame.state.sutures.filter((s) => s.kind === 'web').length} · auxiliares ${frame.state.enemies.filter((e) => e.alive && e.summonerId === q.id).length}</text>`,
   );
 }
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1376" height="1580"><style>text{font-family:DejaVu Sans,sans-serif;fill:#ddd5c6}.label{font-size:18px}.small{font-size:15px}.tiny{font-size:13px;fill:#95a5b6}</style><defs>${[...defs.values()].join('')}</defs><rect width="1376" height="1580" fill="#0d131c"/><text x="28" y="44" font-size="28">CERZIDEIRA / segunda fase: sobe, tece, desce em frenesi</text><text x="28" y="78" class="small">Ensaio da simulação · seed 36 · atlas e desenho da teia reais · cenário em corte</text>${boards.join('')}<text x="28" y="1560" class="tiny">Prévia de mecânica, sem captura de navegador. Simulacao real; paredes frontais em corte para leitura.</text></svg>`;
+const height = 140 + Math.ceil(frames.length / 2) * 480;
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1376" height="${height}"><style>text{font-family:DejaVu Sans,sans-serif;fill:#ddd5c6}.label{font-size:18px}.small{font-size:15px}.tiny{font-size:13px;fill:#95a5b6}</style><defs>${[...defs.values()].join('')}</defs><rect width="1376" height="${height}" fill="#0d131c"/><text x="28" y="44" font-size="28">CERZIDEIRA / segunda fase: sobe, tece, desce em frenesi</text><text x="28" y="78" class="small">Ensaio da simulação · seed 36 · atlas e desenho da teia reais · cenário em corte</text>${boards.join('')}<text x="28" y="${height - 20}" class="tiny">Prévia de mecânica, sem captura de navegador. Simulacao real; paredes frontais em corte para leitura.</text></svg>`;
 const filename = '02-segunda-fase-teia';
 await sharp(Buffer.from(svg))
   .png()
@@ -345,6 +418,17 @@ await writeFile(
     {
       seed: 36,
       sector: 7,
+      frames: frames.map((frame) => ({
+        label: frame.label,
+        tick: frame.state.tick,
+        repairs: frame.state.enemies
+          .filter((e) => e.alive && e.webRepair)
+          .map((e) => ({
+            worker: e.id,
+            ...e.webRepair,
+            progress: engine.webRepairProgress(frame.state, e),
+          })),
+      })),
       events: events.filter(
         (e) =>
           e.t === 'boss_state' || e.t === 'boss_phase' || (e.t === 'suture' && e.phase !== 'sew'),

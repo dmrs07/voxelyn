@@ -243,7 +243,7 @@ describe('impressao digital da geracao', () => {
     // v70: reject Stitcher chambers with fewer than two in-range supports.
     // Only rejected layouts advance the existing deterministic retry sequence;
     // their terrain and spawn positions intentionally differ from v69.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(792388682);
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2822852745);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

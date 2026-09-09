@@ -601,6 +601,20 @@ export type SilkFlight = {
   anchor?: number;
 };
 
+export type WebSupport = {
+  cell: number;
+  kind: 'anchor' | 'junction';
+  /** Remaining impacts. Broken supports stay recorded so workers can rebuild them. */
+  hp: number;
+};
+export type WebRepairJob = {
+  kind: 'support' | 'strand';
+  /** Support cell or strand ID, according to kind. */
+  target: number;
+  /** Reachable floor cell from which the worker performs the repair. */
+  at: number;
+};
+
 export type SilkEncounter = {
   x: number;
   y: number;
@@ -624,6 +638,7 @@ export type SilkEncounter = {
    * fora nao a segura la em cima.
    */
   returnAt: number;
+  supports?: WebSupport[];
 };
 
 export type Entity = {
@@ -665,6 +680,7 @@ export type Entity = {
   facing: Vec2;
   action?: EntityAction;
   silk?: SilkEncounter;
+  webRepair?: WebRepairJob;
   /** Only summoned combat helpers have an owner; colony workers keep sewing. */
   summonerId?: number;
   slot?: number;

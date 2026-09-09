@@ -1,15 +1,10 @@
-import {
-  SOLID_NONE,
-  SOLID_STITCHED_ROCK,
-  SOLID_SUTURE_ANCHOR,
-  SOLID_SUTURE_CRACKED,
-  TICK_HZ,
-  MAX_ENEMIES,
-} from './constants.js';
+import { SOLID_NONE, SOLID_STITCHED_ROCK, TICK_HZ, MAX_ENEMIES } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
-import { approach, sewJob, suturePoint } from './sutures.js';
-import { spinWeb, weaveWeb, webRepairJobs } from './web.js';
+import { approach, suturePoint } from './sutures.js';
+import { maintainWebRepair, webRepairFirst } from './web-repair.js';
+import { registerWebJunctions, WEB_ANCHOR_HP } from './web-supports.js';
+import { chamberAnchors, spinWeb, supportHolds, weaveWeb, webJunctions } from './web.js';
 import {
   SEAMSTRESS_CHAMBER_RADIUS as CHAMBER_RADIUS,
   sutureInSeamstressChamber,
@@ -63,9 +58,9 @@ export const SEAMSTRESS_ASCEND_TICKS = 30;
 export const SEAMSTRESS_DESCEND_TICKS = 24;
 /** Frenesi: perseguicao mais rapida, puxadas mais curtas, mais auxiliares. */
 export const SEAMSTRESS_FRENZY_SPEED = 5.2;
-export const SILK_FRENZY_HELPER_CAP = 8;
-export const SILK_FRENZY_STITCHERS = 2;
-export const SILK_FRENZY_WAVE_INTERVAL = 120;
+export const SILK_FRENZY_HELPER_CAP = 10;
+export const SILK_FRENZY_STITCHERS = 3;
+export const SILK_FRENZY_WAVE_INTERVAL = 90;
 /** Altura, em pixels de zoom 1, a partir da qual o corpo esta fora da tela. */
 export const SEAMSTRESS_OFFSCREEN_LIFT = 320;
 
@@ -88,7 +83,7 @@ export const silkStrike = (enemy: Entity): Vec2 & { radius: number } => {
   return {
     x: (f?.toX ?? enemy.x) + (queen ? direction.x * SILK_NEEDLE_REACH : 0),
     y: (f?.toY ?? enemy.y) + (queen ? direction.y * SILK_NEEDLE_REACH : 0),
-    radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.55 : 0.85,
+    radius: queen ? SILK_STRIKE_RADIUS : enemy.archetype === 'seamstress_brood' ? 0.7 : 0.85,
   };
 };
 const unit = (x: number, y: number): Vec2 => {
@@ -182,6 +177,11 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
     stage: SEAMSTRESS_STAGE_GROUND,
     stageAt: 0,
     returnAt: -1,
+    supports: chamberAnchors(state, queen).map((cell) => ({
+      cell,
+      kind: 'anchor',
+      hp: WEB_ANCHOR_HP,
+    })),
   };
   for (const s of state.sutures) {
     if (!sutureInSeamstressChamber(s, state.config.width, queen)) continue;
@@ -320,13 +320,21 @@ const pull = (
 ): boolean => {
   const encounter = queen.silk!;
   const aim = silkAim(player, 0.7);
-  const anchors = [...new Set(state.sutures.filter((s) => s.encounter).flatMap((s) => [s.a, s.b]))];
+  // Os APOIOS: toda ancora da camara (as das suturas e as garantidas em volta
+  // dela) e, no frenesi, as juncoes inteiras da teia — a teia e a locomocao
+  // dela, e cortar os fios de uma juncao a derruba no meio da puxada.
+  const anchors = [
+    ...new Set([
+      ...chamberAnchors(state, { x: encounter.x, y: encounter.y }),
+      ...(seamstressFrenzied(queen) ? webJunctions(state) : []),
+    ]),
+  ];
   const choices: Array<{ anchor: number; to: Vec2; score: number }> = [];
   for (const anchor of anchors) {
     if (
       anchor === encounter.lastAnchor ||
       !seamstressAnchorInRange(anchor, state.config.width, queen) ||
-      ![SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED].includes(state.solid[anchor])
+      !supportHolds(state, anchor)
     )
       continue;
     const p = suturePoint(state, anchor),
@@ -485,6 +493,7 @@ const seamstressPhaseStep = (
     encounter.stageAt = state.tick;
     // A teia nasce agora, com a volta ja marcada no fim da tecelagem inicial.
     encounter.returnAt = spinWeb(state, { x: encounter.x, y: encounter.y }, state.tick) + 10;
+    registerWebJunctions(state, queen);
     return true;
   }
   if (encounter.stage === SEAMSTRESS_STAGE_ALOFT) {
@@ -601,22 +610,12 @@ export const silkHelperStep = (
   dt: number,
   events: SemanticEvent[],
 ): void => {
-  if (!player || state.tick < enemy.nextActionAt) return;
+  if (state.tick < enemy.nextActionAt) return;
   const brood = enemy.archetype === 'seamstress_brood';
+  // Repairs remain the worker's first priority even with a player nearby.
+  if (!brood && webRepairFirst(state, enemy, dt, events)) return;
+  if (!player) return;
   const d = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-  // COSTUREIROS NO FRENESI refazem a teia antes de brigar: o fio cortado mais
-  // perto e o trabalho, a menos que o jogador esteja em cima deles. E a
-  // decisao que a fase oferece — matar quem costura mantem a passagem aberta.
-  if (!brood && d >= 3) {
-    const mother = state.enemies.find((e) => e.alive && e.id === enemy.summonerId);
-    if (mother && seamstressFrenzied(mother)) {
-      const job = webRepairJobs(state, enemy)[0];
-      if (job) {
-        sewJob(state, enemy, job, dt, events);
-        return;
-      }
-    }
-  }
   if (d < 1.25) {
     const retreat =
       d > 0.01
@@ -677,6 +676,7 @@ export const silkMaintenance = (
     enemy.hp = 0;
     enemy.alive = false;
     enemy.action = undefined;
+    enemy.webRepair = undefined;
     events.push({ t: 'action_end', entity: enemy.id });
     events.push({
       t: 'death',
@@ -690,6 +690,7 @@ export const silkMaintenance = (
     });
     return true;
   }
+  maintainWebRepair(state, enemy, events);
   // A METADE DA VIDA interrompe ate uma puxada em voo: a subida e decidida
   // aqui, antes das acoes, e nao no passo de IA que uma acao suspende.
   if (
@@ -713,11 +714,7 @@ export const silkMaintenance = (
       open: false,
     });
   const anchor = enemy.action?.silkFlight?.anchor;
-  if (
-    anchor !== undefined &&
-    ![SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED].includes(state.solid[anchor])
-  )
-    dropSeamstress(state, enemy, events);
+  if (anchor !== undefined && !supportHolds(state, anchor)) dropSeamstress(state, enemy, events);
   return false;
 };
 
@@ -767,7 +764,7 @@ export const silkStride = (state: SurvivalState, enemy: Entity, events: Semantic
   for (const p of activePlayers(state)) {
     if (Math.hypot(p.x - hit.x, p.y - hit.y) > hit.radius + p.radius) continue;
     action.contactedSlots = (action.contactedSlots ?? 0) | (1 << (p.slot ?? 0));
-    damageEntity(state, p, queen ? 24 : enemy.archetype === 'seamstress_brood' ? 7 : 12, events, {
+    damageEntity(state, p, queen ? 24 : enemy.archetype === 'seamstress_brood' ? 10 : 12, events, {
       kind: 'enemy_contact',
       archetype: enemy.archetype as 'seamstress' | 'seamstress_brood' | 'stitcher',
       elite: false,

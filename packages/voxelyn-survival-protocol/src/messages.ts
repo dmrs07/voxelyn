@@ -15,6 +15,7 @@ import type {
   Suture,
   SilkFlight,
   SilkEncounter,
+  WebRepairJob,
 } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
@@ -123,6 +124,7 @@ export type EntitySnapshot = {
   stunnedUntil?: number;
   action?: EntityActionSnapshot;
   silk?: SilkEncounter;
+  webRepair?: WebRepairJob;
   summonerId?: number;
   /**
    * Postura do Empoverished Miner (MINER_MOOD_*). Ausente nos demais.

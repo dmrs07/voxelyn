@@ -1,4 +1,5 @@
 import { SOLID_SUTURE_ANCHOR, SOLID_SUTURE_CRACKED, SOLID_STITCHED_ROCK } from './constants.js';
+import { damageWebAnchor } from './web-supports.js';
 import {
   BUDGET_DISCHARGE_CELLS,
   BUDGET_REACTING_CELLS,
@@ -813,6 +814,11 @@ export const breakSolid = (
   const w = W(state);
   const i = y * w + x;
   const solid = state.solid[i];
+  if (
+    (solid === SOLID_SUTURE_ANCHOR || solid === SOLID_SUTURE_CRACKED) &&
+    !damageWebAnchor(state, i, events)
+  )
+    return false;
   if (
     solid === SOLID_FRAGILE ||
     solid === SOLID_FRAGILE_WEAK ||

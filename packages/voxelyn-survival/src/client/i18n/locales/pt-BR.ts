@@ -341,7 +341,8 @@ export const PT_BR = {
   'seamstress.hint': 'Corte o fio · esquive da marca',
   'seamstress.exposed': 'ABDOME EXPOSTO · ataque agora',
   'seamstress.aloft': 'ELA SUBIU · a teia se forma: leia as faixas',
-  'seamstress.frenzy': 'FRENESI · corte a teia para abrir passagem · mate quem costura',
+  'seamstress.frenzy':
+    'FRENESI · a teia a sustenta ({integrity}%) · corte fios até 60% para expô-la · mate quem costura',
   'enemy.stitcher': 'Costureiro',
   'enemy.seamstress': 'A Cerzideira',
   'bestiary.name.stitcher': 'Costureiro',

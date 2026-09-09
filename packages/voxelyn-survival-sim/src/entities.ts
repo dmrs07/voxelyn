@@ -9,7 +9,7 @@ import {
   silkStrike,
   seamstressTargetable,
 } from './seamstress.js';
-import { dissolveWeb } from './web.js';
+import { dissolveWeb, webArmor } from './web.js';
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
@@ -474,14 +474,17 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   },
   seamstress_brood: {
     hp: 18,
-    speed: 3.8,
+    // Mais rapida que o Prospector (4,6): uma cria que nao alcanca nao pressiona.
+    speed: 4.8,
     radius: 0.25,
     contactDamage: 7,
     contactCooldown: 32,
     aggroRange: 18,
   },
   seamstress: {
-    hp: 780,
+    // 900, e nao 780: a segunda fase e blindada pela teia (WEB_ARMOR), e a
+    // luta tem de durar o bastante para a teia ser lida, cortada e refeita.
+    hp: 900,
     speed: 4,
     radius: 0.72,
     contactDamage: 20,
@@ -1022,7 +1025,9 @@ export const damageEntity = (
     // Fora da tela (segunda fase) nao ha corpo: nenhum caminho de dano a toca.
     if (!seamstressTargetable(ent)) return;
     const support = silkSupported(ent, state.tick);
-    amount *= state.tick < ent.stunnedUntil ? 1.5 : support ? 0.55 : 1;
+    // A TEIA A SUSTENTA: com a integridade alta ela leva 0,4x, derrubada ou
+    // nao. Cortar a teia e o que abre a fraqueza; os Costureiros a fecham.
+    amount *= (state.tick < ent.stunnedUntil ? 1.5 : support ? 0.55 : 1) * webArmor(state);
   }
   // O Leviata FORA DE VISTA nao e alvo: submerso, ou com a cabeca ainda por
   // baixo da lamina, nenhum caminho de dano o toca — nem tiro, nem fogo, nem

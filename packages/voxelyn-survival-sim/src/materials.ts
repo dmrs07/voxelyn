@@ -57,6 +57,7 @@ import {
   setSurface,
 } from './cells.js';
 import type { EffectOrigin, Projectile, SemanticEvent, SurvivalState } from './types.js';
+import { webSupportAt } from './web-supports.js';
 
 export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
 
@@ -180,6 +181,8 @@ export const impactSolid = (
 
   switch (solid) {
     case SOLID_SUTURE_ANCHOR:
+      if (webSupportAt(state, i)?.kind === 'anchor')
+        return { stop: true, broke: breakSolid(state, cx, cy, events) };
       state.solid[i] = SOLID_SUTURE_CRACKED;
       markDirty(state, cx, cy);
       events.push({ t: 'chip', ...at });

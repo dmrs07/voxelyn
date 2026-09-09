@@ -17,6 +17,8 @@ import {
   summonSilkBrood,
 } from './seamstress.js';
 import { hasLineOfSight } from './pathing.js';
+import { hitWebJunctions, webSupportAt, WEB_JUNCTION_RADIUS } from './web-supports.js';
+import { finishWebRepair } from './web-repair.js';
 import type { Entity, SemanticEvent, SurvivalState, Suture, SutureRecipe, Vec2 } from './types.js';
 
 export const SUTURE_WHIP_WARNING = 16;
@@ -185,8 +187,10 @@ export const hitSutures = (
   events: SemanticEvent[],
   slot = -1,
 ): void => {
+  const guarded = hitWebJunctions(state, from, to, events, slot);
   for (const s of state.sutures) {
     if (s.encounter || (s.phase !== 'loose' && s.phase !== 'taut')) continue;
+    if (s.kind === 'web' && (guarded.has(s.a) || guarded.has(s.b))) continue;
     const a = suturePoint(state, s.cells[0]),
       b = suturePoint(state, s.cells[s.cells.length - 1]);
     if (touchesCable(from, to, a, b)) cutSuture(state, s, events, slot);
@@ -195,6 +199,11 @@ export const hitSutures = (
     if (!queen.alive || queen.archetype !== 'seamstress' || !silkSupported(queen, state.tick))
       continue;
     const b = suturePoint(state, queen.action!.silkFlight!.anchor!);
+    const support = webSupportAt(state, queen.action!.silkFlight!.anchor!);
+    // An aimed hit on a reinforced support must pay its durability instead
+    // of also severing the tether where it meets that same support.
+    if (support && support.hp > 0 && pointSegmentDistance(b, from, to) <= WEB_JUNCTION_RADIUS)
+      continue;
     if (cutsTether(from, to, queen, b)) dropSeamstress(state, queen, events);
   }
 };
@@ -234,6 +243,10 @@ export const cutsTether = (from: Vec2, to: Vec2, body: Vec2, anchor: Vec2): bool
 };
 
 export const sewSuture = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  if (enemy.webRepair) {
+    finishWebRepair(state, enemy, events);
+    return;
+  }
   if (enemy.archetype === 'seamstress') {
     summonSilkBrood(state, enemy, events);
     return;

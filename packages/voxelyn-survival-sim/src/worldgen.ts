@@ -2,6 +2,7 @@ import {
   generateSutures,
   sutureInSeamstressChamber,
   seamstressAnchorInRange,
+  ensureWebAnchors,
 } from './suture-layout.js';
 import { RNG } from '@voxelyn/core';
 import {
@@ -2313,6 +2314,11 @@ const generateAttempt = (
     // The boss excludes its last anchor: one support still cannot teach two lunges
     // or unlock the brood. Retry this layout, like any other unsolvable chamber.
     if (supports.size < 2) return null;
+    // E a TEIA da segunda fase se prende em volta: a primeira parede de cada
+    // um dos dezesseis rumos vira ancora onde a parede o permite (as paredes
+    // estruturais da arena ficam como estao — a teia se prende nelas sem
+    // ancora; ver `webAnchors`). Apoios de puxada a mais para a primeira fase.
+    ensureWebAnchors(solid, w, h, boss, arenaFilled);
   }
 
   return {

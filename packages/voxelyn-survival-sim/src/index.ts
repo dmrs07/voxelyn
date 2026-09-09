@@ -253,3 +253,5 @@ export { generateSutures } from './suture-layout.js';
 
 export * from './seamstress.js';
 export * from './web.js';
+export * from './web-supports.js';
+export * from './web-repair.js';
