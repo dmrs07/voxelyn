@@ -356,6 +356,10 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
     width: live.config.width,
     height: live.config.height,
     playerCount: 1,
+    // A PROFUNDIDADE da run, senao o setor N vira a posicao N da geracao
+    // padrao e a decoracao sai do bioma de OUTRA run: numa descida de sete
+    // setores a Camara de Reflexao (prismatica, Aurix) ganhava teia e cogumelo.
+    depth: live.config.depth,
   });
   const w = state.config.width;
   const h = state.config.height;

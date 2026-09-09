@@ -1051,7 +1051,12 @@ export const PROTOCOL_VERSION = 39;
 //     com a ocupacao dos Costureiros, em volta das suturas — inofensivas,
 //     fogem ao avistar o Prospector, esmagadas ao pisar; no hash e no
 //     contador de arquetipos.
-export const SIMULATION_VERSION = 76;
+// 77: AS INTRUSOES BALANCEADAS. Micelio, Aurix e rocha suturada com a mesma
+//     chance (18% cada) num setor sem ocupacao, e a ocupacao que a linhagem
+//     ja tem em casa sai do sorteio (a parte dela vai para as outras duas).
+//     Antes: 30/15/12. Muda o bioma de (seed, setor) e, com ele, o terreno:
+//     replays de 76 geram outro mapa.
+export const SIMULATION_VERSION = 77;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

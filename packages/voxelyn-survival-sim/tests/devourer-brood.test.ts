@@ -276,7 +276,9 @@ describe('a ninhada — ela nunca acaba dentro da pedra', () => {
   // porque varrer sessenta sementes x tres setores custa oito segundos e o que
   // importa aqui nao e a varredura: e que camara GERADA de verdade, com a
   // parede onde o gerador a pos, nasca com o enxame inteiro.
-  const DEVOURER_SEEDS = [8, 12, 24, 29, 34, 39, 60, 95, 211, 710];
+  // Re-varridas na SIMULATION_VERSION 77 (intrusoes balanceadas): 8, 211 e
+  // 710 deixaram de ser camaras do Devorador.
+  const DEVOURER_SEEDS = [12, 24, 29, 34, 39, 60, 78, 86, 95, 97];
 
   it('camara gerada nasce com o enxame INTEIRO, e nenhum corpo encostado na pedra', () => {
     // O ANGULO AUREO e ideal e a camara e escavada: o anel de fora encosta na
