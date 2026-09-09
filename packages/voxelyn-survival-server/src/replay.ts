@@ -47,6 +47,7 @@ import {
   decodeCommandLog,
   encodeCommandLog,
   fromBase64,
+  sampleDeathEchoTrace,
   toBase64,
   type DeathEchoCapsule,
   type DeathEchoTraceSample,
@@ -192,14 +193,10 @@ export const resimulateRun = (
       trace.length = 0;
     }
     if (state.tick % TRACE_TICKS_PER_SAMPLE === 0) {
-      const extra = state.playerExtra;
-      trace.push({
-        x: state.player.x,
-        y: state.player.y,
-        aimX: extra.aim.x,
-        aimY: extra.aim.y,
-        firing: extra.nextShotAt > state.tick,
-      });
+      // A MESMA amostra que o cliente colhe: posicao, mira, gatilho, vida e as
+      // criaturas a vista. E o que faz a capsula do pool contar a mesma historia
+      // que a capsula local da mesma morte.
+      trace.push(sampleDeathEchoTrace(state));
       if (trace.length > DEATH_ECHO_TRACE_SAMPLES) trace.shift();
     }
     // Para no instante em que a run acaba. O cliente pode ter capturado comandos

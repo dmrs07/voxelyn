@@ -97,9 +97,27 @@ A transmissão não abre por proximidade. Ao alcance, a carcaça mostra o convit
 
 O eco **observa** o comando e nunca o consome: `interact` chega inteiro à simulação. Parear com um corpo não pode custar ao jogador o revive, a descida ou a extração que ele pediu no mesmo aperto — e um comando roubado faria a run gravada divergir da run jogada no replay do servidor.
 
-Pareado, o painel traz serial corporativo, laudo da carcaça, causa e a linha de lição, sem cobrir o HUD nem sair das safe areas. O serial é derivado do id do eco — dá identidade ao corpo sem identificar ninguém, e mantém a invariante 6 intacta. Junto dele, o holograma reproduz os últimos segundos em laço: o trajeto inteiro fraco ao fundo, as marcas de cada disparo e a sombra do Prospector com a direção da mira.
+Pareado, o painel traz serial corporativo, laudo da carcaça, causa, a linha de lição e o contador da fita, sem cobrir o HUD nem sair das safe areas. O serial é derivado do id do eco — dá identidade ao corpo sem identificar ninguém, e mantém a invariante 6 intacta.
 
-O holograma não desenha o inimigo. A cápsula guarda a causa, não a posição de quem matou. Num eco reprojetado o trajeto pode atravessar uma parede do mapa atual: ele é a transmissão de outro lugar, não um fantasma preso a esta geometria.
+#### Holograma
+
+Junto do laudo, a caixa-preta reproduz os últimos segundos em laço, com os **atlas do jogo no tamanho natural**: o Prospector do holograma é o mesmo sprite do Prospector vivo, no mesmo zoom, e o agressor é o mesmo sprite da criatura que o jogador vai encontrar viva dali a pouco. A primeira versão era uma silhueta chapada de dois retângulos andando por uma linha, e ela contava o trajeto sem contar a cena — um retângulo não anda, não atira, não apanha e não cai.
+
+A fita tem três fases: reprodução (o rastro, interpolado entre amostras para o sprite não pular), morte (o corpo cai sobre a carcaça e o efeito da causa acontece nele, por ~1,4 s) e rebobinar (a projeção apaga e recomeça). O relógio é o do pareamento: reabrir a caixa-preta reinicia a fita.
+
+A pose só afirma o que o rastro prova, nesta prioridade: **apanhou** (a vida caiu naquela amostra) > **atirou** (gatilho apertado; o corpo vira para a mira) > **andou** (o corpo vira para onde foi) > **parado**. O golpe vence porque é o que a reprodução existe para mostrar; o tiro vence o andar porque a mira é a informação.
+
+Para isso a cápsula passou a guardar, por amostra, a vida do Prospector (`hpQ`, um byte) e a **trilha do agressor** (`threat`, deslocamentos na mesma quantização do trajeto). O agressor não é inventado: a causa autoritativa diz o arquétipo e se era elite, e o produtor escolhe, entre as criaturas que estavam à vista no golpe final, a desse arquétipo mais próxima do corpo — e segue o `id` dela de volta pela janela. Antes de ela aparecer, a trilha diz "ausente". Uma causa sem criatura (fogo, gás, descarga) nunca tem trilha, e um rastro antigo — sem vida nem trilha — continua reproduzindo como fuga, só sem golpe e sem agressor.
+
+A amostra crua é uma função só do protocolo, `sampleDeathEchoTrace`, chamada pelo cliente (a cada 120 ms de relógio) e pela re-simulação do servidor (a cada tanto de ticks): a cápsula do pool tem de contar a mesma história que a cápsula local da mesma morte.
+
+O efeito da causa acontece **no corpo, no ponto da morte, e em nenhum outro lugar**: chamas para fogo, arcos para descarga, o anel de uma explosão, a nuvem do gás, esporos pousando, o clarão do golpe do lado de quem bateu, o projétil viajando do agressor ao corpo, a ondulação da lâmina d'água. O gás aparece em volta do Prospector porque foi ali que ele o respirou; de onde veio, o holograma não sabe e não finge saber.
+
+Uma cápsula **sem rastro** (co-op, storage legado) ganha uma fita parada: o Prospector em pé no ponto exato da morte, virado para onde a carcaça aponta, e a morte com o efeito da causa. Todos os deslocamentos são zero — o único valor que a cápsula prova.
+
+A projeção é vendida como transmissão sem trair o sprite: linhas de varredura e uma faixa de leitura que sobe pelo corpo (num buffer próprio, para não apagar a caverna atrás), cintilação determinística pelo relógio, um disco no chão sob cada figura e um feixe da lâmpada da caixa-preta ao disco do Prospector. O Prospector sai em fósforo; o agressor, em sangue — quem matou é o que o jogador tem de ler primeiro. Os atores entram na fila de desenho na própria profundidade, como entidades: uma parede à frente os cobre como cobre qualquer criatura.
+
+Num eco reprojetado o trajeto pode atravessar uma parede do mapa atual: ele é a transmissão de outro lugar, não um fantasma preso a esta geometria.
 
 O ato de parear é a base das etapas seguintes — é ele que a recuperação de módulo vai custar em contaminação e alerta.
 
@@ -109,7 +127,7 @@ Somente ecos provenientes de simulação autoritativa entram no pool. Há exatam
 
 **Co-op.** O servidor já simulou a morte e é o único que consegue associar causa e corpo: `summary.deathCause` descreve o que encerrou a SALA, mas `playerExtras[slot].lastDamage` descreve o que matou aquele Prospector. A captura acontece no MESMO tick da morte, e não no fim da run — `descend` reposiciona todos os jogadores na entrada do mapa novo, inclusive os mortos, então uma captura tardia leria a coordenada do setor 3 para quem morreu no setor 1.
 
-O co-op não contribui rastro. Reconstruí-lo exigiria amostrar a posição de cada slot a cada dois ticks dentro do laço autoritativo, e o holograma não vale custo no caminho que roda a 20 Hz para todas as salas. O que o co-op contribui é a associação causa↔posição, que é a parte que o cliente não consegue provar sozinho.
+O co-op não contribui rastro. Reconstruí-lo exigiria amostrar a posição de cada slot a cada dois ticks dentro do laço autoritativo, e o holograma não vale custo no caminho que roda a 20 Hz para todas as salas. O que o co-op contribui é a associação causa↔posição, que é a parte que o cliente não consegue provar sozinho. A caixa-preta de uma cápsula de co-op reproduz a fita parada (ver Holograma).
 
 **Solo.** Apenas depois de re-simular o command log. O cliente manda a seed e o que pressionou; o servidor descobre sozinho onde e de que o Prospector morreu, e constrói a cápsula com a própria topologia. Não existe campo de posição, de causa nem de topologia para preencher — logo não existe o que mentir. Uma cápsula enviada pronta seria uma afirmação do cliente sobre o mundo, e o pool perderia para sempre o direito de um dia conceder qualquer coisa.
 

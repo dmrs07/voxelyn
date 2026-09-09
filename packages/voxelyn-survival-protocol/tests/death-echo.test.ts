@@ -10,6 +10,8 @@ import {
 import {
   CONTENT_VERSION,
   DEATH_ECHO_CLUSTER_RADIUS,
+  DEATH_ECHO_TRACE_ABSENT,
+  DEATH_ECHO_TRACE_ENEMIES_PER_SAMPLE,
   SIMULATION_VERSION,
   buildDeathEchoCapsule,
   contractSeed,
@@ -17,10 +19,15 @@ import {
   deathEchoContract,
   deathEchoTopology,
   groupDeathEchoesByChamber,
+  decodeDeathEchoTracePoint,
+  encodeDeathEchoTrace,
   parseDeathEchoCapsule,
   parseDeathEchoContract,
+  parseDeathEchoTrace,
   projectDeathEchoes,
+  sampleDeathEchoTrace,
   type DeathEchoCapsule,
+  type DeathEchoTraceSample,
   type PlacedDeathEcho,
 } from '../src/index.js';
 
@@ -368,5 +375,140 @@ describe('Desafio Semanal', () => {
     expect(deathEchoContract(new Date()).ranked).toBe(true);
     expect(Object.keys(placed({}))).not.toContain('moduleId');
     expect(Object.keys(placed({}))).not.toContain('salvageCost');
+  });
+});
+
+describe('amostra e trilha do agressor', () => {
+  const BRUISER: DamageCause = { kind: 'enemy_contact', archetype: 'bruiser', elite: false };
+
+  /** Uma janela de cinco amostras em que o Britador 2 chega mais perto que o 1. */
+  const window = (): DeathEchoTraceSample[] =>
+    Array.from({ length: 5 }, (_, i) => ({
+      x: 20 + i * 0.25,
+      y: 30,
+      aimX: -1,
+      aimY: 0,
+      firing: false,
+      hp: 1 - i * 0.2,
+      enemies: [
+        { id: 1, archetype: 'bruiser' as const, elite: false, x: 26, y: 30 },
+        ...(i >= 2
+          ? [{ id: 2, archetype: 'bruiser' as const, elite: false, x: 24 - i * 0.5, y: 30.5 }]
+          : []),
+        { id: 3, archetype: 'bruiser' as const, elite: true, x: 21, y: 30 },
+      ],
+    }));
+
+  it('colhe posição, mira, gatilho, vida e as criaturas mais próximas do estado', () => {
+    const state = createRun({ seed: 0xa11ce });
+    const cell = safeOpenCell(state);
+    state.player.x = cell.x + 0.5;
+    state.player.y = cell.y + 0.5;
+    state.player.hp = state.player.maxHp / 2;
+    const near = state.enemies[0];
+    near.alive = true;
+    near.archetype = 'bruiser';
+    near.x = state.player.x + 2;
+    near.y = state.player.y;
+    const sample = sampleDeathEchoTrace(state);
+    expect(sample.x).toBe(state.player.x);
+    expect(sample.hp).toBeCloseTo(0.5, 5);
+    expect(sample.enemies?.[0]).toEqual({
+      id: near.id,
+      archetype: 'bruiser',
+      elite: near.elite,
+      x: near.x,
+      y: near.y,
+    });
+    expect(sample.enemies?.length ?? 0).toBeLessThanOrEqual(DEATH_ECHO_TRACE_ENEMIES_PER_SAMPLE);
+    // Uma criatura morta não está à vista de ninguém.
+    near.alive = false;
+    expect(sampleDeathEchoTrace(state).enemies?.some((e) => e.id === near.id) ?? false).toBe(false);
+  });
+
+  it('segue pela janela a criatura do arquétipo da causa mais próxima do corpo no golpe', () => {
+    const trace = encodeDeathEchoTrace(window(), 21, 30, 120, BRUISER);
+    if (!trace?.threat) throw new Error('rastro sem trilha');
+    // Antes de o Britador 2 aparecer, a trilha diz "ausente" — e não a posição
+    // do Britador 1, que estava à vista mas não matou.
+    expect(trace.threat.dx.slice(0, 2)).toEqual([DEATH_ECHO_TRACE_ABSENT, DEATH_ECHO_TRACE_ABSENT]);
+    expect(trace.threat.dy.slice(0, 2)).toEqual([DEATH_ECHO_TRACE_ABSENT, DEATH_ECHO_TRACE_ABSENT]);
+    const last = decodeDeathEchoTracePoint(trace, 4, 21, 30);
+    expect(last?.threat?.x).toBeCloseTo(22, 1);
+    expect(last?.threat?.y).toBeCloseTo(30.5, 1);
+    expect(decodeDeathEchoTracePoint(trace, 0, 21, 30)?.threat).toBeNull();
+    // A vida viaja junto, quantizada.
+    expect(trace.hpQ).toEqual([255, 204, 153, 102, 51]);
+    expect(decodeDeathEchoTracePoint(trace, 4, 21, 30)?.hp).toBeCloseTo(0.2, 2);
+  });
+
+  it('ignora criaturas do mesmo arquétipo com elite diferente do da causa', () => {
+    const elite: DamageCause = { kind: 'enemy_contact', archetype: 'bruiser', elite: true };
+    const trace = encodeDeathEchoTrace(window(), 21, 30, 120, elite);
+    expect(decodeDeathEchoTracePoint(trace!, 4, 21, 30)?.threat?.x).toBeCloseTo(21, 1);
+  });
+
+  it('não inventa agressor para causa sem criatura nem sem candidata compatível', () => {
+    expect(encodeDeathEchoTrace(window(), 21, 30, 120, { kind: 'fire' })?.threat).toBeUndefined();
+    const spitter: DamageCause = {
+      kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'spit',
+    };
+    expect(encodeDeathEchoTrace(window(), 21, 30, 120, spitter)?.threat).toBeUndefined();
+    expect(encodeDeathEchoTrace(window(), 21, 30)?.threat).toBeUndefined();
+  });
+
+  it('só grava a vida quando toda amostra a trouxe', () => {
+    const mixed = window().map((sample, i) => (i === 2 ? { ...sample, hp: undefined } : sample));
+    expect(encodeDeathEchoTrace(mixed, 21, 30, 120, BRUISER)?.hpQ).toBeUndefined();
+  });
+
+  it('valida os campos novos sem derrubar o trajeto por causa deles', () => {
+    const trace = encodeDeathEchoTrace(window(), 21, 30, 120, BRUISER)!;
+    expect(parseDeathEchoTrace(trace)).toEqual(trace);
+    // Trilha torta cai fora; o trajeto e a vida ficam.
+    const brokenThreat = parseDeathEchoTrace({ ...trace, threat: { dx: [1, 2], dy: trace.threat!.dy } });
+    expect(brokenThreat?.dx).toEqual(trace.dx);
+    expect(brokenThreat?.hpQ).toEqual(trace.hpQ);
+    expect(brokenThreat?.threat).toBeUndefined();
+    // Vida fora de 0..255 cai fora; o resto fica.
+    const brokenHp = parseDeathEchoTrace({ ...trace, hpQ: [999, 0, 0, 0, 0] });
+    expect(brokenHp?.hpQ).toBeUndefined();
+    expect(brokenHp?.threat).toEqual(trace.threat);
+    // Uma trilha em que ninguém nunca esteve não é trilha.
+    const absent = new Array<number>(5).fill(DEATH_ECHO_TRACE_ABSENT);
+    expect(parseDeathEchoTrace({ ...trace, threat: { dx: absent, dy: absent } })?.threat).toBeUndefined();
+    // Um rastro antigo, sem os campos, continua válido.
+    const { hpQ: _hp, threat: _threat, ...legacy } = trace;
+    expect(parseDeathEchoTrace(legacy)).toEqual(legacy);
+  });
+
+  it('leva a trilha do agressor até a cápsula, escolhida pela causa autoritativa', () => {
+    const state = createRun({ seed: 0xb1b1 });
+    const cell = safeOpenCell(state);
+    const samples = window().map((sample) => ({
+      ...sample,
+      x: cell.x + 0.5 + (sample.x - 21),
+      y: cell.y + 0.5,
+      enemies: sample.enemies?.map((enemy) => ({
+        ...enemy,
+        x: cell.x + 0.5 + (enemy.x - 21),
+        y: cell.y + 0.5 + (enemy.y - 30),
+      })),
+    }));
+    const capsule = buildDeathEchoCapsule(state, {
+      id: 'with-threat',
+      x: cell.x + 0.5,
+      y: cell.y + 0.5,
+      facingX: -1,
+      facingY: 0,
+      cause: BRUISER,
+      ticks: 900,
+      trace: samples,
+    });
+    expect(capsule.finalTrace?.threat).toBeDefined();
+    expect(capsule.finalTrace?.hpQ).toHaveLength(5);
+    // E sobrevive ao portão de validação de fora.
+    const parsed = parseDeathEchoCapsule(JSON.parse(JSON.stringify(capsule)));
+    expect(parsed?.finalTrace).toEqual(capsule.finalTrace);
   });
 });

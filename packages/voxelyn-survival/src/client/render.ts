@@ -362,10 +362,20 @@ import {
 } from './death-echo-presentation';
 import { carcassVariant } from './death-echo-carcass';
 import {
-  deathEchoTraceDuration,
-  decodeDeathEchoTracePoint,
-  type PlacedDeathEcho,
-} from '@voxelyn/survival-protocol';
+  deathEchoHologramFrame,
+  hologramTimecode,
+  type HologramActor,
+  type HologramFrame,
+} from './death-echo-hologram';
+import {
+  HOLOGRAM_THREAT_TINT,
+  HOLOGRAM_VICTIM_TINT,
+  HologramCompositor,
+  drawHologramEffect,
+  drawHologramFallback,
+  drawHologramGround,
+} from './death-echo-hologram-draw';
+import type { PlacedDeathEcho } from '@voxelyn/survival-protocol';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -2096,6 +2106,10 @@ export class SurvivalRenderer {
     startScreen?: { x: number; y: number };
   }[] = [];
   private deathEchoes: DeathEchoFrame = emptyDeathEchoFrame();
+  /** O buffer em que os atores do holograma recebem a varredura. */
+  private readonly hologram = new HologramCompositor();
+  /** O quadro da reprodução deste render, para o laudo mostrar a fita. */
+  private deathEchoHologram: HologramFrame | null = null;
   /**
    * O relogio da tela de fim: qual sumario esta na tela e desde quando.
    *
@@ -4249,6 +4263,7 @@ export class SurvivalRenderer {
     }
 
     const pairedEcho = this.deathEchoes.paired;
+    this.deathEchoHologram = null;
     for (const echo of this.deathEchoes.echoes) {
       const [esx, esy] = toScreen(echo.x, echo.y);
       if (esx < -80 || esx > vw + 80 || esy < -100 || esy > vh + 80) continue;
@@ -4258,13 +4273,54 @@ export class SurvivalRenderer {
         draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs, bodyAlpha),
       });
       if (pairedEcho?.echo.id === echo.id) {
-        // O holograma entra como item PRÓPRIO, meio tile à frente da carcaça: ele
-        // ocupa o espaço em volta do corpo, e enfileirado junto seria cortado
-        // pela mesma parede que esconde o corpo.
-        items.push({
-          depth: echo.x + echo.y + 0.5,
-          draw: () => this.drawDeathEchoTrace(pairedEcho, toScreen, z, nowMs),
-        });
+        const frame = deathEchoHologramFrame(echo, pairedEcho.openedAtMs, nowMs);
+        this.deathEchoHologram = frame;
+        if (frame) {
+          // O chão da transmissão entra meio tile à frente da carcaça: ele ocupa
+          // o espaço em volta do corpo, e enfileirado junto seria cortado pela
+          // mesma parede que esconde o corpo. Os ATORES entram cada um na
+          // própria profundidade, como entidades: são sprites no tamanho
+          // natural, e uma parede à frente deles tem de cobri-los como cobre
+          // qualquer criatura — é o que os mantém no mundo em vez de colados
+          // na tela.
+          items.push({
+            depth: echo.x + echo.y + 0.5,
+            draw: () => drawHologramGround(ctx, frame, echo, toScreen, z, nowMs),
+          });
+          items.push({
+            depth: frame.victim.x + frame.victim.y + 0.01,
+            draw: () => {
+              this.drawDeathEchoActor(
+                'prospector',
+                frame.victim,
+                frame.alpha,
+                toScreen,
+                z,
+                spriteZoom,
+                nowMs,
+                echo.cell,
+              );
+              drawHologramEffect(ctx, frame, toScreen, z, nowMs);
+            },
+          });
+          const threat = frame.threat;
+          if (threat) {
+            items.push({
+              depth: threat.x + threat.y + 0.01,
+              draw: () =>
+                this.drawDeathEchoActor(
+                  threat.archetype,
+                  threat,
+                  frame.alpha,
+                  toScreen,
+                  z,
+                  spriteZoom,
+                  nowMs,
+                  echo.cell + 1,
+                ),
+            });
+          }
+        }
       }
       if (this.deathEchoes.prompt?.id === echo.id) {
         items.push({
@@ -7906,103 +7962,79 @@ export class SurvivalRenderer {
   }
 
   /**
-   * A reprodução holográfica dos últimos segundos.
+   * Um ator da reprodução holográfica: o Prospector, ou quem o matou.
    *
-   * Curta, estilizada e incompleta por decisão: ela conta para onde o Prospector
-   * corria, para onde mirava e em que instante o gatilho esteve apertado. Não
-   * desenha o inimigo — a cápsula guarda a CAUSA, não a posição de quem matou, e
-   * inventar essa posição seria ensinar uma geometria que nunca existiu.
+   * É o MESMO atlas e o MESMO zoom do corpo vivo. A reprodução existia como uma
+   * silhueta chapada de dois retângulos, e ela contava o trajeto sem contar a
+   * cena: um retângulo não anda, não atira, não apanha e não cai. O sprite no
+   * tamanho natural faz as quatro coisas com os quadros que o jogo já tem, e o
+   * jogador reconhece o Britador do holograma porque é o Britador de sempre —
+   * só que feito de luz.
    *
-   * O trajeto é relativo à carcaça, então num eco reprojetado ele pode atravessar
-   * uma parede que não existia no mapa original. Isso é aceitável e é parte do
-   * ponto: o holograma é uma TRANSMISSÃO de outro lugar, não um fantasma preso à
-   * geometria daqui. Corrigi-lo contra as paredes atuais custaria um pathfinding
-   * por quadro para forjar um trajeto que ninguém percorreu.
+   * O que continua verdade da versão antiga: nada aqui inventa geometria. A
+   * posição e a pose vêm do quadro (`death-echo-hologram.ts`), que só afirma
+   * o que o rastro prova, e o agressor só aparece quando a cápsula trouxe a
+   * trilha dele. Num eco reprojetado o trajeto pode atravessar uma parede que
+   * não existia no mapa original: o holograma é uma TRANSMISSÃO de outro
+   * lugar, não um fantasma preso à geometria daqui.
+   *
+   * Sem manifest (atlas de um chefe raro ainda chegando) cai na silhueta de
+   * antes, na cor certa — nunca em nada.
    */
-  private drawDeathEchoTrace(
-    link: { echo: PlacedDeathEcho; openedAtMs: number },
+  private drawDeathEchoActor(
+    archetype: string,
+    actor: HologramActor,
+    alpha: number,
     toScreen: (x: number, y: number) => [number, number],
     z: number,
+    spriteZoom: number,
     nowMs: number,
+    seed: number,
   ): void {
-    const trace = link.echo.finalTrace;
-    if (!trace) return;
-    const duration = deathEchoTraceDuration(trace);
-    if (duration <= 0) return;
-    const elapsed = Math.max(0, nowMs - link.openedAtMs) % duration;
-    const head = Math.min(trace.dx.length - 1, Math.floor(elapsed / trace.stepMs));
-    const ctx = this.ctx;
-
-    ctx.save();
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-
-    // O caminho inteiro fica fraco no fundo: é o contorno da fuga, e ler o
-    // trajeto todo de uma vez é o que transforma um corpo num acontecimento.
-    ctx.strokeStyle = PAL.biolum;
-    ctx.globalAlpha = 0.22;
-    ctx.lineWidth = Math.max(1, z * 0.7);
-    ctx.beginPath();
-    for (let i = 0; i < trace.dx.length; i++) {
-      const point = decodeDeathEchoTracePoint(trace, i, link.echo.x, link.echo.y);
-      if (!point) continue;
-      const [px, py] = toScreen(point.x, point.y);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-
-    // Cada disparo marca o chão de onde saiu. Três ou quatro marcas dizem
-    // "ele estava atirando enquanto recuava" sem uma linha de texto.
-    for (let i = 0; i <= head; i++) {
-      const point = decodeDeathEchoTracePoint(trace, i, link.echo.x, link.echo.y);
-      if (!point?.firing) continue;
-      const [px, py] = toScreen(point.x, point.y);
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = PAL.electric;
-      ctx.fillRect(
-        Math.round(px - z),
-        Math.round(py - 10 * z),
-        Math.max(1, 2 * z),
-        Math.max(1, 2 * z),
+    if (alpha <= 0) return;
+    const [sx, sy] = toScreen(actor.x, actor.y);
+    const victim = archetype === 'prospector';
+    const tint = victim ? HOLOGRAM_VICTIM_TINT : HOLOGRAM_THREAT_TINT;
+    const manifest = this.sprites.manifestForArchetype(archetype);
+    const drew = manifest
+      ? this.hologram.project(
+          this.ctx,
+          (ctx, footX, footY) =>
+            this.sprites.drawEntity(
+              ctx,
+              archetype,
+              actor.anim,
+              actor.facingX,
+              actor.facingY,
+              actor.elapsedMs,
+              footX,
+              footY,
+              spriteZoom,
+              tint,
+            ),
+          sx,
+          sy,
+          manifest.frameWidth * spriteZoom,
+          manifest.frameHeight * spriteZoom,
+          manifest.anchorX * spriteZoom,
+          manifest.anchorY * spriteZoom,
+          alpha * 0.85,
+          nowMs,
+          seed,
+        )
+      : false;
+    if (!drew) {
+      drawHologramFallback(
+        this.ctx,
+        sx,
+        sy,
+        z,
+        victim ? PAL.biolum : PAL.blood,
+        alpha,
+        nowMs,
+        seed,
       );
     }
-
-    const current = decodeDeathEchoTracePoint(trace, head, link.echo.x, link.echo.y);
-    if (!current) {
-      ctx.restore();
-      return;
-    }
-    const [hx, hy] = toScreen(current.x, current.y);
-    // A sombra do Prospector: silhueta chapada, sem sprite. Ela não é o corpo —
-    // é a transmissão de um corpo que já não está ali.
-    ctx.globalAlpha = 0.34 + Math.sin(nowMs * 0.01) * 0.06;
-    ctx.fillStyle = PAL.biolum;
-    ctx.fillRect(
-      Math.round(hx - 3 * z),
-      Math.round(hy - 16 * z),
-      Math.max(2, 6 * z),
-      Math.max(2, 16 * z),
-    );
-    ctx.fillRect(
-      Math.round(hx - 4 * z),
-      Math.round(hy - 21 * z),
-      Math.max(2, 8 * z),
-      Math.max(2, 5 * z),
-    );
-
-    // Para onde ele estava mirando no instante que a reprodução alcançou.
-    const aimLength = Math.hypot(current.aimX, current.aimY) || 1;
-    const ax = ((current.aimX - current.aimY) / aimLength) * 18 * z;
-    const ay = ((current.aimX + current.aimY) / aimLength) * 9 * z;
-    ctx.globalAlpha = current.firing ? 0.75 : 0.35;
-    ctx.strokeStyle = current.firing ? PAL.electric : PAL.biolum;
-    ctx.lineWidth = Math.max(1, z * (current.firing ? 1 : 0.7));
-    ctx.beginPath();
-    ctx.moveTo(hx + ax * 0.35, hy - 10 * z + ay * 0.35);
-    ctx.lineTo(hx + ax, hy - 10 * z + ay);
-    ctx.stroke();
-    ctx.restore();
   }
 
   /**
@@ -8085,8 +8117,13 @@ export class SurvivalRenderer {
       : [];
 
     const headerHeight = 20 + titleSize + conditionSize + 4;
+    // A FITA: o contador da reprodução e a barra que a acompanha. Faz parte do
+    // corpo do laudo porque é o que amarra o texto ao holograma lá fora — o
+    // "T-1,2 s" diz que a figura que corre ali ainda tinha um segundo.
+    const tape = this.deathEchoHologram;
+    const tapeHeight = tape ? 14 : 0;
     const boxHeight =
-      headerHeight + aggregateLines.length * lessonHeight + lines.length * lineHeight;
+      headerHeight + aggregateLines.length * lessonHeight + lines.length * lineHeight + tapeHeight;
     if (boxHeight > region.maxHeight) return;
     const withLesson = boxHeight + 6 + lessonLines.length * lessonHeight;
     const showLesson = lessonLines.length > 0 && withLesson <= region.maxHeight;
@@ -8132,6 +8169,30 @@ export class SurvivalRenderer {
       lessonLines.forEach((line, index) =>
         ctx.fillText(line, x + 12, lessonTop + index * lessonHeight),
       );
+    }
+    if (tape) {
+      const tapeTop = y + totalHeight - 3 - tapeHeight;
+      const label =
+        tape.phase === 'rewind'
+          ? t('echo.tape.rewind')
+          : t('echo.tape', { time: hologramTimecode(tape) });
+      ctx.fillStyle = tape.phase === 'replay' ? PAL.biolum : PAL.blood;
+      ctx.font = `bold ${conditionSize}px monospace`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(label, x + 12, tapeTop);
+      // A barra corre da esquerda para a direita ao longo de fita + morte, e
+      // volta a zero no rebobinar. A marca da morte fica onde a barra troca de
+      // cor: tudo à direita dela é o corpo caído.
+      const labelWidth = ctx.measureText(label).width + 8;
+      const barX = x + 12 + labelWidth;
+      const barWidth = boxWidth - 24 - labelWidth;
+      if (barWidth > 24) {
+        const barY = tapeTop + conditionSize / 2 - 1;
+        ctx.fillStyle = 'rgba(89,242,194,0.18)';
+        ctx.fillRect(barX, barY, barWidth, 2);
+        ctx.fillStyle = tape.phase === 'replay' ? PAL.biolum : PAL.blood;
+        ctx.fillRect(barX, barY, barWidth * Math.max(0, Math.min(1, tape.progress)), 2);
+      }
     }
     ctx.fillStyle = echo.projection === 'exact' ? PAL.blood : PAL.rust;
     ctx.fillRect(x, y + totalHeight - 3, boxWidth, 3);

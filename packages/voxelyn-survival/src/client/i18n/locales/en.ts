@@ -928,6 +928,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'echo.condition.dissolved': 'CORRODED',
   'echo.condition.overgrown': 'COLONIZED',
   'echo.condition.intact': 'INTACT',
+  'echo.tape': 'TAPE {time} s',
+  'echo.tape.rewind': 'REWINDING',
 
   // ---------------------------------------------------------------------
   // Command bar (desktop)

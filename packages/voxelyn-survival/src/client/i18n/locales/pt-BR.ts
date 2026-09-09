@@ -957,6 +957,8 @@ export const PT_BR = {
   'echo.condition.dissolved': 'CORROÍDA',
   'echo.condition.overgrown': 'COLONIZADA',
   'echo.condition.intact': 'ÍNTEGRA',
+  'echo.tape': 'FITA {time} s',
+  'echo.tape.rewind': 'REBOBINANDO',
 
   // ---------------------------------------------------------------------
   // Barra de comandos (desktop)
