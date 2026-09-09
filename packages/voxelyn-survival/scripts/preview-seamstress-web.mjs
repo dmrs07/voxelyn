@@ -14,7 +14,7 @@ const temp = await mkdtemp(resolve(tmpdir(), 'cerzideira-web-'));
 const entry = resolve(temp, 'engine.mjs');
 await build({
   stdin: {
-    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes, drawCocoon } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export { stunEntity } from './packages/voxelyn-survival-sim/src/entities.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
+    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes, cocoonAnimation } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export { stunEntity } from './packages/voxelyn-survival-sim/src/entities.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
     resolveDir: root,
   },
   bundle: true,
@@ -219,6 +219,7 @@ if (frames.length !== 9) throw new Error(`Expected nine beats, got ${frames.leng
 
 const atlasDir = resolve(root, 'packages/voxelyn-survival-content/assets/atlases');
 const terrain = JSON.parse(await readFile(resolve(atlasDir, 'terrain-blocks.json'), 'utf8'));
+const cocoon = JSON.parse(await readFile(resolve(atlasDir, 'fx-silk-cocoon.json'), 'utf8'));
 const defs = new Map();
 const sprite = async (id, index, m, scale = 0.5) => {
   const key = id + '-' + index;
@@ -399,6 +400,22 @@ for (const [n, frame] of frames.entries()) {
       manifest.frameMap[dir][anim] +
       Math.min(def.frames - 1, Math.max(0, Math.floor((elapsed / 1000) * def.fps)));
     const key = await sprite(id, index, manifest);
+    // O CASULO DA REDE por cima do Prospector, pelo mesmo relogio do cliente.
+    let cocoonKey = null;
+    if (e === frame.state.player) {
+      const ex = frame.state.playerExtras[0];
+      if (ex.cocoonUntil > frame.state.tick || ex.webbedUntil > frame.state.tick) {
+        const { animation, elapsedMs } = engine.cocoonAnimation(frame.state.tick, ex);
+        const def = cocoon.animations[animation];
+        const at = Math.floor((elapsedMs / 1000) * def.fps);
+        const frameIndex = def.loop ? at % def.frames : Math.min(at, def.frames - 1);
+        cocoonKey = await sprite(
+          'fx-silk-cocoon',
+          cocoon.frameMap.dr[animation] + frameIndex,
+          cocoon,
+        );
+      }
+    }
     const [sx, sy] = project(e.x, e.y);
     const lift = engine.silkLift(e, frame.state.tick);
     items.push({
@@ -418,12 +435,10 @@ for (const [n, frame] of frames.entries()) {
           const [hx, hy] = project(e.x + e.facing.x * 0.75, e.y + e.facing.y * 0.75);
           engine.drawSeamstressEyes(ctx, hx, hy - 21 - lift, e.facing.x, 1, 0);
         }
-        if (e === frame.state.player) {
-          const ex = frame.state.playerExtras[0];
-          if (ex.cocoonUntil > frame.state.tick) engine.drawCocoon(ctx, sx, sy - 6, 11, 1, 0, true);
-          else if (ex.webbedUntil > frame.state.tick)
-            engine.drawCocoon(ctx, sx, sy - 6, 11, 1, 0, false);
-        }
+        if (e === frame.state.player && cocoonKey)
+          ctx.output.push(
+            `<use href="#${cocoonKey}" x="${sx - cocoon.anchorX * 0.5}" y="${sy - cocoon.anchorY * 0.5}"/>`,
+          );
       },
     });
   }

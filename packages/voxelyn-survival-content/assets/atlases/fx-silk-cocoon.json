@@ -1,0 +1,71 @@
+{
+  "id": "fx-silk-cocoon",
+  "version": 1,
+  "atlas": "fx-silk-cocoon.png",
+  "frameWidth": 96,
+  "frameHeight": 112,
+  "columns": 14,
+  "anchorX": 48,
+  "anchorY": 84,
+  "directions": 1,
+  "authoredDirs": [
+    "dr"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1,
+    "h": 1
+  },
+  "footprint": {
+    "w": 0,
+    "h": 0,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#3d2a22",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "attack": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    },
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "burst": {
+      "frames": 3,
+      "fps": 12,
+      "loop": false
+    },
+    "loose": {
+      "frames": 3,
+      "fps": 5,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4,
+      "burst": 8,
+      "loose": 11
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric silk cocoon wrapped around the prospector: pale mineral silk egg with holes showing a dark interior, two counter-spiralling bone-coloured bands with resin knots, guy-lines pinned to the floor, a twisted thread at the top; wrapping, breathing, bursting open and loose threads on the body",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

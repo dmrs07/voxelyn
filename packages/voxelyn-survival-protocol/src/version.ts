@@ -1242,7 +1242,9 @@ export const SIMULATION_VERSION = 75;
 // 37: tucked flight poses and the Cerzideira brood atlas.
 // 38: o atlas `fx-silk-net` — a rede de seda da Cerzideira, um disco de teia
 //     autorado em oito rumos, tres quadros de giro.
-export const CONTENT_VERSION = 38;
+// 39: o atlas `fx-silk-cocoon` — o casulo da rede sobre o Prospector, sob
+//     demanda no grupo da Cerzideira: fechando, preso, rachando e os fios.
+export const CONTENT_VERSION = 39;
 
 export type VersionTriple = {
   protocolVersion: number;

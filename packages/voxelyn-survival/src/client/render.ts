@@ -11,7 +11,7 @@ import {
   SEAMSTRESS_STAGE_ALOFT,
 } from '@voxelyn/survival-sim';
 import { appendSutureDraws } from './suture-presentation';
-import { drawCocoon } from './web-presentation';
+import { cocoonAnimation, drawCocoon } from './web-presentation';
 import { drawSeamstressEyes } from './web-presentation';
 import {
   depthIntensity,
@@ -127,6 +127,7 @@ import {
   deriveAnim,
   type EntityAnimState,
   PropBank,
+  SILK_COCOON_ATLAS,
 } from './sprites';
 import {
   MAW_CLOUDS,
@@ -5382,10 +5383,18 @@ export class SurvivalRenderer {
       // O CASULO da rede da Cerzideira, e depois os fios: por cima do corpo,
       // do estado (o parceiro no co-op ve o mesmo casulo pelo snapshot).
       if (ex.cocoonUntil > state.tick || ex.webbedUntil > state.tick) {
+        // O atlas do casulo e sob demanda (grupo da Cerzideira): pedido aqui,
+        // na primeira rede, e desenhado pelo relogio do estado — o parceiro
+        // do co-op ve o mesmo quadro pelo snapshot. Enquanto nao chega, o
+        // desenho em canvas segura o lugar.
+        this.sprites.requestPart(SILK_COCOON_ATLAS);
+        const { animation, elapsedMs } = cocoonAnimation(state.tick, ex);
         items.push({
           depth: pl.x + pl.y + 0.02,
           draw: () => {
             const [cx, cy] = toScreen(pl.x, pl.y);
+            if (this.sprites.drawFx(ctx, SILK_COCOON_ATLAS, animation, elapsedMs, cx, cy, z))
+              return;
             drawCocoon(
               ctx,
               cx,

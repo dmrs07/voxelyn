@@ -1,6 +1,7 @@
 import { box, collapse, renderVoxels } from './voxel.mjs';
 import { STITCHER_SPECS } from './stitchers.mjs';
 import { SILK_NET_SPEC } from './silk-net.mjs';
+import { SILK_COCOON_SPEC } from './silk-cocoon.mjs';
 import {
   ANCHOR_X as PROSPECTOR_ANCHOR_X,
   ANCHOR_Y as PROSPECTOR_ANCHOR_Y,
@@ -3883,6 +3884,7 @@ const eightWay = (spec) => ({ ...spec, directions: 8, authoredDirs: DIRS8 });
 export const ENTITY_SPECS = [
   ...STITCHER_SPECS,
   SILK_NET_SPEC,
+  SILK_COCOON_SPEC,
   base(
     'player-prospector',
     PROSPECTOR_FRAME_WIDTH,

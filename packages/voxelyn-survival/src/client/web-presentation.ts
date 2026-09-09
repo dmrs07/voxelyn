@@ -10,6 +10,8 @@ import {
   SEAMSTRESS_STAGE_ASCENDING,
   SEAMSTRESS_STAGE_DESCENDING,
   SEAMSTRESS_STAGE_FRENZY,
+  SEAMSTRESS_COCOON_TICKS,
+  TICK_HZ,
   type Entity,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -352,3 +354,32 @@ export const drawCocoon = (
   }
   ctx.restore();
 };
+
+/**
+ * QUAL QUADRO DO CASULO, pelo relogio do estado. O atlas `fx-silk-cocoon`
+ * tem quatro animacoes: `attack` fecha a seda (0,4 s), `idle` e o ovo
+ * respirando ate a soltura, `burst` racha o ovo nos primeiros ticks depois de
+ * `cocoonUntil`, e `loose` sao os fios no corpo ate `webbedUntil`. Derivado
+ * dos ticks, e nao de um cronometro do cliente, para o parceiro do co-op ver
+ * o mesmo quadro pelo snapshot e para uma reconexao cair no lugar certo.
+ */
+export const cocoonAnimation = (
+  tick: number,
+  ex: { cocoonUntil: number; webbedUntil: number },
+): { animation: string; elapsedMs: number } => {
+  const msPerTick = 1000 / TICK_HZ;
+  if (ex.cocoonUntil > tick) {
+    const since = tick - (ex.cocoonUntil - SEAMSTRESS_COCOON_TICKS);
+    return since < COCOON_WRAP_TICKS
+      ? { animation: 'attack', elapsedMs: since * msPerTick }
+      : { animation: 'idle', elapsedMs: (since - COCOON_WRAP_TICKS) * msPerTick };
+  }
+  const since = tick - ex.cocoonUntil;
+  return since < COCOON_BURST_TICKS
+    ? { animation: 'burst', elapsedMs: since * msPerTick }
+    : { animation: 'loose', elapsedMs: (since - COCOON_BURST_TICKS) * msPerTick };
+};
+/** Quatro quadros a 10 fps: 0,4 s de seda subindo. */
+export const COCOON_WRAP_TICKS = 8;
+/** Tres quadros a 12 fps: 0,25 s de casca rachando. */
+export const COCOON_BURST_TICKS = 5;

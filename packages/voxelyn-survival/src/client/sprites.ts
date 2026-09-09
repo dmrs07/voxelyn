@@ -76,6 +76,7 @@ import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-b
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
 import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
 import silkNetManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-net.json';
+import silkCocoonManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
@@ -151,6 +152,7 @@ import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
 import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
 import silkNetUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-net.png?url';
+import silkCocoonUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
@@ -648,6 +650,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
  * validate.mjs); o teste confere que as duas listas sao a mesma.
  */
 export const DIAMANDIS_CHASSIS_ATLAS = 'enemy-diamandis';
+export const SILK_COCOON_ATLAS = 'fx-silk-cocoon';
 export const DIAMANDIS_PART_ATLASES: readonly string[] = [
   'part-diamandis-drill',
   'part-diamandis-rack',
@@ -659,6 +662,10 @@ export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
   'enemy-seamstress-brood',
   ...DIAMANDIS_PART_ATLASES,
   DIAMANDIS_ARM_ATLAS,
+  // O casulo da rede da Cerzideira: 14 quadros de 96x112 que so quem chega ao
+  // encontro dela precisa. Pedido em `requestPart` quando um Prospector cai
+  // na rede; retido e liberado com o grupo `seamstress`.
+  SILK_COCOON_ATLAS,
 ]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
   'enemy-seamstress-brood': {
@@ -688,6 +695,10 @@ const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string 
   'part-diamandis-arm': {
     manifest: diamandisArmManifest as unknown as SpriteManifestEntry,
     url: diamandisArmUrl,
+  },
+  'fx-silk-cocoon': {
+    manifest: silkCocoonManifest as unknown as SpriteManifestEntry,
+    url: silkCocoonUrl,
   },
 };
 
