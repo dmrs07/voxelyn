@@ -70,7 +70,7 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões atuais: protocolo 38, simulação 75, conteúdo 39. Cliente e servidor precisam ser atualizados juntos.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões atuais: protocolo 39, simulação 76, conteúdo 39. Cliente e servidor precisam ser atualizados juntos.
 
 ### Prioridade de reparo no PR #216
 

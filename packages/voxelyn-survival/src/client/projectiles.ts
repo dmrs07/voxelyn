@@ -608,6 +608,18 @@ export class ProjectileView {
    * e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no outro. A
    * arma nao troca de lado porque o bot sempre vira o corpo para onde mira.
    */
+  /**
+   * O RUMO OBSERVADO de um projetil, unitario, ou `null` antes de ele andar.
+   *
+   * E o que orienta um atlas autorado em rumos (a rede da Cerzideira): online
+   * o snapshot nao traz velocidade, entao `vx/vy` sao zero e so o deslocamento
+   * entre quadros diz para onde o disco voa.
+   */
+  heading(id: number): { dx: number; dy: number } | null {
+    const track = this.tracks.get(id);
+    return track && (track.dx !== 0 || track.dy !== 0) ? { dx: track.dx, dy: track.dy } : null;
+  }
+
   worldOrigin(projectile: ProjectileLike): [number, number] {
     const track = this.tracks.get(projectile.id);
     if (!track) return [projectile.x, projectile.y];

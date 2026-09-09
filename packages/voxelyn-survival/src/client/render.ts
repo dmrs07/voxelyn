@@ -5853,7 +5853,14 @@ export class SurvivalRenderer {
           if (proj.kind === 'net') {
             const [nsx, nsy] = toScreen(proj.x, proj.y);
             drawGroundShadow(ctx, nsx, nsy, 5 * z);
+            // O rumo vem do DESLOCAMENTO observado: online o snapshot nao traz
+            // velocidade, e a rede ficaria sempre no mesmo quadro. A velocidade
+            // so semeia o primeiro quadro, quando o disco ainda nao andou.
             const speed = Math.hypot(proj.vx, proj.vy) || 1;
+            const heading = this.projectileView.heading(proj.id) ?? {
+              dx: proj.vx / speed,
+              dy: proj.vy / speed,
+            };
             if (
               !this.sprites.drawFx(
                 ctx,
@@ -5864,8 +5871,8 @@ export class SurvivalRenderer {
                 nsy,
                 z,
                 undefined,
-                proj.vx / speed,
-                proj.vy / speed,
+                heading.dx,
+                heading.dy,
               )
             ) {
               ctx.save();

@@ -3,19 +3,27 @@
 // ve a teia de frente —, com raios, dois aneis e um no central de resina. Os
 // tres quadros giram o disco em torno do eixo do voo: e o giro que diz que
 // ela esta voando, e nao parada no ar.
-import { box, renderVoxels } from './voxel.mjs';
+import { DIR_UNROTATED, box, renderVoxels } from './voxel.mjs';
 
 export const NET_DIRS = ['dr', 'dl', 'ur', 'ul', 'r', 'd', 'l', 'u'];
-/** Rumo de voo no mundo (x para a direita, y para baixo), por nome de rumo. */
+/**
+ * Rumo de voo NO MUNDO, por nome de rumo. Os nomes sao rumos DE TELA (e assim
+ * que `dirFromFacing8` escolhe o quadro): `dr` e a diagonal para baixo e a
+ * direita da tela, que no mundo e o eixo +x; `r` e a horizontal da tela, que
+ * no mundo e a diagonal (+x, -y). O modelo e construido ja no rumo e
+ * desenhado SEM giro de camera (`DIR_UNROTATED`), entao os eixos do modelo
+ * sao os eixos do mundo, e o disco projeta na tela exatamente como o
+ * projetil autoritativo anda.
+ */
 const DIR_VECTOR = {
-  r: [1, 0],
-  dr: [Math.SQRT1_2, Math.SQRT1_2],
-  d: [0, 1],
-  dl: [-Math.SQRT1_2, Math.SQRT1_2],
-  l: [-1, 0],
-  ul: [-Math.SQRT1_2, -Math.SQRT1_2],
-  u: [0, -1],
-  ur: [Math.SQRT1_2, -Math.SQRT1_2],
+  r: [Math.SQRT1_2, -Math.SQRT1_2],
+  dr: [1, 0],
+  d: [Math.SQRT1_2, Math.SQRT1_2],
+  dl: [0, 1],
+  l: [-Math.SQRT1_2, Math.SQRT1_2],
+  ul: [-1, 0],
+  u: [-Math.SQRT1_2, -Math.SQRT1_2],
+  ur: [0, -1],
 };
 const round = (x) => Math.round(x * 2) / 2;
 
@@ -31,15 +39,25 @@ const limb = (out, a, b, width, mat) => {
 
 export const netModel = (dir, frame) => {
   const [fx, fy] = DIR_VECTOR[dir];
-  // O plano do disco: a lateral (perpendicular ao voo, no chao) e a vertical.
-  const side = [-fy, fx];
   const R = 2.5;
   const Z0 = 4;
   const spin = (frame / 3) * (Math.PI / 4);
+  // O DISCO NAO FICA DE PE, PERPENDICULAR AO VOO, EM NENHUM RUMO: a camera
+  // isometrica veria uma linha em metade deles. Duas correcoes, por rumo:
+  // - INCLINACAO: o topo pende para tras quando o disco vem para a camera e
+  //   para a frente quando se afasta (`atan2(fx + fy, 2)` e o angulo que
+  //   maximiza a altura projetada do eixo vertical do disco).
+  // - GUINADA: nos rumos horizontais da tela (r/l) o eixo lateral do disco
+  //   projeta so em profundidade; ele gira ate 45 graus em direcao ao voo
+  //   para ganhar largura na tela. Nos rumos verticais (d/u) nao gira.
+  const tilt = Math.atan2(fx + fy, 2);
+  const up = [-fx * Math.sin(tilt), -fy * Math.sin(tilt), Math.cos(tilt)];
+  const yaw = (Math.PI / 4) * (1 - Math.abs(fx + fy) / Math.SQRT2);
+  const side = [-fy * Math.cos(yaw) + fx * Math.sin(yaw), fx * Math.cos(yaw) + fy * Math.sin(yaw)];
   const at = (angle, r) => [
-    side[0] * Math.cos(angle) * r,
-    side[1] * Math.cos(angle) * r,
-    Z0 + Math.sin(angle) * r,
+    side[0] * Math.cos(angle) * r + up[0] * Math.sin(angle) * r,
+    side[1] * Math.cos(angle) * r + up[1] * Math.sin(angle) * r,
+    Z0 + up[2] * Math.sin(angle) * r,
   ];
   const b = [];
   // Raios.
@@ -74,8 +92,8 @@ export const SILK_NET_SPEC = {
   hitbox: { w: 1.2, h: 1.2 },
   footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
   animations: { fly: { frames: 3, fps: 10, loop: true } },
-  // A camera e sempre a de `dr` (indice 0): o disco ja esta autorado no rumo.
-  draw: (dir, _anim, frame) => renderVoxels(netModel(dir, frame), 0, 48, 48, 24, 36),
+  // Sem giro de camera: o disco ja esta autorado no rumo, em eixos do mundo.
+  draw: (dir, _anim, frame) => renderVoxels(netModel(dir, frame), DIR_UNROTATED, 48, 48, 24, 36),
   prompt:
     'voxel-isometric thrown silk net, upright disc of pale mineral silk with eight spokes, two rings and a resin knot, spinning in flight, authored in eight directions',
 };
