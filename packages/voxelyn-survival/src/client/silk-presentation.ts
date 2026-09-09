@@ -3,6 +3,8 @@ import {
   silkLift,
   silkSupported,
   silkStrike,
+  SEAMSTRESS_NET_RADIUS,
+  SEAMSTRESS_NET_RANGE,
   SILK_CUT_EXPOSED_FROM,
   type Entity,
   type SurvivalState,
@@ -24,6 +26,49 @@ export const appendSilkThreatDraws = (
   const a = enemy.action,
     f = a?.silkFlight;
   const queen = enemy.archetype === 'seamstress';
+  // A REDE sendo carregada: a faixa do arremesso, num dos oito rumos, com a
+  // largura do disco, enchendo ate o release. E o aviso de sair da linha.
+  if (queen && a?.kind === 'ranged' && state.tick < a.releaseAt) {
+    const progress = Math.max(
+      0,
+      Math.min(1, (state.tick - a.startedAt) / Math.max(1, a.releaseAt - a.startedAt)),
+    );
+    const dir = a.direction,
+      side = { x: -dir.y, y: dir.x },
+      half = SEAMSTRESS_NET_RADIUS,
+      reach = SEAMSTRESS_NET_RANGE;
+    const at = (along: number, lateral: number): [number, number] =>
+      project(
+        enemy.x + dir.x * along + side.x * lateral,
+        enemy.y + dir.y * along + side.y * lateral,
+      );
+    items.push({
+      depth: enemy.x + enemy.y - 0.5,
+      draw: () => {
+        ctx.save();
+        ctx.fillStyle = '#e6dccb';
+        ctx.globalAlpha = 0.08 + 0.16 * progress;
+        ctx.beginPath();
+        ctx.moveTo(...at(0.8, -half));
+        ctx.lineTo(...at(reach * (0.3 + 0.7 * progress), -half));
+        ctx.lineTo(...at(reach * (0.3 + 0.7 * progress), half));
+        ctx.lineTo(...at(0.8, half));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.5 + 0.4 * progress;
+        ctx.strokeStyle = '#e6dccb';
+        ctx.lineWidth = Math.max(1, z);
+        for (const lateral of [-half, half]) {
+          ctx.beginPath();
+          ctx.moveTo(...at(0.8, lateral));
+          ctx.lineTo(...at(reach, lateral));
+          ctx.stroke();
+        }
+        ctx.restore();
+      },
+    });
+    return;
+  }
   if (!a || (!f && !(queen && a.kind === 'contact'))) return;
   const hit = silkStrike(enemy),
     radius = hit.radius,

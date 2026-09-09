@@ -118,6 +118,9 @@ export type EntitySnapshot = {
    */
   freeze?: number;
   frostbitten?: boolean;
+  /** O CASULO da rede da Cerzideira e os fios que ficam depois (players). */
+  cocoonUntil?: number;
+  webbedUntil?: number;
   facingX?: number;
   facingY?: number;
   /** Tick autoritativo ate o qual a entidade permanece atordoada. */
@@ -192,6 +195,8 @@ export type ViewerState = {
    */
   freeze: number;
   frostbitten: boolean;
+  cocoonUntil: number;
+  webbedUntil: number;
 };
 
 /**

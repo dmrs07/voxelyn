@@ -31,6 +31,9 @@ const CANONICAL = {
   'fx-impact-burst': [32, 32],
   'fx-seeker-drone': [32, 32],
   'fx-fire-cyclone': [32, 32],
+  'fx-silk-net': [48, 48],
+  // O casulo usa o canvas e a ancora do Prospector: e carimbado onde ele esta.
+  'fx-silk-cocoon': [96, 112],
 };
 const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
 /**
@@ -150,6 +153,11 @@ export const ON_DEMAND_ATLASES = new Set([
   'part-diamandis-rack',
   'part-diamandis-mast',
   'part-diamandis-arm',
+  // O casulo da rede so existe no encontro da Cerzideira; 14 quadros de 96x112
+  // nao cabem no orcamento de boot, que esta a 0,3 MiB do teto.
+  'fx-silk-cocoon',
+  // A aranhinha so existe na rocha suturada: vai com o grupo da Cerzideira.
+  'enemy-silk-spiderling',
 ]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;

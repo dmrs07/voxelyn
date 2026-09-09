@@ -138,7 +138,13 @@ type BossVoiceTable<K extends string> = Partial<
 >;
 
 const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
-  seamstress: { stitch: 'silkTension', tether: 'silkTension', contact: 'silkTension' },
+  seamstress: {
+    stitch: 'silkTension',
+    tether: 'silkTension',
+    contact: 'silkTension',
+    // A rede sendo carregada: a mesma seda esticando, mais longa.
+    net: 'silkAscend',
+  },
   guardian: {
     salvo: 'guardianSalvoCrack',
     slam: 'guardianCompress',
@@ -179,6 +185,7 @@ const BOSS_WINDUP_VOICE: BossVoiceTable<BossAbility> = {
  */
 const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   stitch: 'silkTension',
+  net: 'silkTension',
   salvo: 'telegraphRanged',
   slam: 'telegraphSlam',
   charge: 'telegraphCharge',
@@ -620,6 +627,10 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       if (ev.archetype === 'devourer_brood') {
         return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 1 }];
       }
+      // A aranhinha esmagada: o mesmo estalo curto da ninhada, sem o grave.
+      if (ev.archetype === 'silk_spiderling') {
+        return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 0.6 }];
+      }
       // O Espectro nao cai: estilhaca e sublima.
       if (ev.archetype === 'frost_wraith') {
         return [{ voice: 'wraithDeath', x: ev.x, y: ev.y, scale: 1 }];
@@ -757,6 +768,10 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 
     case 'chip':
       return [{ voice: 'chip', x: ev.x, y: ev.y, scale: 1 }];
+
+    case 'cocoon':
+      // A rede fechou: a queda de seda, forte, em cima de quem ficou preso.
+      return [{ voice: 'silkFall', x: ev.x, y: ev.y, scale: 1.1 }];
 
     case 'bolt_impact':
       // O bolt morrendo em parede firme era o UNICO fim de tiro mudo. Reusa a

@@ -696,6 +696,8 @@ export class NetClient {
           // mesmo caminho que o local — o estado, nunca um eco de evento.
           state.playerExtras[slot].freeze = snap.freeze ?? 0;
           state.playerExtras[slot].frostbitten = snap.frostbitten ?? false;
+          state.playerExtras[slot].cocoonUntil = snap.cocoonUntil ?? 0;
+          state.playerExtras[slot].webbedUntil = snap.webbedUntil ?? 0;
           pl.action = snap.action
             ? {
                 kind: snap.action.kind,
@@ -860,6 +862,8 @@ export class NetClient {
       // eles que o HUD desenha o medidor azul e troca o gatilho por motor.
       ex.freeze = this.viewer.freeze ?? 0;
       ex.frostbitten = this.viewer.frostbitten ?? false;
+      ex.cocoonUntil = this.viewer.cocoonUntil ?? 0;
+      ex.webbedUntil = this.viewer.webbedUntil ?? 0;
     }
 
     // o renderer segue state.player/playerExtra (camera, HUD, mira): aponta-os

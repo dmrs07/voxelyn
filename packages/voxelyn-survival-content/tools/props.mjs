@@ -87,7 +87,12 @@ export const coreModel = (phase, taken) => {
 
   // Quatro contrafortes nos cantos, subindo e afinando. Sao eles que levam o
   // olho de baixo para cima ate o cristal.
-  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+  for (const [sx, sy] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ]) {
     const cx = sx * (HALF - 2);
     const cy = sy * (HALF - 2);
     boxes.push(box(cx, cy, 5, 1, 1, 7, 'bone'));
@@ -118,7 +123,12 @@ export const coreModel = (phase, taken) => {
   boxes.push(box(0, 0, z + layers.length, 1, 1, 1, 'player'));
   // Lascas orbitando, defasadas do corpo para o conjunto nao subir em bloco.
   const orbit = Math.round(Math.sin(phase * Math.PI * 2 + Math.PI) * 1.5);
-  for (const [ox, oy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) {
+  for (const [ox, oy] of [
+    [-4, 0],
+    [4, 0],
+    [0, -4],
+    [0, 4],
+  ]) {
     boxes.push(box(ox, oy, 10 + orbit, 1, 1, 1, 'biolum'));
   }
   return boxes;
@@ -171,7 +181,12 @@ const descentModel = (frame) => {
   boxes.push(box(-2, -2, 0, 5, 5, 1, 'rockDeep'));
 
   // Quatro trilhos curtos seguram a silhueta de elevador sem criar outra torre.
-  for (const [x, y] of [[-4, -4], [3, -4], [-4, 3], [3, 3]]) {
+  for (const [x, y] of [
+    [-4, -4],
+    [3, -4],
+    [-4, 3],
+    [3, 3],
+  ]) {
     boxes.push(box(x, y, 2, 1, 1, 4, 'rust'));
     boxes.push(box(x, y, 6, 1, 1, 1, 'bone'));
   }
@@ -189,7 +204,12 @@ const descentModel = (frame) => {
   // cruz convergente e lida como direcao; quatro pontos piscando seriam ruido.
   const guideInset = Math.min(3, 1 + Math.floor(platform.step / 2));
   const guide = HALF - guideInset - 1;
-  for (const [x, y] of [[-guide, 0], [guide, 0], [0, -guide], [0, guide]]) {
+  for (const [x, y] of [
+    [-guide, 0],
+    [guide, 0],
+    [0, -guide],
+    [0, guide],
+  ]) {
     boxes.push(box(x, y, 3 - Math.min(2, Math.floor(platform.step / 2)), 1, 1, 1, 'loot'));
   }
 
@@ -207,7 +227,12 @@ const extractionModel = (phase) => {
   ring(boxes, 0, 1, 1, 'rockDeep');
   // Marcas de guia acendendo em sequencia, apontando para dentro.
   const lit = Math.floor(phase * 4) % 4;
-  const marks = [[-HALF + 1, 0], [HALF - 2, 0], [0, -HALF + 1], [0, HALF - 2]];
+  const marks = [
+    [-HALF + 1, 0],
+    [HALF - 2, 0],
+    [0, -HALF + 1],
+    [0, HALF - 2],
+  ];
   marks.forEach(([x, y], i) => {
     boxes.push(box(x, y, 1, 1, 1, 1, i === lit ? 'loot' : 'rust'));
   });
@@ -301,7 +326,12 @@ const salvageCacheTieredModel = (tier, opened) => {
   // Classe III — restrito/pesado.
   boxes.push(box(-3, -2, 2, 6, 4, opened ? 4 : 6, 'rock'));
   // Pes/bumpers blindados nos cantos do plinto: agarrado ao chao.
-  for (const [fx, fy] of [[-4, -3], [3, -3], [-4, 2], [3, 2]]) {
+  for (const [fx, fy] of [
+    [-4, -3],
+    [3, -3],
+    [-4, 2],
+    [3, 2],
+  ]) {
     boxes.push(box(fx, fy, 2, 1, 1, 2, 'rust'));
   }
   // Ranhuras de painel na face sul: tres sulcos escuros verticais.
@@ -344,7 +374,7 @@ const salvageCacheTieredModel = (tier, opened) => {
 export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
   if (!spec) throw new Error(`prop desconhecido: ${kind}`);
-  if (kind.startsWith('decor:')) return decorPropModel(kind);
+  if (kind.startsWith('decor:')) return decorPropModel(kind, frame);
   if (kind.startsWith('portal:')) return portalModel(kind, frame);
   const phase = spec.frames > 1 ? frame / spec.frames : 0;
   if (kind === 'core') return coreModel(phase, false);
@@ -384,7 +414,9 @@ export const buildPropFrames = (frameW, frameH, anchorX, anchorY) => {
   const frames = [];
   for (const kind of PROP_KINDS) {
     for (let frame = 0; frame < kind.frames; frame++) {
-      frames.push(renderVoxels(propModel(kind.name, frame), DIR_UNROTATED, frameW, frameH, anchorX, anchorY));
+      frames.push(
+        renderVoxels(propModel(kind.name, frame), DIR_UNROTATED, frameW, frameH, anchorX, anchorY),
+      );
     }
   }
   return frames;

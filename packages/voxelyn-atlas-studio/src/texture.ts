@@ -1,6 +1,6 @@
 // TEXTURA -> MATERIAIS DO JOGO, por aproximacao.
 //
-// Um GLB texturizado traz cor por pixel; o Voxelyn tem 22 cores fechadas e ~22
+// Um GLB texturizado traz cor por pixel; o Voxelyn tem 25 cores fechadas e ~22
 // materiais, e cada material e uma RAMPA de tres faces, nao uma cor. Entao
 // "importar as cores" nao e quantizar pixels: e escolher, para cada pedaco da
 // malha, QUAL MATERIAL do jogo aquele pedaco e.

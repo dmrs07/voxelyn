@@ -226,6 +226,7 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-stitcher',
   'enemy-seamstress',
   'enemy-seamstress-brood',
+  'enemy-silk-spiderling',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [
@@ -297,6 +298,8 @@ export const FIRST_PACK_IDS = [
   'fx-impact-burst',
   'fx-seeker-drone',
   'fx-fire-cyclone',
+  'fx-silk-net',
+  'fx-silk-cocoon',
 ] as const;
 
 /**

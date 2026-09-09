@@ -10,6 +10,8 @@ import {
   SEAMSTRESS_STAGE_ASCENDING,
   SEAMSTRESS_STAGE_DESCENDING,
   SEAMSTRESS_STAGE_FRENZY,
+  SEAMSTRESS_COCOON_TICKS,
+  TICK_HZ,
   type Entity,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -289,3 +291,95 @@ export const drawSeamstressEyes = (
 };
 
 export const seamstressFrenzyStage = SEAMSTRESS_STAGE_FRENZY;
+
+/**
+ * O CASULO DA REDE sobre um Prospector: um envelope de seda, fios cruzados e
+ * um brilho fraco — o corpo esta la dentro, imune e parado, por 3 s. Depois
+ * do casulo ficam os FIOS: tres linhas soltas presas ao corpo, o aviso de que
+ * ele anda a 10%.
+ */
+export const drawCocoon = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  bodyY: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  full: boolean,
+): void => {
+  ctx.save();
+  const rx = size * 0.95,
+    ry = size * 1.35;
+  const cy = bodyY - size * 0.9;
+  if (full) {
+    const pulse = 0.75 + 0.25 * Math.sin(nowMs / 160);
+    // O envelope: um losango arredondado de seda, translucido.
+    ctx.fillStyle = SILK;
+    ctx.globalAlpha = 0.55 * pulse;
+    ctx.beginPath();
+    for (let n = 0; n <= 20; n++) {
+      const a = (n / 20) * Math.PI * 2;
+      const x = sx + Math.cos(a) * rx,
+        y = cy + Math.sin(a) * ry;
+      if (n) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = SILK;
+    ctx.lineWidth = Math.max(1, z);
+    ctx.stroke();
+    // Os fios enrolados, em diagonais cruzadas.
+    ctx.globalAlpha = 0.8;
+    for (let k = -2; k <= 2; k++) {
+      const yy = cy + k * ry * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(sx - rx * 0.95, yy - ry * 0.18);
+      ctx.lineTo(sx + rx * 0.95, yy + ry * 0.18);
+      ctx.stroke();
+    }
+  } else {
+    // Cheio de fios: tres linhas caidas do corpo, balancando.
+    ctx.strokeStyle = SILK;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = Math.max(1, z);
+    for (const [k, off] of [-0.6, 0.1, 0.7].entries()) {
+      const sway = Math.sin(nowMs / 300 + k) * 2 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx + off * rx, cy + (k - 1) * ry * 0.25);
+      ctx.lineTo(sx + off * rx + sway, bodyY + (4 + k * 2) * z);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+};
+
+/**
+ * QUAL QUADRO DO CASULO, pelo relogio do estado. O atlas `fx-silk-cocoon`
+ * tem quatro animacoes: `attack` fecha a seda (0,4 s), `idle` e o ovo
+ * respirando ate a soltura, `burst` racha o ovo nos primeiros ticks depois de
+ * `cocoonUntil`, e `loose` sao os fios no corpo ate `webbedUntil`. Derivado
+ * dos ticks, e nao de um cronometro do cliente, para o parceiro do co-op ver
+ * o mesmo quadro pelo snapshot e para uma reconexao cair no lugar certo.
+ */
+export const cocoonAnimation = (
+  tick: number,
+  ex: { cocoonUntil: number; webbedUntil: number },
+): { animation: string; elapsedMs: number } => {
+  const msPerTick = 1000 / TICK_HZ;
+  if (ex.cocoonUntil > tick) {
+    const since = tick - (ex.cocoonUntil - SEAMSTRESS_COCOON_TICKS);
+    return since < COCOON_WRAP_TICKS
+      ? { animation: 'attack', elapsedMs: since * msPerTick }
+      : { animation: 'idle', elapsedMs: (since - COCOON_WRAP_TICKS) * msPerTick };
+  }
+  const since = tick - ex.cocoonUntil;
+  return since < COCOON_BURST_TICKS
+    ? { animation: 'burst', elapsedMs: since * msPerTick }
+    : { animation: 'loose', elapsedMs: (since - COCOON_BURST_TICKS) * msPerTick };
+};
+/** Quatro quadros a 10 fps: 0,4 s de seda subindo. */
+export const COCOON_WRAP_TICKS = 8;
+/** Tres quadros a 12 fps: 0,25 s de casca rachando. */
+export const COCOON_BURST_TICKS = 5;

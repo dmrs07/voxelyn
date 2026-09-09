@@ -8,6 +8,7 @@ import {
   silkContact,
   silkStrike,
   seamstressTargetable,
+  seamstressNetRelease,
 } from './seamstress.js';
 import { dissolveWeb, webArmor } from './web.js';
 import {
@@ -153,6 +154,10 @@ import {
   MAX_ENEMIES,
   DEVOURER_BROOD_RING,
   DEVOURER_BROOD_SHY,
+  SPIDERLING_FLEE_TICKS,
+  SPIDERLING_SIGHT,
+  SPIDERLING_SPEED,
+  SPIDERLING_WANDER_TICKS,
   DEVOURER_BROOD_SPREAD,
   DEVOURER_BURROWED_ARMOR,
   DEVOURER_BURROW_MIN_TICKS,
@@ -480,6 +485,14 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     contactDamage: 7,
     contactCooldown: 32,
     aggroRange: 18,
+  },
+  silk_spiderling: {
+    hp: 1,
+    speed: 3.9,
+    radius: 0.16,
+    contactDamage: 0,
+    contactCooldown: 999,
+    aggroRange: 0,
   },
   seamstress: {
     // 900, e nao 780: a segunda fase e blindada pela teia (WEB_ARMOR), e a
@@ -1038,6 +1051,8 @@ export const damageEntity = (
   if (ent.kind === 'player') {
     const extra = state.playerExtras[ent.slot ?? 0];
     if (extra.iframesUntil > state.tick || extra.downed) return;
+    // O CASULO e imune: a rede prende, nao mata.
+    if (extra.cocoonUntil > state.tick) return;
     // A selagem ambiental (CA-04) e aplicada AQUI, e nao em cada `applyCellHazards`,
     // porque a lista de causas ambientais e a coisa que precisa ficar visivel: um
     // caminho de dano novo que se esqueca dela apareceria como bug de balanco em
@@ -1177,7 +1192,9 @@ export const damageEntity = (
   // pisasse neles — um placar em que esmagar filhote rende mais que enfrentar o
   // chefe esta medindo a coisa errada. O evento de morte continua indo; o que
   // nao vai e o credito.
-  if (ent.archetype !== 'devourer_brood') recordKill(state.stats, ent.archetype as EnemyArchetype);
+  // Fauna inofensiva nao e abate: nem a ninhada, nem a aranhinha.
+  if (ent.archetype !== 'devourer_brood' && ent.archetype !== 'silk_spiderling')
+    recordKill(state.stats, ent.archetype as EnemyArchetype);
   // O chefe deste setor CAIU — e cai uma vez so na run.
   //
   // A marca vive no estado (e nao na entidade, que o repovoamento descarta)
@@ -1540,7 +1557,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
   if (!isBossArchetype(archetype)) return null;
   switch (action) {
     case 'ranged':
-      return 'salvo';
+      return enemy.archetype === 'seamstress' ? 'net' : 'salvo';
     case 'slam':
       return 'slam';
     case 'charge':
@@ -1968,6 +1985,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     // segunda. O cuspe abaixo volta a ser exclusivo do Spitter.
     if (enemy.archetype === 'guardian') {
       guardianSalvoRelease(state, enemy, action, target, events);
+      return;
+    }
+    // A REDE da Cerzideira: o ranged dela e seda, e nao fere — encapsula.
+    if (enemy.archetype === 'seamstress') {
+      seamstressNetRelease(state, enemy, action, events);
       return;
     }
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
@@ -3486,6 +3508,76 @@ const separateBrood = (state: SurvivalState): void => {
  * O evento de morte continua indo: e dele que sai o punhado de particulas, e o
  * jogador precisa VER que pisou em alguma coisa.
  */
+/** Ruido inteiro deterministico por (bicho, janela): passeio sem gastar o RNG da run. */
+const spiderlingRoll = (id: number, window: number, salt: number): number => {
+  let h =
+    Math.imul(id + 1, 374761393) ^ Math.imul(window + 1, 668265263) ^ Math.imul(salt, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) >>> 0;
+};
+
+/**
+ * O passo da ARANHINHA.
+ *
+ * 1. AVISTAR. Qualquer Prospector vivo a menos de `SPIDERLING_SIGHT` tiles COM
+ *    linha de visao a assusta por `SPIDERLING_FLEE_TICKS`, e o susto renova
+ *    enquanto ele continuar a vista. Sem linha de visao ela nao sabe dele — e
+ *    por isso que dobrar uma esquina pega uma parada.
+ * 2. FUGIR. Assustada, corre para longe do Prospector mais perto, deslizando
+ *    na parede quando o caminho reto esta fechado (tres rumos: reto, e as duas
+ *    diagonais de 45 graus para o lado). Encurralada de vez, fica parada — e
+ *    ai e pisada, que e o desfecho honesto de um bicho sem saida.
+ * 3. PASSEAR. Em paz, a cada janela de `SPIDERLING_WANDER_TICKS` decide por
+ *    ruido deterministico (id, janela) se anda um passo curto num rumo
+ *    qualquer ou fica. Nada de RNG da run: o passeio nao pode mudar o sorteio
+ *    de quem vem depois no mesmo tick.
+ */
+const spiderlingStep = (state: SurvivalState, enemy: Entity, dt: number): void => {
+  let threat: Entity | null = null;
+  let best = SPIDERLING_SIGHT;
+  for (const p of state.players) {
+    if (!p.alive || !state.playerExtras[p.slot ?? 0].joined) continue;
+    const d = distTo(enemy, p);
+    if (d < best && hasLineOfSight(state, enemy.x, enemy.y, p.x, p.y)) {
+      best = d;
+      threat = p;
+    }
+  }
+  if (threat) enemy.alertedUntil = state.tick + SPIDERLING_FLEE_TICKS;
+  const step = SPIDERLING_SPEED * dt;
+  if (enemy.alertedUntil > state.tick) {
+    // O rumo de fuga e o oposto do ultimo Prospector visto; sem ninguem a
+    // vista, continua no rumo em que ja corria.
+    const away = threat
+      ? normalized(enemy.x - threat.x, enemy.y - threat.y)
+      : { x: enemy.facing.x, y: enemy.facing.y };
+    if (Math.hypot(away.x, away.y) < 0.0001) return;
+    for (const turn of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]) {
+      const c = Math.cos(turn),
+        sn = Math.sin(turn);
+      const dx = away.x * c - away.y * sn,
+        dy = away.x * sn + away.y * c;
+      if (bodyBlocked(state, enemy, enemy.x + dx * step, enemy.y + dy * step)) continue;
+      enemy.facing = { x: dx, y: dy };
+      moveEntity(state, enemy, dx * step, dy * step);
+      return;
+    }
+    return;
+  }
+  const window = Math.floor(state.tick / SPIDERLING_WANDER_TICKS);
+  const roll = spiderlingRoll(enemy.id, window, 1);
+  // Anda em metade das janelas, e so na primeira metade de cada uma: um
+  // passinho curto, uma pausa — o andar de quem esta em casa.
+  if (roll % 2 === 0 || state.tick % SPIDERLING_WANDER_TICKS >= SPIDERLING_WANDER_TICKS / 2) return;
+  const angle = ((spiderlingRoll(enemy.id, window, 2) % 360) * Math.PI) / 180;
+  const dx = Math.cos(angle),
+    dy = Math.sin(angle);
+  const slow = step * 0.5;
+  if (bodyBlocked(state, enemy, enemy.x + dx * slow, enemy.y + dy * slow)) return;
+  enemy.facing = { x: dx, y: dy };
+  moveEntity(state, enemy, dx * slow, dy * slow);
+};
+
 const crushBrood = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): boolean => {
   for (const player of state.players) {
     if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
@@ -8023,6 +8115,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // seja, dano — que a definicao dele proibe.
     if (enemy.archetype === 'devourer_brood') {
       if (!crushBrood(state, enemy, events)) broodStep(state, enemy, player, dt);
+      continue;
+    }
+    // A ARANHINHA: mesma razao da ninhada — nao persegue nem bate. Esmagada
+    // por quem passa por cima; senao passeia, e foge de quem ela AVISTA.
+    if (enemy.archetype === 'silk_spiderling') {
+      if (!crushBrood(state, enemy, events)) spiderlingStep(state, enemy, dt);
       continue;
     }
     // Os chefes de estrato: cada um opera a alavanca do proprio bioma, e

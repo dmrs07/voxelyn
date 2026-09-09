@@ -1633,6 +1633,25 @@ export const DEVOURER_BROOD_SPREAD = 0.75;
 export const DEVOURER_BROOD_SHY = 2.2;
 
 /**
+ * AS ARANHINHAS da rocha suturada: quantas por setor, ate onde enxergam o
+ * Prospector, por quanto tempo correm depois de ve-lo e a que velocidade.
+ *
+ * Elas FOGEM AO AVISTAR, e nao ao ser tocadas como a ninhada do Devorador:
+ * a aranhinha e o bicho que some quando alguem entra na sala, e o que ela
+ * ensina e que a camara e habitada. Enxergar exige linha de visao — atras de
+ * uma parede ela continua parada, e e assim que o jogador a surpreende.
+ *
+ * Um pouco mais lenta que o Prospector (4,6): quem quer pisar numa, consegue;
+ * quem so passa, ve o chao se esvaziar a frente.
+ */
+export const SPIDERLING_COUNT = 10;
+export const SPIDERLING_SIGHT = 6;
+export const SPIDERLING_FLEE_TICKS = 36;
+export const SPIDERLING_SPEED = 3.9;
+/** Passo do passeio: a cada tantos ticks ela decide andar ou ficar. */
+export const SPIDERLING_WANDER_TICKS = 24;
+
+/**
  * O SALTO. A emergencia nao e um ponto, e um ARCO.
  *
  * Ele nao sobe onde esta: recua por baixo ate um ponto de DECOLAGEM, rompe o

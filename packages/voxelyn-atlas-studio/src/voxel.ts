@@ -39,6 +39,8 @@ export const RAMPS: Record<string, [string, string, string]> = {
   // Novas rampas no fim preservam os desempates da quantizacao de modelos existentes.
   silk: ['chalk', 'bone', 'brass'],
   chitin: ['mist', 'rockLight', 'rockShadow'],
+  spiderRed: ['blood', 'crimson', 'char'],
+  spiderBlue: ['cobalt', 'navy', 'rockShadow'],
   sutureResin: ['bone', 'brass', 'char'],
 };
 
@@ -64,6 +66,9 @@ export const SHADOW_OF: Record<string, string> = {
   amber: 'fire',
   fire: 'blood',
   blood: 'char',
+  crimson: 'char',
+  cobalt: 'navy',
+  navy: 'rockShadow',
   electric: 'mist',
   dark: 'dark',
 };
@@ -84,6 +89,9 @@ export const LIGHT_OF: Record<string, string> = {
   moss: 'fungusLight',
   fungusLight: 'fungusLight',
   blood: 'blood',
+  crimson: 'blood',
+  cobalt: 'cobalt',
+  navy: 'cobalt',
   loot: 'loot',
   player: 'player',
   acid: 'acid',

@@ -446,6 +446,41 @@
       "frameMs": 0
     },
     {
+      "name": "decor:web_corner:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:web_sheet:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:web_sheet:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:web_hang:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:cocoon_twitch:0",
+      "frames": 3,
+      "frameMs": 180
+    },
+    {
+      "name": "decor:spider_nest:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:egg_cluster:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
       "name": "portal:basalt",
       "frames": 6,
       "frameMs": 170
@@ -532,6 +567,7 @@
     "#1f3d33",
     "#2e3a4d",
     "#2f6b4f",
+    "#3d2a22",
     "#3f8a5e",
     "#46566e",
     "#59f2c2",

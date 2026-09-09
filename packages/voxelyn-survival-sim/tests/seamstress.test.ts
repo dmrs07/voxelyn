@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, hashAuthoritativeState } from '../src/run';
+import { createRun, stepRun, emptyCommand, hashAuthoritativeState } from '../src/run';
 import {
   bodyBlocked,
   damageEntity,
@@ -24,8 +24,10 @@ import {
 import {
   dropSeamstress,
   SEAMSTRESS_ASCEND_TICKS,
+  SEAMSTRESS_COCOON_TICKS,
   SEAMSTRESS_CONTACT_GRACE,
   SEAMSTRESS_DESCEND_TICKS,
+  SEAMSTRESS_WEBBED_TICKS,
   SEAMSTRESS_DROP_TICKS,
   SEAMSTRESS_STAGE_ALOFT,
   SEAMSTRESS_STAGE_ASCENDING,

@@ -78,8 +78,9 @@ describe('nearestMaterial', () => {
   });
 
   it('acha a familia certa para cores fora da paleta', () => {
-    // vermelho vivo -> a rampa de sangue; azul-claro -> a eletrica
-    expect(nearestMaterial([230, 40, 60])).toBe('blood');
+    // vermelho vivo -> a familia do sangue (o traje da Cerzideira tem o mesmo
+    // topo e laterais vermelhas, entao ganha o desempate); azul-claro -> a eletrica
+    expect(nearestMaterial([230, 40, 60])).toBe('spiderRed');
     expect(nearestMaterial([120, 190, 255])).toBe('electric');
     // quase preto -> um dos materiais de rocha escura, nunca um emissivo
     expect(['floor', 'rockDeep', 'pool']).toContain(nearestMaterial([10, 12, 18]));
@@ -106,7 +107,7 @@ describe('quantizeToMaterials', () => {
     const q = quantizeToMaterials([gelo, sangue, acido], 6);
     expect(q.materials.length).toBe(3);
     expect(q.materials[0]).toBe('ice');
-    expect(q.materials[1]).toBe('blood');
+    expect(q.materials[1]).toBe('spiderRed');
     expect(q.materials[2]).toBe('acid');
   });
 
@@ -134,14 +135,14 @@ describe('quantizeToMaterials', () => {
     const q = quantizeToMaterials([...Array(50).fill(sangue), fogo, fogo], 1, {
       exposure: false,
     });
-    expect(q.used).toEqual(['blood']);
-    expect(q.materials.every((m) => m === 'blood')).toBe(true);
+    expect(q.used).toEqual(['spiderRed']);
+    expect(q.materials.every((m) => m === 'spiderRed')).toBe(true);
   });
 
   it('a paleta final sai ordenada do mais usado para o menos', () => {
     const cores: Rgb[] = [...Array(9).fill(gelo), ...Array(5).fill(sangue), acido];
     const q = quantizeToMaterials(cores, 3, { exposure: false });
-    expect(q.used).toEqual(['ice', 'blood', 'acid']);
+    expect(q.used).toEqual(['ice', 'spiderRed', 'acid']);
   });
 
   it('e deterministico e todo material escolhido tem rampa no rasterizador', () => {

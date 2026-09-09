@@ -27,7 +27,16 @@ export type ProjectileLike = {
   y: number;
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
-  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone' | 'flechette';
+  kind?:
+    | 'bolt'
+    | 'spit'
+    | 'rock'
+    | 'return_disc'
+    | 'seeker'
+    | 'cart'
+    | 'cyclone'
+    | 'net'
+    | 'flechette';
   /**
    * Velocidade, quando o chamador a tem.
    *
@@ -174,7 +183,7 @@ const drawDisc = (
   sx: number,
   sy: number,
   size: number,
-  spin: number
+  spin: number,
 ): void => {
   const rx = size * 1.15;
   const ry = rx * 0.5;
@@ -234,7 +243,7 @@ const drawBounceBall = (
   sx: number,
   sy: number,
   size: number,
-  ramp: FaceRamp
+  ramp: FaceRamp,
 ): void => {
   const r = size * 0.75;
   ctx.fillStyle = ramp[2];
@@ -268,7 +277,7 @@ const drawPiercingDart = (
   sy: number,
   size: number,
   dir: { x: number; y: number },
-  ramp: FaceRamp
+  ramp: FaceRamp,
 ): void => {
   const nx = dir.x;
   const ny = dir.y;
@@ -335,7 +344,7 @@ const drawSiphonSerpent = (
   lift: number,
   size: number,
   phase: number,
-  ramp: FaceRamp
+  ramp: FaceRamp,
 ): void => {
   // Perpendicular no MUNDO: a ondulacao acompanha o chao, nao a tela.
   const px = -dir.dy;
@@ -354,7 +363,10 @@ const drawSiphonSerpent = (
   // Fiapos se desgarrando da ponta da cauda: o fluxo se desfaz no ar. Fase
   // deterministica pela distancia — nada de Math.random por quadro.
   if (span > 0.8) {
-    for (const [drift, seed] of [[0.86, 1.7], [1.02, 4.1]] as const) {
+    for (const [drift, seed] of [
+      [0.86, 1.7],
+      [1.02, 4.1],
+    ] as const) {
       const wob = Math.sin(phase * 5 + seed) * 0.22;
       const [wxp, wyp] = ribbonPoint(span * drift, wob);
       const fade = 0.3 + 0.2 * Math.sin(phase * 7 + seed);
@@ -467,7 +479,7 @@ const drawSpitGlob = (
   sy: number,
   size: number,
   phase: number,
-  ramp: FaceRamp
+  ramp: FaceRamp,
 ): void => {
   const wob = Math.sin(phase * 9);
   const rx = size * (0.95 + 0.14 * wob);
@@ -507,7 +519,15 @@ const drawSpitGlob = (
   ctx.globalAlpha = 0.85 * (1 - drop);
   ctx.fillStyle = ramp[1];
   ctx.beginPath();
-  ctx.ellipse(sx + rx * 0.2 * wob, sy + ry + drop * size * 1.6, size * 0.16, size * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(
+    sx + rx * 0.2 * wob,
+    sy + ry + drop * size * 1.6,
+    size * 0.16,
+    size * 0.22,
+    0,
+    0,
+    Math.PI * 2,
+  );
   ctx.fill();
   ctx.globalAlpha = 1;
 };
@@ -588,12 +608,24 @@ export class ProjectileView {
    * e `-y` e o lado direito e `+x`, e essa e a rotacao que leva um no outro. A
    * arma nao troca de lado porque o bot sempre vira o corpo para onde mira.
    */
+  /**
+   * O RUMO OBSERVADO de um projetil, unitario, ou `null` antes de ele andar.
+   *
+   * E o que orienta um atlas autorado em rumos (a rede da Cerzideira): online
+   * o snapshot nao traz velocidade, entao `vx/vy` sao zero e so o deslocamento
+   * entre quadros diz para onde o disco voa.
+   */
+  heading(id: number): { dx: number; dy: number } | null {
+    const track = this.tracks.get(id);
+    return track && (track.dx !== 0 || track.dy !== 0) ? { dx: track.dx, dy: track.dy } : null;
+  }
+
   worldOrigin(projectile: ProjectileLike): [number, number] {
     const track = this.tracks.get(projectile.id);
     if (!track) return [projectile.x, projectile.y];
     const lateral = muzzleLateralTiles(
       track.travelled,
-      muzzleForProjectile(projectile.kind, projectile.hostile)
+      muzzleForProjectile(projectile.kind, projectile.hostile),
     );
     if (lateral === 0) return [projectile.x, projectile.y];
     return [projectile.x - track.dy * lateral, projectile.y + track.dx * lateral];
@@ -608,7 +640,7 @@ export class ProjectileView {
     projectile: ProjectileLike,
     project: (x: number, y: number) => [number, number],
     zoom: number,
-    tileH: number
+    tileH: number,
   ): void {
     const track = this.tracks.get(projectile.id);
     const muzzle = muzzleForProjectile(projectile.kind, projectile.hostile);
@@ -633,18 +665,28 @@ export class ProjectileView {
     // O missil e um corpo, nao uma faisca: ele precisa ler como algo que voce
     // lancou e que ainda esta no ar procurando alguem.
     const seeker = projectile.kind === 'seeker';
-    const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
+    const armed = Boolean(
+      projectile.modules?.explosive &&
+      (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance,
+    );
     // O ARMADO vence o sifao de proposito: risco fala mais alto que cura, e o
     // aviso laranja do explosivo nao pode ser pintado de verde por cima.
     const flechette = projectile.kind === 'flechette';
-    const ramp = rock ? ROCK_RAMP
-      : disc ? DISC_RAMP
-      : seeker ? SEEKER_RAMP
-      : flechette ? FLECHETTE_RAMP
-      : armed ? ARMED_RAMP
-      : projectile.hostile ? HOSTILE_RAMP
-      : projectile.modules?.siphon ? SIPHON_RAMP
-      : PLAYER_RAMP;
+    const ramp = rock
+      ? ROCK_RAMP
+      : disc
+        ? DISC_RAMP
+        : seeker
+          ? SEEKER_RAMP
+          : flechette
+            ? FLECHETTE_RAMP
+            : armed
+              ? ARMED_RAMP
+              : projectile.hostile
+                ? HOSTILE_RAMP
+                : projectile.modules?.siphon
+                  ? SIPHON_RAMP
+                  : PLAYER_RAMP;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
     // A flechette e MENOR que o bolt de proposito — 60% do corpo. O calibre e
@@ -730,10 +772,7 @@ export class ProjectileView {
       // Deslocamento de ar: nevoa curta na direcao de onde ele veio.
       if (track && (track.dx !== 0 || track.dy !== 0)) {
         for (let i = 2; i >= 1; i--) {
-          const [px, py] = project(
-            ox - track.dx * i * 0.3,
-            oy - track.dy * i * 0.3,
-          );
+          const [px, py] = project(ox - track.dx * i * 0.3, oy - track.dy * i * 0.3);
           ctx.globalAlpha = 0.32 - i * 0.11;
           drawVoxel(ctx, px, py - lift, size * 0.4, ramp);
         }
@@ -782,7 +821,12 @@ export class ProjectileView {
         for (const opposite of [0, Math.PI]) {
           const mx = hx + Math.cos(angle + opposite) * rx * 0.75;
           const my = hy + Math.sin(angle + opposite) * ry * 0.75;
-          ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), Math.max(2, zoom), Math.max(2, zoom));
+          ctx.fillRect(
+            Math.round(mx - 1),
+            Math.round(my - 1),
+            Math.max(2, zoom),
+            Math.max(2, zoom),
+          );
         }
         ctx.fillStyle = ramp[2];
         ctx.fillRect(Math.round(hx - 1), Math.round(hy - 1), Math.max(2, zoom), Math.max(2, zoom));
@@ -811,14 +855,19 @@ export class ProjectileView {
       // massa perdeu no caminho, encolhendo e sumindo.
       if (heading) {
         for (let i = 3; i >= 1; i--) {
-          const [tx, ty] = project(
-            ox - heading.dx * i * 0.26,
-            oy - heading.dy * i * 0.26
-          );
+          const [tx, ty] = project(ox - heading.dx * i * 0.26, oy - heading.dy * i * 0.26);
           ctx.globalAlpha = 0.45 - i * 0.11;
           ctx.fillStyle = HOSTILE_RAMP[1];
           ctx.beginPath();
-          ctx.ellipse(tx, ty - lift, size * (0.5 - i * 0.1), size * (0.4 - i * 0.08), 0, 0, Math.PI * 2);
+          ctx.ellipse(
+            tx,
+            ty - lift,
+            size * (0.5 - i * 0.1),
+            size * (0.4 - i * 0.08),
+            0,
+            0,
+            Math.PI * 2,
+          );
           ctx.fill();
         }
         ctx.globalAlpha = 1;
@@ -836,17 +885,7 @@ export class ProjectileView {
       !projectile.modules.piercing &&
       heading
     ) {
-      drawSiphonSerpent(
-        ctx,
-        project,
-        ox,
-        oy,
-        heading,
-        lift,
-        size,
-        track?.travelled ?? 0,
-        ramp,
-      );
+      drawSiphonSerpent(ctx, project, ox, oy, heading, lift, size, track?.travelled ?? 0, ramp);
       return;
     }
     if (heading) {

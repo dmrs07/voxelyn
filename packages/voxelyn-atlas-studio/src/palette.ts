@@ -26,12 +26,15 @@ export const COLORS: Record<string, [number, number, number]> = {
   amber: [255, 166, 63],
   beam: [255, 233, 184],
   blood: [217, 59, 76],
+  crimson: [168, 42, 60],
+  cobalt: [58, 98, 210],
+  navy: [40, 66, 152],
   electric: [122, 184, 255],
   loot: [255, 209, 102],
   player: [232, 241, 255],
 };
 
-export const PALETTE_NAME = 'veio-fungico.v01';
+export const PALETTE_NAME = 'veio-fungico.v02';
 
 /** Teto de cores POR ATLAS — espelho de MAX_ATLAS_COLORS em tools/validate.mjs. */
 export const MAX_ATLAS_COLORS = 20;

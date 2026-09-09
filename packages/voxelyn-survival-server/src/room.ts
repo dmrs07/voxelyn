@@ -371,6 +371,8 @@ export class GameRoom {
         downed: this.state.playerExtras[i].downed,
         freeze: this.state.playerExtras[i].freeze,
         frostbitten: this.state.playerExtras[i].frostbitten,
+        cocoonUntil: this.state.playerExtras[i].cocoonUntil,
+        webbedUntil: this.state.playerExtras[i].webbedUntil,
         // O RUMO DO CORPO, nao a mira: desde que andar sem mirar gira o
         // Prospector, os dois divergem — e o que o parceiro precisa ver e para
         // onde o corpo olha. A mira continua viajando no viewer (`aimX/aimY`)
@@ -467,6 +469,8 @@ export class GameRoom {
       ability: e.ability,
       freeze: e.freeze,
       frostbitten: e.frostbitten,
+      cocoonUntil: e.cocoonUntil,
+      webbedUntil: e.webbedUntil,
     };
   }
 

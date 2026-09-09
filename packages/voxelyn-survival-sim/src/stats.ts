@@ -67,6 +67,7 @@ export const emptyStats = (): RunStats => ({
     diamandis: 0,
     white_devourer: 0,
     devourer_brood: 0,
+    silk_spiderling: 0,
     archcantor: 0,
     sheet_leviathan: 0,
     lung_matrix: 0,

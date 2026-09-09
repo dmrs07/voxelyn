@@ -1,10 +1,6 @@
 {
-  "guardian": [
-    "enemy-guardian"
-  ],
-  "bishop": [
-    "enemy-bishop"
-  ],
+  "guardian": ["enemy-guardian"],
+  "bishop": ["enemy-bishop"],
   "diamandis": [
     "enemy-diamandis",
     "part-diamandis-drill",
@@ -18,29 +14,15 @@
     "part-white-devourer-coil",
     "part-devourer-brood"
   ],
-  "archcantor": [
-    "enemy-archcantor"
-  ],
+  "archcantor": ["enemy-archcantor"],
   "sheet_leviathan": [
     "enemy-sheet-leviathan",
     "part-sheet-leviathan-wings",
     "part-sheet-leviathan-tail"
   ],
-  "lung_matrix": [
-    "enemy-lung-matrix"
-  ],
-  "furnace_heart": [
-    "enemy-furnace-heart"
-  ],
-  "frost_queen": [
-    "enemy-frost-queen"
-  ],
-  "magnetarch": [
-    "enemy-magnetarch"
-  ],
-  "seamstress": [
-    "enemy-seamstress",
-    "enemy-stitcher",
-    "enemy-seamstress-brood"
-  ]
+  "lung_matrix": ["enemy-lung-matrix"],
+  "furnace_heart": ["enemy-furnace-heart"],
+  "frost_queen": ["enemy-frost-queen"],
+  "magnetarch": ["enemy-magnetarch"],
+  "seamstress": ["enemy-seamstress", "enemy-stitcher", "enemy-seamstress-brood", "enemy-silk-spiderling", "fx-silk-cocoon"]
 }

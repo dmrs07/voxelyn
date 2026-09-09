@@ -24,6 +24,10 @@ export const RAMPS = {
   // cool and dark. Existing palette only, with no new emissive decoration.
   silk: ['chalk', 'bone', 'brass'],
   chitin: ['mist', 'rockLight', 'rockShadow'],
+  // O TRAJE DA CERZIDEIRA: vermelho e azul, como o do Homem-Aranha. So a
+  // rainha usa; Costureiros e crias continuam na seda mineral.
+  spiderRed: ['blood', 'crimson', 'char'],
+  spiderBlue: ['cobalt', 'navy', 'rockShadow'],
   sutureResin: ['bone', 'brass', 'char'],
   rock: ['rockLight', 'rock', 'rockShadow'],
   rockDeep: ['rock', 'rockShadow', 'dark'],
@@ -195,6 +199,10 @@ export const SHADOW_OF = {
   amber: 'fire',
   fire: 'blood',
   blood: 'char',
+  crimson: 'char',
+  // azul saturado
+  cobalt: 'navy',
+  navy: 'rockShadow',
   electric: 'mist',
   dark: 'dark',
 };
@@ -242,6 +250,10 @@ export const LIGHT_OF = {
    */
   fungusLight: 'fungusLight',
   blood: 'blood',
+  crimson: 'blood',
+  // `cobalt` para: o passo seguinte seria `electric`, que e emissivo.
+  cobalt: 'cobalt',
+  navy: 'cobalt',
   loot: 'loot',
   player: 'player',
   acid: 'acid',

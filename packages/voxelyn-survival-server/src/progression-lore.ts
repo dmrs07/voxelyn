@@ -272,6 +272,10 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   stitcher: 'AX-SUT-001',
   seamstress: 'AX-SUT-002',
   seamstress_brood: 'AX-SUT-003',
+  // A ARANHINHA aponta para o documento da Cerzideira, pela mesma razao da
+  // ninhada do Devorador (abaixo): nao e um Ativo, fica fora da contagem de
+  // abates, e um id proprio criaria um documento que ninguem pode abrir.
+  silk_spiderling: 'AX-SUT-002',
   stalker: 'AX-ENG-012',
   spitter: 'AX-ENG-014',
   bomber: 'AX-ENG-016',

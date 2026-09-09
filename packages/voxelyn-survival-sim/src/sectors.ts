@@ -35,6 +35,7 @@ import {
   SOLID_ORE,
   SURF_FUNGAL,
   DEVOURER_BROOD_COUNT,
+  SPIDERLING_COUNT,
   DEVOURER_BROOD_RING,
   DEVOURER_MAW_BITE_RADIUS,
 } from './constants.js';
@@ -355,7 +356,44 @@ export const populateSector = (
       if (bossArchetype === 'white_devourer') spawnDevourerBrood(state, bossSpawn.x, bossSpawn.y);
     }
   }
+  // AS ARANHINHAS moram onde os Costureiros costuram: fauna da ocupacao, nao
+  // do chefe — nascem mesmo com a Cerzideira ja abatida, porque a camara
+  // continua habitada.
+  if (state.occupation === 'stitchers') spawnSpiderlings(state);
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
+};
+
+/**
+ * As aranhinhas nascem EM VOLTA DAS SUTURAS (as casas delas) e, se faltar
+ * sutura, em volta dos pontos de spawn comuns — sempre com o corpo inteiro em
+ * chao aberto, pelo mesmo `circleBlocked` do movimento, e nunca a menos de
+ * oito tiles da entrada, para ninguem nascer pisando numa.
+ */
+const spawnSpiderlings = (state: SurvivalState): void => {
+  const w = state.config.width;
+  const radius = ARCHETYPES.silk_spiderling.radius;
+  const fits = (x: number, y: number): boolean => {
+    const wx = x + 0.5,
+      wy = y + 0.5;
+    if (wx < 2 || wy < 2 || wx >= w - 2 || wy >= state.config.height - 2) return false;
+    if (Math.hypot(wx - state.entry.x, wy - state.entry.y) < 8) return false;
+    return !circleBlocked(state, wx, wy, radius);
+  };
+  const homes = state.sutures.map((s) => suturePoint(state, s.cells[0]));
+  if (homes.length === 0) return;
+  let placed = 0;
+  for (let i = 0; i < SPIDERLING_COUNT * 6 && placed < SPIDERLING_COUNT; i++) {
+    const home = homes[i % homes.length];
+    // Angulo aureo por tentativa: duas aranhinhas da mesma sutura nunca
+    // nascem no mesmo rumo, e o raio cresce devagar.
+    const a = i * 2.39996;
+    const r = 1.5 + (Math.floor(i / homes.length) % 3) * 0.8;
+    const x = home.x + Math.cos(a) * r - 0.5,
+      y = home.y + Math.sin(a) * r - 0.5;
+    if (!fits(x, y)) continue;
+    spawnEnemy(state, 'silk_spiderling', x, y, false);
+    placed++;
+  }
 };
 
 /** O passo da descida pelo raio. Meio tile nao pula celula nenhuma. */

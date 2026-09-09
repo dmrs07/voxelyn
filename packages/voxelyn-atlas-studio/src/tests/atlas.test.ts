@@ -105,7 +105,7 @@ describe('packProject', () => {
   it('manifest carrega paleta, cores usadas ordenadas e metadados', () => {
     const project = makeProject();
     const { manifest } = packProject(project);
-    expect(manifest.palette).toBe('veio-fungico.v01');
+    expect(manifest.palette).toBe('veio-fungico.v02');
     expect(manifest.paletteColors).toEqual([...manifest.paletteColors].sort());
     expect(manifest.paletteColors.length).toBeGreaterThan(0);
     expect(manifest.generation?.tool).toBe('voxelyn-atlas-studio');

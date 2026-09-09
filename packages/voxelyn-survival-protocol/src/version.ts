@@ -242,7 +242,12 @@
 //     Cerzideira) e `Suture.kind` aceita `web`. Um cliente antigo desenharia a
 //     rainha no chao enquanto o servidor a tem fora da tela.
 // 38: support durability and worker repair assignments travel with entity snapshots.
-export const PROTOCOL_VERSION = 38;
+// 39: `EntitySnapshot`/viewer dos players ganham `cocoonUntil` e `webbedUntil`
+//     (a rede da Cerzideira); `ProjectileKind` aceita `net`; `BossAbility`
+//     aceita `net`. Um cliente de 38 desenharia o Prospector solto enquanto o
+//     servidor recusa os comandos dele. `EnemyArchetype` aceita
+//     `silk_spiderling` (a aranhinha da rocha suturada).
+export const PROTOCOL_VERSION = 39;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1039,7 +1044,14 @@ export const PROTOCOL_VERSION = 38;
 //     cada 4,5 s. Replays de 73 com a Cerzideira nao batem.
 // 75: reinforced web supports, persistent destroyed anchors and repair-first workers.
 //     Channel deadlines, support HP and assigned jobs determine future state.
-export const SIMULATION_VERSION = 75;
+// 76: A REDE. Abaixo de 20% a Cerzideira arremessa `net` (oito rumos); quem e
+//     acertado fica 3 s no casulo (imune, parado — `cocoonUntil`) e sai a 10%
+//     por 4 s (`webbedUntil`); os dois no hash. Replays de 75 com a
+//     Cerzideira nao batem. AS ARANHINHAS: dez `silk_spiderling` por setor
+//     com a ocupacao dos Costureiros, em volta das suturas — inofensivas,
+//     fogem ao avistar o Prospector, esmagadas ao pisar; no hash e no
+//     contador de arquetipos.
+export const SIMULATION_VERSION = 76;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1235,7 +1247,18 @@ export const SIMULATION_VERSION = 75;
 //     parado. Um cliente com o atlas antigo em cache cairia no `idle` de
 //     sempre; o bump invalida a precache.
 // 37: tucked flight poses and the Cerzideira brood atlas.
-export const CONTENT_VERSION = 37;
+// 38: o atlas `fx-silk-net` — a rede de seda da Cerzideira, um disco de teia
+//     autorado em oito rumos, tres quadros de giro.
+// 39: o atlas `fx-silk-cocoon` — o casulo da rede sobre o Prospector, sob
+//     demanda no grupo da Cerzideira: fechando, preso, rachando e os fios.
+// 40: a Cerzideira de traje vermelho e azul (paleta mestra ganha `crimson`,
+//     `cobalt` e `navy`; `veio-fungico.v02`) e a rede concava, uma cupula
+//     aberta para o alvo. Um cliente com o atlas antigo em cache mostraria a
+//     rainha de seda mineral. A rocha suturada ganha props de seda no atlas
+//     de props (teias, casulo que se mexe, casa de aranha, ninhada, fios do
+//     teto — nove quadros, nas vagas da ultima linha) e o atlas
+//     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
+export const CONTENT_VERSION = 40;
 
 export type VersionTriple = {
   protocolVersion: number;

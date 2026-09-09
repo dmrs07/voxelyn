@@ -39,6 +39,7 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   stitcher: 'enemy.stitcher',
   seamstress: 'enemy.seamstress',
   seamstress_brood: 'enemy.seamstress_brood',
+  silk_spiderling: 'enemy.silk_spiderling',
   diamandis: 'enemy.diamandis',
   white_devourer: 'enemy.white_devourer',
   devourer_brood: 'enemy.devourer_brood',

@@ -20,7 +20,7 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   numa laje de base que não faz parte do bicho. `🗑z` apaga a camada z inteira;
   a ferramenta `⬚` marca um retângulo na fatia e apaga **naquela camada** ou
   **em todas de uma vez** (ou preenche com o material atual); e `Menu → ✂
-  Camadas` corta da base até a camada escolhida e **assenta o modelo em z=0**,
+Camadas` corta da base até a camada escolhida e **assenta o modelo em z=0**,
   que é o que sobra fazer depois de tirar a base.
 - **Importar GLB (malha + animação)**: `.glb` é o único dos três formatos que o
   Meshy oferece que é **um arquivo só e autocontido** — geometria, esqueleto,
@@ -45,12 +45,12 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   resultado é **espremido nos N materiais mais usados**, com corte por área — sem
   esse teto, uma textura rica escolheria oito materiais, cada um trazendo três
   cores de rampa mais os degraus de oclusão, e o export reprovaria no teto de 20
-  cores *depois* de todo o trabalho. Cada voxel herda o material da superfície
+  cores _depois_ de todo o trabalho. Cada voxel herda o material da superfície
   mais próxima das duas que fecham o vão: só a casca aparece na tela.
 - **Modo pixel**: desenho touch-first frame a frame. 1 dedo desenha, 2 dedos
   fazem pan/pinch. Lápis, borracha, balde, linha, retângulo e conta-gotas;
   pincel de 1–3 px; undo/redo; grade, onion skin e guia da margem de 2 px.
-- **Paleta travada no jogo**: só as 22 cores da `veio-fungico.v01` (espelho de
+- **Paleta travada no jogo**: só as 25 cores da `veio-fungico.v02` (espelho de
   `voxelyn-survival-content/tools/lib.mjs`, com teste de paridade), contador do
   teto de 20 cores por atlas e alpha sempre binário — por construção.
 - **Contrato de animações**: presets com os canvases canônicos (humanoide
@@ -70,7 +70,7 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   exato** de uma entidade que existe — tamanho de frame, âncora, hitbox,
   footprint e a lista de animações com frames/fps/loop, lidos do manifest real.
   Existe porque "Abrir do jogo" devolve um projeto **pixel** (os modelos voxel
-  originais vivem em código e não voltam do PNG), então quem queria *remodelar*
+  originais vivem em código e não voltam do PNG), então quem queria _remodelar_
   precisava reproduzir mais de vinte campos à mão na tela de configurações —
   qualquer um deles trocado invalida o export. A versão sobe em um, e o que sai
   cai como substituição direta do par `PNG + JSON`.
@@ -98,7 +98,7 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   Toda pose passa por uma **cura de adjacência**: par de voxels que era vizinho
   na pose base e ficou separado depois da transformação ganha uma reta ligando
   os dois — é o que impede perna fina de se despedaçar ao girar. `Menu →
-  Partes` mostra a divisão colorida e deixa renomear ou marcar um membro como
+Partes` mostra a divisão colorida e deixa renomear ou marcar um membro como
   corpo quando a geometria enganou o detector.
 - **Rig manual (`Menu → 🦴 Esqueleto`)**: quando a geometria engana o detector —
   membro grudado no corpo por uma área larga, dois membros encostados — quem
@@ -106,7 +106,7 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   numa junta da lista e depois **no próprio modelo** para cravá-la; vale na
   vista 3D (pega o voxel da superfície) e na Fatia. A **simetria** espelha o
   lado B automaticamente, e o botão "chutar juntas" preenche tudo a partir do
-  rig automático para você só corrigir o que saiu torto. O *skinning* é exato:
+  rig automático para você só corrigir o que saiu torto. O _skinning_ é exato:
   em voxel a grade é discreta, então "cada voxel pertence ao osso mais próximo"
   é uma resposta, não uma aproximação com pesos — e empate vai para a
   extremidade, senão o osso da ponta nasceria vazio.

@@ -334,6 +334,11 @@ export const PT_BR = {
   'enemy.frost_wraith': 'Espectro',
   'enemy.sulfur_bomber': 'Bombardeiro',
   'enemy.seamstress_brood': 'Cria da Cerzideira',
+  'enemy.silk_spiderling': 'Aranhinha',
+  'bestiary.name.silk_spiderling': 'Aranhinha',
+  'bestiary.code.silk_spiderling': 'ESPÉCIME SUT-04',
+  'bestiary.note.silk_spiderling':
+    'Inofensiva. Mora em volta das suturas e dispara assim que avista um Prospector; um passo em cima basta para esmagá-la.',
   'bestiary.name.seamstress_brood': 'Cria da Cerzideira',
   'bestiary.code.seamstress_brood': 'ESPÉCIME SUT-03',
   'bestiary.note.seamstress_brood':

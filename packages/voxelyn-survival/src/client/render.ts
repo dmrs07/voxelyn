@@ -11,6 +11,7 @@ import {
   SEAMSTRESS_STAGE_ALOFT,
 } from '@voxelyn/survival-sim';
 import { appendSutureDraws } from './suture-presentation';
+import { cocoonAnimation, drawCocoon } from './web-presentation';
 import { drawSeamstressEyes } from './web-presentation';
 import {
   depthIntensity,
@@ -126,6 +127,7 @@ import {
   deriveAnim,
   type EntityAnimState,
   PropBank,
+  SILK_COCOON_ATLAS,
 } from './sprites';
 import {
   MAW_CLOUDS,
@@ -4404,7 +4406,8 @@ export class SurvivalRenderer {
       if (
         enemy.archetype === 'stitcher' ||
         enemy.archetype === 'seamstress' ||
-        enemy.archetype === 'seamstress_brood'
+        enemy.archetype === 'seamstress_brood' ||
+        enemy.archetype === 'silk_spiderling'
       )
         this.sprites.requestPart(`enemy-${enemy.archetype.replaceAll('_', '-')}`);
       // FORA DA TELA (segunda fase): nem corpo, nem sombra. O que fica dela e
@@ -5378,6 +5381,33 @@ export class SurvivalRenderer {
         (overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0) +
         faultY +
         (pulse?.dy ?? 0) * z;
+      // O CASULO da rede da Cerzideira, e depois os fios: por cima do corpo,
+      // do estado (o parceiro no co-op ve o mesmo casulo pelo snapshot).
+      if (ex.cocoonUntil > state.tick || ex.webbedUntil > state.tick) {
+        // O atlas do casulo e sob demanda (grupo da Cerzideira): pedido aqui,
+        // na primeira rede, e desenhado pelo relogio do estado — o parceiro
+        // do co-op ve o mesmo quadro pelo snapshot. Enquanto nao chega, o
+        // desenho em canvas segura o lugar.
+        this.sprites.requestPart(SILK_COCOON_ATLAS);
+        const { animation, elapsedMs } = cocoonAnimation(state.tick, ex);
+        items.push({
+          depth: pl.x + pl.y + 0.02,
+          draw: () => {
+            const [cx, cy] = toScreen(pl.x, pl.y);
+            if (this.sprites.drawFx(ctx, SILK_COCOON_ATLAS, animation, elapsedMs, cx, cy, z))
+              return;
+            drawCocoon(
+              ctx,
+              cx,
+              cy - 18 * z,
+              pl.radius * TILE_W * 0.9 * z,
+              z,
+              nowMs,
+              ex.cocoonUntil > state.tick,
+            );
+          },
+        });
+      }
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
@@ -5819,6 +5849,43 @@ export class SurvivalRenderer {
           // para o voxel de runtime resolver, e este ocupa uma coluna inteira
           // de chao. Sem atlas ele cai no ramo generico e vira um ponto, que e
           // exatamente o que um perigo do tamanho dele nao pode ser.
+          // A REDE DE SEDA: um disco de teia autorado em oito rumos, girando no
+          // voo. Sem atlas ainda, um anel de seda do tamanho certo.
+          if (proj.kind === 'net') {
+            const [nsx, nsy] = toScreen(proj.x, proj.y);
+            drawGroundShadow(ctx, nsx, nsy, 5 * z);
+            // O rumo vem do DESLOCAMENTO observado: online o snapshot nao traz
+            // velocidade, e a rede ficaria sempre no mesmo quadro. A velocidade
+            // so semeia o primeiro quadro, quando o disco ainda nao andou.
+            const speed = Math.hypot(proj.vx, proj.vy) || 1;
+            const heading = this.projectileView.heading(proj.id) ?? {
+              dx: proj.vx / speed,
+              dy: proj.vy / speed,
+            };
+            if (
+              !this.sprites.drawFx(
+                ctx,
+                'fx-silk-net',
+                'fly',
+                nowMs,
+                nsx,
+                nsy,
+                z,
+                undefined,
+                heading.dx,
+                heading.dy,
+              )
+            ) {
+              ctx.save();
+              ctx.strokeStyle = '#e6dccb';
+              ctx.lineWidth = Math.max(1, z);
+              ctx.beginPath();
+              ctx.ellipse(nsx, nsy - 8 * z, 6 * z, 7 * z, 0, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+            return;
+          }
           if (proj.kind === 'cyclone') {
             const [csx, csy] = toScreen(proj.x, proj.y);
             drawGroundShadow(ctx, csx, csy, 6 * z);

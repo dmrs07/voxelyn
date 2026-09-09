@@ -49,6 +49,12 @@ export type RunConfig = {
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
 export type EnemyArchetype =
   | 'seamstress_brood'
+  /**
+   * A ARANHINHA da rocha suturada: fauna inofensiva. Nao ataca, nao pode
+   * (dano de contato zero), e foge ao AVISTAR o Prospector — e esmagada se
+   * ele passar por cima. So nasce em setores com a ocupacao dos Costureiros.
+   */
+  | 'silk_spiderling'
   | 'stitcher'
   | 'seamstress'
   | 'stalker'
@@ -1008,8 +1014,9 @@ export type BossRuntime = {
  * ameaca ("o chao onde voce esta"), entao sao um.
  */
 export type BossAbility =
-  // Cerzideira: fechar uma sutura e puxar o corpo por ela.
+  // Cerzideira: fechar uma sutura, puxar o corpo por ela e arremessar a rede.
   | 'stitch'
+  | 'net'
   // Guardiao: pedra e massa.
   | 'salvo'
   | 'slam'
@@ -1348,6 +1355,13 @@ export type PlayerExtra = {
   channelingUntil: number;
   dodgeUntil: number;
   iframesUntil: number;
+  /**
+   * ENCAPSULADO pela rede da Cerzideira ate este tick: nao anda, nao atira,
+   * nao esquiva — e nao leva dano (o casulo e imune). Depois vem `webbedUntil`.
+   */
+  cocoonUntil: number;
+  /** Saiu do casulo cheio de fios: anda a 10% ate este tick. */
+  webbedUntil: number;
   dodgeCooldownUntil: number;
   abilityCooldownUntil: number;
   purgeCells: number;
@@ -1450,6 +1464,12 @@ export type ProjectileKind =
    * balas" num calibre que quase nao ocupa pixel.
    */
   | 'flechette'
+  /**
+   * A REDE DE SEDA da Cerzideira (abaixo de 20% de vida): um disco de teia
+   * arremessado num dos oito rumos autorados. Nao fere: ENCAPSULA quem
+   * acerta (ver `PlayerExtra.cocoonUntil`). Some no impacto e na parede.
+   */
+  | 'net'
   /**
    * CICLONE DE FOGO: a instabilidade do Coracao da Fornalha andando pela sala.
    *
@@ -1702,6 +1722,8 @@ export type SemanticEvent =
    * mao nao o carregam); a interoperabilidade real e garantida pelo handshake.
    */
   | { t: 'hit'; x: number; y: number; amount: number; target: number; hazard?: true }
+  /** A rede da Cerzideira fechou sobre um Prospector: o casulo dura ate `until`. */
+  | { t: 'cocoon'; entity: number; x: number; y: number; until: number }
   | {
       t: 'death';
       x: number;

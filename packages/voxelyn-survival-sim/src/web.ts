@@ -39,6 +39,8 @@ export const WEB_STRAND_LENGTH = 4;
  */
 export const WEB_ARMOR_THRESHOLD = 0.6;
 export const WEB_ARMOR = 0.4;
+/** Saindo do casulo, cheio de fios: 10% do passo. */
+export const WEB_COCOON_SLOW = 0.1;
 
 export const isWebStrand = (s: SutureRecipe): boolean => s.kind === 'web';
 
