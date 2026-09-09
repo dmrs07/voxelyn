@@ -4406,7 +4406,8 @@ export class SurvivalRenderer {
       if (
         enemy.archetype === 'stitcher' ||
         enemy.archetype === 'seamstress' ||
-        enemy.archetype === 'seamstress_brood'
+        enemy.archetype === 'seamstress_brood' ||
+        enemy.archetype === 'silk_spiderling'
       )
         this.sprites.requestPart(`enemy-${enemy.archetype.replaceAll('_', '-')}`);
       // FORA DA TELA (segunda fase): nem corpo, nem sombra. O que fica dela e

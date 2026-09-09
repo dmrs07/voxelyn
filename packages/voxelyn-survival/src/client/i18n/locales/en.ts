@@ -326,6 +326,11 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.frost_queen': 'Frost Queen',
   'enemy.magnetarch': 'Magnetarch',
   'enemy.seamstress_brood': 'Darner Brood',
+  'enemy.silk_spiderling': 'Spiderling',
+  'bestiary.name.silk_spiderling': 'Spiderling',
+  'bestiary.code.silk_spiderling': 'SPECIMEN SUT-04',
+  'bestiary.note.silk_spiderling':
+    'Harmless. Lives around the sutures and bolts the moment it sees a Prospector; one step is enough to crush it.',
   'bestiary.name.seamstress_brood': 'Darner Brood',
   'bestiary.code.seamstress_brood': 'SPECIMEN SUT-03',
   'bestiary.note.seamstress_brood':

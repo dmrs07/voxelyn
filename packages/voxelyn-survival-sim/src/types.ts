@@ -49,6 +49,12 @@ export type RunConfig = {
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
 export type EnemyArchetype =
   | 'seamstress_brood'
+  /**
+   * A ARANHINHA da rocha suturada: fauna inofensiva. Nao ataca, nao pode
+   * (dano de contato zero), e foge ao AVISTAR o Prospector — e esmagada se
+   * ele passar por cima. So nasce em setores com a ocupacao dos Costureiros.
+   */
+  | 'silk_spiderling'
   | 'stitcher'
   | 'seamstress'
   | 'stalker'

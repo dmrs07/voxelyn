@@ -77,20 +77,47 @@ const VOLUMETRIC = [
   // ESTADO. :0 = canario vivo, :1 = canario morto; o cliente escolhe o frame
   // pela contaminacao autoritativa (CANARY_DEAD_AT), nao por sorteio.
   'canary_cage',
+  // A ROCHA SUTURADA: o que a Cerzideira e os Costureiros deixam pela camara.
+  // Teias de canto e de chao, um casulo que ainda se mexe (o unico decor
+  // ANIMADO: tres quadros de espasmo), a casa de aranha em domo com a boca
+  // escura, a ninhada de ovos e os fios pendurados do teto.
+  //
+  // NOVE QUADROS AO TODO, e nao mais: o atlas de props tinha nove vagas na
+  // ultima linha, e uma linha nova custa 2,2 MiB de RGBA no boot (todo quadro
+  // paga o canvas dos monumentos), que o orcamento nao tem. So a teia de chao
+  // tem duas variantes — e a que mais se repete; o resto tem uma, e o
+  // anti-carimbo fica por conta da colocacao.
+  { name: 'web_corner', variants: 1 },
+  'web_sheet',
+  { name: 'web_hang', variants: 1 },
+  { name: 'cocoon_twitch', frames: 3, frameMs: 180, variants: 1 },
+  { name: 'spider_nest', variants: 1 },
+  { name: 'egg_cluster', variants: 1 },
 ];
 
-/** Kinds no formato do atlas de props: um frame estatico por variante. */
-export const DECOR_PROP_KINDS = VOLUMETRIC.flatMap((kind) =>
-  Array.from({ length: DECOR_VARIANTS }, (_, v) => ({
+/**
+ * Kinds no formato do atlas de props: um frame por variante, ou os quadros
+ * que o kind declarar (o casulo que se mexe). Um kind animado paga
+ * `frames x variantes` quadros; e por isso que so ele e animado.
+ */
+export const DECOR_PROP_KINDS = VOLUMETRIC.flatMap((entry) => {
+  const kind = typeof entry === 'string' ? entry : entry.name;
+  const frames = typeof entry === 'string' ? 1 : (entry.frames ?? 1);
+  const frameMs = typeof entry === 'string' ? 0 : (entry.frameMs ?? 0);
+  const variants = typeof entry === 'string' ? DECOR_VARIANTS : (entry.variants ?? DECOR_VARIANTS);
+  return Array.from({ length: variants }, (_, v) => ({
     name: `decor:${kind}:${v}`,
-    frames: 1,
-    frameMs: 0,
-  })),
-);
+    frames,
+    frameMs,
+  }));
+});
 
 const hash3 = (x, y, z, seed) => {
   let h =
-    Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 2246822519);
+    Math.imul(x, 374761393) ^
+    Math.imul(y, 668265263) ^
+    Math.imul(z, 2147483647) ^
+    Math.imul(seed, 2246822519);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return (h ^ (h >>> 16)) >>> 0;
 };
@@ -107,7 +134,10 @@ const SPECKLE = {
   rock: [['rockDeep', 5]],
   rockDeep: [['rock', 6]],
   bone: [['rust', 7]],
-  rust: [['rockDeep', 6], ['bone', 11]],
+  rust: [
+    ['rockDeep', 6],
+    ['bone', 11],
+  ],
   ice: [['rock', 9]],
   fungus: [['fungusDeep', 5]],
   fungusDeep: [['fungus', 7]],
@@ -165,6 +195,16 @@ const slab = (boxes, cx, cy, r, z, h, mat) => {
 };
 
 /** Cone centrado em (0,0): camadas chanfradas encolhendo. */
+/** Um FIO DE SEDA: cubinhos de meio voxel entre dois pontos. */
+const thread = (boxes, a, b, mat = 'silk') => {
+  const n = Math.max(1, Math.ceil(Math.max(...a.map((p, i) => Math.abs(p - b[i]))) * 2));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const at = a.map((p, k) => Math.round((p + (b[k] - p) * t) * 2) / 2);
+    boxes.push(box(at[0], at[1], at[2], 0.5, 0.5, 0.5, mat));
+  }
+};
+
 const cone = (boxes, steps, cx = 0, cy = 0) => {
   let z = 0;
   for (const [r, h, mat] of steps) {
@@ -174,7 +214,7 @@ const cone = (boxes, steps, cx = 0, cy = 0) => {
   return z;
 };
 
-const modelOf = (kind, v) => {
+const modelOf = (kind, v, frame = 0) => {
   const s = v === 0 ? 1 : -1; // espelho por variante
   const boxes = [];
 
@@ -197,7 +237,15 @@ const modelOf = (kind, v) => {
         [1, 3, 'bone'],
         [0, 3 + v, 'bone'],
       ]);
-      cone(boxes, [[1, 2, 'bone'], [0, 2, 'bone']], s * 4, 2); // broto
+      cone(
+        boxes,
+        [
+          [1, 2, 'bone'],
+          [0, 2, 'bone'],
+        ],
+        s * 4,
+        2,
+      ); // broto
       break;
     }
     case 'flow_curtain': {
@@ -241,7 +289,15 @@ const modelOf = (kind, v) => {
         [1, 4, 'ice'],
         [0, 4 + v, 'ice'],
       ]);
-      cone(boxes, [[1, 3, 'ice'], [0, 3, 'ice']], s * 4, s * 2); // agulha filha
+      cone(
+        boxes,
+        [
+          [1, 3, 'ice'],
+          [0, 3, 'ice'],
+        ],
+        s * 4,
+        s * 2,
+      ); // agulha filha
       break;
     }
     case 'crate': {
@@ -297,6 +353,173 @@ const modelOf = (kind, v) => {
     }
 
     // ------------------------------------------------------------------
+    // ROCHA SUTURADA: seda. Fios sao caixas de meio voxel (a seda nao tem
+    // regra de textura, entao passam inteiras); so o que e macico usa osso.
+    // ------------------------------------------------------------------
+    case 'web_corner': {
+      // A TEIA DE CANTO: um leque de fios de um no alto na parede ate uma
+      // linha no chao, com duas cordas cruzando o leque. A variante espelha o
+      // lado e muda o numero de fios, para duas teias vizinhas nao rimarem.
+      const top = [s * 0.5, -s * 0.5, 10 + v];
+      const spokes = 6 + v;
+      const foot = (t) => [s * (-4.5 + 8 * t), -s * (-4.5 + 8 * t) + (t - 0.5) * 2 * s, 0];
+      boxes.push(box(top[0] - 0.5, top[1] - 0.5, top[2] - 0.5, 1, 1, 1, 'sutureResin'));
+      for (let k = 0; k < spokes; k++) thread(boxes, top, foot(k / (spokes - 1)), 'silk');
+      for (const h of [0.35, 0.65]) {
+        let prev = null;
+        for (let k = 0; k < spokes; k++) {
+          const f = foot(k / (spokes - 1));
+          const at = f.map((c, i) => top[i] + (c - top[i]) * h);
+          // A corda cede um pouco entre um fio e outro.
+          at[2] -= 0.5;
+          if (prev) thread(boxes, prev, at, 'silt');
+          prev = at;
+        }
+      }
+      // Poeira presa: pontos de silte pelo leque.
+      for (let k = 0; k < 5; k++)
+        boxes.push(box(s * (k - 2), -s * (k - 2) + 0.5, 3 + k * 1.3, 0.5, 0.5, 0.5, 'silt'));
+      break;
+    }
+    case 'web_sheet': {
+      // A TEIA DE CHAO: um funil. Aneis concentricos rentes ao chao, oito
+      // raios, e a boca escura no centro com a borda levantada — e para dentro
+      // dela que a coisa que mora ali some quando alguem chega.
+      const R = 3.5 + v * 0.5;
+      const ringPoint = (a, r) => [
+        Math.cos(a) * r,
+        Math.sin(a) * r * 0.85,
+        0.5 + (1 - r / R) * 0.5,
+      ];
+      for (const r of [R, R * 0.68, R * 0.38]) {
+        let prev = null;
+        for (let k = 0; k <= 16; k++) {
+          const at = ringPoint((k / 16) * Math.PI * 2 + v * 0.2, r);
+          if (prev) thread(boxes, prev, at, k % 3 === 0 ? 'silt' : 'silk');
+          prev = at;
+        }
+      }
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + 0.3 + v * 0.2;
+        thread(boxes, ringPoint(a, R), ringPoint(a, 1.2), 'silk');
+      }
+      // O funil: borda de seda e o fundo escuro.
+      slab(boxes, 0, 0, 1.5, 0.5, 1, 'silk');
+      boxes.push(box(-1, -1, 0.5, 2, 2, 1, 'scorch'));
+      break;
+    }
+    case 'web_hang': {
+      // OS FIOS DO TETO: pendem de alturas diferentes; num deles, um casulo
+      // pequeno enrolado, e um no de resina onde o fio se prende.
+      const hangs = [
+        [-2 * s, 1, 14, 6],
+        [1.5 * s, -1.5, 14, 9],
+        [0, 2.5, 14, 4 + v],
+      ];
+      for (const [x, y, z0, len] of hangs) {
+        thread(boxes, [x, y, z0], [x + 0.3 * s, y, z0 - len], 'silk');
+        boxes.push(box(x - 0.5, y - 0.5, z0 - 0.5, 1, 1, 1, 'sutureResin'));
+      }
+      // O casulinho no fio mais comprido: um ovo de seda com duas voltas.
+      const cx = hangs[1][0] + 0.3 * s,
+        cy = hangs[1][1],
+        cz = hangs[1][2] - hangs[1][3];
+      boxes.push(box(cx - 1, cy - 1, cz - 3, 2, 2, 3, 'silk'));
+      boxes.push(box(cx - 1.5, cy - 1.5, cz - 2, 3, 3, 0.5, 'silt'));
+      boxes.push(box(cx - 1.5, cy - 1.5, cz - 0.5, 3, 3, 0.5, 'silt'));
+      break;
+    }
+    case 'cocoon_twitch': {
+      // O CASULO QUE SE MEXE: pendurado por um fio curto na parede, com
+      // faixas de osso. Quatro quadros: balanca para um lado, estufa (algo
+      // empurra de dentro, uma bossa escura na costura), volta, descansa.
+      const sway = [0, 0.5, -0.5][frame] * s;
+      const bulge = frame === 1;
+      const top = [s * 0.5, -s * 0.5, 11];
+      boxes.push(box(top[0] - 0.5, top[1] - 0.5, top[2] - 0.5, 1, 1, 1, 'sutureResin'));
+      thread(boxes, top, [top[0] + sway, top[1], 8.5], 'silk');
+      const cx = top[0] + sway,
+        cy = top[1];
+      // O ovo: tres camadas de seda, a do meio mais larga.
+      boxes.push(box(cx - 1, cy - 1, 2, 2, 2, 1.5, 'silk'));
+      boxes.push(box(cx - 1.5, cy - 1.5, 3.5, 3, 3, 3, 'silk'));
+      boxes.push(box(cx - 1, cy - 1, 6.5, 2, 2, 2, 'silk'));
+      // As faixas de osso em volta, e a bossa escura quando ele estufa.
+      boxes.push(box(cx - 1.5, cy - 1.5, 4.5, 3, 3, 0.5, 'bone'));
+      boxes.push(box(cx - 1.5, cy - 1.5, 6, 3, 3, 0.5, 'bone'));
+      if (bulge) {
+        const bx = cx + (v ? -2 : 1.5);
+        boxes.push(box(bx, cy + 1.5, 4, 0.5, 0.5, 1.5, 'scorch'));
+        boxes.push(box(bx, cy + 1.5, 3.5, 0.5, 0.5, 0.5, 'silt'));
+      }
+      // Fios soltos ate o chao, balancando com o corpo.
+      thread(boxes, [cx - 1, cy + 1, 2], [cx - 2 + sway, cy + 2, 0], 'silk');
+      thread(boxes, [cx + 1, cy - 1, 2.5], [cx + 2.5 + sway, cy - 1.5, 0], 'silk');
+      break;
+    }
+    case 'spider_nest': {
+      // A CASA DE ARANHA: um domo de seda encostado na parede, com a boca
+      // escura virada para a camera, fios de sustentacao ate o chao e ovos
+      // encostados na base. A variante muda o tamanho e o lado da boca.
+      const R = 3 + v * 0.5;
+      // Camadas REDONDAS (uma caixa por voxel dentro do circulo), e nao os
+      // degraus quadrados de `slab`: e o que faz ler como domo e nao caixote.
+      for (let z = 0; z < R; z += 0.5) {
+        const r = Math.sqrt(Math.max(0, R * R - z * z));
+        for (let y = -Math.ceil(r); y <= Math.ceil(r); y += 0.5)
+          for (let x = -Math.ceil(r); x <= Math.ceil(r); x += 0.5) {
+            const d = Math.hypot(x, y);
+            if (d > r || d < r - 0.75) continue;
+            // A boca: um vao na frente (x+y grande, para a camera), na base.
+            if (z < 2 && x + y > r * 0.9 && Math.abs(x - y) < 1.6 + (v ? 0.5 : 0)) continue;
+            boxes.push(box(x, y, z, 0.5, 0.5, 0.5, z % 1 === 0 ? 'silk' : 'silt'));
+          }
+      }
+      // O escuro atras da boca.
+      boxes.push(box(R * 0.35 - 0.5, R * 0.35 - 0.5, 0, 1.5, 1.5, 1.5, 'scorch'));
+      // Estais do domo ate o chao e ate a parede.
+      thread(boxes, [-s * R * 0.7, -R * 0.7, R * 0.6], [-s * (R + 2.5), -R - 1.5, 0], 'silk');
+      thread(boxes, [s * R * 0.7, -R * 0.7, R * 0.6], [s * (R + 2), -R - 2, 0], 'silk');
+      thread(boxes, [0, 0, R], [-s * 1.5, -1.5, R + 3.5], 'silk');
+      boxes.push(box(-s * 1.5 - 0.25, -1.75, R + 3.25, 0.5, 0.5, 0.5, 'sutureResin'));
+      // Ovos na base, do lado da boca.
+      for (let k = 0; k < 3; k++) {
+        const ex = s * (R - 0.5 - k * 0.9),
+          ey = -R + 0.5 + k * 0.7;
+        boxes.push(box(ex, ey, 0, 1, 1, 1.5, 'silk'));
+      }
+      break;
+    }
+    case 'egg_cluster': {
+      // A NINHADA: seis ovos de seda juntos por fios, um deles ja aberto (o
+      // fundo escuro aparece pela racha). A variante muda a arrumacao.
+      const eggs = [
+        [0, 0],
+        [1.5, 0.5],
+        [-1.5, 0.8],
+        [0.4, 1.8],
+        [-0.6, -1.4],
+        [1.6, -1.2],
+      ];
+      eggs.forEach(([x, y], k) => {
+        const ex = x * s + (v ? 0.3 : 0),
+          ey = y + (v && k % 2 ? 0.4 : 0);
+        const h = 1.5 + (k % 3) * 0.25;
+        boxes.push(box(ex - 0.5, ey - 0.5, 0, 1, 1, h, 'silk'));
+        boxes.push(box(ex - 0.25, ey - 0.25, h, 0.5, 0.5, 0.5, 'silt'));
+        if (k === 3 + v) {
+          // O ovo aberto: a tampa fora e o fundo escuro.
+          boxes.push(box(ex - 0.25, ey - 0.25, h - 0.5, 0.5, 0.5, 0.5, 'scorch'));
+          boxes.push(box(ex + 0.75, ey - 0.75, 0, 0.5, 0.5, 0.5, 'silt'));
+        }
+      });
+      // Os fios que prendem a ninhada ao chao.
+      thread(boxes, [0, 0, 1.5], [-3 * s, 2, 0], 'silk');
+      thread(boxes, [1.5 * s, 0.5, 1.5], [3.5 * s, -1.5, 0], 'silk');
+      break;
+    }
+
+    // ------------------------------------------------------------------
     // LANDMARKS: os monumentos. Mais altos que qualquer parede, mais baixos
     // que o Nucleo — pontuacao do salao, nunca competindo com o objetivo.
     // ------------------------------------------------------------------
@@ -322,8 +545,24 @@ const modelOf = (kind, v) => {
         z += 3;
       }
       slab(boxes, 0, 0, 0, z, 2, 'ice'); // a ponta
-      cone(boxes, [[1, 4, 'ice'], [0, 3, 'ice']], s * 6, s); // lasca satelite
-      cone(boxes, [[1, 3, 'ice'], [0, 2 + v, 'ice']], -s * 5, s * 3);
+      cone(
+        boxes,
+        [
+          [1, 4, 'ice'],
+          [0, 3, 'ice'],
+        ],
+        s * 6,
+        s,
+      ); // lasca satelite
+      cone(
+        boxes,
+        [
+          [1, 3, 'ice'],
+          [0, 2 + v, 'ice'],
+        ],
+        -s * 5,
+        s * 3,
+      );
       break;
     }
     case 'stalagnate': {
@@ -337,7 +576,15 @@ const modelOf = (kind, v) => {
         [2, 4, 'bone'],
         [1, 3 + v, 'bone'],
       ]);
-      cone(boxes, [[1, 3, 'bone'], [0, 2, 'bone']], s * 5, s * 2); // filha
+      cone(
+        boxes,
+        [
+          [1, 3, 'bone'],
+          [0, 2, 'bone'],
+        ],
+        s * 5,
+        s * 2,
+      ); // filha
       break;
     }
     case 'strata_arch': {
@@ -384,7 +631,15 @@ const modelOf = (kind, v) => {
       slab(boxes, 0, 0, 2, 11, 7, 'ice');
       slab(boxes, 0, 0, 1, 18, 5, 'ice');
       slab(boxes, 0, 0, 0, 23, 2 + v, 'ice');
-      cone(boxes, [[1, 4, 'ice'], [0, 3, 'ice']], s * 5, s * 3); // agulha filha
+      cone(
+        boxes,
+        [
+          [1, 4, 'ice'],
+          [0, 3, 'ice'],
+        ],
+        s * 5,
+        s * 3,
+      ); // agulha filha
       break;
     }
     case 'magnet_core': {
@@ -402,7 +657,12 @@ const modelOf = (kind, v) => {
       // A broca-mae, parada onde parou: plataforma, mastro, colar e a ponta
       // de osso apontando para o veio. Maquina morta — sem luz de painel.
       slab(boxes, 0, 0, 6, 0, 3, 'rockDeep');
-      for (const [lx, ly] of [[-6, -6], [5, -6], [-6, 5], [5, 5]]) {
+      for (const [lx, ly] of [
+        [-6, -6],
+        [5, -6],
+        [-6, 5],
+        [5, 5],
+      ]) {
         boxes.push(box(lx, ly, 3, 2, 2, 5, 'rust'));
       }
       boxes.push(box(-2, -2, 3, 4, 4, 17, 'rust')); // mastro
@@ -479,13 +739,29 @@ const modelOf = (kind, v) => {
       break;
     }
     case 'sulfur_mound': {
-      cone(boxes, [[3, 1, 'bone'], [2, 1, 'rust'], [1, 1 + v, 'bone']]);
-      cone(boxes, [[1, 1, 'rust'], [0, 1, 'bone']], s * 4, s);
+      cone(boxes, [
+        [3, 1, 'bone'],
+        [2, 1, 'rust'],
+        [1, 1 + v, 'bone'],
+      ]);
+      cone(
+        boxes,
+        [
+          [1, 1, 'rust'],
+          [0, 1, 'bone'],
+        ],
+        s * 4,
+        s,
+      );
       break;
     }
     case 'cinder_pile': {
       // Cinza assentada: montinho escuro com nucleos que ja foram brasa.
-      cone(boxes, [[3, 1, 'rockDeep'], [2, 1, 'rockDeep'], [1, 1, 'rock']]);
+      cone(boxes, [
+        [3, 1, 'rockDeep'],
+        [2, 1, 'rockDeep'],
+        [1, 1, 'rock'],
+      ]);
       boxes.push(box(s * 3, -2, 0, 2, 2, 1 + v, 'rockDeep'));
       boxes.push(box(-s * 2, 2, 0, 2, 2, 1, 'rock'));
       break;
@@ -517,21 +793,70 @@ const modelOf = (kind, v) => {
     // para cima. O cliente desenha erguido e translucido.
     // ------------------------------------------------------------------
     case 'hanging_spur': {
-      cone(boxes, [[0, 3, 'rockDeep'], [1, 4, 'rock'], [2, 4, 'rockDeep']]);
-      cone(boxes, [[0, 2, 'rock'], [1, 3 + v, 'rockDeep']], s * 4, s);
+      cone(boxes, [
+        [0, 3, 'rockDeep'],
+        [1, 4, 'rock'],
+        [2, 4, 'rockDeep'],
+      ]);
+      cone(
+        boxes,
+        [
+          [0, 2, 'rock'],
+          [1, 3 + v, 'rockDeep'],
+        ],
+        s * 4,
+        s,
+      );
       break;
     }
     case 'crystal_chandelier': {
       // Lustre frio: agulhas invertidas em leque, presas num miolo comum.
-      cone(boxes, [[0, 4, 'ice'], [1, 4, 'ice']], 0, 0);
-      cone(boxes, [[0, 3, 'ice'], [1, 2, 'ice']], -4, s);
-      cone(boxes, [[0, 3 + v, 'ice'], [1, 2, 'ice']], 4, -s);
+      cone(
+        boxes,
+        [
+          [0, 4, 'ice'],
+          [1, 4, 'ice'],
+        ],
+        0,
+        0,
+      );
+      cone(
+        boxes,
+        [
+          [0, 3, 'ice'],
+          [1, 2, 'ice'],
+        ],
+        -4,
+        s,
+      );
+      cone(
+        boxes,
+        [
+          [0, 3 + v, 'ice'],
+          [1, 2, 'ice'],
+        ],
+        4,
+        -s,
+      );
       boxes.push(box(-5, -1, 7, 11, 3, 2, 'rock')); // o miolo na rocha
       break;
     }
     case 'stalactite': {
-      cone(boxes, [[0, 3, 'bone'], [1, 4, 'bone'], [2, 4, 'bone'], [3, 3 + v, 'bone']]);
-      cone(boxes, [[0, 2, 'bone'], [1, 3, 'bone']], s * 5, s * 2);
+      cone(boxes, [
+        [0, 3, 'bone'],
+        [1, 4, 'bone'],
+        [2, 4, 'bone'],
+        [3, 3 + v, 'bone'],
+      ]);
+      cone(
+        boxes,
+        [
+          [0, 2, 'bone'],
+          [1, 3, 'bone'],
+        ],
+        s * 5,
+        s * 2,
+      );
       break;
     }
     case 'hanging_slab': {
@@ -545,19 +870,40 @@ const modelOf = (kind, v) => {
     case 'sulfur_drip': {
       // Escorrimento mineral APAGADO: crosta terrosa gotejando — sem verde
       // de gas, sem particula.
-      cone(boxes, [[0, 2, 'rust'], [1, 3, 'bone'], [2, 3, 'rust'], [3, 2 + v, 'bone']]);
+      cone(boxes, [
+        [0, 2, 'rust'],
+        [1, 3, 'bone'],
+        [2, 3, 'rust'],
+        [3, 2 + v, 'bone'],
+      ]);
       cone(boxes, [[0, 3, 'bone']], s * 3, s);
       cone(boxes, [[0, 2, 'rust']], -s * 3, -s);
       break;
     }
     case 'soot_fang': {
-      cone(boxes, [[0, 3, 'rockDeep'], [1, 4, 'rockDeep'], [2, 3 + v, 'rock']]);
+      cone(boxes, [
+        [0, 3, 'rockDeep'],
+        [1, 4, 'rockDeep'],
+        [2, 3 + v, 'rock'],
+      ]);
       boxes.push(box(s * 2, 0, 8 + v, 2, 2, 1, 'scorch')); // fuligem na raiz
       break;
     }
     case 'icicle': {
-      cone(boxes, [[0, 4, 'ice'], [1, 4, 'ice'], [2, 3, 'ice']]);
-      cone(boxes, [[0, 3, 'ice'], [1, 2, 'ice']], s * 4, s);
+      cone(boxes, [
+        [0, 4, 'ice'],
+        [1, 4, 'ice'],
+        [2, 3, 'ice'],
+      ]);
+      cone(
+        boxes,
+        [
+          [0, 3, 'ice'],
+          [1, 2, 'ice'],
+        ],
+        s * 4,
+        s,
+      );
       cone(boxes, [[0, 2 + v, 'ice']], -s * 3, s * 2);
       break;
     }
@@ -567,7 +913,12 @@ const modelOf = (kind, v) => {
       // (um passaro engaiolado nao le como coletavel). v=1: o poleiro vazio
       // e o passaro caido na bandeja, sem um voxel de cor viva.
       boxes.push(box(-2, -2, 0, 5, 5, 1, 'rockDeep')); // bandeja
-      for (const [bx, by] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+      for (const [bx, by] of [
+        [-2, -2],
+        [2, -2],
+        [-2, 2],
+        [2, 2],
+      ]) {
         boxes.push(box(bx, by, 1, 1, 1, 6, 'rust')); // barras
       }
       slab(boxes, 0, 0, 2, 7, 1, 'rust'); // tampa
@@ -587,10 +938,10 @@ const modelOf = (kind, v) => {
 };
 
 /** Modelo pelo NOME de atlas (`decor:<kind>:<variante>`), ja texturizado. */
-export const decorPropModel = (name) => {
+export const decorPropModel = (name, frame = 0) => {
   const [, kind, v] = name.split(':');
   // Seed por (kind, variante): a malha da variante 1 nao repete a da 0.
   let seed = 0x811c9dc5 ^ Number(v);
   for (let i = 0; i < kind.length; i++) seed = Math.imul(seed ^ kind.charCodeAt(i), 0x01000193);
-  return texture(modelOf(kind, Number(v)), seed >>> 0);
+  return texture(modelOf(kind, Number(v), frame), seed >>> 0);
 };

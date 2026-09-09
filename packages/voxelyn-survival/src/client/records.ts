@@ -371,7 +371,7 @@ export const hasDiscovery = (records: Records, bit: number): boolean =>
  * A lista e explicita e testada nos dois sentidos: nada entra no painel sem
  * texto, e nada sai do painel sem estar declarado aqui.
  */
-export const CODEX_EXCLUDED: readonly EnemyArchetype[] = ['devourer_brood'];
+export const CODEX_EXCLUDED: readonly EnemyArchetype[] = ['devourer_brood', 'silk_spiderling'];
 
 /**
  * A ordem do painel — e a lista do que o Codex chega a MOSTRAR.
@@ -426,6 +426,7 @@ export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
   stitcher: 'bestiary.name.stitcher',
   seamstress: 'bestiary.name.seamstress',
   seamstress_brood: 'bestiary.name.seamstress_brood',
+  silk_spiderling: 'bestiary.name.silk_spiderling',
   diamandis: 'bestiary.name.diamandis',
   white_devourer: 'bestiary.name.white_devourer',
   devourer_brood: 'bestiary.name.devourer_brood',
@@ -478,6 +479,10 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
   seamstress_brood: {
     code: 'bestiary.code.seamstress_brood',
     note: 'bestiary.note.seamstress_brood',
+  },
+  silk_spiderling: {
+    code: 'bestiary.code.silk_spiderling',
+    note: 'bestiary.note.silk_spiderling',
   },
   undertaker: { code: 'bestiary.code.undertaker', note: 'bestiary.note.undertaker' },
   diamandis: { code: 'bestiary.code.diamandis', note: 'bestiary.note.diamandis' },

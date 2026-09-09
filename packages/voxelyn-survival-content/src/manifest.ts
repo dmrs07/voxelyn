@@ -226,6 +226,7 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-stitcher',
   'enemy-seamstress',
   'enemy-seamstress-brood',
+  'enemy-silk-spiderling',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [

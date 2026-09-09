@@ -3542,6 +3542,8 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'stitcher',
   'seamstress',
   'seamstress_brood',
+  // A aranhinha, no fim pela mesma regra.
+  'silk_spiderling',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */

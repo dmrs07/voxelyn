@@ -10,30 +10,84 @@ import { decorAtlasName } from '../client/decor-draw';
 import type { DecorativeProp, PropKind } from '../client/decor';
 
 const VOLUMETRIC: PropKind[] = [
-  'fallen_column', 'stalagmite', 'flow_curtain', 'fumarole_cone', 'slag_block',
-  'ice_spike', 'crate', 'strut', 'insulator', 'duct', 'mushroom',
-  'monolith', 'great_prism', 'stalagnate', 'strata_arch', 'great_fumarole',
-  'slag_monolith', 'frost_obelisk', 'magnet_core', 'drill',
+  'fallen_column',
+  'stalagmite',
+  'flow_curtain',
+  'fumarole_cone',
+  'slag_block',
+  'ice_spike',
+  'crate',
+  'strut',
+  'insulator',
+  'duct',
+  'mushroom',
+  'monolith',
+  'great_prism',
+  'stalagnate',
+  'strata_arch',
+  'great_fumarole',
+  'slag_monolith',
+  'frost_obelisk',
+  'magnet_core',
+  'drill',
   // Segunda varredura: medios, infra Aurix e pendentes minerais de teto.
-  'walkway', 'rail', 'calcite_basin', 'crystal_fan', 'slab_pile',
-  'fallen_plate', 'sulfur_mound', 'cinder_pile', 'frost_stone', 'lodestone',
-  'ore_spur', 'hanging_spur', 'crystal_chandelier', 'stalactite',
-  'hanging_slab', 'sulfur_drip', 'soot_fang', 'icicle', 'canary_cage',
+  'walkway',
+  'rail',
+  'calcite_basin',
+  'crystal_fan',
+  'slab_pile',
+  'fallen_plate',
+  'sulfur_mound',
+  'cinder_pile',
+  'frost_stone',
+  'lodestone',
+  'ore_spur',
+  'hanging_spur',
+  'crystal_chandelier',
+  'stalactite',
+  'hanging_slab',
+  'sulfur_drip',
+  'soot_fang',
+  'icicle',
+  'canary_cage',
+  // Rocha suturada: so a teia de chao tem duas variantes (ver SINGLE_VARIANT).
+  'web_sheet',
+];
+
+// Uma variante so: cabem nas vagas da ultima linha do atlas sem abrir outra.
+const SINGLE: PropKind[] = [
+  'web_corner',
+  'web_hang',
+  'cocoon_twitch',
+  'spider_nest',
+  'egg_cluster',
 ];
 
 // Runtime por MERITO: pedrinhas/cacos (silhueta basta) e os pendentes que
 // balancam por relogio (frame estatico mataria a deriva).
 const RUNTIME_ONLY: PropKind[] = [
-  'rubble', 'basalt_shard', 'crystal_shards', 'puffball',
-  'spore_veil', 'cable_hook', 'root_strand',
+  'rubble',
+  'basalt_shard',
+  'crystal_shards',
+  'puffball',
+  'spore_veil',
+  'cable_hook',
+  'root_strand',
 ];
 
 const propOf = (kind: PropKind, variant: number): DecorativeProp => ({
-  kind, x: 0, y: 0, wallCell: -1, variant, anchor: 'floor',
+  kind,
+  x: 0,
+  y: 0,
+  wallCell: -1,
+  variant,
+  anchor: 'floor',
 });
 
 describe('decoracao volumetrica no atlas', () => {
-  const names = new Set((propManifest as { kinds: Array<{ name: string }> }).kinds.map((k) => k.name));
+  const names = new Set(
+    (propManifest as { kinds: Array<{ name: string }> }).kinds.map((k) => k.name),
+  );
 
   it('todo kind volumetrico tem as DUAS variantes no atlas', () => {
     for (const kind of VOLUMETRIC) {
@@ -44,6 +98,16 @@ describe('decoracao volumetrica no atlas', () => {
         const name = decorAtlasName(propOf(kind, variant));
         expect(name, `${kind} sem nome de atlas`).not.toBeNull();
         expect(names.has(name as string), `${name} nao existe no atlas`).toBe(true);
+      }
+    }
+  });
+
+  it('kinds de uma variante so tem a :0 no atlas, e o cliente nunca pede a :1', () => {
+    for (const kind of SINGLE) {
+      expect(names.has(`decor:${kind}:0`), `${kind}:0 ausente do atlas`).toBe(true);
+      expect(names.has(`decor:${kind}:1`), `${kind}:1 nao deveria existir`).toBe(false);
+      for (const variant of [0, 7, 512, 999]) {
+        expect(decorAtlasName(propOf(kind, variant))).toBe(`decor:${kind}:0`);
       }
     }
   });

@@ -102,6 +102,29 @@ const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
   // Gaiola de canario: no atlas, mas o frame vivo/morto e escolhido pela
   // CONTAMINACAO no render — nao pela variante sorteada.
   'canary_cage',
+  // Rocha suturada: tudo de seda vem do atlas (fios de meio voxel nao se
+  // desenham em runtime com a mesma leitura).
+  'web_corner',
+  'web_sheet',
+  'web_hang',
+  'cocoon_twitch',
+  'spider_nest',
+  'egg_cluster',
+]);
+
+/**
+ * Kinds com UMA variante so no atlas. O atlas de props tinha nove vagas na
+ * ultima linha e uma linha nova custa 2,2 MiB de boot; a rocha suturada coube
+ * nas nove abrindo mao da segunda variante de tudo menos a teia de chao. O
+ * `variant` sorteado continua existindo (o jitter e o flip do runtime saem
+ * dele), so nao escolhe frame.
+ */
+export const SINGLE_VARIANT: ReadonlySet<PropKind> = new Set<PropKind>([
+  'web_corner',
+  'web_hang',
+  'cocoon_twitch',
+  'spider_nest',
+  'egg_cluster',
 ]);
 
 /**
@@ -111,7 +134,9 @@ const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
  * maquina.
  */
 export const decorAtlasName = (prop: DecorativeProp): string | null =>
-  ATLAS_VOLUMETRIC.has(prop.kind) ? `decor:${prop.kind}:${h32(prop.variant) & 1}` : null;
+  ATLAS_VOLUMETRIC.has(prop.kind)
+    ? `decor:${prop.kind}:${SINGLE_VARIANT.has(prop.kind) ? 0 : h32(prop.variant) & 1}`
+    : null;
 
 /**
  * Desenha um prop na posicao de tela (sx, sy) da celula ancora.
@@ -382,7 +407,13 @@ export const drawDecorProp = (
     case 'flow_curtain': {
       // Cascata petrificada ao pe da parede: camadas descendo.
       for (let k = 0; k < 3; k++) {
-        drawVoxel(ctx, x + flip * k * s(1.2), sy - k * s(2.2), s(3.6 - k * 0.5), k % 2 === 0 ? BONE : MIST);
+        drawVoxel(
+          ctx,
+          x + flip * k * s(1.2),
+          sy - k * s(2.2),
+          s(3.6 - k * 0.5),
+          k % 2 === 0 ? BONE : MIST,
+        );
       }
       return;
     }
@@ -463,7 +494,13 @@ export const drawDecorProp = (
       // bastante para nunca parecer um caminho que importa.
       for (let k = 0; k < 3; k++) {
         if (k === 1 && (v & 8) !== 0) continue; // o vao
-        drawVoxel(ctx, x + flip * (k - 1) * s(4), sy + (k - 1) * s(1), s(3.8), k === 2 ? ROCK_DEEP : RUST);
+        drawVoxel(
+          ctx,
+          x + flip * (k - 1) * s(4),
+          sy + (k - 1) * s(1),
+          s(3.8),
+          k === 2 ? ROCK_DEEP : RUST,
+        );
       }
       return;
     }

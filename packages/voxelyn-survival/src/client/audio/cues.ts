@@ -627,6 +627,10 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       if (ev.archetype === 'devourer_brood') {
         return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 1 }];
       }
+      // A aranhinha esmagada: o mesmo estalo curto da ninhada, sem o grave.
+      if (ev.archetype === 'silk_spiderling') {
+        return [{ voice: 'devourerBroodSwallowed', x: ev.x, y: ev.y, scale: 0.6 }];
+      }
       // O Espectro nao cai: estilhaca e sublima.
       if (ev.archetype === 'frost_wraith') {
         return [{ voice: 'wraithDeath', x: ev.x, y: ev.y, scale: 1 }];

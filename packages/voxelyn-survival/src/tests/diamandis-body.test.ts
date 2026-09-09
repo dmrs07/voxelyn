@@ -462,6 +462,7 @@ describe('os atlas sob demanda batem com o orcamento do validador', () => {
     expect(ids.filter((id) => id.startsWith('enemy-'))).toEqual([
       'enemy-seamstress',
       'enemy-seamstress-brood',
+      'enemy-silk-spiderling',
       'enemy-stitcher',
     ]);
   });

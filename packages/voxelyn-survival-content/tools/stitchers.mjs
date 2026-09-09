@@ -21,7 +21,7 @@ const limb = (out, a, b, width, mat) => {
 
 const QUEEN_SUIT = { silk: 'spiderRed', chitin: 'spiderBlue' };
 
-export const stitcherModel = (anim, frame, queen = false, brood = false) => {
+export const stitcherModel = (anim, frame, queen = false, brood = false, tiny = false) => {
   const flying = anim === 'fly';
   const crouching = anim === 'burst';
   const phase = (frame * Math.PI) / 3;
@@ -39,7 +39,9 @@ export const stitcherModel = (anim, frame, queen = false, brood = false) => {
   const thrust = striking ? [-0.5, -1, 2, 0.5][frame % 4] : 0;
   const breath = anim === 'idle' ? [0, 0.5, 0.5, 0][frame % 4] : 0;
   const hurt = anim === 'hit' ? [1, 0][frame % 2] : 0;
-  const scale = queen ? 1.4 : brood ? 0.55 : 1;
+  // A ARANHINHA e a cria sem os sacos de seda, a 0,4: um bicho de chao, nao
+  // uma ameaca. Mesmo modelo, mesmas poses.
+  const scale = queen ? 1.4 : tiny ? 0.4 : brood ? 0.55 : 1;
   const z = downed ? 1 + struggle * 0.5 : crouching ? 1 : (queen ? 4.5 : 2.5) + breath - hurt;
   const b = [];
 
@@ -115,7 +117,7 @@ export const stitcherModel = (anim, frame, queen = false, brood = false) => {
     limb(b, needle, [needle[0], needle[1] - 1.5, needle[2] - 1], 0.5, 'silk');
   }
 
-  if (brood) {
+  if (brood && !tiny) {
     // Unspun silk sacs: a compact, unfinished abdomen, distinct from a small worker.
     b.push(box(-2, 2.5, z + 1, 4, 3, 2, 'silk'));
     b.push(box(-0.5, 3, z + 3, 1, 1.5, 0.5, 'sutureResin'));
@@ -167,15 +169,29 @@ const animations = (queen) => ({
   die: { frames: 5, fps: 10, loop: false },
 });
 
-const spec = (queen, brood = false) => {
+const SPIDERLING_ANIMATIONS = {
+  idle: { frames: 4, fps: 6, loop: true },
+  walk: { frames: 6, fps: 12, loop: true },
+  attack: { frames: 2, fps: 8, loop: false },
+  hit: { frames: 2, fps: 10, loop: false },
+  die: { frames: 4, fps: 10, loop: false },
+};
+
+const spec = (queen, brood = false, tiny = false) => {
   // Union measured across every animation in every authored direction,
   // including death. Two pixels of border, no rescaling or unused canvas.
-  const w = queen ? 176 : brood ? 64 : 104;
-  const h = queen ? 122 : brood ? 48 : 74;
-  const ax = queen ? 88 : brood ? 32 : 50;
-  const ay = queen ? 88 : brood ? 34 : 48;
+  const w = queen ? 176 : tiny ? 48 : brood ? 64 : 104;
+  const h = queen ? 122 : tiny ? 40 : brood ? 48 : 74;
+  const ax = queen ? 88 : tiny ? 24 : brood ? 32 : 50;
+  const ay = queen ? 88 : tiny ? 28 : brood ? 34 : 48;
   return {
-    id: queen ? 'enemy-seamstress' : brood ? 'enemy-seamstress-brood' : 'enemy-stitcher',
+    id: queen
+      ? 'enemy-seamstress'
+      : tiny
+        ? 'enemy-silk-spiderling'
+        : brood
+          ? 'enemy-seamstress-brood'
+          : 'enemy-stitcher',
     version: 1,
     frameWidth: w,
     frameHeight: h,
@@ -184,15 +200,17 @@ const spec = (queen, brood = false) => {
     directions: queen ? 8 : 4,
     authoredDirs: queen ? SEAMSTRESS_DIRS : STITCHER_DIRS,
     flipPairs: {},
-    hitbox: { w: queen ? 1.8 : 0.72, h: queen ? 1.8 : 0.8 },
+    hitbox: { w: queen ? 1.8 : tiny ? 0.5 : 0.72, h: queen ? 1.8 : tiny ? 0.5 : 0.8 },
     footprint: { w: queen ? 2 : 1, h: queen ? 2 : 1, offsetX: 0, offsetY: 0 },
-    animations: animations(queen),
+    // A aranhinha so precisa das obrigatorias: cada quadro custa quatro rumos
+    // e o grupo sob demanda da Cerzideira esta perto do teto.
+    animations: tiny ? SPIDERLING_ANIMATIONS : animations(queen),
     draw: (dir, anim, frame) =>
-      renderVoxels(stitcherModel(anim, frame, queen, brood), DIR_INDEX[dir], w, h, ax, ay),
+      renderVoxels(stitcherModel(anim, frame, queen, brood, tiny), DIR_INDEX[dir], w, h, ax, ay),
     prompt: queen
       ? 'Cerzideira: eight-direction mineral arthropod, suspended hollow silk ribcage, eight articulated load-bearing legs, paired asymmetrical needle forelimbs, open dorsal fan; existing camera-rotation face raster for diagonal anti-corduroy'
       : 'Costureiro: pale six-legged subterranean arthropod, open silk abdomen, pinning and pulling needle forelimbs, articulated sewing and walking poses',
   };
 };
 
-export const STITCHER_SPECS = [spec(false), spec(true), spec(false, true)];
+export const STITCHER_SPECS = [spec(false), spec(true), spec(false, true), spec(false, true, true)];

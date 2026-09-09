@@ -77,6 +77,7 @@ import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-dr
 import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
 import silkNetManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-net.json';
 import silkCocoonManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.json';
+import spiderlingManifest from '@voxelyn/survival-content/assets/atlases/enemy-silk-spiderling.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
@@ -153,6 +154,7 @@ import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.p
 import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
 import silkNetUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-net.png?url';
 import silkCocoonUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.png?url';
+import spiderlingUrl from '@voxelyn/survival-content/assets/atlases/enemy-silk-spiderling.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
@@ -660,6 +662,8 @@ export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
   'enemy-stitcher',
   'enemy-seamstress',
   'enemy-seamstress-brood',
+  // A aranhinha da rocha suturada: fauna do encontro da Cerzideira.
+  'enemy-silk-spiderling',
   ...DIAMANDIS_PART_ATLASES,
   DIAMANDIS_ARM_ATLAS,
   // O casulo da rede da Cerzideira: 14 quadros de 96x112 que so quem chega ao
@@ -699,6 +703,10 @@ const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string 
   'fx-silk-cocoon': {
     manifest: silkCocoonManifest as unknown as SpriteManifestEntry,
     url: silkCocoonUrl,
+  },
+  'enemy-silk-spiderling': {
+    manifest: spiderlingManifest as unknown as SpriteManifestEntry,
+    url: spiderlingUrl,
   },
 };
 
@@ -753,6 +761,7 @@ export const DEVOURER_BROOD_ATLAS = 'part-devourer-brood';
 export const ARCHETYPE_SPRITE: Record<string, string> = {
   seamstress: 'enemy-seamstress',
   seamstress_brood: 'enemy-seamstress-brood',
+  silk_spiderling: 'enemy-silk-spiderling',
   stitcher: 'enemy-stitcher',
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',

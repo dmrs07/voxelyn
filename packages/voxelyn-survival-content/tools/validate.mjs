@@ -156,6 +156,8 @@ export const ON_DEMAND_ATLASES = new Set([
   // O casulo da rede so existe no encontro da Cerzideira; 14 quadros de 96x112
   // nao cabem no orcamento de boot, que esta a 0,3 MiB do teto.
   'fx-silk-cocoon',
+  // A aranhinha so existe na rocha suturada: vai com o grupo da Cerzideira.
+  'enemy-silk-spiderling',
 ]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;

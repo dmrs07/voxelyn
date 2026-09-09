@@ -108,7 +108,14 @@ export type PropKind =
   | 'strata_arch'
   | 'great_fumarole'
   | 'slag_monolith'
-  | 'frost_obelisk';
+  | 'frost_obelisk'
+  // Rocha suturada: seda. Teias, o casulo que se mexe, a casa de aranha e a ninhada.
+  | 'web_corner'
+  | 'web_sheet'
+  | 'web_hang'
+  | 'cocoon_twitch'
+  | 'spider_nest'
+  | 'egg_cluster';
 
 export type DecorativeProp = {
   kind: PropKind;
@@ -265,7 +272,14 @@ const OCCUPATION_KIT: Record<
   Exclude<OccupationId, 'none'>,
   { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[] }
 > = {
-  stitchers: { edge: ['strut'], micro: [], ceiling: ['cable_hook'] },
+  // A rocha suturada e HABITADA: teias de canto, o casulo que se mexe e a
+  // casa de aranha nas paredes; teia de chao e ninhadas de ovos pelo chao;
+  // fios pendurados do teto. As aranhinhas (fauna autoritativa) moram aqui.
+  stitchers: {
+    edge: ['strut', 'web_corner', 'cocoon_twitch', 'spider_nest'],
+    micro: ['web_sheet', 'egg_cluster'],
+    ceiling: ['cable_hook', 'web_hang'],
+  },
   mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
   aurix: {
     edge: ['crate', 'strut', 'canary_cage'],

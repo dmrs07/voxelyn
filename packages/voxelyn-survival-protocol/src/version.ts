@@ -245,7 +245,8 @@
 // 39: `EntitySnapshot`/viewer dos players ganham `cocoonUntil` e `webbedUntil`
 //     (a rede da Cerzideira); `ProjectileKind` aceita `net`; `BossAbility`
 //     aceita `net`. Um cliente de 38 desenharia o Prospector solto enquanto o
-//     servidor recusa os comandos dele.
+//     servidor recusa os comandos dele. `EnemyArchetype` aceita
+//     `silk_spiderling` (a aranhinha da rocha suturada).
 export const PROTOCOL_VERSION = 39;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
@@ -1046,7 +1047,10 @@ export const PROTOCOL_VERSION = 39;
 // 76: A REDE. Abaixo de 20% a Cerzideira arremessa `net` (oito rumos); quem e
 //     acertado fica 3 s no casulo (imune, parado — `cocoonUntil`) e sai a 10%
 //     por 4 s (`webbedUntil`); os dois no hash. Replays de 75 com a
-//     Cerzideira nao batem.
+//     Cerzideira nao batem. AS ARANHINHAS: dez `silk_spiderling` por setor
+//     com a ocupacao dos Costureiros, em volta das suturas — inofensivas,
+//     fogem ao avistar o Prospector, esmagadas ao pisar; no hash e no
+//     contador de arquetipos.
 export const SIMULATION_VERSION = 76;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
@@ -1250,7 +1254,10 @@ export const SIMULATION_VERSION = 76;
 // 40: a Cerzideira de traje vermelho e azul (paleta mestra ganha `crimson`,
 //     `cobalt` e `navy`; `veio-fungico.v02`) e a rede concava, uma cupula
 //     aberta para o alvo. Um cliente com o atlas antigo em cache mostraria a
-//     rainha de seda mineral.
+//     rainha de seda mineral. A rocha suturada ganha props de seda no atlas
+//     de props (teias, casulo que se mexe, casa de aranha, ninhada, fios do
+//     teto — nove quadros, nas vagas da ultima linha) e o atlas
+//     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
 export const CONTENT_VERSION = 40;
 
 export type VersionTriple = {

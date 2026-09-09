@@ -1,0 +1,107 @@
+{
+  "id": "enemy-silk-spiderling",
+  "version": 1,
+  "atlas": "enemy-silk-spiderling.png",
+  "normalAtlas": "enemy-silk-spiderling.normal.png",
+  "normalScale": 2,
+  "frameWidth": 48,
+  "frameHeight": 40,
+  "columns": 72,
+  "anchorX": 24,
+  "anchorY": 28,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.5,
+    "h": 0.5
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v02",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 12,
+      "loop": true
+    },
+    "attack": {
+      "frames": 2,
+      "fps": 8,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 10,
+      "loop": false
+    },
+    "die": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "hit": 12,
+      "die": 14
+    },
+    "dl": {
+      "idle": 18,
+      "walk": 22,
+      "attack": 28,
+      "hit": 30,
+      "die": 32
+    },
+    "ur": {
+      "idle": 36,
+      "walk": 40,
+      "attack": 46,
+      "hit": 48,
+      "die": 50
+    },
+    "ul": {
+      "idle": 54,
+      "walk": 58,
+      "attack": 64,
+      "hit": 66,
+      "die": 68
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "Costureiro: pale six-legged subterranean arthropod, open silk abdomen, pinning and pulling needle forelimbs, articulated sewing and walking poses",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}
