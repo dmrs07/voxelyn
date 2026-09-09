@@ -12,6 +12,7 @@ import {
   DEATH_ECHO_CLUSTER_RADIUS,
   DEATH_ECHO_TRACE_ABSENT,
   DEATH_ECHO_TRACE_ENEMIES_PER_SAMPLE,
+  DEATH_ECHO_TRACE_ENEMY_RADIUS,
   SIMULATION_VERSION,
   buildDeathEchoCapsule,
   contractSeed,
@@ -446,6 +447,97 @@ describe('amostra e trilha do agressor', () => {
     const elite: DamageCause = { kind: 'enemy_contact', archetype: 'bruiser', elite: true };
     const trace = encodeDeathEchoTrace(window(), 21, 30, 120, elite);
     expect(decodeDeathEchoTracePoint(trace!, 4, 21, 30)?.threat?.x).toBeCloseTo(21, 1);
+  });
+
+  it.each([
+    [16, 0], [-16, 0], [0, 16], [0, -16],
+    [18, 0], [-18, 0], [0, 18], [0, -18],
+    [DEATH_ECHO_TRACE_ENEMY_RADIUS, 0], [-DEATH_ECHO_TRACE_ENEMY_RADIUS, 0],
+    [0, DEATH_ECHO_TRACE_ENEMY_RADIUS], [0, -DEATH_ECHO_TRACE_ENEMY_RADIUS],
+  ])('preserva o atirador a (%s, %s) tiles pelo ciclo de gravação e leitura', (dx, dy) => {
+    const state = createRun({ seed: 0xa11ce });
+    state.player.x = 40.5;
+    state.player.y = 40.5;
+    const enemy = state.enemies[0];
+    state.enemies = [enemy];
+    Object.assign(enemy, {
+      alive: true, archetype: 'spitter', elite: false,
+      x: state.player.x + dx, y: state.player.y + dy,
+    });
+    const sample = sampleDeathEchoTrace(state);
+    expect(sample.enemies?.[0]?.id).toBe(enemy.id);
+    const cause: DamageCause = {
+      kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'spit',
+    };
+    const encoded = encodeDeathEchoTrace(
+      [{ ...sample, enemies: [] }, sample], state.player.x, state.player.y, 120, cause,
+    );
+    const trace = parseDeathEchoTrace(JSON.parse(JSON.stringify(encoded)));
+    expect(trace).not.toBeNull();
+    expect(decodeDeathEchoTracePoint(trace!, 0, 40.5, 40.5)?.threat).toBeNull();
+    expect(decodeDeathEchoTracePoint(trace!, 1, 40.5, 40.5)?.threat).toEqual({
+      x: enemy.x, y: enemy.y,
+    });
+  });
+
+  it('mede o alcance da trilha a partir da morte, mesmo quando o jogador se deslocou', () => {
+    const samples = window().map((sample) => ({
+      ...sample, x: sample.x + 30,
+      enemies: sample.enemies?.map((enemy) => ({ ...enemy, x: enemy.x + 30 })),
+    }));
+    samples[0] = {
+      ...samples[0], x: 41, y: 30,
+      enemies: [{ id: 2, archetype: 'bruiser', elite: false, x: 21, y: 30.125 }],
+    };
+    const encoded = encodeDeathEchoTrace(samples, 51, 30, 120, BRUISER)!;
+    const trace = parseDeathEchoTrace(JSON.parse(JSON.stringify(encoded)))!;
+    expect(decodeDeathEchoTracePoint(trace, 0, 51, 30)?.threat).toEqual({ x: 21, y: 30.125 });
+    expect(decodeDeathEchoTracePoint(trace, 1, 51, 30)?.threat).toBeNull();
+    // A precisão e o formato do trajeto do Prospector continuam os mesmos.
+    expect(trace.dx).toEqual([-80, -6, -4, -2, 0]);
+  });
+
+  it('mantém a sentinela e os limites das trilhas int8 legadas', () => {
+    const trace = encodeDeathEchoTrace(window(), 21, 30, 120, BRUISER)!;
+    const legacy = {
+      ...trace,
+      threat: { dx: [-128, -127, 0, 126, 127], dy: [-128, 127, 0, -126, -127] },
+    };
+    const parsed = parseDeathEchoTrace(JSON.parse(JSON.stringify(legacy)))!;
+    expect(parsed).toEqual(legacy);
+    expect(decodeDeathEchoTracePoint(parsed, 0, 21, 30)?.threat).toBeNull();
+    expect(decodeDeathEchoTracePoint(parsed, 1, 21, 30)?.threat).toEqual({
+      x: 21 - 15.875, y: 30 + 15.875,
+    });
+    expect(parseDeathEchoTrace({
+      ...legacy, threat: { ...legacy.threat, dx: [128, 0, 0, 0, 0] },
+    })?.threat).toBeUndefined();
+  });
+
+  it.each([
+    { offsetBits: 32, dx: [0, 160], dy: [0, 0] },
+    { offsetBits: 16, dx: [0, 32768], dy: [0, 0] },
+    { offsetBits: 16, dx: [0, -32769], dy: [0, 0] },
+    { offsetBits: 16, dx: [-32768, 160], dy: [0, 0] },
+    { offsetBits: 16, dx: [0, 160], dy: [-32768, 0] },
+    { offsetBits: 16, dx: [-32768, -32768], dy: [-32768, -32768] },
+  ])('descarta apenas a trilha ampliada malformada: %j', (threat) => {
+    const trace = encodeDeathEchoTrace(window().slice(-2), 21, 30, 120, BRUISER)!;
+    const parsed = parseDeathEchoTrace({ ...trace, threat });
+    expect(parsed?.threat).toBeUndefined();
+    expect(parsed?.dx).toEqual(trace.dx);
+    expect(parsed?.hpQ).toEqual(trace.hpQ);
+  });
+
+  it('omite uma posição fora até do int16 em vez de movê-la para a borda', () => {
+    const samples = window();
+    samples[0] = { ...samples[0], enemies: [{
+      id: 2, archetype: 'bruiser', elite: false, x: 5000, y: 30,
+    }] };
+    const encoded = encodeDeathEchoTrace(samples, 21, 30, 120, BRUISER)!;
+    const trace = parseDeathEchoTrace(JSON.parse(JSON.stringify(encoded)))!;
+    expect(decodeDeathEchoTracePoint(trace, 0, 21, 30)?.threat).toBeNull();
+    expect(decodeDeathEchoTracePoint(trace, 4, 21, 30)?.threat).toEqual({ x: 22, y: 30.5 });
   });
 
   it('não inventa agressor para causa sem criatura nem sem candidata compatível', () => {

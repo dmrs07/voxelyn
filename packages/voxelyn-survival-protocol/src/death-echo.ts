@@ -43,8 +43,10 @@ export const DEATH_ECHO_TRACE_MIN_SAMPLES = 2;
 /** Quantização espacial do rastro: oitavos de tile, em int8. */
 const TRACE_UNITS_PER_TILE = 8;
 const TRACE_MAX_OFFSET = 127;
+/** Trilhas distantes usam int16, ainda em oitavos de tile. */
+const THREAT_MAX_OFFSET = 32767;
 /**
- * O valor que marca "o agressor não estava aqui" numa amostra da trilha dele.
+ * Ausência nas trilhas int8 legadas. Em int16 a sentinela é -32768.
  *
  * Fora do alcance de `quantizeOffset`, que satura em ±127: um deslocamento real
  * nunca produz este número, e ele cabe no mesmo int8 sem custar um campo a
@@ -112,9 +114,12 @@ export type DeathEchoTraceSample = {
  * elite da causa entre as que estavam à vista no último instante, a mais
  * próxima do corpo. Quem ela é não vem daqui: vem de `cause`. Aqui só mora
  * ONDE ela esteve, e `DEATH_ECHO_TRACE_ABSENT` marca as amostras em que ela
- * ainda não tinha aparecido.
+ * ainda não tinha aparecido nas trilhas int8. Com `offsetBits: 16`, a ausência
+ * passa a ser -32768: -128 é uma posição válida, a -16 tiles da carcaça.
  */
 export type DeathEchoThreatTrack = {
+  /** Ausente = int8 legado. Int16 cobre o raio de 20 tiles mais o deslocamento da fuga. */
+  offsetBits?: 16;
   dx: number[];
   dy: number[];
 };
@@ -122,8 +127,8 @@ export type DeathEchoThreatTrack = {
 /**
  * Os últimos segundos, comprimidos.
  *
- * Deslocamentos são relativos à célula da morte e cabem em int8; a mira vira
- * octante. É deliberadamente grosseiro: a reprodução tem de contar uma história
+ * Deslocamentos do Prospector são relativos à célula da morte e cabem em int8;
+ * a mira vira octante. É deliberadamente grosseiro: a reprodução tem de contar uma história
  * curta, não reproduzir a luta — e no cliente o storage é `localStorage`,
  * compartilhado com o histórico de runs.
  *
@@ -297,11 +302,15 @@ export const isDeathEchoCause = (value: unknown): value is DamageCause => {
   }
 };
 
-const int8Array = (value: unknown, length: number): number[] | null => {
+const offsetArray = (
+  value: unknown,
+  length: number,
+  max: number = TRACE_MAX_OFFSET,
+): number[] | null => {
   if (!Array.isArray(value) || value.length !== length) return null;
   const out: number[] = [];
   for (const entry of value) {
-    const integer = finiteInt(entry, -TRACE_MAX_OFFSET - 1, TRACE_MAX_OFFSET);
+    const integer = finiteInt(entry, -max - 1, max);
     if (integer === null) return null;
     out.push(integer);
   }
@@ -320,8 +329,8 @@ export const parseDeathEchoTrace = (value: unknown): DeathEchoTrace | null => {
   if (stepMs === null || !Array.isArray(raw.dx)) return null;
   const length = raw.dx.length;
   if (length < DEATH_ECHO_TRACE_MIN_SAMPLES || length > DEATH_ECHO_TRACE_SAMPLES) return null;
-  const dx = int8Array(raw.dx, length);
-  const dy = int8Array(raw.dy, length);
+  const dx = offsetArray(raw.dx, length);
+  const dy = offsetArray(raw.dy, length);
   if (!dx || !dy) return null;
   if (!Array.isArray(raw.aim) || raw.aim.length !== length) return null;
   const aim: number[] = [];
@@ -359,13 +368,18 @@ const parseByteArray = (value: unknown, length: number): number[] | null => {
 const parseThreatTrack = (value: unknown, length: number): DeathEchoThreatTrack | null => {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Partial<DeathEchoThreatTrack>;
-  const dx = int8Array(raw.dx, length);
-  const dy = int8Array(raw.dy, length);
+  if (raw.offsetBits !== undefined && raw.offsetBits !== 16) return null;
+  const max = raw.offsetBits === 16 ? THREAT_MAX_OFFSET : TRACE_MAX_OFFSET;
+  const absent = -max - 1;
+  const dx = offsetArray(raw.dx, length, max);
+  const dy = offsetArray(raw.dy, length, max);
   if (!dx || !dy) return null;
+  // Ausência vale para o ponto inteiro, nunca para só uma coordenada.
+  if (dx.some((entry, i) => (entry === absent) !== (dy[i] === absent))) return null;
   // Uma trilha em que o agressor nunca esteve não é trilha: cai fora aqui,
   // para o consumidor não ter de perguntar "há alguém?" amostra a amostra.
-  if (!dx.some((entry) => entry !== DEATH_ECHO_TRACE_ABSENT)) return null;
-  return { dx, dy };
+  if (!dx.some((entry) => entry !== absent)) return null;
+  return { ...(raw.offsetBits === 16 ? { offsetBits: 16 as const } : {}), dx, dy };
 };
 
 /** Teto do id: cabe `seed:phase:ticks:serial` com folga, e nada mais. */
@@ -528,14 +542,33 @@ const threatTrackFor = (
   }
   if (!killer) return null;
   const id = killer.id;
+  const positions = window.map((sample) => {
+    const seen = sample.enemies?.find((enemy) => enemy.id === id);
+    return seen
+      ? {
+          dx: Math.round((seen.x - originX) * TRACE_UNITS_PER_TILE),
+          dy: Math.round((seen.y - originY) * TRACE_UNITS_PER_TILE),
+        }
+      : null;
+  });
+  // O raio é relativo ao jogador em cada amostra, mas a trilha é relativa à
+  // morte. Ampliar pelo deslocamento REAL também cobre quem esteve longe da
+  // carcaça no começo da fuga. Trilhas curtas conservam o formato int8 legado.
+  const wide = positions.some((point) =>
+    point && (Math.abs(point.dx) > TRACE_MAX_OFFSET || Math.abs(point.dy) > TRACE_MAX_OFFSET),
+  );
+  const max = wide ? THREAT_MAX_OFFSET : TRACE_MAX_OFFSET;
+  const absent = -max - 1;
   const dx: number[] = [];
   const dy: number[] = [];
-  for (const sample of window) {
-    const seen = sample.enemies?.find((enemy) => enemy.id === id) ?? null;
-    dx.push(seen ? quantizeOffset(seen.x - originX) : DEATH_ECHO_TRACE_ABSENT);
-    dy.push(seen ? quantizeOffset(seen.y - originY) : DEATH_ECHO_TRACE_ABSENT);
+  for (const point of positions) {
+    // Um ponto fora até do int16 fica ausente; saturar inventaria uma posição.
+    const present = point && Math.abs(point.dx) <= max && Math.abs(point.dy) <= max;
+    dx.push(present ? point.dx : absent);
+    dy.push(present ? point.dy : absent);
   }
-  return { dx, dy };
+  if (!dx.some((entry) => entry !== absent)) return null;
+  return { ...(wide ? { offsetBits: 16 as const } : {}), dx, dy };
 };
 
 /**
@@ -603,11 +636,13 @@ export const decodeDeathEchoTracePoint = (
   const angle = (code & 7) * (Math.PI / 4);
   const threatDx = trace.threat?.dx[index];
   const threatDy = trace.threat?.dy[index];
+  const threatAbsent =
+    trace.threat?.offsetBits === 16 ? -THREAT_MAX_OFFSET - 1 : DEATH_ECHO_TRACE_ABSENT;
   const threatPresent =
     threatDx !== undefined &&
     threatDy !== undefined &&
-    threatDx !== DEATH_ECHO_TRACE_ABSENT &&
-    threatDy !== DEATH_ECHO_TRACE_ABSENT;
+    threatDx !== threatAbsent &&
+    threatDy !== threatAbsent;
   const hpQ = trace.hpQ?.[index];
   return {
     x: originX + trace.dx[index] / TRACE_UNITS_PER_TILE,

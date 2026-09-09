@@ -4276,17 +4276,11 @@ export class SurvivalRenderer {
         const frame = deathEchoHologramFrame(echo, pairedEcho.openedAtMs, nowMs);
         this.deathEchoHologram = frame;
         if (frame) {
-          // O chão da transmissão entra meio tile à frente da carcaça: ele ocupa
-          // o espaço em volta do corpo, e enfileirado junto seria cortado pela
-          // mesma parede que esconde o corpo. Os ATORES entram cada um na
-          // própria profundidade, como entidades: são sprites no tamanho
-          // natural, e uma parede à frente deles tem de cobri-los como cobre
-          // qualquer criatura — é o que os mantém no mundo em vez de colados
-          // na tela.
-          items.push({
-            depth: echo.x + echo.y + 0.5,
-            draw: () => drawHologramGround(ctx, frame, echo, toScreen, z, nowMs),
-          });
+          // A projeção no chão sai antes de executar a fila: o trajeto pode
+          // passar atrás da carcaça e atravessar várias profundidades. Paredes
+          // e atores devem cobri-lo por inteiro. Só os atores entram na fila,
+          // cada um na própria profundidade, como as entidades vivas.
+          drawHologramGround(ctx, frame, echo, toScreen, z, nowMs);
           items.push({
             depth: frame.victim.x + frame.victim.y + 0.01,
             draw: () => {
