@@ -75,7 +75,7 @@ describe('contrato da trilha composta', () => {
       10 ** ((alvo - lufsDoArquivo) / 20) / MUSIC_CEILING;
     expect(trimPara(-17.1)).toBeCloseTo(COMPOSED_TRIM, 2);
     expect(trimPara(-15.0)).toBeCloseTo(MENU_TRIM, 2);
-    expect(trimPara(-5.95)).toBeCloseTo(BOSS_TRIM, 2);
+    expect(trimPara(-8.2)).toBeCloseTo(BOSS_TRIM, 2);
   });
 
   it('composedBaseGain satura o slider em [0,1]', () => {

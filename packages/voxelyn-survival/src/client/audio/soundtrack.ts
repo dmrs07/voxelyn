@@ -151,12 +151,12 @@ export const BOSS_SOUNDTRACK_URL = 'audio/voxelyn-survival-diamandis.mp3';
 /**
  * Trim da trilha do Diamandis, mesmo papel do COMPOSED_TRIM.
  *
- * Calibrado para o master recebido em 2026-09-02: -5,95 LUFS integrado (um
- * master MUITO quente, true peak 0,0 dBTP, brickwall), 85,6 s, estereo com o
- * lado 13 dB abaixo do centro -> 0.48 poe o leito em -21 LUFS com o slider
- * no maximo. Trocou o master, rode o script de novo.
+ * Calibrado para o master recebido em 2026-09-09 ("BOSS_FIGHT_DIAMANDS3"):
+ * -8,2 LUFS integrado, true peak +0,4 dBTP, 84,72 s, estereo com o lado
+ * 7,1 dB abaixo do centro -> 0.63 poe o leito em -21 LUFS com o slider no
+ * maximo. Trocou o master, rode o script de novo.
  */
-export const BOSS_TRIM = 0.48;
+export const BOSS_TRIM = 0.63;
 
 /** Ganho base da trilha de encontro sob o slider. */
 export const bossBaseGain = (musicVolume: number): number => trackBaseGain(BOSS_TRIM, musicVolume);
