@@ -243,7 +243,12 @@ describe('impressao digital da geracao', () => {
     // v70: reject Stitcher chambers with fewer than two in-range supports.
     // Only rejected layouts advance the existing deterministic retry sequence;
     // their terrain and spawn positions intentionally differ from v69.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2822852745);
+    // 2945120737 (era 2822852745), na SIMULATION_VERSION 77: as INTRUSOES
+    // balanceadas. Micelio, Aurix e rocha suturada passam a ter 18% cada em
+    // todo setor sem ocupacao (antes 30/15/12), com a seda no topo das faixas.
+    // O bioma de (seed, setor) muda para parte das seeds da amostra, e com ele
+    // o terreno inteiro delas — e continua o mesmo em qualquer geracao.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2945120737);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

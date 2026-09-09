@@ -63,7 +63,10 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
   bishop: {
     label: 'Bispo',
     place: 'Contaminação Micelial',
-    seed: 2,
+    // Re-varrida na SIMULATION_VERSION 77 (intrusoes balanceadas): a seed 2
+    // virou rocha suturada na Fornalha. A 7 e Reservatorio Negro de verdade:
+    // aquifero com colonia micelial, a casa do Bispo.
+    seed: 7,
     sector: 3,
     generation: 'G-04',
     sectorCount: 7,
@@ -90,7 +93,10 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
   archcantor: {
     label: 'Arquicantor',
     place: 'Catedral Prismática',
-    seed: 11,
+    // Re-varrida na SIMULATION_VERSION 77: a seed 11 passou a entregar o
+    // Bispo no nucleo do setor 3. A 154 e prismatica sem ocupacao — a rotunda
+    // aberta e os cristais que o teste da catedral exige.
+    seed: 154,
     sector: 3,
     generation: 'G-04',
     sectorCount: 7,
@@ -123,7 +129,9 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
   lung_matrix: {
     label: 'Pulmão-Matriz',
     place: 'Fenda Sulfurosa',
-    seed: 9,
+    // Re-varrida na SIMULATION_VERSION 77 (intrusoes balanceadas): a seed 9
+    // virou rocha suturada no enxofre. A 13 e Fenda Sulfurosa sem ocupacao.
+    seed: 13,
     sector: 5,
     generation: 'G-03',
     sectorCount: 5,
@@ -150,7 +158,9 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
   magnetarch: {
     label: 'Magnetarca',
     place: 'Estrato Ferrífero',
-    seed: 22,
+    // Re-varrida na SIMULATION_VERSION 77 (intrusoes balanceadas): a seed 22
+    // virou rocha suturada no ferrifero. A 44 e o veio sem ocupacao.
+    seed: 44,
     sector: 7,
     generation: 'G-04',
     sectorCount: 7,

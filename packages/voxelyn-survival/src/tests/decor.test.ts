@@ -8,7 +8,15 @@
 // 3. HONESTIDADE: prop de chao so em celula aberta e sem materia reativa; o
 //    micelio so cresce sobre o proprio tapete; prop de borda tem parede viva.
 import { describe, expect, it } from 'vitest';
-import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SOLID_ROCK, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
+import {
+  createRun,
+  hashAuthoritativeState,
+  sectorBiome,
+  SOLID_NONE,
+  SOLID_ROCK,
+  SURF_FUNGAL,
+  SURF_WATER,
+} from '@voxelyn/survival-sim';
 import { placeDecor, propStillValid, sectorRupture, surfaceRuptureFor } from '../client/decor';
 
 describe('decoracao derivada', () => {
@@ -79,7 +87,9 @@ describe('decoracao derivada', () => {
   it('o prop some quando o mundo muda por baixo dele', () => {
     const state = createRun({ seed: 42 });
     const decor = placeDecor(state);
-    const wallProp = decor.find((p) => p.anchor === 'wall_base' && p.kind !== 'crate' && p.kind !== 'strut');
+    const wallProp = decor.find(
+      (p) => p.anchor === 'wall_base' && p.kind !== 'crate' && p.kind !== 'strut',
+    );
     expect(wallProp).toBeDefined();
     if (!wallProp) return;
     // O Bruiser arranca a parede que formava a cascata/leque: sem parede, sem
@@ -223,18 +233,24 @@ describe('decoracao derivada', () => {
 
   it('a Aurix adapta a infraestrutura ao substrato', () => {
     // Catedral + Aurix => isoladores ceramicos entre os registros da borda.
-    const prismaticAurix = (() => {
-      for (let s = 1; s < 65536; s++) {
-        for (let sector = 2; sector <= 3; sector++) {
-          const b = sectorBiome(s, sector);
-          if (b.stratum === 'prismatic' && b.occupation === 'aurix') return { seed: s, sector };
-        }
+    // Varre ate oito camaras prismaticas Aurix: a colocacao tem orcamento
+    // (dez tentativas de borda) e uma camara pode nao ter parede livre para o
+    // isolador — o que se prova e que o kit da Aurix prismatica O CONTEM, e que
+    // ele aparece de fato em alguma delas.
+    const depth = { generation: 'G-04', sectorCount: 7, coreSectors: [3, 7] } as const;
+    const prismaticAurix: { seed: number; sector: number }[] = [];
+    for (let s = 1; s < 65536 && prismaticAurix.length < 8; s++) {
+      for (let sector = 2; sector <= 6; sector++) {
+        const b = sectorBiome(s, sector);
+        if (b.stratum === 'prismatic' && b.occupation === 'aurix')
+          prismaticAurix.push({ seed: s, sector });
       }
-      throw new Error('nenhuma seed prismatic+aurix');
-    })();
-    const cathedral = createRun(prismaticAurix);
-    const kinds = new Set(placeDecor(cathedral).map((p) => p.kind));
-    expect(kinds.has('insulator')).toBe(true);
+    }
+    expect(prismaticAurix.length).toBeGreaterThan(0);
+    const insulated = prismaticAurix.some((at) =>
+      placeDecor(createRun({ ...at, depth })).some((p) => p.kind === 'insulator'),
+    );
+    expect(insulated).toBe(true);
 
     // Ferrifero + Aurix (linhagem industrial, o pareamento canonico): o kit
     // base da operacao, sem isolador nem duto — essas pecas sao resposta ao
@@ -296,7 +312,9 @@ describe('decoracao derivada', () => {
     expect(roots.length).toBeGreaterThan(0);
     for (const root of roots) {
       expect(root.anchor).toBe('ceiling');
-      expect(Math.max(Math.abs(root.x - rupture.x), Math.abs(root.y - rupture.y))).toBeLessThanOrEqual(8);
+      expect(
+        Math.max(Math.abs(root.x - rupture.x), Math.abs(root.y - rupture.y)),
+      ).toBeLessThanOrEqual(8);
     }
 
     // Sem ruptura, nem uma raiz: a superficie nao vaza para setor intacto.

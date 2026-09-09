@@ -475,8 +475,10 @@ describe('arena do chefe por estrato', () => {
 
 describe('arena real do Arquicantor', () => {
   it('nasce como uma rotunda aberta cercada por muitos cristais', () => {
+    // Seed 154, e nao mais 11: na SIMULATION_VERSION 77 (intrusoes balanceadas)
+    // a 11 passou a entregar o Bispo no nucleo do setor 3.
     const state = createRun({
-      seed: 11,
+      seed: 154,
       sector: 3,
       depth: { generation: 'G-04', sectorCount: 7, coreSectors: [3, 7] },
     });

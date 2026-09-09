@@ -315,11 +315,19 @@ export const lineageOf = (runSeed: number): LineageId =>
  * Bioma do setor N da run.
  *
  * Alem da tabela da linhagem, ha INTRUSOES: um setor sem ocupacao a partir do
- * segundo pode ganhar uma colonia micelial ou uma instalacao Aurix. E o que
+ * segundo pode ganhar uma colonia micelial, uma instalacao Aurix ou a rocha
+ * suturada dos Costureiros, com a mesma chance cada (INTRUSION_SHARE). E o que
  * impede a linhagem mineral de ser sempre a mesma catedral limpa — e e
  * deterministico por (seed, setor), entao as duas maquinas de uma sala de
  * co-op e o replay do leaderboard veem a mesma intrusao.
  */
+/**
+ * Chance, em pontos percentuais, de cada intrusao (micelio, Aurix, rocha
+ * suturada) num setor sem ocupacao a partir do segundo: tres vezes isto e a
+ * chance de haver intrusao (54%), e o resto fica limpo.
+ */
+export const INTRUSION_SHARE = 18;
+
 export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
   const lineage = lineageOf(runSeed);
   const table = LINEAGES[lineage];
@@ -329,9 +337,28 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
   let occupation = base.occupation;
   if (occupation === 'none' && clamped >= 2) {
     const roll = mix32(runSeed >>> 0, clamped * 0x27d4eb2f) % 100;
-    if (roll < 30) occupation = 'mycelial';
-    else if (roll < 45) occupation = 'aurix';
-    else if (roll >= 88) occupation = 'stitchers';
+    // AS TRES OCUPACOES COM A MESMA CHANCE. Medido antes deste balanco:
+    // micelio 22%, Aurix 25%, rocha suturada 8% de todos os setores — a
+    // rocha suturada nao tem linhagem propria e sobrevivia de um sorteio de
+    // 12%. Agora cada intrusao tem `INTRUSION_SHARE` por cento, em TODO setor
+    // sem ocupacao, e o bioma continua funcao pura de (seed, setor).
+    //
+    // Sem excluir a ocupacao que a linhagem ja tem em casa, de proposito. A
+    // primeira versao excluia (uma run industrial so ganhava micelio ou seda)
+    // e abria a excecao no setor final — mas "final" depende da geracao (G-02
+    // acaba no 4, G-04 no 7), e o terreno de (seed, setor) tem de ser o mesmo
+    // em qualquer geracao (ver a impressao digital da geracao). A linhagem
+    // industrial fica puxada para o Aurix pelos cinco setores que o trazem em
+    // casa; e a identidade dela, nao um desbalanco do sorteio.
+    //
+    // AS FAIXAS: a rocha suturada fica no TOPO (rolos 82..99) e as outras
+    // sobem do zero. E o superconjunto da faixa antiga da seda (88..99), entao
+    // toda seed suturada de antes continua suturada — a prancha e a arena da
+    // Cerzideira seguem na seed 36 — e o micelio e o Aurix de rolos baixos
+    // tambem ficam onde estavam.
+    if (roll >= 100 - INTRUSION_SHARE) occupation = 'stitchers';
+    else if (roll < INTRUSION_SHARE) occupation = 'mycelial';
+    else if (roll < INTRUSION_SHARE * 2) occupation = 'aurix';
   }
   // A Fornalha nao recebe colonia micelial: biomassa umida nao coloniza chao
   // incandescente. A intrusao vira Aurix — os sistemas de refrigeracao

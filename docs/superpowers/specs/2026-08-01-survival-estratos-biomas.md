@@ -15,11 +15,11 @@ cabe na fantasia do Veio ("deserto" e "superfície" não existem lá embaixo). A
 resposta é **reinterpretá-los como interiores subterrâneos** e dividir a
 identidade ambiental de cada setor em três camadas:
 
-| Camada   | O que representa                  | Exemplos                                    |
-| -------- | --------------------------------- | ------------------------------------------- |
-| Estrato  | A formação geológica dominante    | Basalto, cristal, aquífero, enxofre, gelo   |
-| Ocupação | O que tomou conta daquele estrato | Micélio, Aurix, contaminação, colapso       |
-| Bolso    | Um encontro localizado e autoral  | Terminal, arena do Bispo, colônia, poço     |
+| Camada   | O que representa                  | Exemplos                                  |
+| -------- | --------------------------------- | ----------------------------------------- |
+| Estrato  | A formação geológica dominante    | Basalto, cristal, aquífero, enxofre, gelo |
+| Ocupação | O que tomou conta daquele estrato | Micélio, Aurix, contaminação, colapso     |
+| Bolso    | Um encontro localizado e autoral  | Terminal, arena do Bispo, colônia, poço   |
 
 Assim não são necessários quinze biomas completos: três estratos e duas
 ocupações já produzem sete setores distintos, e cada peça nova multiplica em
@@ -27,18 +27,18 @@ vez de somar.
 
 ## Tradução dos biomas de referência
 
-| Referência | Versão dentro do Veio                          | Leva    |
-| ---------- | ---------------------------------------------- | ------- |
-| Cavern     | Galerias de Basalto                            | 1ª ✅   |
-| Fungal     | Matriz Micelial (como OCUPAÇÃO)                | 1ª ✅   |
-| Flooded    | Aquífero Negro                                 | 1ª ✅   |
-| —          | Catedral Prismática (cristal já existente)     | 1ª ✅   |
-| —          | Cicatriz Aurix (como OCUPAÇÃO)                 | 1ª ✅ (parcial) |
-| Toxic      | Fenda Sulfurosa                                | 2ª ✅   |
-| Volcanic   | Fornalha Abissal                               | 2ª ✅   |
-| Desert     | Sumidouros de Sílica                           | 2ª ✅   |
-| Frozen     | Cripta Glacial                                 | 2ª ✅ (sem inércia) |
-| Surface    | Ruptura à Superfície (evento raro, não setor)  | futuro  |
+| Referência | Versão dentro do Veio                         | Leva                |
+| ---------- | --------------------------------------------- | ------------------- |
+| Cavern     | Galerias de Basalto                           | 1ª ✅               |
+| Fungal     | Matriz Micelial (como OCUPAÇÃO)               | 1ª ✅               |
+| Flooded    | Aquífero Negro                                | 1ª ✅               |
+| —          | Catedral Prismática (cristal já existente)    | 1ª ✅               |
+| —          | Cicatriz Aurix (como OCUPAÇÃO)                | 1ª ✅ (parcial)     |
+| Toxic      | Fenda Sulfurosa                               | 2ª ✅               |
+| Volcanic   | Fornalha Abissal                              | 2ª ✅               |
+| Desert     | Sumidouros de Sílica                          | 2ª ✅               |
+| Frozen     | Cripta Glacial                                | 2ª ✅ (sem inércia) |
+| Surface    | Ruptura à Superfície (evento raro, não setor) | futuro              |
 
 ## O que foi implementado
 
@@ -57,8 +57,9 @@ vez de somar.
     (a densidade de cristal cresce com a profundidade);
   - **industrial**: Caverna Escavada → Complexo Aurix → Instalação Alagada.
 - **Intrusões**: um setor sem ocupação, do segundo em diante, pode ganhar uma
-  colônia micelial (30%) ou uma instalação Aurix (15%), deterministicamente
-  por (seed, setor).
+  colônia micelial, uma instalação Aurix ou a rocha suturada dos Costureiros,
+  com 18% cada, deterministicamente por (seed, setor) — sem olhar a linhagem,
+  porque o terreno de (seed, setor) tem de ser o mesmo em qualquer geração.
 - Tudo é **função pura da seed** — nada consome `state.rng`. Reconexão, replay
   e leaderboard derivam o mesmo bioma em qualquer máquina
   (`createRun({ sector: N })` ≡ descida ao vivo; coberto por teste).
@@ -228,27 +229,27 @@ mesmo lugar, só tem água de diferente"):
     geografia e a matéria chegam juntas;
   - `sinkholes` (Sílica): poços circulares com **borda frágil**;
   - `lakes` (Cripta): lagos ovais congelados — o território do Espectro.
-  Basalto: `none`, o labirinto orgânico histórico intocado.
+    Basalto: `none`, o labirinto orgânico histórico intocado.
 
 ## Sexta etapa (implementada): a strata determina a arquitetura
 
 Redefinição formalizada: **a strata determina a arquitetura da caverna; a
 ocupação determina o que tomou conta dela.** A regra de qualidade que rege as
-gramáticas: *trocar a paleta inteira por cinza não pode apagar a identidade —
-a forma dos salões e corredores tem de dizer onde o jogador está.*
+gramáticas: _trocar a paleta inteira por cinza não pode apagar a identidade —
+a forma dos salões e corredores tem de dizer onde o jogador está._
 
 Gramáticas espaciais (`WorldgenProfile.halls`), carimbadas após o autômato e
 antes das provas de alcançabilidade:
 
-| Strata | Gramática | Salões e corredores |
-| --- | --- | --- |
-| Basáltica | `columns` | Anfiteatro cercado de colunas, floresta de pilares, fissura entre dois espaços. Pesado e tectônico. |
-| Prismática | `radial` | Rotunda com raios e pilares de cristal, **geodo** (casca cristalina voltada pra dentro), **câmara espelhada**, corredores angulares segmentados em 90°. Angular: cresceu, não foi erodida. |
-| Cárstica (Aquífero) | `karst` | Cúpula calcária, cisternas que nascem cheias, colunata, túneis **sinuosos** de walker com persistência direcional que alargam e estreitam. Dissolvido pela água — o oposto visual da Catedral. |
+| Strata              | Gramática  | Salões e corredores                                                                                                                                                                                  |
+| ------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Basáltica           | `columns`  | Anfiteatro cercado de colunas, floresta de pilares, fissura entre dois espaços. Pesado e tectônico.                                                                                                  |
+| Prismática          | `radial`   | Rotunda com raios e pilares de cristal, **geodo** (casca cristalina voltada pra dentro), **câmara espelhada**, corredores angulares segmentados em 90°. Angular: cresceu, não foi erodida.           |
+| Cárstica (Aquífero) | `karst`    | Cúpula calcária, cisternas que nascem cheias, colunata, túneis **sinuosos** de walker com persistência direcional que alargam e estreitam. Dissolvido pela água — o oposto visual da Catedral.       |
 | Sedimentar (Sílica) | `terraced` | Galerias estratificadas mais largas que altas, **corredores paralelos separados por parede fina frágil** (o frágil como seam estrutural legível), sumidouros de borda frágil. Horizontal e laminado. |
-| Sulfurosa | `lungs` | Pulmões em cadeia, gargantas. |
-| Fornalha | `canyon` | Cânions com blocos desabados no leito. |
-| Cripta | `lakes` | Lagos ovais congelados + túneis suaves de walker. |
+| Sulfurosa           | `lungs`    | Pulmões em cadeia, gargantas.                                                                                                                                                                        |
+| Fornalha            | `canyon`   | Cânions com blocos desabados no leito.                                                                                                                                                               |
+| Cripta              | `lakes`    | Lagos ovais congelados + túneis suaves de walker.                                                                                                                                                    |
 
 **Mudança de contrato do basalto** (pedido em playtest): a gramática basáltica
 também evolui — o basalto ganha salões. O que continua intocável: o autômato
@@ -256,9 +257,9 @@ como base e as **matérias** (nada de água/brasa/gelo nele; variação de maté
 segue sendo trabalho das ocupações). O invariante passou de bytes para
 identidade; `generateWorld()` sem perfil continua sendo o histórico puro.
 
-Traduções do doc de design: *Estrato Sedimentar* = Sumidouros de Sílica
-(a parede em camadas já era arenito); *Cárstico* = Aquífero Negro; *Estrato
-Ferrífero* = trabalho futuro (naturalmente pareado com a Cicatriz Aurix).
+Traduções do doc de design: _Estrato Sedimentar_ = Sumidouros de Sílica
+(a parede em camadas já era arenito); _Cárstico_ = Aquífero Negro; _Estrato
+Ferrífero_ = trabalho futuro (naturalmente pareado com a Cicatriz Aurix).
 
 ## Sétima etapa (implementada): props decorativos
 
@@ -365,27 +366,27 @@ um terreno que **guarda por onde alguém passou**.
 
 **Valores escolhidos** (todos em `sim/src/constants.ts`):
 
-| Parâmetro | Valor | O que produz |
-| --- | --- | --- |
-| `ICE_GLIDE` | 0,915 | ~2,5 tiles de frenagem; inversão cruza o zero em ~0,4 s e completa em ~1,7 s |
-| `ICE_GLIDE_STABILISED` | 0,81 | com MV-04: ~0,98 tile (−60%), inversão em ~0,16 s |
-| `ICE_MOMENTUM_CAP` | 7,4 tiles/s | teto do embalo que entra na lâmina (~1,6× `PLAYER_SPEED`): a esquiva carrega momento sem virar transporte |
-| `ICE_CRACK_CROSSINGS_TO_COLLAPSE` | 4 | a quarta travessia abre o buraco |
-| `ICE_HOLE_REFREEZE_TICKS` | 240 (12 s) | o buraco recongela como gelo INTEIRO |
-| `ICE_REFREEZE_TICKS` | 280 (14 s) | inalterado: a água derretida volta a ser gelo |
+| Parâmetro                         | Valor       | O que produz                                                                                              |
+| --------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `ICE_GLIDE`                       | 0,915       | ~2,5 tiles de frenagem; inversão cruza o zero em ~0,4 s e completa em ~1,7 s                              |
+| `ICE_GLIDE_STABILISED`            | 0,81        | com MV-04: ~0,98 tile (−60%), inversão em ~0,16 s                                                         |
+| `ICE_MOMENTUM_CAP`                | 7,4 tiles/s | teto do embalo que entra na lâmina (~1,6× `PLAYER_SPEED`): a esquiva carrega momento sem virar transporte |
+| `ICE_CRACK_CROSSINGS_TO_COLLAPSE` | 4           | a quarta travessia abre o buraco                                                                          |
+| `ICE_HOLE_REFREEZE_TICKS`         | 240 (12 s)  | o buraco recongela como gelo INTEIRO                                                                      |
+| `ICE_REFREEZE_TICKS`              | 280 (14 s)  | inalterado: a água derretida volta a ser gelo                                                             |
 
 **Os cinco estados**, IDs append-only (nenhum `SURF_*` foi renumerado):
 
-| Estado | ID | Travessias | Inércia | Couraça da Rainha | Calor |
-| --- | --- | --- | --- | --- | --- |
-| `SURF_ICE` intacto | 10 | — | sim | conta | vira água rasa |
-| `SURF_ICE_CRACKED` | 15 | 1ª | sim | conta | vira água rasa |
-| `SURF_ICE_FRACTURED` | 16 | 2ª | sim | conta | vira água rasa |
-| `SURF_ICE_CRITICAL` | 17 | 3ª | sim | conta | vira água rasa |
-| `SURF_DEEP_WATER` | 18 | 4ª (colapso) | — | **não** conta | nada (já é água) |
+| Estado               | ID  | Travessias   | Inércia | Couraça da Rainha | Calor            |
+| -------------------- | --- | ------------ | ------- | ----------------- | ---------------- |
+| `SURF_ICE` intacto   | 10  | —            | sim     | conta             | vira água rasa   |
+| `SURF_ICE_CRACKED`   | 15  | 1ª           | sim     | conta             | vira água rasa   |
+| `SURF_ICE_FRACTURED` | 16  | 2ª           | sim     | conta             | vira água rasa   |
+| `SURF_ICE_CRITICAL`  | 17  | 3ª           | sim     | conta             | vira água rasa   |
+| `SURF_DEEP_WATER`    | 18  | 4ª (colapso) | —       | **não** conta     | nada (já é água) |
 
 **A carga** é do Prospector e só dele: a Rainha e os Espectros não racham o
-piso (eles *são* a lâmina). Conta ENTRADA na célula — ficar parado nunca
+piso (eles _são_ a lâmina). Conta ENTRADA na célula — ficar parado nunca
 progride, sair e voltar conta de novo, deslizar e esquivar contam. Todas as
 células cruzadas pelo segmento de movimento são processadas (`cellsCrossed`,
 DDA por eixo com desempate em X), então velocidade alta não pula nada; cada
@@ -423,6 +424,7 @@ E a queda, quadro a quadro (~820 ms: perda de altura, afundamento com a água
 comendo o corpo de baixo para cima, e a cauda só de ondulação):
 
 ![queda no buraco](../../media/ice-rework/queda-no-buraco.png)
+
 - **Fratura por camada na Sílica** (13ª): quebrar frágil racha os vizinhos
   frágeis da MESMA faixa horizontal para o estágio enfraquecido (avisa, não
   derruba; o vertical não sente). E o minério corre em **seams horizontais**
@@ -605,15 +607,15 @@ Cripta e na Fornalha. Onde o combate é mais longo, o lugar era mais mudo.
 A moldura usa o **vocabulário que o estrato já tem** — nada de material novo,
 só o material do lugar posto onde muda a luta:
 
-| Estrato | Moldura | O que muda no combate |
-| --- | --- | --- |
-| Basalto (`columns`) | pilares de rocha nas diagonais | anfiteatro: quinas para cortar linha de tiro |
-| Prismático (`radial`) | pilares de **cristal** nas diagonais e nos eixos | cobertura que também é munição: quebrar um no meio da luta descarrega a cadeia |
-| Aquífero (`karst`) | orla de **água** | numa arena fechada a água é chão que CONDUZ: a descarga volta para quem a soltou |
-| Sulfuroso (`lungs`) | parede **porosa** nos eixos e diagonais | abre com um tiro — e o que era cobertura vira passagem nos dois sentidos |
-| Fornalha/Ferrífero (`canyon`) | escombros + orla de **brasa** | o calor abre a couraça do Escoriáceo e cobra do jogador a mesma barra que a arma dele já cobra |
-| Sílica (`terraced`) | anel **frágil** nos eixos | a camada cede em faixa: a cobertura desta arena some mais depressa do que parece |
-| Glacial (`lakes`) | orla de **gelo** | a arena escorrega: esquivar do chefe vira problema de embalo, não de reflexo |
+| Estrato                       | Moldura                                          | O que muda no combate                                                                          |
+| ----------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Basalto (`columns`)           | pilares de rocha nas diagonais                   | anfiteatro: quinas para cortar linha de tiro                                                   |
+| Prismático (`radial`)         | pilares de **cristal** nas diagonais e nos eixos | cobertura que também é munição: quebrar um no meio da luta descarrega a cadeia                 |
+| Aquífero (`karst`)            | orla de **água**                                 | numa arena fechada a água é chão que CONDUZ: a descarga volta para quem a soltou               |
+| Sulfuroso (`lungs`)           | parede **porosa** nos eixos e diagonais          | abre com um tiro — e o que era cobertura vira passagem nos dois sentidos                       |
+| Fornalha/Ferrífero (`canyon`) | escombros + orla de **brasa**                    | o calor abre a couraça do Escoriáceo e cobra do jogador a mesma barra que a arma dele já cobra |
+| Sílica (`terraced`)           | anel **frágil** nos eixos                        | a camada cede em faixa: a cobertura desta arena some mais depressa do que parece               |
+| Glacial (`lakes`)             | orla de **gelo**                                 | a arena escorrega: esquivar do chefe vira problema de embalo, não de reflexo                   |
 
 **Geometria.** Sólidos no anel de Chebyshev 4, superfícies nos anéis 5–6 em
 passo 2 (esparsa o bastante para ler como orla). O carimbo pula tudo dentro
@@ -623,7 +625,7 @@ raio do bolso do Bispo (4), então no setor 2 a colônia micelial e a orla do
 estrato coexistem em vez de brigar pelo mesmo chão.
 
 **A ordem é o detalhe caro.** Diferente do pedestal do poço, esta arena é
-carimbada *depois* de o ponto do chefe ser escolhido (ele depende do
+carimbada _depois_ de o ponto do chefe ser escolhido (ele depende do
 terreno), ou seja, depois das provas de alcançabilidade da geração. Então
 ela paga a própria: refaz o flood da entrada e, se isolou o poço ou o chefe,
 **se desfaz por inteiro**. Desfazer tudo — e não a célula culpada — é
@@ -631,7 +633,7 @@ deliberado: meia moldura é um acento que ninguém sabe ler. Um acento de
 bioma nunca vale uma run impossível.
 
 O desfazer leva **as duas camadas**. O `canyon` é o único ramo que levanta
-escombro *e* pinta brasa, e restaurar só o sólido deixava a orla incandescente
+escombro _e_ pinta brasa, e restaurar só o sólido deixava a orla incandescente
 de pé — justo quando a prova decidiu que a moldura inteira não podia existir.
 Meia moldura já seria ilegível; meia moldura que ainda queima é pior.
 
@@ -648,7 +650,7 @@ nada passaria no primeiro teste sem fazer nada.
 **O mundo medido deixou de existir.** `openCells` e `distFromEntry` são
 montados no começo da geração, e nenhum consumidor deles reconfere o terreno —
 `blobSurface`, `pickOpenFar`, `chooseBandCell` e os trilhos sorteiam direto
-dali. O pedestal do poço não sofre disso porque é carimbado *antes* dos dois; a
+dali. O pedestal do poço não sofre disso porque é carimbado _antes_ dos dois; a
 arena não tem essa sorte, porque depende do ponto do chefe, que depende do
 terreno. Três sintomas, todos do mesmo defeito:
 
@@ -663,13 +665,13 @@ terreno. Três sintomas, todos do mesmo defeito:
 
 A primeira correção só **podava** as células viradas pilar, o que resolve o
 primeiro sintoma e nenhum dos outros dois: um pilar não só ocupa chão, ele
-também *corta caminho*. Agora a moldura **refaz** o re-flood e o BFS depois de
+também _corta caminho_. Agora a moldura **refaz** o re-flood e o BFS depois de
 carimbar — as duas estruturas que o pedestal já goza por ordem de execução.
 Refazê-las é mais barato do que auditar cada consumidor, e não depende de
 adivinhar quais deles se importam.
 
 **Porta franca no cerco do Guardião.** `closeArena` nunca emparedou ninguém —
-mas *pular* a célula ocupada deixava um vão **aberto e permanente**: o corpo
+mas _pular_ a célula ocupada deixava um vão **aberto e permanente**: o corpo
 saía de cima dela e sobrava uma saída que nem custa tiro, ao contrário das
 frágeis. O cerco é a promessa da segunda fase, e uma porta de graça a
 desmancha. Agora o corpo é **empurrado uma casa para dentro** (onde a luta é)
@@ -682,13 +684,13 @@ continuam podendo furar o anel — são os objetivos da run.
 células vizinhas de um lado reto compartilham o mesmo destino, porque `(r,0)`
 e `(r,1)` apontam ambas para `(r-1,0)`. Quem é empurrado passa a constar no
 mapa de corpos, então o segundo enxerga o primeiro. Sem isso o corpo pousava
-nas coordenadas *exatas* do ocupante: um inimigo escondido em cima do
+nas coordenadas _exatas_ do ocupante: um inimigo escondido em cima do
 jogador, com o dano de contato dos dois no mesmo ponto.
 
 E há um terceiro: **dois corpos já na mesma célula do anel**. A simulação não
 aplica colisão entre entidades no movimento, então dois bichos dividem uma
 célula com coordenadas diferentes — mandar os dois para o centro da casa de
-dentro os sobreporia *perfeitamente*, que é exatamente o que o empurrão existe
+dentro os sobreporia _perfeitamente_, que é exatamente o que o empurrão existe
 para evitar. Nesse caso o vão sobra.
 
 Nenhum dos dois é da arena por estrato: são anteriores a ela, e a mudança de
@@ -707,7 +709,7 @@ fixá-la, ou para abrir o próprio espaço:
   mão antes, e o sintoma era sempre enganoso — `fixture nao morreu` parece
   defeito da morte, e a falha da extração aparecia numa asserção de
   `duplicate`, como se o servidor tivesse duplicado a entrada. Agora procuram.
-- **Prensa do Coveiro em ângulo oblíquo**: o alvo a 60° e 90° nascia *fora* da
+- **Prensa do Coveiro em ângulo oblíquo**: o alvo a 60° e 90° nascia _fora_ da
   faixa que o helper limpava, então o que segurava o arrasto era o terreno que
   a seed calhou de gerar. Agora o teste abre a própria caixa.
 - **Aposentadoria de slot** (três testes de servidor): atravessam 45 s de
@@ -717,11 +719,11 @@ fixá-la, ou para abrir o próprio espaço:
 - **"Ninguém nasce dentro da moldura"**: usava alcançabilidade a pé, e passava
   por sorte. Bolsão fechado é feição normal de caverna — a broca abre parede,
   então bicho atrás de rocha é conteúdo, não defeito. O critério certo é estar
-  *dentro da pedra*, que é o que de fato é impossível.
+  _dentro da pedra_, que é o que de fato é impossível.
 
 **A decoração não re-sorteia a moldura.** O passo 4 da geração converte rocha
 adjacente a chão aberto em frágil, minério ou cristal — e um pilar isolado é
-parede *fina nos dois eixos*, o caso de maior chance de virar frágil. Na
+parede _fina nos dois eixos_, o caso de maior chance de virar frágil. Na
 Fornalha da seed 7 os quatro escombros saíam `[minério, minério, frágil,
 rocha]`: como rocha é o único material que não cede a tiro nenhum, três dos
 quatro pilares iam embora a tiro e levavam junto a cobertura que a arena
@@ -731,8 +733,8 @@ promete. As células do carimbo agora saem da decoração — o material da mold
 A proteção é **uniforme**, e não só na passada que hoje alcança a moldura. São
 quatro passadas que convertem rocha depois do carimbo (decoração pontual,
 nervuras de cristal, seams e nós de minério), e saber quais podem tocá-la exige
-cruzar estrato com `halls`: o Ferrífero carimba rocha *e* roda nós de minério,
-o Prismático carimba cristal *e* roda nervuras de cristal. Esse raciocínio
+cruzar estrato com `halls`: o Ferrífero carimba rocha _e_ roda nós de minério,
+o Prismático carimba cristal _e_ roda nervuras de cristal. Esse raciocínio
 quebra em silêncio quando alguém acrescenta um estrato — e quebrou na primeira
 tentativa, que só cobriu a decoração pontual e deixou os nós do Ferrífero
 comendo um pilar (seed 168, setor 2).
@@ -742,7 +744,7 @@ conseguir distinguir um pilar da arena de uma rocha comum que por acaso caiu
 na mesma diagonal. Sem a distinção o teste cobraria da moldura um minério que
 nunca foi dela — foi o que a primeira versão dele fez.
 
-**Fica pendente, e não é destes:** na seed 71 um perseguidor *invocado* nasce
+**Fica pendente, e não é destes:** na seed 71 um perseguidor _invocado_ nasce
 dentro da coluna de borda do mapa — o invocar do Guardião não confere solidez
 ao posicionar. É de outro sistema e merece correção própria.
 
@@ -763,18 +765,18 @@ carimbasse chão no meio do caminho tinha de lembrar de reparar as duas à mão.
 do cálculo), não por garantia. A arena do chefe não podia seguir essa ordem —
 depende do ponto do chefe, que depende do terreno — e não lembrou:
 
-| Sintoma | Evidência |
-| --- | --- |
-| bicho nascendo dentro de um pilar | seed 205 s3 |
-| chão órfão continuando em `openCells` | seed 141 s3, célula 8251 |
+| Sintoma                                 | Evidência                                 |
+| --------------------------------------- | ----------------------------------------- |
+| bicho nascendo dentro de um pilar       | seed 205 s3                               |
+| chão órfão continuando em `openCells`   | seed 141 s3, célula 8251                  |
 | site de tier 3 medido num mundo extinto | seed 210 s2: 135 quando a banda pedia 136 |
 
 Os três são o **mesmo defeito**. Foram achados um a um, cada um depois de uma
-correção que parecia completa — porque cada correção raciocinava sobre *quais
-consumidores se importam*, e essa lista sempre estava incompleta.
+correção que parecia completa — porque cada correção raciocinava sobre _quais
+consumidores se importam_, e essa lista sempre estava incompleta.
 
 **`TerrainDraft`.** O terreno em construção passa a carregar as estruturas que
-derivam dele. Escrita que muda a *abertura* de uma célula invalida o derivado;
+derivam dele. Escrita que muda a _abertura_ de uma célula invalida o derivado;
 `derived()` recalcula quando alguém pede. Quem carimbar terreno no futuro não
 precisa saber que essas estruturas existem — e o bloco de reparo manual que a
 arena carregava **desapareceu**.
@@ -811,12 +813,12 @@ conferido nos **dois lados** do refactor: `origin/main` e esta branch produzem
 `1444846605`.
 
 A primeira versão do hash tinha dois furos que valem registro, porque eram
-furos na própria prova: misturava só o *tamanho* de `openCells` — então uma
+furos na própria prova: misturava só o _tamanho_ de `openCells` — então uma
 regressão que trocasse **quais** células estão abertas sem mexer na contagem
 passaria verde — e omitia `hallCenters`, que não é apresentação: é onde
 `client/decor.ts` ancora os landmarks e **sorteia a Ruptura à Superfície**. Esse teste é o segundo produto da etapa, e vale sozinho: até aqui,
 mudar o worldgen e esquecer o bump só aparecia como fixture semeada quebrando
-em *outro pacote*, com sintoma que não aponta para a causa. Isso custou duas
+em _outro pacote_, com sintoma que não aponta para a causa. Isso custou duas
 rodadas de investigação nesta série.
 
 De brinde, a geração ficou **~16% mais rápida** (192 mundos: 3,35 s → 2,81 s):
@@ -837,13 +839,13 @@ preguiçosa ele simplesmente não acontece mais.
 
 ## Ressonância favorecida por bioma (referência de tuning)
 
-| Bioma      | Ressonâncias favorecidas          |
-| ---------- | --------------------------------- |
-| Basalto    | Cinética e explosão               |
-| Prismático | Corrente, explosão e ricochete    |
-| Aquífero   | Corrente e cinética               |
-| Micelial   | Fogo e explosão                   |
-| Sulfuroso  | Fogo, explosão e cinética         |
-| Fornalha   | Fogo e explosão                   |
-| Sílica     | Cinética e explosão               |
-| Glacial    | Fogo, corrente e cinética         |
+| Bioma      | Ressonâncias favorecidas       |
+| ---------- | ------------------------------ |
+| Basalto    | Cinética e explosão            |
+| Prismático | Corrente, explosão e ricochete |
+| Aquífero   | Corrente e cinética            |
+| Micelial   | Fogo e explosão                |
+| Sulfuroso  | Fogo, explosão e cinética      |
+| Fornalha   | Fogo e explosão                |
+| Sílica     | Cinética e explosão            |
+| Glacial    | Fogo, corrente e cinética      |

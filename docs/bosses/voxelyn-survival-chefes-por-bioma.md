@@ -47,7 +47,8 @@ responder em silêncio.
   descida. A identidade deles é a fauna de assinatura.
 - **O chefe final é escolhido pelo mapa final da linhagem.** A linhagem hídrica
   termina em Aquífero + Matriz Micelial → Bispo; as intrusões sorteadas (um setor
-  final `none` pode ganhar ocupação micelial) também trazem o Bispo.
+  final `none` pode ganhar micélio, Aurix ou rocha suturada, 18% cada) trazem o
+  Bispo, o Diamandis ou a Cerzideira.
 - A câmara de chefe continua carimbada pelo worldgen em todo setor (moldura por
   estrato incluída); só o setor final a ocupa.
 - `bossesDown` continua por setor: chefe abatido não repovoa.
@@ -879,12 +880,12 @@ os 100 quadros que eram só o verme pagavam a largura dela. Dobrar os rumos cust
 
 Separados, cada um tem o quadro do que ele é:
 
-| | quadro | rumos | quadros | custo |
-| --- | --- | --- | --- | --- |
-| `enemy-white-devourer` (corpo) | 100×122 | **8** | 200 | 9,31 MiB |
-| `part-white-devourer-maw` (cratera) | 156×106 | 4 | 48 | 3,03 MiB |
-| **total** | | | | **12,34 MiB** |
-| *antes, num atlas só* | *156×152* | *4* | *148* | *13,57 MiB* |
+|                                     | quadro    | rumos | quadros | custo         |
+| ----------------------------------- | --------- | ----- | ------- | ------------- |
+| `enemy-white-devourer` (corpo)      | 100×122   | **8** | 200     | 9,31 MiB      |
+| `part-white-devourer-maw` (cratera) | 156×106   | 4     | 48      | 3,03 MiB      |
+| **total**                           |           |       |         | **12,34 MiB** |
+| _antes, num atlas só_               | _156×152_ | _4_   | _148_   | _13,57 MiB_   |
 
 Ou seja: os oito rumos saíram **1,23 MiB mais baratos** que os quatro de antes. O boot
 caiu de 166.746.272 para 165.453.984 bytes.
@@ -928,16 +929,16 @@ se ele é ortogonal ou diagonal.
 
 Medido, os oito pedidos numa passagem:
 
-| pedido | saiu | arco | |
-| --- | --- | --- | --- |
-| dr | dr | (9, 0) | ortogonal |
-| dl | dl | (0, 11) | ortogonal |
-| ur | ur | (0, −10) | ortogonal |
-| ul | ul | (−10, 0) | ortogonal |
-| **r** | **r** | **(7, −7)** | **diagonal** |
-| **d** | **d** | **(7, 7)** | **diagonal** |
-| **l** | **l** | **(−7, 7)** | **diagonal** |
-| **u** | **u** | **(−4, −4)** | **diagonal** |
+| pedido | saiu  | arco         |              |
+| ------ | ----- | ------------ | ------------ |
+| dr     | dr    | (9, 0)       | ortogonal    |
+| dl     | dl    | (0, 11)      | ortogonal    |
+| ur     | ur    | (0, −10)     | ortogonal    |
+| ul     | ul    | (−10, 0)     | ortogonal    |
+| **r**  | **r** | **(7, −7)**  | **diagonal** |
+| **d**  | **d** | **(7, 7)**   | **diagonal** |
+| **l**  | **l** | **(−7, 7)**  | **diagonal** |
+| **u**  | **u** | **(−4, −4)** | **diagonal** |
 
 **8/8 rumos, 4/4 diagonais** — os quatro quadros novos saem de arcos que não
 correm num eixo. O painel acumula essa conta enquanto está aberto, então ela
@@ -970,10 +971,10 @@ pendurados no rastro caem no vizinho mais próximo dos quatro autorados — o co
 faltavam (`r`/`d`/`l`/`u`) são exatamente as diagonais do mundo, que é por onde
 ele salta (a tabela acima: 4/4 diagonais).
 
-| | quadro | rumos | quadros | custo |
-| --- | --- | --- | --- | --- |
-| *antes* | *64×58* | *4* | *40* | *0,57 MiB* |
-| `part-white-devourer-coil` | 70×58 | **8** | 80 | **1,24 MiB** |
+|                            | quadro  | rumos | quadros | custo        |
+| -------------------------- | ------- | ----- | ------- | ------------ |
+| _antes_                    | _64×58_ | _4_   | _40_    | _0,57 MiB_   |
+| `part-white-devourer-coil` | 70×58   | **8** | 80      | **1,24 MiB** |
 
 O boot subiu de 165.453.984 para **166.159.264** bytes — **+705.280**, com
 1.612.896 de folga no teto. Barato porque o anel é um quadro minúsculo: dobrar os
@@ -984,7 +985,7 @@ Três medidas guiaram o quadro novo, e nenhuma foi escolha de gosto:
 - **70 de largura, não 64.** Nos quatro rumos novos o anel projeta mais para os
   lados (conteúdo 64 contra os 60 dos rumos antigos) e a validação ainda cobra 2
   px de margem. 66 foi medido e **recusado pelo próprio gerador** (`conteudo
-  64x52 nao cabe em 66x58 com margem 2`). Um pixel de anel cortado, numa fila de
+64x52 nao cabe em 66x58 com margem 2`). Um pixel de anel cortado, numa fila de
   dez, lê como um degrau no meio do corpo.
 - **A altura não mudou.** O anel desce os mesmos **11 px** abaixo da origem nos
   oito rumos, e esse número é a **linha da areia** que o cliente compartilha com
@@ -1418,8 +1419,8 @@ de poder existir.
 
 Entrou `basaltic`: basalto do topo ao fundo, o mapa histórico como linhagem inteira. E
 ela não é monótona por ser um estrato só — as intrusões de ocupação continuam
-sorteando micélio e Aurix nos setores 2 e 3, então ela termina no **Guardião, no Bispo
-ou no Diamandis** conforme o que tomou conta do fundo. É a única linhagem em que os
+sorteando micélio, Aurix e rocha suturada do setor 2 em diante, então ela termina no
+**Guardião, no Bispo, no Diamandis ou na Cerzideira** conforme o que tomou conta do fundo. É a única linhagem em que os
 chefes de ocupação e o de estrato disputam a mesma câmara.
 
 Custo: uma linhagem a mais remapeia **toda seed** (o sorteio é `% LINEAGE_ORDER.length`).
