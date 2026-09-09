@@ -58,10 +58,8 @@ vez de somar.
   - **industrial**: Caverna Escavada → Complexo Aurix → Instalação Alagada.
 - **Intrusões**: um setor sem ocupação, do segundo em diante, pode ganhar uma
   colônia micelial, uma instalação Aurix ou a rocha suturada dos Costureiros,
-  com 18% cada, deterministicamente por (seed, setor). Nos setores
-  intermediários a ocupação que a linhagem já traz em casa (Aurix na
-  industrial, micélio na hídrica) sai do sorteio e a parte dela vai para as
-  outras duas; o setor final sorteia as três.
+  com 18% cada, deterministicamente por (seed, setor) — sem olhar a linhagem,
+  porque o terreno de (seed, setor) tem de ser o mesmo em qualquer geração.
 - Tudo é **função pura da seed** — nada consome `state.rng`. Reconexão, replay
   e leaderboard derivam o mesmo bioma em qualquer máquina
   (`createRun({ sector: N })` ≡ descida ao vivo; coberto por teste).

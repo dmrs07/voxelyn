@@ -3,9 +3,8 @@ import { INTRUSION_SHARE, lineageOf, sectorBiome } from '../src/strata';
 
 // AS INTRUSOES BALANCEADAS. Medido antes: micelio 22%, Aurix 25%, rocha
 // suturada 8% de todos os setores — a seda sobrevivia de um sorteio de 12%.
-// Estes testes prendem o balanco novo: a mesma chance para as tres num setor
-// sem ocupacao, a ocupacao de casa fora do sorteio no meio da descida, e o
-// setor final sorteando as tres.
+// Estes testes prendem o balanco novo: a mesma chance para as tres em todo
+// setor sem ocupacao, sem olhar a linhagem, e a seda no topo das faixas.
 const SEEDS = 6000;
 const count = (sector: number, filter: (lineage: string) => boolean) => {
   const tally = { none: 0, mycelial: 0, aurix: 0, stitchers: 0, n: 0 };
@@ -30,23 +29,33 @@ describe('intrusoes de ocupacao', () => {
     }
   });
 
-  it('no meio da descida a ocupacao de casa sai do sorteio, e a parte dela vai para as outras', () => {
-    // A industrial tem Aurix em casa; o setor 7 (Poco Diamandis) e o unico
-    // `none` dela, entao olha-se a hidrica no setor 2 (Aquifero Superior).
-    const t = count(2, (l) => l === 'hydric');
-    expect(t.mycelial).toBe(0);
-    const aurix = (100 * t.aurix) / t.n,
-      stitchers = (100 * t.stitchers) / t.n;
-    expect(aurix).toBeGreaterThan(INTRUSION_SHARE * 1.5 - 5);
-    expect(stitchers).toBeGreaterThan(INTRUSION_SHARE * 1.5 - 5);
+  it('a ocupacao de casa NAO sai do sorteio: o bioma e funcao pura de (seed, setor)', () => {
+    // A hidrica tem micelio em casa e a industrial tem Aurix; mesmo assim os
+    // setores livres delas sorteiam as tres. Excluir a de casa exigiria saber
+    // qual setor e o final (muda com a geracao), e o terreno de (seed, setor)
+    // tem de ser o mesmo em qualquer geracao.
+    for (const [lineage, sector] of [
+      ['hydric', 2],
+      ['industrial', 7],
+      ['mineral', 4],
+    ] as const) {
+      const t = count(sector, (l) => l === lineage);
+      expect(t.n).toBeGreaterThan(400);
+      for (const occ of ['mycelial', 'aurix', 'stitchers'] as const) {
+        const share = (100 * t[occ]) / t.n;
+        expect(share, `${lineage}/${occ}`).toBeGreaterThan(INTRUSION_SHARE - 4);
+        expect(share, `${lineage}/${occ}`).toBeLessThan(INTRUSION_SHARE + 4);
+      }
+    }
   });
 
-  it('o setor final sorteia as tres, mesmo na linhagem que tem uma delas em casa', () => {
-    for (const lineage of ['hydric', 'industrial', 'mineral']) {
-      const t = count(7, (l) => l === lineage);
-      for (const occ of ['mycelial', 'aurix', 'stitchers'] as const)
-        expect((100 * t[occ]) / t.n, `${lineage}/${occ}`).toBeGreaterThan(INTRUSION_SHARE - 5);
-    }
+  it('a rocha suturada fica no topo do sorteio: toda seed suturada de antes continua suturada', () => {
+    // A faixa antiga era 88..99; a nova e 82..99. As seeds das fixtures (a
+    // prancha e a arena da Cerzideira na 36, os testes dela na 66 e na 177)
+    // continuam onde estavam.
+    expect(sectorBiome(36, 7).occupation).toBe('stitchers');
+    expect(sectorBiome(66, 3).occupation).toBe('stitchers');
+    expect(sectorBiome(177, 3).occupation).toBe('stitchers');
   });
 
   it('o primeiro setor nunca recebe intrusao e a Fornalha nunca recebe micelio', () => {

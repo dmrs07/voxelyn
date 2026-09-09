@@ -321,13 +321,10 @@ export const lineageOf = (runSeed: number): LineageId =>
  * deterministico por (seed, setor), entao as duas maquinas de uma sala de
  * co-op e o replay do leaderboard veem a mesma intrusao.
  */
-/** As ocupacoes que uma intrusao pode trazer, na ordem das faixas do sorteio. */
-const INTRUSIONS: readonly Exclude<OccupationId, 'none'>[] = ['mycelial', 'aurix', 'stitchers'];
 /**
- * Chance, em pontos percentuais, de cada intrusao num setor sem ocupacao a
- * partir do segundo: tres vezes isto e a chance de haver intrusao (54%), e o
- * resto fica limpo. Numa linhagem com ocupacao em casa a mesma soma se divide
- * entre as duas que faltam.
+ * Chance, em pontos percentuais, de cada intrusao (micelio, Aurix, rocha
+ * suturada) num setor sem ocupacao a partir do segundo: tres vezes isto e a
+ * chance de haver intrusao (54%), e o resto fica limpo.
  */
 export const INTRUSION_SHARE = 18;
 
@@ -340,33 +337,28 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
   let occupation = base.occupation;
   if (occupation === 'none' && clamped >= 2) {
     const roll = mix32(runSeed >>> 0, clamped * 0x27d4eb2f) % 100;
-    // AS TRES OCUPACOES COM A MESMA CHANCE, e nunca a que a linhagem ja tem
-    // em casa. Medido antes deste balanco: micelio 22%, Aurix 25%, rocha
-    // suturada 8% de todos os setores — a rocha suturada nao tem linhagem
-    // propria e sobrevivia de um sorteio de 12%, enquanto a industrial
-    // empilhava Aurix sobre Aurix. Agora cada intrusao tem `INTRUSION_SHARE`
-    // por cento, e o que a tabela da linhagem ja traz (Aurix na industrial,
-    // micelio na hidrica) sai do sorteio: a parte dele vai para as outras
-    // duas, e uma run industrial ganha micelio ou seda em vez de mais Aurix.
+    // AS TRES OCUPACOES COM A MESMA CHANCE. Medido antes deste balanco:
+    // micelio 22%, Aurix 25%, rocha suturada 8% de todos os setores — a
+    // rocha suturada nao tem linhagem propria e sobrevivia de um sorteio de
+    // 12%. Agora cada intrusao tem `INTRUSION_SHARE` por cento, em TODO setor
+    // sem ocupacao, e o bioma continua funcao pura de (seed, setor).
     //
-    // O SETOR FINAL sorteia as tres: a exclusao vale para o meio da descida,
-    // onde ela compra variedade; no fundo ela tiraria da hidrica o Bispo e da
-    // industrial o Diamandis, que sao justamente os finais que o chefe de
-    // ocupacao existe para dar.
-    const home = new Set(table.map((t) => t.occupation));
-    const candidates =
-      clamped === MAX_LINEAGE_SECTORS ? INTRUSIONS : INTRUSIONS.filter((o) => !home.has(o));
-    const share = Math.floor((INTRUSION_SHARE * INTRUSIONS.length) / candidates.length);
-    // AS FAIXAS DO SORTEIO. A rocha suturada fica no TOPO (rolos 82..99) e as
-    // outras sobem do zero: e a disposicao que preserva o maior numero de
-    // seeds que ja eram o que eram — toda seed suturada de antes (88..99)
-    // continua suturada, e o micelio e o Aurix de rolos baixos tambem — para
-    // as fixtures, as arenas do catalogo e a prancha da Cerzideira (seed 36)
-    // nao mudarem de bioma por um balanco de chances.
-    const last = candidates.length - 1;
-    const slot = Math.floor(roll / share);
-    if (roll >= 100 - share) occupation = candidates[last];
-    else if (slot < last) occupation = candidates[slot];
+    // Sem excluir a ocupacao que a linhagem ja tem em casa, de proposito. A
+    // primeira versao excluia (uma run industrial so ganhava micelio ou seda)
+    // e abria a excecao no setor final — mas "final" depende da geracao (G-02
+    // acaba no 4, G-04 no 7), e o terreno de (seed, setor) tem de ser o mesmo
+    // em qualquer geracao (ver a impressao digital da geracao). A linhagem
+    // industrial fica puxada para o Aurix pelos cinco setores que o trazem em
+    // casa; e a identidade dela, nao um desbalanco do sorteio.
+    //
+    // AS FAIXAS: a rocha suturada fica no TOPO (rolos 82..99) e as outras
+    // sobem do zero. E o superconjunto da faixa antiga da seda (88..99), entao
+    // toda seed suturada de antes continua suturada — a prancha e a arena da
+    // Cerzideira seguem na seed 36 — e o micelio e o Aurix de rolos baixos
+    // tambem ficam onde estavam.
+    if (roll >= 100 - INTRUSION_SHARE) occupation = 'stitchers';
+    else if (roll < INTRUSION_SHARE) occupation = 'mycelial';
+    else if (roll < INTRUSION_SHARE * 2) occupation = 'aurix';
   }
   // A Fornalha nao recebe colonia micelial: biomassa umida nao coloniza chao
   // incandescente. A intrusao vira Aurix — os sistemas de refrigeracao

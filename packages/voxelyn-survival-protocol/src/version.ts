@@ -1052,10 +1052,10 @@ export const PROTOCOL_VERSION = 39;
 //     fogem ao avistar o Prospector, esmagadas ao pisar; no hash e no
 //     contador de arquetipos.
 // 77: AS INTRUSOES BALANCEADAS. Micelio, Aurix e rocha suturada com a mesma
-//     chance (18% cada) num setor sem ocupacao, e a ocupacao que a linhagem
-//     ja tem em casa sai do sorteio (a parte dela vai para as outras duas).
-//     Antes: 30/15/12. Muda o bioma de (seed, setor) e, com ele, o terreno:
-//     replays de 76 geram outro mapa.
+//     chance (18% cada) em todo setor sem ocupacao a partir do segundo, com
+//     a seda no topo das faixas (toda seed suturada de antes continua
+//     suturada). Antes: 30/15/12. Muda o bioma de parte das seeds e, com
+//     ele, o terreno: replays de 76 geram outro mapa.
 export const SIMULATION_VERSION = 77;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
