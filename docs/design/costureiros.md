@@ -72,7 +72,7 @@ node packages/voxelyn-survival/scripts/export-costureiros-preview.mjs
 
 O estado de suturas, seus prazos e a máscara de recompensas entram no hash autoritativo, snapshots, resync e estados de apresentação solo/co-op. A sutura desenhada acompanha o tick do corpo, em vez do snapshot mais recente recebido. O snapshot MCP expõe geometria, fase, prazos e objetivo.
 
-Versões: protocolo 38, simulação 75, conteúdo 37. O encontro com a Cerzideira foi refeito depois deste documento; as regras atuais da câmara estão em [docs/media/cerzideira-rework/README.md](../media/cerzideira-rework/README.md). Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
+Versões: protocolo 38, simulação 75, conteúdo 38. O encontro com a Cerzideira foi refeito depois deste documento; as regras atuais da câmara estão em [docs/media/cerzideira-rework/README.md](../media/cerzideira-rework/README.md). Cliente e servidor precisam ser atualizados juntos. IDs de terreno/superfície e índices de archetypes foram acrescentados ao fim das listas existentes.
 
 Os atlas novos carregam sob demanda. Ao trocar de encontro, o cliente libera os atlas opcionais e mapas de faces do boss anterior, incluindo pedidos ainda em andamento. Os limites existentes de 160 MiB no boot e 48 MiB sob demanda foram mantidos; o validador mede o conjunto comum mais o maior encontro residente.
 

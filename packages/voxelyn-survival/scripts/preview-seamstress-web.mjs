@@ -14,7 +14,7 @@ const temp = await mkdtemp(resolve(tmpdir(), 'cerzideira-web-'));
 const entry = resolve(temp, 'engine.mjs');
 await build({
   stdin: {
-    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export { stunEntity } from './packages/voxelyn-survival-sim/src/entities.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
+    contents: `export { createArenaRun } from './packages/voxelyn-survival/src/client/arena-setup.ts'; export { appendSutureDraws } from './packages/voxelyn-survival/src/client/suture-presentation.ts'; export { drawSeamstressEyes, drawCocoon } from './packages/voxelyn-survival/src/client/web-presentation.ts'; export { stunEntity } from './packages/voxelyn-survival-sim/src/entities.ts'; export * from './packages/voxelyn-survival-sim/src/index.ts';`,
     resolveDir: root,
   },
   bundle: true,
@@ -188,7 +188,34 @@ capture(
   'Atordoamento cancela a barra. A ancora permanece destruida.',
   focus,
 );
-if (frames.length !== 8) throw new Error(`Expected eight beats, got ${frames.length}`);
+// A REDE: abaixo de 20% ela carrega e arremessa; o jogador parado e encapsulado.
+anchorMender.stunnedUntil = state.tick;
+queen.hp = queen.maxHp * 0.15;
+queen.rangedReadyAt = 0;
+queen.nextActionAt = state.tick;
+for (const e of state.enemies) if (e.summonerId === queen.id) e.nextActionAt = state.tick + 100000;
+{
+  const dx = state.player.x - queen.x,
+    dy = state.player.y - queen.y,
+    d = Math.hypot(dx, dy) || 1;
+  const clear = engine.silkLanding(
+    state,
+    state.player,
+    { x: queen.x + (dx / d) * 5, y: queen.y + (dy / d) * 5 },
+    3,
+  );
+  if (clear) {
+    state.player.x = clear.x;
+    state.player.y = clear.y;
+  }
+}
+state.playerExtra.iframesUntil = 0;
+for (let i = 0; i < 600 && !(state.playerExtra.cocoonUntil > state.tick); i++) step();
+if (!(state.playerExtra.cocoonUntil > state.tick))
+  throw new Error('a rede nao encapsulou o jogador');
+for (let i = 0; i < 6; i++) step();
+capture('REDE / CASULO', 'Abaixo de 20%: a rede fecha 3 s de casulo imune; depois, 10% do passo.');
+if (frames.length !== 9) throw new Error(`Expected nine beats, got ${frames.length}`);
 
 const atlasDir = resolve(root, 'packages/voxelyn-survival-content/assets/atlases');
 const terrain = JSON.parse(await readFile(resolve(atlasDir, 'terrain-blocks.json'), 'utf8'));
@@ -390,6 +417,12 @@ for (const [n, frame] of frames.entries()) {
         if (e.archetype === 'seamstress' && engine.seamstressFrenzied(e)) {
           const [hx, hy] = project(e.x + e.facing.x * 0.75, e.y + e.facing.y * 0.75);
           engine.drawSeamstressEyes(ctx, hx, hy - 21 - lift, e.facing.x, 1, 0);
+        }
+        if (e === frame.state.player) {
+          const ex = frame.state.playerExtras[0];
+          if (ex.cocoonUntil > frame.state.tick) engine.drawCocoon(ctx, sx, sy - 6, 11, 1, 0, true);
+          else if (ex.webbedUntil > frame.state.tick)
+            engine.drawCocoon(ctx, sx, sy - 6, 11, 1, 0, false);
         }
       },
     });

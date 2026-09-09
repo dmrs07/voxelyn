@@ -31,11 +31,12 @@ Na metade da vida a Cerzideira interrompe o que estiver fazendo, prende-se a um 
 - **Apoios reforçados.** Âncoras da câmara resistem a seis impactos; junções da teia, a três impactos mirados. As marcas na junção mostram sua resistência restante. Destruir a junção rompe os fios ligados a ela; acertar um apoio ainda resistente não corta também a amarra da Cerzideira naquele ponto. Os trechos de fio entre junções continuam cortáveis com um tiro transversal. As âncoras da colônia mantêm sua regra anterior.
 - **Crias e Costureiros.** As crias perseguem a 4,8 tiles/s (mais rápidas que o Prospector) e o salto causa 10 num raio de 0,7. No frenesi, os Costureiros convocados reconstroem apoios destruídos, depois fios cortados e então apoios parcialmente danificados. Cada um reserva um trabalho acessível; os demais escolhem outros reparos. A proximidade do jogador não os distrai. Atacam quando não encontram reparo disponível.
 - **Reconstrução visível.** Uma barra âmbar acima da cabeça acompanha a canalização: 2 s por fio e 3 s por âncora ou junção, após chegar ao local. O reparo só se aplica ao completar a barra. Atordoar, matar ou afastar o operário do alvo interrompe o trabalho; a tentativa seguinte começa novamente. Âncoras destruídas permanecem registradas e podem voltar ao mesmo lugar, mas nunca se reconstrói uma parede dentro de um personagem. Os fios da junção são reparados depois do nó.
+- **A rede (abaixo de 20%).** Ela carrega a rede com aviso longo (26 ticks, faixa no chão num dos oito rumos autorados) e arremessa um disco de teia a 9 tiles/s, alcance 12. Não fere: quem é acertado fica 3 s encapsulado, imune e parado, e ao sair anda a 10% por 4 s, cheio de fios. Recarga de 12 s. O disco é o atlas `fx-silk-net`, oito rumos, três quadros de giro; o casulo e os fios são desenhados pelo cliente sobre o Prospector, também no parceiro do co-op (`cocoonUntil`/`webbedUntil` viajam no snapshot e entram no hash).
 - **Fim.** A morte da Cerzideira encerra os auxiliares e dissolve a teia.
 
 Os fios são suturas `kind: 'web'`: cortes, reparos, hash, snapshot e reconexão reutilizam a infraestrutura das suturas. A decisão que a fase oferece: atacar a Cerzideira exposta, controlar as crias, ou matar os Costureiros para manter a teia aberta e a fraqueza dela à mostra. O estado da fase vive em `silk.stage`, `stageAt` e `returnAt`, no hash e nos snapshots. Fora da tela ela não é alvo de nada. As oito direções autoradas e o raster de câmera das diagonais ficam como estão; os olhos vermelhos são desenhados pelo cliente sobre o sprite, porque o orçamento sob demanda dos atlas não comporta outra animação de oito rumos.
 
-Prancha: `node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs` gera a imagem acima e `second-phase-events.json`, a partir da simulação real (seed 36): subida, teia se formando, retorno com olhos vermelhos, passagem aberta pelo jogador, Costureiro reconstruindo um fio, uma puxada do frenesi, reconstrução de âncora a 50% e cancelamento por atordoamento. O JSON registra o trabalho e o progresso de cada operário nos quadros capturados.
+Prancha: `node packages/voxelyn-survival/scripts/preview-seamstress-web.mjs` gera a imagem acima e `second-phase-events.json`, a partir da simulação real (seed 36): subida, teia se formando, retorno com olhos vermelhos, passagem aberta pelo jogador, Costureiro reconstruindo um fio, uma puxada do frenesi, reconstrução de âncora a 50%, cancelamento por atordoamento e a rede fechando o casulo abaixo de 20%. O JSON registra o trabalho e o progresso de cada operário nos quadros capturados.
 
 ## Jogar e reproduzir
 
@@ -69,7 +70,7 @@ Build de produção, lint, testes focados e verificações por pacote foram exec
 
 O navegador remoto bloqueou URLs locais, portanto o pacote jogável não recebeu inspeção interativa nesta sessão. A inspeção visual cobre a prancha da simulação e os atlas; os testes cobrem impacto, interrupções, pouso, auxiliares, hash, apresentação e reconexão durante o voo.
 
-O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões atuais: protocolo 38, simulação 75, conteúdo 37. Cliente e servidor precisam ser atualizados juntos.
+O validador de conteúdo manteve os limites existentes: 159,52 MiB no boot e 46,31 MiB sob demanda, abaixo dos tetos de 160 e 48 MiB. Versões atuais: protocolo 38, simulação 75, conteúdo 38. Cliente e servidor precisam ser atualizados juntos.
 
 ### Prioridade de reparo no PR #216
 

@@ -1,0 +1,79 @@
+{
+  "id": "fx-silk-net",
+  "version": 1,
+  "atlas": "fx-silk-net.png",
+  "frameWidth": 48,
+  "frameHeight": 48,
+  "columns": 24,
+  "anchorX": 24,
+  "anchorY": 36,
+  "directions": 8,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul",
+    "r",
+    "d",
+    "l",
+    "u"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.2,
+    "h": 1.2
+  },
+  "footprint": {
+    "w": 0,
+    "h": 0,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#3d2a22",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "fly": {
+      "frames": 3,
+      "fps": 10,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "fly": 0
+    },
+    "dl": {
+      "fly": 3
+    },
+    "ur": {
+      "fly": 6
+    },
+    "ul": {
+      "fly": 9
+    },
+    "r": {
+      "fly": 12
+    },
+    "d": {
+      "fly": 15
+    },
+    "l": {
+      "fly": 18
+    },
+    "u": {
+      "fly": 21
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric thrown silk net, upright disc of pale mineral silk with eight spokes, two rings and a resin knot, spinning in flight, authored in eight directions",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

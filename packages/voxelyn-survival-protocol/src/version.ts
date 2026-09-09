@@ -242,6 +242,8 @@
 //     Cerzideira) e `Suture.kind` aceita `web`. Um cliente antigo desenharia a
 //     rainha no chao enquanto o servidor a tem fora da tela.
 // 38: support durability and worker repair assignments travel with entity snapshots.
+//     `EntitySnapshot`/viewer dos players ganham `cocoonUntil` e `webbedUntil`
+//     (a rede da Cerzideira); `ProjectileKind` aceita `net`; `BossAbility` aceita `net`.
 export const PROTOCOL_VERSION = 38;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
@@ -1039,6 +1041,9 @@ export const PROTOCOL_VERSION = 38;
 //     cada 4,5 s. Replays de 73 com a Cerzideira nao batem.
 // 75: reinforced web supports, persistent destroyed anchors and repair-first workers.
 //     Channel deadlines, support HP and assigned jobs determine future state.
+//     A REDE: abaixo de 20% a Cerzideira arremessa `net` (oito rumos); quem e
+//     acertado fica 3 s no casulo (imune, parado — `cocoonUntil`) e sai a 10%
+//     por 4 s (`webbedUntil`); os dois no hash.
 export const SIMULATION_VERSION = 75;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
@@ -1235,7 +1240,9 @@ export const SIMULATION_VERSION = 75;
 //     parado. Um cliente com o atlas antigo em cache cairia no `idle` de
 //     sempre; o bump invalida a precache.
 // 37: tucked flight poses and the Cerzideira brood atlas.
-export const CONTENT_VERSION = 37;
+// 38: o atlas `fx-silk-net` — a rede de seda da Cerzideira, um disco de teia
+//     autorado em oito rumos, tres quadros de giro.
+export const CONTENT_VERSION = 38;
 
 export type VersionTriple = {
   protocolVersion: number;

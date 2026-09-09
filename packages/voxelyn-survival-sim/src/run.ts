@@ -124,8 +124,8 @@ import {
   stepCells,
 } from './cells.js';
 import { leviathanCovers, leviathanTargetable } from './leviathan.js';
-import { seamstressTargetable } from './seamstress.js';
-import { webSpeedMul } from './web.js';
+import { cocoonPlayer, seamstressTargetable } from './seamstress.js';
+import { WEB_COCOON_SLOW, webSpeedMul } from './web.js';
 import {
   explosiveArmedByDistance,
   impactSolid,
@@ -264,7 +264,10 @@ const playerSurfaceSpeedMul = (
 ): number => {
   // A TEIA da Cerzideira pega o Prospector, e nao e liquido: nao passa pelo
   // desconto de `liquidSlowScale`. Fios cortados nao pegam (ver web.ts).
-  const web = webSpeedMul(state, player);
+  const extra = state.playerExtras[player.slot ?? 0];
+  // Cheio de fios depois do casulo: 10% do passo, ate o relogio acabar.
+  const webbed = extra.webbedUntil > state.tick ? WEB_COCOON_SLOW : 1;
+  const web = webSpeedMul(state, player) * webbed;
   const base = surfaceSpeedMul(state, player);
   if (base >= 1) return base * web;
   return (1 - (1 - base) * tuning.liquidSlowScale) * web;
@@ -301,6 +304,8 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   channelingUntil: 0,
   dodgeUntil: 0,
   iframesUntil: 0,
+  cocoonUntil: 0,
+  webbedUntil: 0,
   dodgeCooldownUntil: 0,
   abilityCooldownUntil: 0,
   purgeCells: tuning.startingPurgeCells,
@@ -341,6 +346,8 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.channelingUntil = 0;
   extra.dodgeUntil = 0;
   extra.iframesUntil = 0;
+  extra.cocoonUntil = 0;
+  extra.webbedUntil = 0;
   extra.dodgeCooldownUntil = 0;
   extra.abilityCooldownUntil = 0;
   extra.aim = { x: 1, y: 0 };
@@ -1820,6 +1827,21 @@ const stepPlayer = (
     return;
   }
 
+  // NO CASULO: nenhum comando chega ao corpo. Ele esta imune (ver
+  // `damageEntity`) e parado; o que o jogador faz e esperar os 3 s.
+  if (extra.cocoonUntil > state.tick) {
+    cmd = {
+      ...cmd,
+      move: { x: 0, y: 0 },
+      fire: false,
+      ability: false,
+      dodge: false,
+      interact: false,
+    };
+    player.vx = 0;
+    player.vy = 0;
+  }
+
   // Pedra do Bruiser interrompe movimento e todas as acoes. Timers do mundo e
   // dos modulos continuam correndo; o stun nao pausa a simulacao. O canal do
   // sopro e interrompido DE VEZ, como a esquiva — com ele cai o bloqueio de
@@ -2903,6 +2925,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
               });
               continue;
             }
+            // A REDE nao fere: fecha o casulo e some.
+            if (proj.kind === 'net') {
+              cocoonPlayer(state, player, events);
+              dead = true;
+              break;
+            }
             if (proj.kind === 'cart') {
               if (proj.hits?.includes(player.id)) continue;
               proj.hits?.push(player.id);
@@ -3590,6 +3618,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(p.facing.x * 1000));
     mix(Math.round(p.facing.y * 1000));
     mix(e.channelingUntil);
+    // O casulo e os fios da rede: imunidade e passo sao autoritativos.
+    mix(e.cocoonUntil);
+    mix(e.webbedUntil);
     mix(e.purgeCells);
     // A habilidade equipada MUDA o resultado da run, entao ela e estado
     // autoritativo: duas simulacoes que discordam de qual habilidade o slot

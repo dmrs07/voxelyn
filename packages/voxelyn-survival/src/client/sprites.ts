@@ -75,6 +75,7 @@ import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
 import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
+import silkNetManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-net.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
@@ -149,6 +150,7 @@ import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
 import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
+import silkNetUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-net.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
@@ -635,6 +637,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
   { manifest: droneManifest as unknown as SpriteManifestEntry, url: droneUrl },
   { manifest: cycloneManifest as unknown as SpriteManifestEntry, url: cycloneUrl },
+  { manifest: silkNetManifest as unknown as SpriteManifestEntry, url: silkNetUrl },
 ];
 
 /**
@@ -1617,10 +1620,13 @@ export class SpriteBank {
     y: number,
     zoom: number,
     tint?: Tint,
+    /** O rumo, para FX autorados em varios rumos (a rede da Cerzideira). */
+    facingX = 0,
+    facingY = 1,
   ): boolean {
     const loaded = this.get(id);
     if (!loaded || !loaded.ready) return false;
-    this.drawLoadedFrame(ctx, loaded, animation, 0, 1, elapsedMs, x, y, zoom, tint);
+    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, x, y, zoom, tint);
     return true;
   }
 

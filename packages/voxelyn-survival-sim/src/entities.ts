@@ -8,6 +8,7 @@ import {
   silkContact,
   silkStrike,
   seamstressTargetable,
+  seamstressNetRelease,
 } from './seamstress.js';
 import { dissolveWeb, webArmor } from './web.js';
 import {
@@ -1038,6 +1039,8 @@ export const damageEntity = (
   if (ent.kind === 'player') {
     const extra = state.playerExtras[ent.slot ?? 0];
     if (extra.iframesUntil > state.tick || extra.downed) return;
+    // O CASULO e imune: a rede prende, nao mata.
+    if (extra.cocoonUntil > state.tick) return;
     // A selagem ambiental (CA-04) e aplicada AQUI, e nao em cada `applyCellHazards`,
     // porque a lista de causas ambientais e a coisa que precisa ficar visivel: um
     // caminho de dano novo que se esqueca dela apareceria como bug de balanco em
@@ -1540,7 +1543,7 @@ const bossAbilityOfAction = (enemy: Entity, action: EntityActionKind): BossAbili
   if (!isBossArchetype(archetype)) return null;
   switch (action) {
     case 'ranged':
-      return 'salvo';
+      return enemy.archetype === 'seamstress' ? 'net' : 'salvo';
     case 'slam':
       return 'slam';
     case 'charge':
@@ -1968,6 +1971,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     // segunda. O cuspe abaixo volta a ser exclusivo do Spitter.
     if (enemy.archetype === 'guardian') {
       guardianSalvoRelease(state, enemy, action, target, events);
+      return;
+    }
+    // A REDE da Cerzideira: o ranged dela e seda, e nao fere — encapsula.
+    if (enemy.archetype === 'seamstress') {
+      seamstressNetRelease(state, enemy, action, events);
       return;
     }
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];

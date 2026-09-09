@@ -10,7 +10,14 @@ import {
   sutureInSeamstressChamber,
   seamstressAnchorInRange,
 } from './suture-layout.js';
-import type { Entity, SemanticEvent, SilkFlight, SurvivalState, Vec2 } from './types.js';
+import type {
+  Entity,
+  EntityAction,
+  SemanticEvent,
+  SilkFlight,
+  SurvivalState,
+  Vec2,
+} from './types.js';
 
 export const SEAMSTRESS_GROUND_SPEED = 4;
 export const SEAMSTRESS_FLIGHT_SPEED = 12;
@@ -63,6 +70,93 @@ export const SILK_FRENZY_STITCHERS = 3;
 export const SILK_FRENZY_WAVE_INTERVAL = 90;
 /** Altura, em pixels de zoom 1, a partir da qual o corpo esta fora da tela. */
 export const SEAMSTRESS_OFFSCREEN_LIFT = 320;
+
+// ---------------------------------------------------------------------------
+// A REDE DE SEDA (abaixo de 20% de vida).
+//
+// Ela CARREGA a rede — um preparo longo, com aviso — e arremessa um disco de
+// teia num dos oito rumos autorados, com uma antecipacao curta do jogador.
+// Quem e acertado fica ENCAPSULADO por 3 s: imune, parado, cego para os
+// comandos; ao sair, anda a 10% por mais 4 s, cheio de fios. Nao fere: e o
+// que muda a leitura da reta final — a pressao vem das crias, e a rede e o
+// que as deixa chegar.
+// ---------------------------------------------------------------------------
+export const SEAMSTRESS_NET_HP = 0.2;
+export const SEAMSTRESS_NET_WINDUP = 26;
+export const SEAMSTRESS_NET_COOLDOWN = 240;
+export const SEAMSTRESS_NET_SPEED = 9;
+export const SEAMSTRESS_NET_RANGE = 12;
+export const SEAMSTRESS_NET_RADIUS = 0.6;
+export const SEAMSTRESS_COCOON_TICKS = 60;
+export const SEAMSTRESS_WEBBED_TICKS = 80;
+
+/** Um dos oito rumos autorados: o disco voa exatamente como e desenhado. */
+export const netDirection = (aim: Vec2): Vec2 => {
+  const angle = Math.round(Math.atan2(aim.y, aim.x) / (Math.PI / 4)) * (Math.PI / 4);
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+};
+
+const netReady = (state: SurvivalState, queen: Entity): boolean =>
+  queen.hp <= queen.maxHp * SEAMSTRESS_NET_HP && state.tick >= queen.rangedReadyAt;
+
+const castNet = (
+  state: SurvivalState,
+  queen: Entity,
+  player: Entity,
+  events: SemanticEvent[],
+): void => {
+  const aim = silkAim(player, 0.6);
+  const dir = netDirection(unit(aim.x - queen.x, aim.y - queen.y));
+  startAction(state, queen, 'ranged', dir, SEAMSTRESS_NET_WINDUP, 10, events, player.id);
+  queen.rangedReadyAt = state.tick + SEAMSTRESS_NET_COOLDOWN;
+  queen.nextActionAt = queen.action!.endsAt;
+};
+
+export const seamstressNetRelease = (
+  state: SurvivalState,
+  queen: Entity,
+  action: EntityAction,
+  _events: SemanticEvent[],
+): void => {
+  const dir = action.direction;
+  state.projectiles.push({
+    kind: 'net',
+    id: state.nextEntityId++,
+    owner: queen.id,
+    x: queen.x + dir.x * 0.9,
+    y: queen.y + dir.y * 0.9,
+    vx: dir.x * SEAMSTRESS_NET_SPEED,
+    vy: dir.y * SEAMSTRESS_NET_SPEED,
+    damage: 0,
+    radius: SEAMSTRESS_NET_RADIUS,
+    distanceTravelled: 0,
+    hostile: true,
+    leavesBiofluid: false,
+    ttl: Math.ceil((SEAMSTRESS_NET_RANGE / SEAMSTRESS_NET_SPEED) * TICK_HZ),
+  });
+  // O `boss_attack` da rede sai do release generico (ver `releaseAction`).
+};
+
+/** A rede fechou: casulo imune por 3 s, depois 4 s cheio de fios. */
+export const cocoonPlayer = (
+  state: SurvivalState,
+  player: Entity,
+  events: SemanticEvent[],
+): void => {
+  const extra = state.playerExtras[player.slot ?? 0];
+  if (extra.cocoonUntil > state.tick) return;
+  extra.cocoonUntil = state.tick + SEAMSTRESS_COCOON_TICKS;
+  extra.webbedUntil = extra.cocoonUntil + SEAMSTRESS_WEBBED_TICKS;
+  extra.channelingUntil = 0;
+  player.vx = player.vy = 0;
+  events.push({
+    t: 'cocoon',
+    entity: player.id,
+    x: player.x,
+    y: player.y,
+    until: extra.cocoonUntil,
+  });
+};
 
 export const seamstressStage = (queen: Entity): number => queen.silk?.stage ?? 0;
 export const seamstressFrenzied = (queen: Entity): boolean =>
@@ -583,6 +677,13 @@ export const seamstressStep = (
   ) {
     startAction(state, queen, 'stitch', queen.facing, 18, 12, events);
     queen.nextActionAt = queen.action!.endsAt;
+    return;
+  }
+  if (
+    netReady(state, queen) &&
+    Math.hypot(player.x - queen.x, player.y - queen.y) <= SEAMSTRESS_NET_RANGE
+  ) {
+    castNet(state, queen, player, events);
     return;
   }
   if (pull(state, queen, player, events)) return;

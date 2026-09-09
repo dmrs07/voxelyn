@@ -289,3 +289,66 @@ export const drawSeamstressEyes = (
 };
 
 export const seamstressFrenzyStage = SEAMSTRESS_STAGE_FRENZY;
+
+/**
+ * O CASULO DA REDE sobre um Prospector: um envelope de seda, fios cruzados e
+ * um brilho fraco — o corpo esta la dentro, imune e parado, por 3 s. Depois
+ * do casulo ficam os FIOS: tres linhas soltas presas ao corpo, o aviso de que
+ * ele anda a 10%.
+ */
+export const drawCocoon = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  bodyY: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  full: boolean,
+): void => {
+  ctx.save();
+  const rx = size * 0.95,
+    ry = size * 1.35;
+  const cy = bodyY - size * 0.9;
+  if (full) {
+    const pulse = 0.75 + 0.25 * Math.sin(nowMs / 160);
+    // O envelope: um losango arredondado de seda, translucido.
+    ctx.fillStyle = SILK;
+    ctx.globalAlpha = 0.55 * pulse;
+    ctx.beginPath();
+    for (let n = 0; n <= 20; n++) {
+      const a = (n / 20) * Math.PI * 2;
+      const x = sx + Math.cos(a) * rx,
+        y = cy + Math.sin(a) * ry;
+      if (n) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = SILK;
+    ctx.lineWidth = Math.max(1, z);
+    ctx.stroke();
+    // Os fios enrolados, em diagonais cruzadas.
+    ctx.globalAlpha = 0.8;
+    for (let k = -2; k <= 2; k++) {
+      const yy = cy + k * ry * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(sx - rx * 0.95, yy - ry * 0.18);
+      ctx.lineTo(sx + rx * 0.95, yy + ry * 0.18);
+      ctx.stroke();
+    }
+  } else {
+    // Cheio de fios: tres linhas caidas do corpo, balancando.
+    ctx.strokeStyle = SILK;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = Math.max(1, z);
+    for (const [k, off] of [-0.6, 0.1, 0.7].entries()) {
+      const sway = Math.sin(nowMs / 300 + k) * 2 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx + off * rx, cy + (k - 1) * ry * 0.25);
+      ctx.lineTo(sx + off * rx + sway, bodyY + (4 + k * 2) * z);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+};
