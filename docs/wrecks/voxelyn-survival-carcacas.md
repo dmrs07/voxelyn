@@ -59,6 +59,11 @@ só *quão fundo*, casa **que tipo de lugar**. `candidateScore` pesa os quatro e
 - fog of war que revela **luz**, não silhueta;
 - **holograma dos últimos segundos**: 24 amostras a cada 120 ms, deslocamento em
   oitavos de tile a partir da célula da morte, octante da mira e bit de disparo.
+  Desde então a cápsula também guarda a vida por amostra e a trilha do agressor
+  (escolhido pela causa autoritativa entre as criaturas à vista), e a reprodução
+  usa os atlas do jogo no tamanho natural: o Prospector anda, atira, apanha e
+  cai; quem o matou aparece em sangue, e a causa acontece no corpo. Ver a seção
+  "Holograma" da spec dos Ecos.
 
 ## O que falta: a camada comunitária
 

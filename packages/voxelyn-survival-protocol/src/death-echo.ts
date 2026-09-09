@@ -43,12 +43,54 @@ export const DEATH_ECHO_TRACE_MIN_SAMPLES = 2;
 /** Quantização espacial do rastro: oitavos de tile, em int8. */
 const TRACE_UNITS_PER_TILE = 8;
 const TRACE_MAX_OFFSET = 127;
+/**
+ * O valor que marca "o agressor não estava aqui" numa amostra da trilha dele.
+ *
+ * Fora do alcance de `quantizeOffset`, que satura em ±127: um deslocamento real
+ * nunca produz este número, e ele cabe no mesmo int8 sem custar um campo a
+ * mais por amostra.
+ */
+export const DEATH_ECHO_TRACE_ABSENT = -128;
+/**
+ * Até onde uma criatura entra na amostra crua, em tiles.
+ *
+ * É maior que qualquer alcance de ataque do jogo de propósito: o agressor de um
+ * projétil pode estar a dezoito tiles, e um rastro que só o visse ao chegar
+ * perto contaria a pedra sem contar quem a jogou.
+ */
+export const DEATH_ECHO_TRACE_ENEMY_RADIUS = 20;
+/**
+ * Quantas criaturas cada amostra crua guarda.
+ *
+ * A amostra crua nunca vai para o storage — ela vive na memória do produtor
+ * até a morte, quando só a trilha de UM agressor sobrevive. Guardar as mais
+ * próximas em vez de todas mantém o custo por quadro constante numa sala com
+ * quarenta inimigos.
+ */
+export const DEATH_ECHO_TRACE_ENEMIES_PER_SAMPLE = 6;
+
+/**
+ * Uma criatura viva perto do Prospector no instante da amostra.
+ *
+ * O `id` é o que costura as amostras numa trilha: a morte diz o ARQUÉTIPO que
+ * matou (a causa autoritativa), e o id é o que permite seguir aquela criatura
+ * de volta pela janela em vez de trocar de Britador a cada amostra.
+ */
+export type DeathEchoTraceEnemy = {
+  id: number;
+  archetype: EnemyArchetype;
+  elite: boolean;
+  x: number;
+  y: number;
+};
 
 /**
  * Uma amostra crua do Prospector vivo, antes de virar cápsula.
  *
  * Quem coleta é o produtor (o cliente, quadro a quadro; o servidor, tick a
  * tick); só a morte transforma a janela corrente em `DeathEchoTrace`.
+ * `sampleDeathEchoTrace` é a única fábrica: os dois produtores chamam a mesma
+ * função, e a re-simulação do servidor vê exatamente o que o cliente viu.
  */
 export type DeathEchoTraceSample = {
   x: number;
@@ -56,6 +98,25 @@ export type DeathEchoTraceSample = {
   aimX: number;
   aimY: number;
   firing: boolean;
+  /** Vida do Prospector, 0..1. Ausente em amostras de produtores antigos. */
+  hp?: number;
+  /** As criaturas mais próximas neste instante. Ausente = nenhuma vista. */
+  enemies?: readonly DeathEchoTraceEnemy[];
+};
+
+/**
+ * A trilha do AGRESSOR ao longo da janela, na mesma quantização do Prospector.
+ *
+ * Só existe quando a causa autoritativa nomeia uma criatura (contato ou
+ * projétil), e é a trilha DAQUELA criatura — escolhida pelo arquétipo e pelo
+ * elite da causa entre as que estavam à vista no último instante, a mais
+ * próxima do corpo. Quem ela é não vem daqui: vem de `cause`. Aqui só mora
+ * ONDE ela esteve, e `DEATH_ECHO_TRACE_ABSENT` marca as amostras em que ela
+ * ainda não tinha aparecido.
+ */
+export type DeathEchoThreatTrack = {
+  dx: number[];
+  dy: number[];
 };
 
 /**
@@ -65,6 +126,10 @@ export type DeathEchoTraceSample = {
  * octante. É deliberadamente grosseiro: a reprodução tem de contar uma história
  * curta, não reproduzir a luta — e no cliente o storage é `localStorage`,
  * compartilhado com o histórico de runs.
+ *
+ * `hpQ` e `threat` são opcionais porque o storage e o pool guardam cápsulas de
+ * antes de eles existirem, e um rastro antigo continua sendo um rastro: o
+ * holograma anda por ele do mesmo jeito, só sem o golpe nem o agressor.
  */
 export type DeathEchoTrace = {
   stepMs: number;
@@ -73,6 +138,10 @@ export type DeathEchoTrace = {
   dy: number[];
   /** Octante da mira (0..7), somado a 8 quando havia disparo em curso. */
   aim: number[];
+  /** Vida do Prospector por amostra, 0..255. */
+  hpQ?: number[];
+  /** Por onde andou quem matou. Ver `DeathEchoThreatTrack`. */
+  threat?: DeathEchoThreatTrack;
 };
 
 export type DeathEchoCapsule = {
@@ -261,7 +330,42 @@ export const parseDeathEchoTrace = (value: unknown): DeathEchoTrace | null => {
     if (octant === null) return null;
     aim.push(octant);
   }
-  return { stepMs, dx, dy, aim };
+  // Os campos novos são ACESSÓRIOS do acessório: um `hpQ` torto derruba só o
+  // `hpQ`, e o trajeto continua valendo. Descartar o rastro inteiro por causa
+  // do golpe seria pagar a carcaça animada com a parte que ela já tinha.
+  const hpQ = parseByteArray(raw.hpQ, length);
+  const threat = parseThreatTrack(raw.threat, length);
+  return {
+    stepMs,
+    dx,
+    dy,
+    aim,
+    ...(hpQ ? { hpQ } : {}),
+    ...(threat ? { threat } : {}),
+  };
+};
+
+const parseByteArray = (value: unknown, length: number): number[] | null => {
+  if (!Array.isArray(value) || value.length !== length) return null;
+  const out: number[] = [];
+  for (const entry of value) {
+    const byte = finiteInt(entry, 0, 255);
+    if (byte === null) return null;
+    out.push(byte);
+  }
+  return out;
+};
+
+const parseThreatTrack = (value: unknown, length: number): DeathEchoThreatTrack | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Partial<DeathEchoThreatTrack>;
+  const dx = int8Array(raw.dx, length);
+  const dy = int8Array(raw.dy, length);
+  if (!dx || !dy) return null;
+  // Uma trilha em que o agressor nunca esteve não é trilha: cai fora aqui,
+  // para o consumidor não ter de perguntar "há alguém?" amostra a amostra.
+  if (!dx.some((entry) => entry !== DEATH_ECHO_TRACE_ABSENT)) return null;
+  return { dx, dy };
 };
 
 /** Teto do id: cabe `seed:phase:ticks:serial` com folga, e nada mais. */
@@ -341,19 +445,124 @@ const quantizeOffset = (value: number): number =>
   );
 
 /**
+ * Uma amostra crua do Prospector solo NESTE instante do estado.
+ *
+ * A única fábrica de amostra, chamada pelos dois produtores: o cliente a cada
+ * 120 ms de relógio, a re-simulação do servidor a cada tanto de ticks. Se cada
+ * um lesse o estado do seu jeito, o holograma de uma cápsula do pool contaria
+ * uma história diferente da cápsula local da mesma morte.
+ *
+ * As criaturas entram pelas MAIS PRÓXIMAS, vivas, dentro do raio. O agressor
+ * ainda não é conhecido — a causa só existe na morte —, então a amostra guarda
+ * candidatos, e `encodeDeathEchoTrace` escolhe entre eles quando souber quem.
+ */
+export const sampleDeathEchoTrace = (state: SurvivalState): DeathEchoTraceSample => {
+  const player = state.player;
+  const extra = state.playerExtra;
+  const radiusSquared = DEATH_ECHO_TRACE_ENEMY_RADIUS ** 2;
+  const nearby: Array<{ enemy: DeathEchoTraceEnemy; distance: number }> = [];
+  for (const enemy of state.enemies) {
+    if (!enemy.alive || enemy.kind !== 'enemy' || enemy.archetype === 'prospector') continue;
+    const distance = (enemy.x - player.x) ** 2 + (enemy.y - player.y) ** 2;
+    if (distance > radiusSquared) continue;
+    nearby.push({
+      distance,
+      enemy: {
+        id: enemy.id,
+        archetype: enemy.archetype,
+        elite: enemy.elite,
+        x: enemy.x,
+        y: enemy.y,
+      },
+    });
+  }
+  nearby.sort((a, b) => a.distance - b.distance || a.enemy.id - b.enemy.id);
+  const enemies = nearby
+    .slice(0, DEATH_ECHO_TRACE_ENEMIES_PER_SAMPLE)
+    .map((entry) => entry.enemy);
+  return {
+    x: player.x,
+    y: player.y,
+    aimX: extra.aim.x,
+    aimY: extra.aim.y,
+    // `nextShotAt` no futuro significa "acabou de disparar": é o único sinal
+    // de gatilho que o estado carrega depois que o tiro já saiu.
+    firing: extra.nextShotAt > state.tick,
+    hp: player.maxHp > 0 ? Math.max(0, Math.min(1, player.hp / player.maxHp)) : 0,
+    ...(enemies.length > 0 ? { enemies } : {}),
+  };
+};
+
+/**
+ * Quem, entre as criaturas vistas, foi o agressor que a causa nomeia.
+ *
+ * A causa é autoritativa e diz o ARQUÉTIPO e se era elite; o rastro diz quem
+ * estava lá. A escolha é a criatura desse arquétipo mais próxima do corpo na
+ * ÚLTIMA amostra — onde o golpe saiu —, e a trilha é a dela, seguida pelo id
+ * de volta pela janela. Sem candidata compatível não há trilha: um holograma
+ * que inventasse um Britador do nada ensinaria uma geometria que não existiu.
+ */
+const threatTrackFor = (
+  window: readonly DeathEchoTraceSample[],
+  originX: number,
+  originY: number,
+  cause: DamageCause | undefined,
+): DeathEchoThreatTrack | null => {
+  if (!cause || (cause.kind !== 'enemy_contact' && cause.kind !== 'enemy_projectile')) {
+    return null;
+  }
+  let killer: DeathEchoTraceEnemy | null = null;
+  let killerDistance = Number.POSITIVE_INFINITY;
+  // Do fim para o começo: o agressor tem de estar à vista no golpe final, e a
+  // amostra anterior só entra se a última não tiver ninguém compatível (a
+  // criatura pode ter morrido junto — um Bomber explode).
+  for (let i = window.length - 1; i >= Math.max(0, window.length - 2) && !killer; i--) {
+    const sample = window[i];
+    for (const enemy of sample.enemies ?? []) {
+      if (enemy.archetype !== cause.archetype || enemy.elite !== cause.elite) continue;
+      const distance = (enemy.x - sample.x) ** 2 + (enemy.y - sample.y) ** 2;
+      if (distance >= killerDistance) continue;
+      killer = enemy;
+      killerDistance = distance;
+    }
+  }
+  if (!killer) return null;
+  const id = killer.id;
+  const dx: number[] = [];
+  const dy: number[] = [];
+  for (const sample of window) {
+    const seen = sample.enemies?.find((enemy) => enemy.id === id) ?? null;
+    dx.push(seen ? quantizeOffset(seen.x - originX) : DEATH_ECHO_TRACE_ABSENT);
+    dy.push(seen ? quantizeOffset(seen.y - originY) : DEATH_ECHO_TRACE_ABSENT);
+  }
+  return { dx, dy };
+};
+
+/**
  * Fecha a janela corrente de amostras num rastro guardável.
  *
  * Devolve `null` quando a janela é curta demais: uma morte de dois quadros não
  * tem história para contar, e a spec já exclui mortes muito curtas do pool.
+ *
+ * `cause` é o que permite escolher o agressor entre as criaturas amostradas;
+ * sem ela (produtor antigo, teste) o rastro sai sem trilha, nunca inválido.
  */
 export const encodeDeathEchoTrace = (
   samples: readonly DeathEchoTraceSample[],
   originX: number,
   originY: number,
   stepMs: number = DEATH_ECHO_TRACE_STEP_MS,
+  cause?: DamageCause,
 ): DeathEchoTrace | null => {
   const window = samples.slice(-DEATH_ECHO_TRACE_SAMPLES);
   if (window.length < DEATH_ECHO_TRACE_MIN_SAMPLES) return null;
+  // A vida só entra se TODA amostra a trouxe: uma janela meio a meio (produtor
+  // atualizado no meio da run não existe, mas o formato não pode depender disso)
+  // viraria um golpe fantasma onde o valor passou de ausente para presente.
+  const hpQ = window.every((sample) => typeof sample.hp === 'number')
+    ? window.map((sample) => Math.max(0, Math.min(255, Math.round((sample.hp ?? 0) * 255))))
+    : null;
+  const threat = threatTrackFor(window, originX, originY, cause);
   return {
     stepMs,
     dx: window.map((sample) => quantizeOffset(sample.x - originX)),
@@ -361,6 +570,8 @@ export const encodeDeathEchoTrace = (
     aim: window.map(
       (sample) => octantOf(sample.aimX, sample.aimY) + (sample.firing ? 8 : 0),
     ),
+    ...(hpQ ? { hpQ } : {}),
+    ...(threat ? { threat } : {}),
   };
 };
 
@@ -370,6 +581,10 @@ export type DeathEchoTracePoint = {
   aimX: number;
   aimY: number;
   firing: boolean;
+  /** Vida 0..1, ou `null` num rastro sem esse campo. */
+  hp: number | null;
+  /** Onde o agressor estava, ou `null` se ausente (ou rastro sem trilha). */
+  threat: { x: number; y: number } | null;
 };
 
 /** Duração total da reprodução, em ms. */
@@ -386,12 +601,27 @@ export const decodeDeathEchoTracePoint = (
   if (index < 0 || index >= trace.dx.length) return null;
   const code = trace.aim[index];
   const angle = (code & 7) * (Math.PI / 4);
+  const threatDx = trace.threat?.dx[index];
+  const threatDy = trace.threat?.dy[index];
+  const threatPresent =
+    threatDx !== undefined &&
+    threatDy !== undefined &&
+    threatDx !== DEATH_ECHO_TRACE_ABSENT &&
+    threatDy !== DEATH_ECHO_TRACE_ABSENT;
+  const hpQ = trace.hpQ?.[index];
   return {
     x: originX + trace.dx[index] / TRACE_UNITS_PER_TILE,
     y: originY + trace.dy[index] / TRACE_UNITS_PER_TILE,
     aimX: Math.cos(angle),
     aimY: Math.sin(angle),
     firing: (code & 8) !== 0,
+    hp: hpQ === undefined ? null : hpQ / 255,
+    threat: threatPresent
+      ? {
+          x: originX + threatDx / TRACE_UNITS_PER_TILE,
+          y: originY + threatDy / TRACE_UNITS_PER_TILE,
+        }
+      : null,
   };
 };
 
@@ -549,7 +779,13 @@ export const buildDeathEchoCapsule = (
   const sourceY = Math.max(0, Math.min(height - 1, Math.floor(origin.y)));
   const topology = deathEchoTopology(state, sourceX, sourceY);
   const finalTrace = origin.trace
-    ? encodeDeathEchoTrace(origin.trace, sourceX + 0.5, sourceY + 0.5)
+    ? encodeDeathEchoTrace(
+        origin.trace,
+        sourceX + 0.5,
+        sourceY + 0.5,
+        DEATH_ECHO_TRACE_STEP_MS,
+        origin.cause,
+      )
     : null;
   return {
     ...(finalTrace ? { finalTrace } : {}),

@@ -13,6 +13,7 @@ import type { SurvivalState } from '@voxelyn/survival-sim';
 import {
   DEATH_ECHO_TRACE_SAMPLES,
   DEATH_ECHO_TRACE_STEP_MS,
+  sampleDeathEchoTrace,
   type DeathEchoCapsule,
   type DeathEchoTraceSample,
   type PlacedDeathEcho,
@@ -164,16 +165,10 @@ class DeathEchoTraceRecorder {
     if (state.config.playerCount !== 1 || state.phase !== 'running') return;
     if (nowMs < this.nextSampleAtMs) return;
     this.nextSampleAtMs = nowMs + DEATH_ECHO_TRACE_STEP_MS;
-    const extra = state.playerExtra;
-    this.samples.push({
-      x: state.player.x,
-      y: state.player.y,
-      aimX: extra.aim.x,
-      aimY: extra.aim.y,
-      // `nextShotAt` no futuro significa "acabou de disparar": é o único sinal
-      // de gatilho que o estado carrega depois que o tiro já saiu.
-      firing: extra.nextShotAt > state.tick,
-    });
+    // A amostra é a do protocolo, e não uma leitura própria do estado: o
+    // servidor re-simula o log com a mesma função, e o holograma da cápsula do
+    // pool tem de ser o mesmo que o da cápsula guardada aqui.
+    this.samples.push(sampleDeathEchoTrace(state));
     if (this.samples.length > DEATH_ECHO_TRACE_SAMPLES) {
       this.samples.splice(0, this.samples.length - DEATH_ECHO_TRACE_SAMPLES);
     }
