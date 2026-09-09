@@ -26,7 +26,7 @@ import {
   DEVOURER_MAW_RADIUS,
   PLAYER_SPEED,
 } from '@voxelyn/survival-sim';
-import { blobRadius, fbm01 } from './noise';
+import { blobRadius, fbm01, fbm2 } from './noise';
 
 /**
  * Quantos graos o vortice carrega de uma vez, NA QUALIDADE ALTA.
@@ -565,3 +565,299 @@ export const mawCloudShape = (
   const density = 0.55 + 0.45 * fbm01(seconds * 0.35 + i * 0.31, i * 1.7 + 11.3, seed + 1, 2);
   return { points, density };
 };
+
+// ---------------------------------------------------------------------------
+// O CENTRO DO SUMIDOURO — o buraco e a rampa toroidal.
+// ---------------------------------------------------------------------------
+// A boca tem garganta; o sumidouro nao tem, e nao pode ter um centro que
+// prometa uma sentenca. Mas um disco de sucao sem centro nenhum le como um
+// anel de riscos flutuando sobre o chao — nao ha para ONDE a areia esta indo.
+// O que ele ganha e um centro de terreno: um buraco escuro, pequeno, e em
+// volta dele a areia empilhada num anel que desce — a crista clara por fora,
+// a parede escurecendo para dentro, o buraco no fundo. E o corte de um funil
+// de areia visto de cima: a materia que a sucao come nao some, ela se
+// amontoa na borda do buraco antes de cair.
+
+/** O raio do buraco, como fracao do alcance do instante. */
+export const SINKHOLE_HOLE_FRACTION = 0.2;
+/** Onde a crista da rampa fica, como fracao do alcance: o ponto mais alto e mais claro. */
+export const SINKHOLE_CREST_FRACTION = 0.38;
+/** Ate onde a rampa se espalha antes de virar chao, como fracao do alcance. */
+export const SINKHOLE_RAMP_FRACTION = 0.6;
+/** Quantos vertices tem a crista rasgada. */
+export const SINKHOLE_CREST_VERTICES = 24;
+/** Quanto a crista ondula (fracao do raio dela). Menos que a nuvem: e areia empilhada, nao poeira. */
+export const SINKHOLE_CREST_RAGGED = 0.14;
+
+export type SinkholeRamp = {
+  /** Raio do buraco, em tiles. */
+  hole: number;
+  /** Raio da crista, em tiles. */
+  crest: number;
+  /** Raio externo da rampa, em tiles. */
+  outer: number;
+};
+
+/**
+ * Os tres raios da rampa para um alcance. Tudo escala com o alcance, pela
+ * mesma razao das nuvens: o sumidouro abre de zero e fecha a zero, e um
+ * buraco de tamanho fixo seria maior que o proprio disco nas pontas.
+ */
+export const sinkholeRamp = (reach: number): SinkholeRamp => ({
+  hole: reach * SINKHOLE_HOLE_FRACTION,
+  crest: reach * SINKHOLE_CREST_FRACTION,
+  outer: reach * SINKHOLE_RAMP_FRACTION,
+});
+
+/**
+ * O CONTORNO DA CRISTA: um anel de raio `radius` rasgado por Perlin, em tiles
+ * a partir do centro do sumidouro. A semente vem de quem chama (o tick de
+ * abertura serve): dois sumidouros nao tem a mesma crista, e o mesmo
+ * sumidouro tem a mesma crista em dois clientes. Ferve devagar — e areia
+ * empilhada escorregando, nao poeira.
+ */
+export const sinkholeCrestShape = (
+  seed: number,
+  seconds: number,
+  radius: number,
+  vertices = SINKHOLE_CREST_VERTICES
+): ReadonlyArray<{ dx: number; dy: number }> => {
+  const points: Array<{ dx: number; dy: number }> = [];
+  for (let k = 0; k < vertices; k++) {
+    const angle = (k / vertices) * Math.PI * 2;
+    const r = radius * blobRadius(angle, seconds * 0.35, seed, SINKHOLE_CREST_RAGGED, 2.6);
+    points.push({ dx: Math.cos(angle) * r, dy: Math.sin(angle) * r });
+  }
+  return points;
+};
+
+// ---------------------------------------------------------------------------
+// O VEU DE AREIA — a nuvem continua, em Perlin, fluindo para dentro.
+// ---------------------------------------------------------------------------
+// As nuvens de `mawCloud` sao manchas: vinte e duas, de um tile, com o
+// contorno em ruido. Vistas em tela elas sao borroes, e um borrao nao mostra
+// ruido nenhum — o Perlin estava na borda de uma coisa pequena demais para
+// ter borda. O que faz uma nuvem de areia LER como nuvem e textura por
+// dentro: regioes densas e ralas, rasgos, filamentos, tudo se movendo junto.
+//
+// O veu e isso: um campo de Perlin amostrado sobre o disco inteiro, numa
+// grade de celulas projetadas no chao. O truque que o faz parecer SUGADO e
+// nao pintado esta nas coordenadas: o ruido nao e amostrado em (x, y), e sim
+// nas coordenadas MATERIAIS da espiral — o progresso pela lei do sumidouro e
+// o angulo desenrolado pelo passo. Nessas coordenadas um ponto que viaja pelo
+// mesmo caminho dos graos tem coordenadas constantes, entao deslocar o campo
+// no tempo faz a textura inteira escorrer para a garganta, ao longo dos
+// mesmos riscos, sem nunca se rasgar numa costura.
+
+/** Quantas celulas cabem no RAIO do veu, na qualidade alta. Escalado pelo preset. */
+export const MAW_VEIL_CELLS = 20;
+/**
+ * A textura e mais grossa que os graos e mais fina que as nuvens: cerca de
+ * cinco nodulos por raio. Menos e um blob; mais e granulado que compete com
+ * os riscos.
+ */
+const VEIL_SCALE_RADIAL = 5.5;
+const VEIL_SCALE_ANGULAR = 4.2;
+/** O limiar abaixo do qual o veu e transparente: e o que abre os rasgos. */
+const VEIL_THRESHOLD = 0.38;
+/**
+ * O GRAO: um segundo ruido, tres vezes mais fino que o corpo do veu, que
+ * decide o tom de cada celula (areia escura, base ou clara) e mexe na
+ * opacidade. E o que separa "nuvem" de "areia": nuvem e lisa por dentro,
+ * areia e feita de grao, e o olho le grao como pontilhado de tons — nao como
+ * uma mancha mais ou menos densa.
+ */
+const VEIL_GRAIN_SCALE = 3.1;
+/**
+ * O PERIODO do veu, em travessias do disco. O campo se repete depois de
+ * quatro travessias (cerca de 8,6 s) — e o que permite guarda-lo numa tabela
+ * finita. Ninguem le uma repeticao de areia a oito segundos de distancia.
+ */
+const VEIL_PERIOD = 4;
+/** A resolucao da tabela: amostras no angulo e no progresso (por periodo inteiro). */
+const VEIL_TABLE_A = 96;
+const VEIL_TABLE_M = 192;
+
+/**
+ * A TABELA DO VEU: o ruido do corpo e o do grao, pre-calculados sobre as
+ * coordenadas materiais da espiral — angulo desenrolado por progresso — e
+ * lidos por interpolacao bilinear a cada quadro.
+ *
+ * Por que uma tabela, e nao Perlin por celula: o veu tem ate ~1.600 celulas
+ * na boca e ~300 em cada sumidouro, e cada uma custava sete oitavas de Perlin
+ * por quadro. Isso era varios milissegundos de CPU antes de o canvas entrar,
+ * e o quadro da Fome ja e o mais caro do encontro. Como o campo e funcao SO
+ * de (angulo, progresso + tempo), ele cabe inteiro numa tabela: o tempo vira
+ * um deslocamento no eixo do progresso, e o quadro le em vez de calcular.
+ *
+ * As duas coordenadas entram como PONTOS EM CIRCULOS do plano do ruido (o
+ * angulo num circulo, o progresso em outro, com o raio escolhido para manter
+ * a mesma frequencia espacial de antes). E o que faz a tabela ser periodica
+ * nos dois eixos sem costura — sem isso, o wrap no fim do periodo seria uma
+ * linha de descontinuidade varrendo o disco a cada oito segundos.
+ *
+ * Construida uma vez, sob demanda (~18 mil amostras, dezenas de
+ * milissegundos): ver `mawVeilWarm`, que o cliente chama no primeiro quadro
+ * em que o Devorador aparece — antes de a boca abrir — para o custo cair num
+ * quadro tranquilo e nao no que abre a janela.
+ */
+const veilTable = new Float32Array(VEIL_TABLE_A * VEIL_TABLE_M * 2);
+/** Quantas linhas (de progresso) da tabela ja foram calculadas. */
+let veilRowsBuilt = 0;
+
+/** Calcula UMA linha da tabela: todos os angulos para um progresso. */
+const buildVeilRow = (mi: number): void => {
+  // O raio do circulo do progresso: um periodo inteiro percorre 2*pi*R, que
+  // tem de valer o mesmo que a reta antiga percorria (S_r por travessia).
+  const rm = (VEIL_SCALE_RADIAL * VEIL_PERIOD) / (Math.PI * 2);
+  const phase = (mi / VEIL_TABLE_M) * Math.PI * 2;
+  const mx = Math.cos(phase) * rm;
+  const my = Math.sin(phase) * rm;
+  for (let ai = 0; ai < VEIL_TABLE_A; ai++) {
+    const a = (ai / VEIL_TABLE_A) * Math.PI * 2;
+    const x = Math.cos(a) * VEIL_SCALE_ANGULAR + mx;
+    const y = Math.sin(a) * VEIL_SCALE_ANGULAR + my;
+    const k = (mi * VEIL_TABLE_A + ai) * 2;
+    // Cinco oitavas com ganho alto no corpo: as finas pesam o bastante para
+    // o veu ja ter grao, e nao so a forma.
+    veilTable[k] = Math.max(0, Math.min(1, 0.5 + 0.5 * fbm2(x, y, 4242, 5, 2, 0.62)));
+    veilTable[k + 1] = Math.max(
+      0,
+      Math.min(1, 0.5 + 0.5 * fbm2(x * VEIL_GRAIN_SCALE, y * VEIL_GRAIN_SCALE, 9191, 2, 2, 0.7))
+    );
+  }
+};
+
+/** Quantas linhas um `mawVeilWarm` constroi por chamada: ~2 ms de Perlin, longe do orcamento do quadro. */
+export const MAW_VEIL_WARM_ROWS = 8;
+
+/**
+ * Avanca a construcao da tabela em ate `rows` linhas. Idempotente e gratis
+ * depois de pronta.
+ *
+ * Em FATIAS porque a tabela inteira custa dezenas de milissegundos — tres
+ * quadros —, e um engasgo desses no primeiro quadro do chefe seria lido como
+ * o jogo travando na hora em que ele aparece. Oito linhas por quadro fecham
+ * a tabela em 24 quadros (0,4 s), e a primeira boca so abre depois de tres
+ * arcos, dez segundos depois. Se alguem ler antes de ela fechar (um cenario
+ * de arena que abre a boca no primeiro quadro), a leitura termina o resto
+ * sozinha — ver `veilRead`.
+ *
+ * Devolve se a tabela esta completa.
+ */
+export const mawVeilWarm = (rows = MAW_VEIL_WARM_ROWS): boolean => {
+  const until = Math.min(VEIL_TABLE_M, veilRowsBuilt + rows);
+  while (veilRowsBuilt < until) buildVeilRow(veilRowsBuilt++);
+  return veilRowsBuilt >= VEIL_TABLE_M;
+};
+
+/**
+ * As coordenadas MATERIAIS de um ponto do disco: o angulo desenrolado pela
+ * espiral (em voltas, [0, 1)) e o progresso pela lei do sumidouro deslocado
+ * pelo relogio (em periodos, [0, 1)).
+ *
+ * Um ponto que viaja pelo caminho dos graos tem as duas constantes — e o
+ * invariante que faz a textura escorrer em vez de ficar parada com o disco
+ * passando por cima.
+ */
+const veilCoords = (dx: number, dy: number, seconds: number, reach: number): [number, number] => {
+  const r = Math.hypot(dx, dy);
+  const inner = mawInnerRadius(reach);
+  const outerQ = Math.pow(reach, SINK_Q);
+  const innerQ = Math.pow(inner, SINK_Q);
+  const span = Math.max(1e-6, outerQ - innerQ);
+  const progress = (Math.pow(r, SINK_Q) - innerQ) / span;
+  const m = progress + seconds / (MAW_FALL_SECONDS * MAW_CLOUD_DRAG);
+  const a = Math.atan2(dy, dx) - Math.tan(MAW_SPIRAL_PITCH_RAD) * Math.log(reach / r);
+  const au = a / (Math.PI * 2);
+  const mu = m / VEIL_PERIOD;
+  return [au - Math.floor(au), mu - Math.floor(mu)];
+};
+
+/** Leitura bilinear da tabela, com wrap nos dois eixos. `channel` 0 = corpo, 1 = grao. */
+const veilRead = (au: number, mu: number, channel: 0 | 1): number => {
+  if (veilRowsBuilt < VEIL_TABLE_M) mawVeilWarm(VEIL_TABLE_M);
+  const table = veilTable;
+  const fa = au * VEIL_TABLE_A;
+  const fm = mu * VEIL_TABLE_M;
+  const a0 = Math.floor(fa) % VEIL_TABLE_A;
+  const m0 = Math.floor(fm) % VEIL_TABLE_M;
+  const a1 = (a0 + 1) % VEIL_TABLE_A;
+  const m1 = (m0 + 1) % VEIL_TABLE_M;
+  const ta = fa - Math.floor(fa);
+  const tm = fm - Math.floor(fm);
+  const v00 = table[(m0 * VEIL_TABLE_A + a0) * 2 + channel];
+  const v10 = table[(m0 * VEIL_TABLE_A + a1) * 2 + channel];
+  const v01 = table[(m1 * VEIL_TABLE_A + a0) * 2 + channel];
+  const v11 = table[(m1 * VEIL_TABLE_A + a1) * 2 + channel];
+  const top = v00 + (v10 - v00) * ta;
+  const bottom = v01 + (v11 - v01) * ta;
+  return top + (bottom - top) * tm;
+};
+
+/**
+ * O RUIDO do corpo do veu em (dx, dy), em [0, 1], nas coordenadas da espiral.
+ *
+ * Invariante que o teste guarda: um ponto levado pelo fluxo (o raio caindo
+ * pela lei, o angulo girando pelo passo) le o MESMO valor um instante depois.
+ */
+export const mawVeilNoise = (dx: number, dy: number, seconds: number, reach: number): number => {
+  if (Math.hypot(dx, dy) <= 1e-6 || reach <= 1e-6) return 0;
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  return veilRead(au, mu, 0);
+};
+
+/** O GRAO em (dx, dy), em [0, 1]: fino, advectado pelo mesmo fluxo. */
+export const mawVeilGrain = (dx: number, dy: number, seconds: number, reach: number): number => {
+  if (Math.hypot(dx, dy) <= 1e-6 || reach <= 1e-6) return 0.5;
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  return veilRead(au, mu, 1);
+};
+
+export type MawVeilSample = {
+  /** A opacidade da celula, em [0, 1]. */
+  alpha: number;
+  /** O tom da areia: 0 escura, 1 base, 2 clara. */
+  tone: 0 | 1 | 2;
+};
+
+/** Abaixo disto o grao e areia escura; acima de `VEIL_TONE_LIGHT`, clara. */
+const VEIL_TONE_DARK = 0.4;
+const VEIL_TONE_LIGHT = 0.62;
+
+/**
+ * UMA CELULA do veu: opacidade e tom, com UMA leitura das coordenadas e das
+ * duas tabelas. E o que o desenho chama por celula; `mawVeilAlpha` e
+ * `mawVeilGrain` separados existem para os testes dizerem cada coisa por si.
+ *
+ * A opacidade e o corpo com limiar (os rasgos), temperado pelo grao em
+ * +-35%, vezes a janela do disco — some na garganta, onde nao pode haver
+ * poeira por cima da sentenca, e some na borda, para o veu nao ter contorno.
+ */
+export const mawVeilSample = (
+  dx: number,
+  dy: number,
+  seconds: number,
+  reach: number
+): MawVeilSample => {
+  const r = Math.hypot(dx, dy);
+  if (reach <= 1e-6 || r >= reach || r <= 1e-6) return { alpha: 0, tone: 1 };
+  const inner = mawInnerRadius(reach);
+  if (r <= inner) return { alpha: 0, tone: 1 };
+  const t = (r - inner) / Math.max(1e-6, reach - inner);
+  // Rente as duas bordas o veu apaga em rampa curta; no meio do disco vale
+  // inteiro. A da garganta e mais curta: a areia acumula perto dela.
+  const window = Math.min(1, t / 0.12, (1 - t) / 0.28);
+  if (window <= 0) return { alpha: 0, tone: 1 };
+  const [au, mu] = veilCoords(dx, dy, seconds, reach);
+  const body = Math.max(0, (veilRead(au, mu, 0) - VEIL_THRESHOLD) / (1 - VEIL_THRESHOLD));
+  if (body <= 0) return { alpha: 0, tone: 1 };
+  const grain = veilRead(au, mu, 1);
+  const alpha = body * (0.65 + 0.7 * grain) * window;
+  const tone: 0 | 1 | 2 = grain < VEIL_TONE_DARK ? 0 : grain > VEIL_TONE_LIGHT ? 2 : 1;
+  return { alpha: Math.min(1, alpha), tone };
+};
+
+/** A opacidade sozinha, para os testes de forma. */
+export const mawVeilAlpha = (dx: number, dy: number, seconds: number, reach: number): number =>
+  mawVeilSample(dx, dy, seconds, reach).alpha;

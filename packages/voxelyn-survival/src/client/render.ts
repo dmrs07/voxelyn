@@ -131,9 +131,14 @@ import {
   MAW_CLOUDS,
   MAW_NO_RETURN_RADIUS,
   MAW_STREAKS,
+  MAW_VEIL_CELLS,
   mawCloud,
   mawCloudShape,
   mawStreak,
+  mawVeilSample,
+  mawVeilWarm,
+  sinkholeCrestShape,
+  sinkholeRamp,
 } from './maw-vortex';
 import { PAL } from './palette';
 import { BossHealthBarPresentation, drawBossHealthBar, usesMonumentalBar } from './boss-health-bar';
@@ -601,6 +606,10 @@ const drawBiomeVeil = (
  * agora vem do ruido (`mawCloudShape`), e duas copias dela bastam para a
  * opacidade crescer para o centro sem um gradiente por quadro.
  */
+/** Os tons do grao do veu de areia, em volta do tom base da silica solta. */
+const VEIL_SAND_DARK = 'rgb(118,98,66)';
+const VEIL_SAND_LIGHT = 'rgb(236,220,184)';
+
 const CLOUD_LAYERS = [
   { scale: 1, alpha: 1 },
   { scale: 0.58, alpha: 1.35 },
@@ -1929,6 +1938,12 @@ export class SurvivalRenderer {
    * quadros anteriores sabe. Ver devourer-spine.ts.
    */
   private readonly devourerSpines = new DevourerSpines();
+  /**
+   * Os doze baldes do veu de areia (tres tons x quatro faixas de alfa),
+   * reutilizados quadro a quadro para o desenho nao alocar por vortice. Cada
+   * um e uma lista chata de (dx, dy) em tiles.
+   */
+  private readonly veilBuckets: number[][] = Array.from({ length: 12 }, () => []);
   /** Os corpos dos Leviatas em cena (ver leviathan-body.ts). */
   private readonly leviathanBodies = new LeviathanBodies();
   /**
@@ -3740,6 +3755,7 @@ export class SurvivalRenderer {
           seconds,
           fxScale,
           'sinkhole',
+          hole.at,
         );
       }
     }
@@ -4356,6 +4372,10 @@ export class SurvivalRenderer {
       // entrega quando nao da para ve-lo, e apaga-lo junto com o sprite seria
       // apagar o unico aviso que sobra.
       if (enemy.archetype === 'white_devourer') {
+        // A tabela do veu de areia e construida no primeiro quadro em que o
+        // chefe existe — mergulhado, num quadro tranquilo — e nao no que abre
+        // a boca. Idempotente: custa uma comparacao depois da primeira vez.
+        mawVeilWarm();
         const aloft = enemy.mood === DEVOURER_AIRBORNE;
         const was = this.devourerAloft.get(enemy.id);
         if (was !== undefined && was !== aloft) {
@@ -6990,6 +7010,8 @@ export class SurvivalRenderer {
     seconds: number,
     fxScale: number,
     kind: 'maw' | 'sinkhole',
+    /** A semente da crista do sumidouro (o tick de abertura). Ignorada pela boca. */
+    seed = 0,
   ): void {
     const [mx, my] = toScreen(cx, cy);
     // O FATOR DA PROJECAO, e ele nao e cosmetico.
@@ -7038,6 +7060,72 @@ export class SurvivalRenderer {
       ctx.fill();
     }
 
+    // 1b. O CENTRO DO SUMIDOURO: o buraco e a rampa toroidal de silica.
+    //
+    //     A boca tem garganta e o sumidouro nao — e por isso ele nao pode
+    //     ter um centro que prometa sentenca. Mas um disco de sucao sem
+    //     centro nenhum le como riscos flutuando: nao ha para ONDE a areia
+    //     vai. O que ele ganha e um centro de TERRENO: um buraco escuro e
+    //     pequeno, e em volta dele a areia comida empilhada num anel que
+    //     desce — a crista clara por fora, a parede escurecendo para dentro.
+    //     E o corte de um funil de areia visto de cima.
+    //
+    //     Um gradiente radial no espaco do tile, esmagado pela projecao com
+    //     `scale`: o mesmo achatamento 2:1 de todo anel desta lamina, num
+    //     unico preenchimento por sumidouro. A crista ganha um contorno
+    //     rasgado por Perlin por cima, porque areia empilhada nao tem borda
+    //     geometrica.
+    if (!isMaw) {
+      const ramp = sinkholeRamp(reach);
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.scale(ringX(1), ringY(1));
+      const fill = ctx.createRadialGradient(0, 0, 0, 0, 0, ramp.outer);
+      const holeAt = ramp.hole / ramp.outer;
+      const crestAt = ramp.crest / ramp.outer;
+      fill.addColorStop(0, 'rgba(5,3,2,0.94)');
+      fill.addColorStop(holeAt * 0.85, 'rgba(7,5,4,0.92)');
+      // A PAREDE: do fundo escuro ate a crista clara, a rampa subindo.
+      fill.addColorStop(holeAt, 'rgba(38,28,20,0.85)');
+      fill.addColorStop(holeAt + (crestAt - holeAt) * 0.55, 'rgba(126,104,74,0.7)');
+      fill.addColorStop(crestAt, 'rgba(222,203,164,0.72)');
+      // O LADO DE FORA: a crista desce de volta ao chao e some.
+      fill.addColorStop(crestAt + (1 - crestAt) * 0.45, 'rgba(184,163,124,0.36)');
+      fill.addColorStop(1, 'rgba(184,163,124,0)');
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, ramp.outer, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // A CRISTA RASGADA: o contorno do topo do anel, em ruido. Projetado
+      // ponto a ponto como as nuvens, para achatar com o chao.
+      const crest = sinkholeCrestShape(seed, seconds, ramp.crest);
+      ctx.strokeStyle = 'rgba(240,226,190,0.5)';
+      ctx.lineWidth = Math.max(1, z * 0.6);
+      ctx.beginPath();
+      for (let k = 0; k < crest.length; k++) {
+        const [px, py] = toScreen(cx + crest[k].dx, cy + crest[k].dy);
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      // E a BOCA do buraco, um contorno escuro por dentro da crista: a linha
+      // onde a areia deixa de ser rampa e passa a ser queda.
+      const lip = sinkholeCrestShape(seed + 17, seconds, ramp.hole * 1.15, 16);
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = Math.max(1, z * 0.5);
+      ctx.beginPath();
+      for (let k = 0; k < lip.length; k++) {
+        const [px, py] = toScreen(cx + lip[k].dx, cy + lip[k].dy);
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
     // 2. A BORDA: ate onde a sucao chega NESTE tick. Cresce com a janela,
     //    entao o anel avancando pelo chao e o cronometro dela.
     ctx.strokeStyle = isMaw ? 'rgba(201,180,140,0.42)' : 'rgba(201,180,140,0.26)';
@@ -7067,6 +7155,73 @@ export class SurvivalRenderer {
         Math.PI * 2,
       );
       ctx.stroke();
+    }
+
+    // 3b. O VEU DE AREIA: a nuvem continua, em Perlin, escorrendo para a
+    //     garganta. Vem ANTES das manchas e dos riscos porque e o fundo dos
+    //     dois: a areia em suspensao que cobre o disco, com regioes densas e
+    //     rasgos, e que se move junto com os graos porque e amostrada nas
+    //     coordenadas da espiral (ver `mawVeilSample`).
+    //
+    //     Uma grade de celulas projetadas no chao. O ruido NAO e calculado
+    //     aqui: vem de uma tabela pre-computada em coordenadas materiais
+    //     (`maw-vortex.ts`), lida por interpolacao — o quadro paga trigonometria
+    //     e leituras, nao oitavas de Perlin. E as celulas nao sao pintadas uma
+    //     a uma: sao AGRUPADAS por tom (tres areias) e por faixa de opacidade
+    //     (quatro), e cada grupo e um unico caminho preenchido — doze `fill`
+    //     por vortice em vez de um por celula. Foi o que a revisao pediu:
+    //     milhares de caminhos por quadro estouravam o orcamento da Fome, que
+    //     ja e o quadro mais caro do encontro.
+    //
+    //     A resolucao segue o preset: 20 celulas por raio no alto, menos nos
+    //     outros — e no sumidouro, metade, porque ele e menor e sao tres.
+    {
+      const cellsPerRadius = Math.max(
+        5,
+        Math.round(MAW_VEIL_CELLS * Math.sqrt(fxScale) * (isMaw ? 1 : 0.5)),
+      );
+      const cell = reach / cellsPerRadius;
+      const half = cell * 0.5;
+      const peak = isMaw ? 0.4 : 0.3;
+      // Doze baldes: tom * 4 + faixa de alfa. Cada balde acumula os losangos
+      // das suas celulas num caminho so.
+      const buckets = this.veilBuckets;
+      for (const path of buckets) path.length = 0;
+      for (let gy = -cellsPerRadius; gy < cellsPerRadius; gy++) {
+        for (let gx = -cellsPerRadius; gx < cellsPerRadius; gx++) {
+          const dx = (gx + 0.5) * cell;
+          const dy = (gy + 0.5) * cell;
+          const sample = mawVeilSample(dx, dy, seconds, reach);
+          if (sample.alpha <= 0.05) continue;
+          const band = Math.min(3, Math.floor(sample.alpha * 4));
+          buckets[sample.tone * 4 + band].push(dx, dy);
+        }
+      }
+      for (let bucket = 0; bucket < buckets.length; bucket++) {
+        const cells = buckets[bucket];
+        if (cells.length === 0) continue;
+        const tone = Math.floor(bucket / 4);
+        const band = bucket % 4;
+        ctx.fillStyle =
+          tone === 0 ? VEIL_SAND_DARK : tone === 2 ? VEIL_SAND_LIGHT : SURFACE_FALLBACK[SURF_SILT];
+        // O centro da faixa: 0,125 / 0,375 / 0,625 / 0,875 do pico.
+        ctx.globalAlpha = peak * ((band + 0.5) / 4);
+        ctx.beginPath();
+        for (let k = 0; k < cells.length; k += 2) {
+          const dx = cells[k];
+          const dy = cells[k + 1];
+          const [x0, y0] = toScreen(cx + dx - half, cy + dy - half);
+          const [x1, y1] = toScreen(cx + dx + half, cy + dy - half);
+          const [x2, y2] = toScreen(cx + dx + half, cy + dy + half);
+          const [x3, y3] = toScreen(cx + dx - half, cy + dy + half);
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.lineTo(x3, y3);
+          ctx.closePath();
+        }
+        ctx.fill();
+      }
     }
 
     // 4. A POEIRA. Vem ANTES dos riscos porque e o segundo plano deles: a

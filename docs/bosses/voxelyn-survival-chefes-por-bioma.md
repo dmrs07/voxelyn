@@ -818,10 +818,15 @@ a boca comendo durante a janela significam que, na Fome, o chefe consome o vidro
 _antes_ de ele ser feito mais rápido do que na primeira metade. Vitrificar cedo — e
 vitrificar onde se vai ficar — deixa de ser a jogada boa para virar a única.
 
-**O desenho é o mesmo em escala menor.** O sumidouro é desenhado com o mesmo
-vórtice da boca (`drawSandVortex`), mais ralo, sem a garganta escura (não há sentença
-ali) e sem a linha vermelha (a caminhada vence em todo raio; uma linha que prometesse
-o contrário seria mentira). O alcance sai de `sinkholeReach`, a mesma conta que a
+**O desenho é o mesmo em escala menor, com um centro de terreno.** O sumidouro é
+desenhado com o mesmo vórtice da boca (`drawSandVortex`), mais ralo, sem a garganta
+da boca (não há sentença ali) e sem a linha vermelha (a caminhada vence em todo raio;
+uma linha que prometesse o contrário seria mentira). No lugar da garganta ele tem um
+**buraco escuro pequeno e uma rampa toroidal de sílica** em volta (`sinkholeRamp`):
+a crista clara por fora, a parede escurecendo para dentro, o buraco no fundo — o corte
+de um funil de areia visto de cima, com a crista rasgada por Perlin
+(`sinkholeCrestShape`, semeada pelo tick de abertura). É um gradiente radial no espaço
+do tile, achatado pela projeção. O alcance sai de `sinkholeReach`, a mesma conta que a
 simulação usa para puxar. Só o centro e o tick de abertura viajam (`WorldFlags.sinkholes`).
 
 **As nuvens de areia deixaram de ser elipses.** A forma de cada nuvem sai do ruído de
