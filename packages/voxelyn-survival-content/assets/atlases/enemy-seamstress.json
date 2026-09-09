@@ -31,19 +31,19 @@
     "offsetX": 0,
     "offsetY": 0
   },
-  "palette": "veio-fungico.v01",
+  "palette": "veio-fungico.v02",
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
-    "#2e3a4d",
+    "#284298",
+    "#3a62d2",
     "#3d2a22",
-    "#46566e",
     "#6e4a33",
-    "#7b8ba3",
     "#8a7154",
+    "#a82a3c",
     "#b8a98f",
     "#d5cdba",
-    "#e8f1ff"
+    "#d93b4c"
   ],
   "animations": {
     "idle": {

@@ -19,6 +19,8 @@ const limb = (out, a, b, width, mat) => {
   }
 };
 
+const QUEEN_SUIT = { silk: 'spiderRed', chitin: 'spiderBlue' };
+
 export const stitcherModel = (anim, frame, queen = false, brood = false) => {
   const flying = anim === 'fly';
   const crouching = anim === 'burst';
@@ -137,6 +139,9 @@ export const stitcherModel = (anim, frame, queen = false, brood = false) => {
 
   const scaled = b.map((v) => ({
     ...v,
+    // O TRAJE da rainha: a seda vira vermelho, a cuticula vira azul. Resina e
+    // o coracao ficam. Costureiros e crias continuam na seda mineral.
+    mat: queen ? (QUEEN_SUIT[v.mat] ?? v.mat) : v.mat,
     x: round(v.x * scale),
     y: round(v.y * scale),
     z: round(v.z * scale),

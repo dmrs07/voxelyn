@@ -51,6 +51,15 @@ export const COLORS = {
   /** Acima de amber: o branco quente de uma lampada acesa. EMISSIVA. */
   beam: [255, 233, 184],
   blood: [217, 59, 76],
+  /** Abaixo de blood: o vermelho fechado do traje da Cerzideira. A familia
+   *  vermelha so tinha um degrau, e a sombra de um corpo vermelho caia direto
+   *  em `char` — o traje ficava marrom nas laterais. */
+  crimson: [168, 42, 60],
+  /** O AZUL SATURADO que a paleta nao tinha: `electric` e claro e EMISSIVO
+   *  (viraria halo num corpo), e a familia fria e cinza-azulada. `cobalt` e
+   *  `navy` sao dois degraus nao emissivos para o traje da Cerzideira. */
+  cobalt: [58, 98, 210],
+  navy: [40, 66, 152],
   electric: [122, 184, 255],
   loot: [255, 209, 102],
   player: [232, 241, 255],

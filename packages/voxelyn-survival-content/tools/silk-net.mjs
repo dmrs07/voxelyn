@@ -54,11 +54,18 @@ export const netModel = (dir, frame) => {
   const up = [-fx * Math.sin(tilt), -fy * Math.sin(tilt), Math.cos(tilt)];
   const yaw = (Math.PI / 4) * (1 - Math.abs(fx + fy) / Math.SQRT2);
   const side = [-fy * Math.cos(yaw) + fx * Math.sin(yaw), fx * Math.cos(yaw) + fy * Math.sin(yaw)];
-  const at = (angle, r) => [
-    side[0] * Math.cos(angle) * r + up[0] * Math.sin(angle) * r,
-    side[1] * Math.cos(angle) * r + up[1] * Math.sin(angle) * r,
-    Z0 + up[2] * Math.sin(angle) * r,
-  ];
+  // CONCAVA, como a teia do Homem-Aranha: a borda vai na frente e o centro
+  // fica para tras, uma cupula aberta para o alvo — e o que vai se fechar em
+  // volta dele. `CUP` e a profundidade do centro em relacao a borda.
+  const CUP = 1.4;
+  const at = (angle, r) => {
+    const back = CUP * (1 - (r / R) * (r / R));
+    return [
+      side[0] * Math.cos(angle) * r + up[0] * Math.sin(angle) * r - fx * back,
+      side[1] * Math.cos(angle) * r + up[1] * Math.sin(angle) * r - fy * back,
+      Z0 + up[2] * Math.sin(angle) * r,
+    ];
+  };
   const b = [];
   // Raios.
   for (let k = 0; k < 8; k++) {
@@ -74,8 +81,8 @@ export const netModel = (dir, frame) => {
       limb(b, at(a0, r), at(a1, r), 0.5, 'silk');
     }
   }
-  // O no central de resina, um pouco a frente no rumo do voo.
-  b.push(box(fx * 0.5 - 0.5, fy * 0.5 - 0.5, Z0 - 0.5, 1, 1, 1, 'sutureResin'));
+  // O no central de resina, no fundo da cupula.
+  b.push(box(-fx * CUP - 0.5, -fy * CUP - 0.5, Z0 - 0.5, 1, 1, 1, 'sutureResin'));
   return b;
 };
 

@@ -1247,7 +1247,11 @@ export const SIMULATION_VERSION = 76;
 //     autorado em oito rumos, tres quadros de giro.
 // 39: o atlas `fx-silk-cocoon` — o casulo da rede sobre o Prospector, sob
 //     demanda no grupo da Cerzideira: fechando, preso, rachando e os fios.
-export const CONTENT_VERSION = 39;
+// 40: a Cerzideira de traje vermelho e azul (paleta mestra ganha `crimson`,
+//     `cobalt` e `navy`; `veio-fungico.v02`) e a rede concava, uma cupula
+//     aberta para o alvo. Um cliente com o atlas antigo em cache mostraria a
+//     rainha de seda mineral.
+export const CONTENT_VERSION = 40;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -307,7 +307,7 @@ const buildEntity = (spec) => {
     flipPairs: spec.flipPairs,
     hitbox: spec.hitbox,
     footprint: spec.footprint,
-    palette: 'veio-fungico.v01',
+    palette: 'veio-fungico.v02',
     paletteColors: [...palette].sort(),
     animations: spec.animations,
     frameMap,
