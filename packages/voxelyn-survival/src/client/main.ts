@@ -1597,6 +1597,32 @@ const prepareTraining = (): PreparedRun => {
   let frameNow = lastTime;
   /** A carta de modulo escolhida neste quadro, a caminho do proximo tick. */
   let queuedChoice: 0 | 1 | null = null;
+  /**
+   * As descobertas que o operador ja provocou NESTA tentativa, somadas por
+   * cima das descontinuidades.
+   *
+   * Existe porque o exercicio tem duas coisas que `state.stats` nao atravessa:
+   * o reinicio a prova de falha (um `createRun` novo zera as estatisticas) e o
+   * proprio fim (`buildSummary` acrescenta descobertas que ele DERIVA do
+   * estado terminal, num clone, sem tocar em `state.stats`).
+   *
+   * Sem este acumulador, quem quebrasse a rocha fragil e perdesse a unidade na
+   * volta chegava a homologacao com o arquivo vazio — e o checkpoint de volta
+   * comeca DEPOIS do tampao, entao a licao nao tinha como ser reconquistada.
+   * O toast ja tinha dito "DESCOBERTA REGISTRADA"; nada seria registrado.
+   */
+  let earnedDiscoveries = 0;
+
+  /**
+   * Tudo o que este estado tem a dizer sobre descobertas.
+   *
+   * O sumario, quando existe, e a fonte MAIS COMPLETA: `buildSummary` deriva
+   * dele o Nucleo recolhido (`DISCOVERY_CORE_TAKEN`) e a carga perdida, que
+   * sao exatamente as descobertas que nao moram em `state.stats`. Fora de uma
+   * fase terminal ele e nulo, e as estatisticas vivas sao o que ha.
+   */
+  const discoveriesOf = (view: SurvivalState): number =>
+    view.stats.discoveries | (view.summary?.stats.discoveries ?? 0);
   const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
     renderer.ingestEvents(events, frameNow);
     audio.ingest(events, frameNow, state);
@@ -1644,6 +1670,8 @@ const prepareTraining = (): PreparedRun => {
    * assistencia, toasts, painel de Ecos — e drenado por `rearm`.
    */
   const restartAt = (checkpoint: TrainingCheckpoint): void => {
+    // Antes de o estado velho desaparecer: o que ele ensinou fica.
+    earnedDiscoveries |= discoveriesOf(state);
     state = createTrainingRun(checkpoint);
     liveRun = state;
     rearm();
@@ -1719,9 +1747,12 @@ const prepareTraining = (): PreparedRun => {
         if (certified) {
           markTrainingDone();
           // A UNICA coisa que o exercicio deixa gravada. Ver `applyDiscoveries`:
-          // o que ele aprendeu quebrando rocha fragil e o que faz o "ABRIR OS
-          // ARQUIVOS" do formulario levar a uma pagina com conteudo.
-          const merged = applyDiscoveries(records, state.stats.discoveries);
+          // o que ele aprendeu quebrando rocha fragil e recolhendo o Nucleo e o
+          // que faz o "ABRIR OS ARQUIVOS" do formulario levar a uma pagina com
+          // conteudo. `earnedDiscoveries` entra junto porque a tentativa pode
+          // ter atravessado uma unidade perdida.
+          earnedDiscoveries |= discoveriesOf(state);
+          const merged = applyDiscoveries(records, earnedDiscoveries);
           if (merged !== records) {
             records = merged;
             saveRecords(records);

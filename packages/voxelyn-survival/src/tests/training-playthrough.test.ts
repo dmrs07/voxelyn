@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DISCOVERY_CORE_TAKEN,
   SALVAGE_SCAN_TICKS,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -138,6 +139,24 @@ describe('a operacao de treinamento, jogada de ponta a ponta', () => {
     put(state, state.entry.x, state.entry.y);
     interact(state);
     expect(state.phase).toBe('extracted_with_core');
+
+    // -- E o que o exercicio tem a arquivar --------------------------------
+    // A licao central do percurso — o Nucleo recolhido — NAO esta em
+    // `state.stats`: `buildSummary` a deriva do estado terminal e a escreve num
+    // clone. Quem le as estatisticas vivas na homologacao arquiva tudo MENOS a
+    // descoberta que a homologacao acabou de exigir.
+    expect(state.stats.discoveries & DISCOVERY_CORE_TAKEN).toBe(0);
+    expect((state.summary?.stats.discoveries ?? 0) & DISCOVERY_CORE_TAKEN).not.toBe(0);
+  });
+
+  it('o checkpoint de volta nasce sem descobertas: quem as carrega e o laco', () => {
+    // `createRun` zera `RunStats`, e a reconstrucao so devolve a posse do
+    // Nucleo. Como o checkpoint de volta comeca DEPOIS do tampao fragil, uma
+    // descoberta perdida aqui nao tem como ser reconquistada — e por isso o
+    // laco do treinamento acumula a mascara por fora, atravessando a morte.
+    const state = createTrainingRun({ sector: 1, withCore: true });
+    expect(state.stats.discoveries).toBe(0);
+    expect(state.summary).toBeNull();
   });
 
   it('extrair de maos vazias no setor 1 NAO homologa', () => {
