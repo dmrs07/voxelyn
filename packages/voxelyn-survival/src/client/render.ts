@@ -194,6 +194,7 @@ import { bossModuleNameKey, bossModulePresentation } from './boss-module-present
 import { DIAMANDIS_LINES, diamandisLineFor } from './audio/boss-voice-lines';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import {
+  ELITE_BODY_SCALE,
   drawEliteBarFrame,
   drawEliteFront,
   drawEliteGround,
@@ -5035,6 +5036,14 @@ export class SurvivalRenderer {
             ? { sx, sy, size, z, nowMs, seed: enemy.id, reducedMotion: prefersReducedMotion() }
             : null;
           if (eliteMark) drawEliteGround(ctx, eliteMark);
+          // O CORPO MAIOR (ver ELITE_BODY_SCALE). Duas escalas convivem daqui
+          // para baixo: `size`, que e o PE (sombra, hexagono — o raio real da
+          // simulacao, que o elite nao muda), e `bodySize`/`bodyZoom`, que sao o
+          // CORPO. Tudo que mora em cima do bicho — a barra de vida, o
+          // atordoamento — sobe com o corpo, senao a barra atravessaria a
+          // cabeca do elite.
+          const bodyZoom = enemy.elite ? spriteZoom * ELITE_BODY_SCALE : spriteZoom;
+          const bodySize = enemy.elite ? size * ELITE_BODY_SCALE : size;
           // O RECORTE NA LINHA DA AREIA, so para quem esta atravessando ela.
           //
           // O anel do corpo ja fazia isso; a cabeca nunca fez, e enquanto o
@@ -5135,7 +5144,7 @@ export class SurvivalRenderer {
               presented.elapsedMs,
               bodyX,
               bodyDrawY,
-              spriteZoom,
+              bodyZoom,
               // Um sheet de frames fixos nao sabe o humor da entidade, e o
               // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
               // gancho de tint que ja existia para o elite serve exatamente para
@@ -5214,7 +5223,7 @@ export class SurvivalRenderer {
               presented.elapsedMs,
               bodyX,
               bodyDrawY,
-              spriteZoom,
+              bodyZoom,
               eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
             );
           }
@@ -5335,7 +5344,10 @@ export class SurvivalRenderer {
               sx,
               sy: drawY,
               z,
-              radius: enemy.radius,
+              // O recuo desenha o mesmo bicho que o atlas desenharia, entao
+              // cresce pelo mesmo fator: um elite que muda de tamanho conforme
+              // o atlas chegou seria a mesma incoerencia que a marca tracejada.
+              radius: enemy.elite ? enemy.radius * ELITE_BODY_SCALE : enemy.radius,
               brightness: b,
               archetype: enemy.archetype,
               nowMs,
@@ -5369,7 +5381,7 @@ export class SurvivalRenderer {
           }
           if (sand !== null) ctx.restore();
           if (enemy.stunnedUntil > state.tick) {
-            drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
+            drawStunIndicator(ctx, sx, bodyY, bodySize, z, enemy.id, state.tick);
           }
           // AS BRASAS QUE PASSAM NA FRENTE do corpo, fechando a marca. As de
           // tras ja sairam com o chao; separar as duas metades e o que da
@@ -5387,7 +5399,13 @@ export class SurvivalRenderer {
             !usesMonumentalBar(state, enemy) &&
             (!leviathanHead || leviathanTargetable(enemy, state.tick))
           ) {
-            drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp, eliteMark);
+            drawHealthBar(
+              sx,
+              bodyY - bodySize * 2.1 - 5 * z,
+              bodySize,
+              enemy.hp / enemy.maxHp,
+              eliteMark,
+            );
           }
         },
       });

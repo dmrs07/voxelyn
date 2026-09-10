@@ -80,6 +80,30 @@ const EMBER = mixHex(PAL.blood, PAL.fire, 0.55);
 /** O topo da brasa, so nas faiscas: o unico ponto da marca que chega ao claro. */
 const SPARK = mixHex(PAL.fire, PAL.loot, 0.5);
 
+/**
+ * O CORPO DO ELITE, um quarto maior que o dos irmaos da mesma leva.
+ *
+ * E a leitura que chega ANTES da cor: silhueta maior se le pela borda do campo
+ * de visao, com o bicho meio atras de uma coluna, antes de qualquer brasa
+ * aparecer. Contra um bando do mesmo arquetipo — que e onde o elite quase
+ * sempre esta —, um corpo destoando de tamanho e o sinal mais barato que
+ * existe.
+ *
+ * Cresce so o CORPO. A sombra de contato e o hexagono no chao continuam no
+ * tamanho do pe, porque o raio dele na simulacao nao mudou: inchar a marca
+ * junto faria ela prometer um alcance de contato que a simulacao nao cobra.
+ * Um corpo grande sobre um pe do tamanho de sempre e, alias, o que os bichos
+ * pesados do jogo ja fazem.
+ *
+ * O CUSTO, registrado: 1,25 nao e inteiro, entao no zoom 2x do jogo o sprite
+ * deixa de cair 1:1 na tela e alguns pixels de atlas viram dois de tela e
+ * outros um. E a unica coisa no jogo fora da grade de pixel, e vale por ser
+ * exatamente UMA entidade rara por setor. Se um dia isso incomodar, o degrau
+ * seguinte que preserva a grade e 2x (o dobro), que e grande demais para
+ * "elite" e comecaria a ler como chefe.
+ */
+export const ELITE_BODY_SCALE = 1.25;
+
 /** Periodo da respiracao, em ms. Lento: um bicho grande respira devagar. */
 export const ELITE_BREATH_MS = 2600;
 /** Opacidade do tint no fundo da respiracao (carvao) e no alto dela (brasa). */

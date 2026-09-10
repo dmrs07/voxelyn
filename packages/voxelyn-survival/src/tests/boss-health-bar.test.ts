@@ -145,7 +145,11 @@ describe('selecao do chefe', () => {
 
   it('render.ts guarda a barra local do inimigo com usesMonumentalBar', () => {
     const src = readFileSync(join(HERE, '..', 'client', 'render.ts'), 'utf8');
-    const call = src.indexOf('drawHealthBar(sx, bodyY - size * 2.1');
+    // Ancora no comeco da chamada, e nao na expressao inteira do topo da barra:
+    // ela mudou quando o corpo do elite passou a ser maior que o pe (`bodySize`),
+    // e o que este teste protege e a GUARDA em volta da chamada, nao a conta que
+    // levanta a barra.
+    const call = src.indexOf('drawHealthBar(\n              sx,');
     expect(call).toBeGreaterThan(0);
     const guard = src.lastIndexOf('usesMonumentalBar(state, enemy)', call);
     expect(guard).toBeGreaterThan(0);

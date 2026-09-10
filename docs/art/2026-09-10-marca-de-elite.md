@@ -33,6 +33,7 @@ corpo em vez de efeitos empilhados:
 
 | Camada                                                 | O que conta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Corpo maior** (`ELITE_BODY_SCALE`)                   | O corpo é desenhado 25% maior que o dos irmãos da mesma leva — a leitura que chega **antes da cor**, pela borda do campo de visão e com o bicho meio atrás de uma coluna. Cresce só o corpo: a sombra de contato e o hexágono continuam no tamanho do pé, porque o raio na simulação não mudou e inchar a marca prometeria um alcance de contato que a simulação não cobra.                                                                                                                                                                       |
 | **Corpo carbonizado** (`eliteTint`)                    | O tint deixa de clarear e passa a **escurecer**: carvão com sangue seco no fundo da respiração, brasa viva no alto. Contra os irmãos da mesma leva, o elite é o vulto mais escuro e mais quente da tela — contraste de valor funciona a qualquer distância.                                                                                                                                                                                                                                                                                       |
 | **Contorno aceso** (`SpriteBank.drawEntityRim`)        | A silhueta carimbada 1 px de atlas para os lados e para **baixo**, nunca para cima. Fechar o contorno devolveria o brilho de "unidade selecionada"; deixando o topo no escuro, a mesma passada vira **luz vinda de baixo** — do chão que está queimando sob ele.                                                                                                                                                                                                                                                                                  |
 | **Chão estragado** (`drawEliteGround`)                 | Poça de fuligem que come a luz do piso, luz de brasa **aditiva** por cima dela e um **hexágono queimado**: seis riscos de brasa com as quinas abertas, parado, cada lado tremulando no seu próprio tempo. Seis lados retos são da família do losango do tile e da faceta do voxel — a elipse lisa era a única curva perfeita da tela, e por isso lia como interface. Não gira: hexágono girando é runa de magia; parado e alinhado à grade, é coisa queimada no chão. O raio é o mesmo do anel antigo: a marca continua medindo a célula ocupada. |
@@ -55,6 +56,14 @@ corpo em vez de efeitos empilhados:
   anel para de girar e as brasas congelam espalhadas: continua havendo elite na
   tela, só não há pulso.
 - **Co-op.** Tudo deriva do relógio e do ID da criatura — nada sorteado por quadro.
+
+### O custo registrado: a grade de pixel
+
+`ELITE_BODY_SCALE = 1.25` não é inteiro, então no zoom 2× o sprite do elite deixa
+de cair 1:1 na tela: alguns pixels de atlas viram dois de tela e outros um. É a
+única coisa do jogo fora da grade de pixel, e vale por ser **uma entidade rara por
+setor**. O degrau seguinte que preservaria a grade é 2× — grande demais para
+"elite", começaria a ler como chefe.
 
 ## Onde mexer
 
