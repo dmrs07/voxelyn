@@ -1,0 +1,74 @@
+# A marca do elite — repaginação visual
+
+> Mudança **apenas visual**. Nenhuma regra de simulação foi tocada: elite continua
+> sendo a mesma propriedade de spawn, com a mesma vida e o mesmo dano de contato.
+> O que muda é o que o jogador vê quando um deles está na tela.
+
+![Antes e depois, no zoom do jogo](../media/elite-mark/01-antes-depois.png)
+
+## O que havia
+
+Duas coisas, e as duas trabalhavam contra o jogo:
+
+1. **Um véu laranja chapado sobre o corpo** (`rgba(255,122,47,0.35)`). O Voxelyn é
+   volume facetado — cada bicho tem topo claro, lateral esquerda média e lateral
+   direita escura. Uma cor só por cima disso apaga exatamente as três faces que
+   contam o volume: o elite virava a própria silhueta pintada de laranja, _menos_
+   legível que o bicho comum, não mais. E laranja é a cor reservada do fogo
+   (Art Bible §6): um elite ao lado de uma explosão lia como "pegando fogo", e um
+   bicho comum sob o clarão de uma explosão lia como elite.
+2. **Uma elipse lisa de 1 px nos pés.** Círculo perfeito, parado, do mesmo laranja
+   — leitura de interface, um marcador de seleção de jogo de estratégia colado
+   embaixo da criatura. Marcava a célula e não dizia mais nada sobre o que estava
+   em pé nela. Pior: o recuo de voxel (`voxel-fallback.ts`) desenhava a mesma marca
+   **tracejada** — dois desenhos diferentes para o mesmo estado, escolhidos por um
+   detalhe que o jogador não controla (se o atlas já tinha carregado).
+
+## O que entra
+
+A premissa: um elite não é um bicho comum com um adesivo — é um bicho que
+sobreviveu a alguma coisa. Cinco camadas, quase todas em `elite-mark.ts`, dividindo
+**um relógio só** (`eliteBreath`), e é essa unidade que faz todas lerem como um
+corpo em vez de efeitos empilhados:
+
+| Camada                                                 | O que conta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Corpo maior** (`ELITE_BODY_SCALE`)                   | O corpo é desenhado 25% maior que o dos irmãos da mesma leva — a leitura que chega **antes da cor**, pela borda do campo de visão e com o bicho meio atrás de uma coluna. Cresce só o corpo: a sombra de contato e o hexágono continuam no tamanho do pé, porque o raio na simulação não mudou e inchar a marca prometeria um alcance de contato que a simulação não cobra.                                                                                                                                                                       |
+| **Corpo carbonizado** (`eliteTint`)                    | O tint deixa de clarear e passa a **escurecer**: carvão com sangue seco no fundo da respiração, brasa viva no alto. Contra os irmãos da mesma leva, o elite é o vulto mais escuro e mais quente da tela — contraste de valor funciona a qualquer distância.                                                                                                                                                                                                                                                                                       |
+| **Contorno aceso** (`SpriteBank.drawEntityRim`)        | A silhueta carimbada 1 px de atlas para os lados e para **baixo**, nunca para cima. Fechar o contorno devolveria o brilho de "unidade selecionada"; deixando o topo no escuro, a mesma passada vira **luz vinda de baixo** — do chão que está queimando sob ele.                                                                                                                                                                                                                                                                                  |
+| **Chão estragado** (`drawEliteGround`)                 | Poça de fuligem que come a luz do piso, luz de brasa **aditiva** por cima dela e um **hexágono queimado**: seis riscos de brasa com as quinas abertas, parado, cada lado tremulando no seu próprio tempo. Seis lados retos são da família do losango do tile e da faceta do voxel — a elipse lisa era a única curva perfeita da tela, e por isso lia como interface. Não gira: hexágono girando é runa de magia; parado e alinhado à grade, é coisa queimada no chão. O raio é o mesmo do anel antigo: a marca continua medindo a célula ocupada. |
+| **Brasas subindo** (`drawEliteFront` + metade de trás) | O único movimento vertical da marca, metade atrás e metade na frente do corpo — é o que separa "isto está aceso agora" de "isto tem textura quente pintada".                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Barra marcada** (`drawEliteBarFrame`)                | Quatro cantoneiras em L nas quinas da barra de vida, na mesma família das quinas do hexágono. Cantoneiras e não moldura fechada: a barra tem cinco pixels de altura no zoom do jogo, e uma caixa em volta de uma barra que já tem borda é a mesma borda desenhada duas vezes. Como toda barra de inimigo, aparece a partir do primeiro dano — é a confirmação de com quem se está trocando dano, não um rótulo permanente.                                                                                                                        |
+
+![O elite dentro de um bando](../media/elite-mark/02-elite-no-bando.png)
+
+## Regras que a marca respeita
+
+- **Legibilidade de perigo (§1).** A luz aditiva no chão aparece mesmo com o corpo
+  atrás de uma coluna: o elite se anuncia antes de estar em alcance.
+- **Contraste de valor (§6).** O corpo escurece, mas a fuligem escurece o chão
+  junto — a criatura continua ≥ 2 passos acima do piso sob ela.
+- **Cor reservada.** A brasa mora no vermelho quente _abaixo_ do `#ff7a2f`; o
+  laranja puro continua sendo só da explosão.
+- **Silhueta (§5).** Nada é desenhado por cima do corpo além das brasas da frente,
+  que são pontos de 2–4 px.
+- **Menos movimento.** Com `prefers-reduced-motion` a respiração para no meio, o
+  anel para de girar e as brasas congelam espalhadas: continua havendo elite na
+  tela, só não há pulso.
+- **Co-op.** Tudo deriva do relógio e do ID da criatura — nada sorteado por quadro.
+
+### O custo registrado: a grade de pixel
+
+`ELITE_BODY_SCALE = 1.25` não é inteiro, então no zoom 2× o sprite do elite deixa
+de cair 1:1 na tela: alguns pixels de atlas viram dois de tela e outros um. É a
+única coisa do jogo fora da grade de pixel, e vale por ser **uma entidade rara por
+setor**. O degrau seguinte que preservaria a grade é 2× — grande demais para
+"elite", começaria a ler como chefe.
+
+## Onde mexer
+
+- `packages/voxelyn-survival/src/client/elite-mark.ts` — a marca inteira (dono único).
+- `packages/voxelyn-survival/src/client/sprites.ts` — `drawEntityRim`.
+- `packages/voxelyn-survival/src/client/render.ts` — chão antes do corpo, contorno
+  colado no corpo, brasas da frente depois.
+- `packages/voxelyn-survival/src/client/elite-mark.test.ts` — o que não pode regredir.

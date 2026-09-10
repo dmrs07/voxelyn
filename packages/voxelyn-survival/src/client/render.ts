@@ -193,6 +193,15 @@ import {
 import { bossModuleNameKey, bossModulePresentation } from './boss-module-presentation';
 import { DIAMANDIS_LINES, diamandisLineFor } from './audio/boss-voice-lines';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
+import {
+  ELITE_BODY_SCALE,
+  drawEliteBarFrame,
+  drawEliteFront,
+  drawEliteGround,
+  eliteRim,
+  eliteTint,
+  type EliteMarkDraw,
+} from './elite-mark';
 import { COMBAT_PLANE_TILES, heightToScreenPx } from './combat-plane';
 import { drawEmissiveHalo } from './emissive-halo';
 import {
@@ -4077,12 +4086,25 @@ export class SurvivalRenderer {
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
     };
-    const drawHealthBar = (sx: number, topY: number, size: number, hpFrac: number): void => {
+    const drawHealthBar = (
+      sx: number,
+      topY: number,
+      size: number,
+      hpFrac: number,
+      /**
+       * A marca do elite, quando o dono da barra e um. A moldura sai DEPOIS do
+       * preenchimento para as cantoneiras ficarem por cima da vida, e nao
+       * debaixo dela — uma cantoneira sumindo conforme o bicho apanha seria uma
+       * segunda leitura de dano competindo com a barra.
+       */
+      elite: EliteMarkDraw | null = null,
+    ): void => {
       if (hpFrac >= 1) return;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(sx - size, topY, size * 2, 2.4 * z);
       ctx.fillStyle = hpFrac > 0.4 ? PAL.fungusLight : PAL.blood;
       ctx.fillRect(sx - size, topY, size * 2 * hpFrac, 2.4 * z);
+      if (elite) drawEliteBarFrame(ctx, sx, topY, size, z, nowMs, elite.seed, elite.reducedMotion);
     };
 
     // Atlases na grade fina (ATLAS_SCALE): no zoom tipico de 2x o sprite e
@@ -5001,6 +5023,27 @@ export class SurvivalRenderer {
           }
           if (silkHeight <= 0)
             drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
+          // A MARCA DO ELITE (elite-mark.ts). O chao dela entra AQUI, logo
+          // depois da sombra de contato e antes do corpo: a poca de fuligem, a
+          // luz da brasa e o anel partido sao chao, e o bicho tem de passar por
+          // cima deles. O anel antigo saia depois do corpo e cortava as pernas
+          // da criatura ao meio — o detalhe que mais denunciava "isto e
+          // interface, nao mundo".
+          //
+          // A ancora e o PE (`sx`, `sy`), nunca o corpo: num salto, o chao
+          // queimado fica onde ele esta pisando, e nao sobe junto com ele.
+          const eliteMark: EliteMarkDraw | null = enemy.elite
+            ? { sx, sy, size, z, nowMs, seed: enemy.id, reducedMotion: prefersReducedMotion() }
+            : null;
+          if (eliteMark) drawEliteGround(ctx, eliteMark);
+          // O CORPO MAIOR (ver ELITE_BODY_SCALE). Duas escalas convivem daqui
+          // para baixo: `size`, que e o PE (sombra, hexagono — o raio real da
+          // simulacao, que o elite nao muda), e `bodySize`/`bodyZoom`, que sao o
+          // CORPO. Tudo que mora em cima do bicho — a barra de vida, o
+          // atordoamento — sobe com o corpo, senao a barra atravessaria a
+          // cabeca do elite.
+          const bodyZoom = enemy.elite ? spriteZoom * ELITE_BODY_SCALE : spriteZoom;
+          const bodySize = enemy.elite ? size * ELITE_BODY_SCALE : size;
           // O RECORTE NA LINHA DA AREIA, so para quem esta atravessando ela.
           //
           // O anel do corpo ja fazia isso; a cabeca nunca fez, e enquanto o
@@ -5091,8 +5134,36 @@ export class SurvivalRenderer {
               );
             }
           };
-          const paint = (override: Tint | undefined): boolean =>
-            this.sprites.drawEntity(
+          const paint = (override: Tint | undefined): boolean => {
+            // O CONTORNO ACESO do elite sai DAQUI DE DENTRO, junto do corpo.
+            //
+            // Ele acompanha o CORPO — `bodyX`/`bodyDrawY`, com o espasmo e o
+            // salto dentro —, ao contrario do chao, que fica no pe. E precisa
+            // sair na mesma passada que o corpo porque o corpo nem sempre e UMA
+            // passada: debaixo do Diluvio ele e desenhado duas vezes, recortado
+            // na lamina (`drawCutByWaterline`), com veu azul e transparencia na
+            // metade submersa. Um contorno desenhado por fora dessas passadas
+            // continuaria inteiro e aceso debaixo d'agua — um risco laranja sob
+            // a lamina, justamente onde o corpo esta azul e apagado.
+            //
+            // E por isso ele tambem herda o `override`: submerso, o contorno usa
+            // o mesmo veu do corpo. Duas cores para o mesmo bicho na mesma agua
+            // seriam dois bichos.
+            if (eliteMark) {
+              this.sprites.drawEntityRim(
+                ctx,
+                enemy.archetype,
+                presented.anim,
+                presented.facingX,
+                presented.facingY,
+                presented.elapsedMs,
+                bodyX,
+                bodyDrawY,
+                bodyZoom,
+                override ?? eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
+              );
+            }
+            return this.sprites.drawEntity(
               ctx,
               enemy.archetype,
               presented.anim,
@@ -5101,7 +5172,7 @@ export class SurvivalRenderer {
               presented.elapsedMs,
               bodyX,
               bodyDrawY,
-              spriteZoom,
+              bodyZoom,
               // Um sheet de frames fixos nao sabe o humor da entidade, e o
               // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
               // gancho de tint que ja existia para o elite serve exatamente para
@@ -5122,7 +5193,11 @@ export class SurvivalRenderer {
                       isDiamandis
                       ? frenzyTint(frenzyStacks, nowMs)
                       : enemy.elite
-                        ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                        ? // O CORPO CARBONIZADO do elite, respirando entre carvao
+                          // e brasa. Ver elite-mark.ts: o veu laranja chapado que
+                          // morava aqui apagava as tres faces do voxel e disputava
+                          // a cor reservada do fogo.
+                          eliteTint(nowMs, enemy.id, prefersReducedMotion())
                         : undefined),
               // A LUZ DO MUNDO sobre a casca do bicho. Separada do tint acima de
               // proposito: aquele conta um ESTADO da criatura (elite, enfurecida,
@@ -5132,6 +5207,7 @@ export class SurvivalRenderer {
               bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
               bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
             );
+          };
           // A POSE DO CHASSI da broca (drill-machine.ts): compressao, mergulho
           // do nariz e chacoalho, em volta do PE — o sprite continua sendo o
           // sprite, e a sombra e a barra ficam no chao. O mergulho e uma
@@ -5279,10 +5355,19 @@ export class SurvivalRenderer {
               sx,
               sy: drawY,
               z,
-              radius: enemy.radius,
+              // O recuo desenha o mesmo bicho que o atlas desenharia, entao
+              // recebe a mesma marca: tamanho, carvao e contorno aceso. Um elite
+              // que muda de aparencia conforme o atlas chegou ou nao seria a
+              // mesma incoerencia da elipse tracejada que este recuo desenhava.
+              radius: enemy.elite ? enemy.radius * ELITE_BODY_SCALE : enemy.radius,
+              elite: eliteMark
+                ? {
+                    tint: eliteTint(nowMs, enemy.id, eliteMark.reducedMotion),
+                    rim: eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
+                  }
+                : undefined,
               brightness: b,
               archetype: enemy.archetype,
-              elite: enemy.elite,
               nowMs,
               // Amostra a superficie sob o bicho em vez de esperar um campo no
               // snapshot: o cliente online ja espelha os chunks, entao o chao
@@ -5314,18 +5399,12 @@ export class SurvivalRenderer {
           }
           if (sand !== null) ctx.restore();
           if (enemy.stunnedUntil > state.tick) {
-            drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
+            drawStunIndicator(ctx, sx, bodyY, bodySize, z, enemy.id, state.tick);
           }
-          if (enemy.elite && drew) {
-            // O anel de elite fica no CHAO com a sombra, e nao com o corpo: ele
-            // marca a celula que a criatura ocupa, e um anel subindo junto com
-            // um salto marcaria o ar.
-            ctx.strokeStyle = PAL.fire;
-            ctx.lineWidth = z;
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, size * 1.05, size * 0.55, 0, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          // AS BRASAS QUE PASSAM NA FRENTE do corpo, fechando a marca. As de
+          // tras ja sairam com o chao; separar as duas metades e o que da
+          // profundidade ao calor, em vez de um decalque colado no fundo.
+          if (eliteMark) drawEliteFront(ctx, eliteMark);
           // A barra do Leviata so existe enquanto ele E alvo: uma barra sobre
           // agua lisa entregaria a posicao de um corpo que ninguem ve — e
           // prometeria dano onde o funil nao cobra.
@@ -5338,7 +5417,13 @@ export class SurvivalRenderer {
             !usesMonumentalBar(state, enemy) &&
             (!leviathanHead || leviathanTargetable(enemy, state.tick))
           ) {
-            drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+            drawHealthBar(
+              sx,
+              bodyY - bodySize * 2.1 - 5 * z,
+              bodySize,
+              enemy.hp / enemy.maxHp,
+              eliteMark,
+            );
           }
         },
       });
@@ -5582,7 +5667,6 @@ export class SurvivalRenderer {
                   radius: pl.radius,
                   brightness: isLocal ? 1 : allyLight,
                   archetype: 'prospector',
-                  elite: false,
                   nowMs,
                   allyTint: !isLocal,
                 });
@@ -5809,7 +5893,6 @@ export class SurvivalRenderer {
                 radius: 0.34,
                 brightness: 0.7,
                 archetype: 'prospector',
-                elite: false,
                 nowMs,
               });
             }
@@ -5870,7 +5953,6 @@ export class SurvivalRenderer {
               radius: tombstone.archetype === 'guardian' ? 0.68 : 0.34,
               brightness: 0.7,
               archetype: tombstone.archetype,
-              elite: false,
               nowMs,
             });
           }

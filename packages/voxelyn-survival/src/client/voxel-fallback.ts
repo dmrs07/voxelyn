@@ -1,3 +1,5 @@
+import { ELITE_RIM_OFFSETS, type Tint } from './elite-mark';
+
 const PAL = {
   dark: '#0b0e14',
   rockShadow: '#1d2430',
@@ -28,8 +30,13 @@ type VoxelEntityOptions = {
   radius: number;
   brightness: number;
   archetype: string;
-  elite: boolean;
   nowMs: number;
+  /**
+   * A marca de elite no CORPO — carvao e contorno aceso —, quando este recuo
+   * esta desenhando um. O chao (poca, hexagono, brasas) nao vem por aqui: ele e
+   * o mesmo nos dois caminhos e quem desenha e o chamador.
+   */
+  elite?: { tint: Tint; rim: Tint };
   allyTint?: boolean;
   /**
    * A criatura esta sendo alimentada pelo chao neste instante.
@@ -124,8 +131,8 @@ const limb = (
  * pixel-snapped isometric blocks, a restricted palette, selective dark outlines
  * and unique silhouettes instead of the previous flat ellipse.
  */
-export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEntityOptions): void => {
-  const { sx, sy, z, radius, brightness, archetype, elite, nowMs, allyTint, charged } = options;
+const drawEntityBody = (ctx: CanvasRenderingContext2D, options: VoxelEntityOptions): void => {
+  const { sx, sy, z, radius, brightness, archetype, nowMs, allyTint, charged } = options;
   const size = radius * 32 * 0.9 * z;
   const light = Math.max(0.35, Math.min(1.15, 0.5 + brightness * 0.7));
   const bob = Math.round(Math.sin(nowMs * 0.006 + sx * 0.01) * Math.max(1, z * 0.6));
@@ -352,15 +359,107 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
     }
   }
 
-  if (elite) {
-    ctx.strokeStyle = PAL.fire;
-    ctx.lineWidth = Math.max(1.5, z);
-    ctx.setLineDash([Math.max(3, z * 2), Math.max(2, z)]);
-    ctx.beginPath();
-    ctx.ellipse(sx, sy - size * 0.45, size * 1.15, size * 0.68, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  // A MARCA DE ELITE NO CHAO NAO MORA MAIS AQUI.
+  //
+  // Este recuo desenhava uma elipse TRACEJADA nos pes enquanto o caminho de
+  // sprite desenhava uma elipse INTEIRA: o mesmo estado da mesma criatura com
+  // dois desenhos diferentes, escolhidos por um detalhe que o jogador nao
+  // controla — se o atlas ja tinha chegado. Hoje a poca, o hexagono e as brasas
+  // sao uma coisa so (`elite-mark.ts`) e quem desenha e o CHAMADOR, antes e
+  // depois do corpo, valendo para os dois caminhos. O que sobra para ca e o
+  // CORPO do elite — ver `drawVoxelEntity`.
+
+  ctx.restore();
+};
+
+/** O corpo do elite e o contorno dele saem por buffers proprios. Ver abaixo. */
+let bodyBuffer: HTMLCanvasElement | null = null;
+let rimBuffer: HTMLCanvasElement | null = null;
+
+/**
+ * O RECUO DE VOXEL, com ou sem a marca de elite no corpo.
+ *
+ * Sem elite o desenho vai direto para a tela, como sempre foi — o caminho comum
+ * nao paga nada por este envelope.
+ *
+ * Com elite, o corpo passa por um BUFFER antes. Nao e capricho: este recuo
+ * desenha o bicho com dezenas de `fillRect` soltos, e tingir isso na tela com
+ * `source-atop` pegaria o mundo inteiro que ja esta pintado embaixo — a mina
+ * toda ficaria cor de carvao. No buffer, o `source-atop` alcanca so o que foi
+ * desenhado ali: o corpo. O contorno sai do mesmo buffer, pela silhueta
+ * carimbada nos mesmos rumos do caminho de sprite (`ELITE_RIM_OFFSETS`), para
+ * o elite ter a MESMA marca tenha o atlas chegado ou nao.
+ */
+export const drawVoxelEntity = (
+  ctx: CanvasRenderingContext2D,
+  options: VoxelEntityOptions,
+): void => {
+  const elite = options.elite;
+  if (!elite) {
+    drawEntityBody(ctx, options);
+    return;
   }
 
+  // A caixa: o maior corpo deste recuo (o cavalo) abre pouco mais de dois
+  // tamanhos para os lados e sobe perto de dois e meio. A folga aqui e o dobro
+  // disso — um corpo cortado na borda do buffer seria pior que corpo nenhum.
+  const size = options.radius * 32 * 0.9 * options.z;
+  const half = Math.ceil(size * 3.5) + 2;
+  const up = Math.ceil(size * 4.5) + 2;
+  const down = Math.ceil(size * 1.5) + 2;
+  const x0 = Math.round(options.sx) - half;
+  const y0 = Math.round(options.sy) - up;
+  const w = half * 2;
+  const h = up + down;
+
+  if (!bodyBuffer) bodyBuffer = document.createElement('canvas');
+  if (!rimBuffer) rimBuffer = document.createElement('canvas');
+  const body = bodyBuffer;
+  const rim = rimBuffer;
+  for (const buffer of [body, rim]) {
+    if (buffer.width !== w || buffer.height !== h) {
+      buffer.width = w;
+      buffer.height = h;
+    }
+  }
+  const bctx = body.getContext('2d');
+  const rctx = rim.getContext('2d');
+  // Sem contexto 2d nao ha buffer nenhum: desenha o corpo sem a marca, que e
+  // pior que o certo e muito melhor que um bicho invisivel.
+  if (!bctx || !rctx) {
+    drawEntityBody(ctx, options);
+    return;
+  }
+
+  bctx.clearRect(0, 0, w, h);
+  bctx.imageSmoothingEnabled = false;
+  drawEntityBody(bctx, { ...options, sx: options.sx - x0, sy: options.sy - y0 });
+
+  // A SILHUETA carimbada: uniao das copias deslocadas, e so entao achatada na
+  // cor do contorno. Carimbar direto na tela somaria alpha nas sobreposicoes e
+  // devolveria um contorno manchado, mais forte nas quinas.
+  rctx.clearRect(0, 0, w, h);
+  rctx.imageSmoothingEnabled = false;
+  for (const [ox, oy] of ELITE_RIM_OFFSETS) rctx.drawImage(body, ox, oy);
+  rctx.globalCompositeOperation = 'source-atop';
+  rctx.fillStyle = elite.rim.color;
+  rctx.fillRect(0, 0, w, h);
+  rctx.globalCompositeOperation = 'source-over';
+
+  // O CARVAO no corpo, dentro do buffer.
+  bctx.globalCompositeOperation = 'source-atop';
+  bctx.globalAlpha = elite.tint.alpha;
+  bctx.fillStyle = elite.tint.color;
+  bctx.fillRect(0, 0, w, h);
+  bctx.globalCompositeOperation = 'source-over';
+  bctx.globalAlpha = 1;
+
+  const inherited = ctx.globalAlpha;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = inherited * elite.rim.alpha;
+  ctx.drawImage(rim, x0, y0);
+  ctx.globalAlpha = inherited;
+  ctx.drawImage(body, x0, y0);
   ctx.restore();
 };
