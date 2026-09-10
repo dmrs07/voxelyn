@@ -804,7 +804,6 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'toast.purge.used': 'PURGE — SYSTEMS RESTORED +{amount}',
   'toast.scan.complete': 'SCAN COMPLETE — CACHE REVEALED',
   'toast.overheat': 'OVERHEAT!',
-  'toast.well.resonance': 'THE VEIN RESONATES — TWO ECHOES DEMONSTRATE',
   'toast.sector.entered': 'SECTOR {sector} — {biome}',
 
   // Messages emitted by the simulation (they arrive as a key, never as text)

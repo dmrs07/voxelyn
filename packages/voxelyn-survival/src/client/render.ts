@@ -2580,11 +2580,9 @@ export class SurvivalRenderer {
           break;
         }
         case 'well_offers':
-          this.messages.push({
-            text: t('toast.well.resonance'),
-            until: nowMs + 3400,
-            tone: 'info',
-          });
+          // Sem toast: o painel de sintonia (echo-choice.ts) abre sozinho ao
+          // chegar ao poco e ja diz tudo que a frase dizia. Os dois juntos
+          // deixavam o aviso vazando por tras do subtitulo do painel.
           break;
         case 'ability_taken':
           // O clarao e do mundo (o poco acendeu); a frase e de quem assimilou.

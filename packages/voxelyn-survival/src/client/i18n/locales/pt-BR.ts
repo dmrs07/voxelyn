@@ -834,7 +834,6 @@ export const PT_BR = {
   'toast.purge.used': 'PURGA — SISTEMAS RESTABELECIDOS +{amount}',
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
   'toast.overheat': 'SUPERAQUECIMENTO!',
-  'toast.well.resonance': 'O VEIO RESSOA — DOIS ECOS DEMONSTRAM',
   'toast.sector.entered': 'SETOR {sector} — {biome}',
 
   // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
