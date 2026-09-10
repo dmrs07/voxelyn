@@ -103,11 +103,25 @@ export class EchoChoicePanel {
     this.element.replaceChildren();
     this.element.hidden = false;
 
+    // O "Manter" mora no CABECALHO, a direita do titulo, em todo layout: a
+    // ordem visual e a ordem do DOM (e do foco) sao a mesma — manter, card 1,
+    // card 2 — e em tela baixa ele nao custa uma linha propria. Um rodape
+    // reordenado por CSS deixava o teclado saltar para tras.
     const header = document.createElement('header');
-    header.append(text('p', 'echo-eyebrow', t('ability.choice.sector', { sector: state.sector })));
+    const headText = text('div', 'echo-head-text', '');
+    headText.append(
+      text('p', 'echo-eyebrow', t('ability.choice.sector', { sector: state.sector })),
+    );
     const title = text('h2', 'echo-title', t('ability.choice.title'));
     title.id = 'echo-choice-title';
-    header.append(title, text('p', 'echo-subtitle', t('ability.choice.subtitle')));
+    headText.append(title, text('p', 'echo-subtitle', t('ability.choice.subtitle')));
+    const current = abilityPresentation(state.playerExtra.ability);
+    const keep = document.createElement('button');
+    keep.type = 'button';
+    keep.className = 'echo-keep';
+    keep.textContent = t('ability.choice.keep', { ability: current.label });
+    keep.addEventListener('click', () => this.select(null));
+    header.append(headText, keep);
     this.element.append(header);
 
     const cards = text('div', 'echo-cards', '');
@@ -148,14 +162,8 @@ export class EchoChoicePanel {
       cards.append(card);
     });
     this.element.append(cards);
-    const current = abilityPresentation(state.playerExtra.ability);
     const footer = document.createElement('footer');
-    const keep = document.createElement('button');
-    keep.type = 'button';
-    keep.className = 'echo-keep';
-    keep.textContent = t('ability.choice.keep', { ability: current.label });
-    keep.addEventListener('click', () => this.select(null));
-    footer.append(keep, text('p', 'echo-live', t('ability.choice.live')));
+    footer.append(text('p', 'echo-live', t('ability.choice.live')));
     this.element.append(footer);
   }
 
