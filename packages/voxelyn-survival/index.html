@@ -1621,6 +1621,21 @@
       #pause-options-slot .ax-optgroup {
         gap: 6px;
       }
+      /* Bloco de leitura ANEXO dentro de um formulário: a barra lateral e o
+         fundo levemente aceso o separam do corpo sem virar outro cartão. */
+      .ax-note {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        border-left: 2px solid var(--ax-key);
+        background: rgba(255, 255, 255, 0.012);
+        padding: 8px 10px;
+      }
+      /* A placa do anexo pode quebrar linha: ela é um título, não um código. */
+      .ax-note .ax-doc-code {
+        margin-top: 0;
+        white-space: normal;
+      }
       .ax-form.is-danger {
         border-color: var(--ax-red-line);
         box-shadow:
@@ -3948,12 +3963,31 @@
           Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende. O
           Veio lá embaixo rende.
         </div>
+        <!-- A última aula do exercício, e a única que não cabe dentro de um
+             setor: o Registro e os Arquivos vivem no TERMINAL, não no Veio.
+             Fica escondida quando o exercício não é homologado — quem vai
+             repetir a operação não precisa de leitura complementar ainda. -->
+        <div id="training-complete-archive" class="ax-note">
+          <div class="ax-doc-code" data-i18n="training.complete.archive.title">
+            LEITURA COMPLEMENTAR
+          </div>
+          <div class="sub" data-i18n="training.complete.archive.body">
+            Cada Ativo que você encontrar e cada reação que você provocar abrem uma ficha.
+          </div>
+        </div>
         <button
           id="btn-training-descend"
           class="primary ax-stamp"
           data-i18n="training.complete.descend"
         >
           AUTORIZAR DESCIDA
+        </button>
+        <button
+          id="btn-training-archive"
+          class="ax-order-secondary"
+          data-i18n="training.complete.archive"
+        >
+          ABRIR OS ARQUIVOS
         </button>
         <button
           id="btn-training-terminal"

@@ -1039,30 +1039,90 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   'menu.training': 'Training op',
   'aurix.doc.training': 'FORM AD-TRN-01 · induction exercise',
+  // The operation spans TWO sectors, and the drill numbering runs straight
+  // through both: the player never sees "sector 1" and "sector 2", only a list
+  // that keeps going on the other side of the shaft.
   'training.step.move': 'Drill 1 — MOVE: W A S D. Advance down the gallery.',
   'training.step.move.touch': 'Drill 1 — MOVE: left stick. Advance down the gallery.',
+  'training.step.mine':
+    'Drill 2 — MINE: the vein in the walls is cargo. Shoot it until you chip three off.',
+  'training.step.mine.touch':
+    'Drill 2 — MINE: the vein in the walls is cargo. Aim at it with the right stick until you chip three off.',
   'training.step.clear':
-    'Drill 2 — FIRE: hold the left mouse button and aim with the cursor. Neutralise both specimens.',
+    'Drill 3 — FIRE: hold the left mouse button and aim with the cursor. Neutralise both specimens.',
   'training.step.clear.touch':
-    'Drill 2 — FIRE: the right stick aims and fires. Neutralise both specimens.',
-  'training.step.dash': 'Drill 3 — DASH: SPACE. Execute an evasive burst between the pillars.',
+    'Drill 3 — FIRE: the right stick aims and fires. Neutralise both specimens.',
+  'training.step.dash': 'Drill 4 — DASH: SPACE. Execute an evasive burst between the pillars.',
   'training.step.dash.touch':
-    'Drill 3 — DASH: the dodge button. Execute an evasive burst between the pillars.',
-  'training.step.core': 'Drill 4 — THE CORE: approach the pedestal and interact with E.',
+    'Drill 4 — DASH: the dodge button. Execute an evasive burst between the pillars.',
+  'training.step.terminal':
+    'Drill 5 — TERMINAL: approach the survey terminal and trigger it with E. It sweeps the sector for the cache — and announces you while it sweeps.',
+  'training.step.terminal.touch':
+    'Drill 5 — TERMINAL: approach the survey terminal and trigger it with the interact button. It sweeps the sector for the cache — and announces you while it sweeps.',
+  'training.step.hold':
+    'Drill 6 — HOLD: the alarm called company. The sweep does not stop; hold the bay until it finishes.',
+  'training.step.hold.touch':
+    'Drill 6 — HOLD: the alarm called company. The sweep does not stop; hold the bay until it finishes.',
+  'training.step.cache':
+    'Drill 7 — LOCATOR: the cache is revealed. The ring at the top of the screen gives its on-screen bearing and distance — follow the marker and open the cache with E.',
+  'training.step.cache.touch':
+    'Drill 7 — LOCATOR: the cache is revealed. The ring at the top of the screen gives its on-screen bearing and distance — follow the marker and open the cache with the interact button.',
+  'training.step.module':
+    'Drill 8 — MODULE: the cache paid in hardware. Pick one of the two cards — the module lasts this descent.',
+  'training.step.module.touch':
+    'Drill 8 — MODULE: the cache paid in hardware. Tap one of the two cards — the module lasts this descent.',
+  'training.step.echo':
+    'Drill 9 — THE ECHO: the shaft resonates with what you did here. Get close and tune an Echo — it REPLACES your ability. Descending without choosing keeps the current one.',
+  'training.step.echo.touch':
+    'Drill 9 — THE ECHO: the shaft resonates with what you did here. Get close and tune an Echo — it REPLACES your ability. Descending without choosing keeps the current one.',
+  'training.step.descend':
+    'Drill 10 — DESCEND: interact at the shaft with E. Contamination eases on the way down; the way back is through here.',
+  'training.step.descend.touch':
+    'Drill 10 — DESCEND: interact at the shaft with the interact button. Contamination eases on the way down; the way back is through here.',
+  'training.step.ability':
+    'Drill 11 — ABILITY: Q fires the equipped Echo. It has a cooldown — the command bar at the bottom says when it is back.',
+  'training.step.ability.touch':
+    'Drill 11 — ABILITY: the ability button fires the equipped Echo. It has a cooldown — the ring on the button says when it is back.',
+  'training.step.breach':
+    'Drill 12 — BREACH: the pale rock ahead is fragile and yields to fire. Not every wall is a wall — open a way through.',
+  'training.step.breach.touch':
+    'Drill 12 — BREACH: the pale rock ahead is fragile and yields to fire. Not every wall is a wall — open a way through.',
+  'training.step.core': 'Drill 13 — THE CORE: approach the pedestal and interact with E.',
   'training.step.core.touch':
-    'Drill 4 — THE CORE: approach the pedestal and use the interact button.',
+    'Drill 13 — THE CORE: approach the pedestal and use the interact button.',
+  'training.step.ascend':
+    'Drill 14 — ASCEND: with the Core in hand the shaft has sealed. The way out is the way you came in — return to this sector entry and interact with E.',
+  'training.step.ascend.touch':
+    'Drill 14 — ASCEND: with the Core in hand the shaft has sealed. The way out is the way you came in — return to this sector entry and use the interact button.',
   'training.step.extract':
     'Final drill — EXTRACTION: return to the entry platform and interact with E. Cargo only counts outside the Vein.',
   'training.step.extract.touch':
     'Final drill — EXTRACTION: return to the entry platform and use the interact button. Cargo only counts outside the Vein.',
   'training.done.move': '✓ movement logged',
+  'training.done.mine': '✓ chips in cargo',
   'training.done.clear': '✓ neutralisation logged',
   'training.done.dash': '✓ evasive logged',
+  'training.done.hold': '✓ sweep complete — cache located',
+  'training.done.module': '✓ hardware fitted',
+  'training.done.echo': '✓ Echo tuned',
+  'training.done.ability': '✓ Echo discharged',
+  'training.done.breach': '✓ way opened',
+  'training.done.ascend': '✓ sector cleared — the platform remains',
   'training.tip.heat':
     'The barrel saturated. Release the trigger and let the heat fall — pacing is part of the armament.',
+  'training.tip.purge':
+    'The cache also paid a PURGE CELL. F spends one: it zeroes heat, unjams the barrel and disperses fire, gas and spores around you. You descend with very few.',
+  'training.tip.contamination':
+    'The CONTAMINATION bar at the top climbs on its own with time in the Vein. Descending eases it; ascending charges for it. When it saturates the air bites — and the only answer is to already be on your way out.',
+  'training.tip.archive':
+    'DISCOVERY LOGGED. What happens to you becomes a file: the RECORDS keep the fact, the AURIX FILES explain what the company knows about it. Both live in the terminal, at the end of the drill.',
   'training.complete.title': 'DRILL CERTIFIED',
   'training.complete.body':
     'Training record filed. No cargo was credited — training pays nothing. The Vein below does.',
+  'training.complete.archive.title': 'FURTHER READING',
+  'training.complete.archive.body':
+    'Every Asset you meet and every reaction you cause opens a file. The RECORDS list what has already happened to you; inside them, "See docs" leads to the AURIX FILES, where the company keeps what it knows — and what it would rather not have written down. An unread document keeps happening to you.',
+  'training.complete.archive': 'OPEN THE FILES',
   'training.complete.descend': 'AUTHORISE DESCENT',
   'training.complete.terminal': 'RETURN TO TERMINAL',
   // Empty-handed extraction: the exit is logged, the drill is not. Same
@@ -1072,6 +1132,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'training.incomplete.body':
     'Extraction with empty cargo. The exercise contract wants the Core on the platform — the company logs the exit, but does not certify it. Repeat the operation.',
   'training.incomplete.retry': 'REPEAT DRILL',
+  'training.restart.sector': 'UNIT LOST — replacement chassis at the head of this sector.',
+  'training.restart.return':
+    'UNIT LOST — replacement chassis at the shaft, Core included. The way back continues.',
 
   // ---------------------------------------------------------------------
   // Arquivo desbloqueado (o aviso, nao o painel)

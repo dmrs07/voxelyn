@@ -1109,31 +1109,104 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   'menu.training': 'Operação de treinamento',
   'aurix.doc.training': 'FORMULÁRIO AD-TRN-01 · exercício de indução',
+  // A OPERAÇÃO TEM DOIS SETORES, e a numeração dos exercícios atravessa os
+  // dois: o jogador não vê "setor 1" e "setor 2", ele vê uma lista que continua
+  // do outro lado do poço. É o mesmo truque da circular — a companhia numera
+  // procedimentos, não lugares.
   'training.step.move': 'Exercício 1 — MOVER: W A S D. Avance pela galeria.',
   'training.step.move.touch': 'Exercício 1 — MOVER: manche esquerdo. Avance pela galeria.',
+  'training.step.mine':
+    'Exercício 2 — MINERAR: o veio nas paredes é carga. Atire nele até arrancar três lascas.',
+  'training.step.mine.touch':
+    'Exercício 2 — MINERAR: o veio nas paredes é carga. Mire nele com o manche direito até arrancar três lascas.',
   'training.step.clear':
-    'Exercício 2 — FOGO: segure o botão esquerdo do mouse e mire com o cursor. Neutralize os dois espécimes.',
+    'Exercício 3 — FOGO: segure o botão esquerdo do mouse e mire com o cursor. Neutralize os dois espécimes.',
   'training.step.clear.touch':
-    'Exercício 2 — FOGO: o manche direito mira e dispara. Neutralize os dois espécimes.',
+    'Exercício 3 — FOGO: o manche direito mira e dispara. Neutralize os dois espécimes.',
   'training.step.dash':
-    'Exercício 3 — ESQUIVA: ESPAÇO. Execute um avanço evasivo entre os pilares.',
+    'Exercício 4 — ESQUIVA: ESPAÇO. Execute um avanço evasivo entre os pilares.',
   'training.step.dash.touch':
-    'Exercício 3 — ESQUIVA: botão de esquiva. Execute um avanço evasivo entre os pilares.',
-  'training.step.core': 'Exercício 4 — O NÚCLEO: aproxime-se do pedestal e interaja com E.',
+    'Exercício 4 — ESQUIVA: botão de esquiva. Execute um avanço evasivo entre os pilares.',
+  // O terminal é o "beacon" do salvage: ativá-lo é o que acende o localizador
+  // mais adiante. A instrução avisa o preço ANTES — um alarme que surpreende
+  // ensina a não tocar em terminal nenhum.
+  'training.step.terminal':
+    'Exercício 5 — TERMINAL: aproxime-se do terminal de escaneamento e acione com E. Ele varre o setor atrás do cofre — e denuncia você enquanto varre.',
+  'training.step.terminal.touch':
+    'Exercício 5 — TERMINAL: aproxime-se do terminal de escaneamento e acione com o botão de interação. Ele varre o setor atrás do cofre — e denuncia você enquanto varre.',
+  'training.step.hold':
+    'Exercício 6 — SEGURAR: o alarme chamou companhia. O escaneamento não para; segure a baía até ele terminar.',
+  'training.step.hold.touch':
+    'Exercício 6 — SEGURAR: o alarme chamou companhia. O escaneamento não para; segure a baía até ele terminar.',
+  // O anel no topo da tela é um instrumento de rumo, não um mapa: ele diz a
+  // direção NA TELA e a distância, e nada mais. Dizer isso na instrução evita
+  // que o jogador espere um minimapa que o jogo nunca vai dar.
+  'training.step.cache':
+    'Exercício 7 — LOCALIZADOR: o cofre foi revelado. O anel no topo da tela aponta o rumo dele na tela e a distância — siga o marcador e abra o cofre com E.',
+  'training.step.cache.touch':
+    'Exercício 7 — LOCALIZADOR: o cofre foi revelado. O anel no topo da tela aponta o rumo dele na tela e a distância — siga o marcador e abra o cofre com o botão de interação.',
+  'training.step.module':
+    'Exercício 8 — MÓDULO: o cofre pagou hardware. Escolha uma das duas cartas — o módulo vale por esta descida.',
+  'training.step.module.touch':
+    'Exercício 8 — MÓDULO: o cofre pagou hardware. Toque uma das duas cartas — o módulo vale por esta descida.',
+  'training.step.echo':
+    'Exercício 9 — O ECO: o poço ressoa com o que você fez aqui. Chegue perto e sintonize um Eco — ele SUBSTITUI sua habilidade. Descer sem escolher mantém a atual.',
+  'training.step.echo.touch':
+    'Exercício 9 — O ECO: o poço ressoa com o que você fez aqui. Chegue perto e sintonize um Eco — ele SUBSTITUI sua habilidade. Descer sem escolher mantém a atual.',
+  'training.step.descend':
+    'Exercício 10 — DESCER: interaja no poço com E. A contaminação alivia ao descer; o caminho de volta é por aqui.',
+  'training.step.descend.touch':
+    'Exercício 10 — DESCER: interaja no poço com o botão de interação. A contaminação alivia ao descer; o caminho de volta é por aqui.',
+  'training.step.ability':
+    'Exercício 11 — HABILIDADE: Q dispara o Eco equipado. Ele tem recarga — a barra de comandos, no rodapé, diz quando ele volta.',
+  'training.step.ability.touch':
+    'Exercício 11 — HABILIDADE: o botão de habilidade dispara o Eco equipado. Ele tem recarga — o anel no botão diz quando ele volta.',
+  'training.step.breach':
+    'Exercício 12 — BRECHA: a rocha clara à frente é frágil e cede ao tiro. Nem toda parede é parede — abra passagem.',
+  'training.step.breach.touch':
+    'Exercício 12 — BRECHA: a rocha clara à frente é frágil e cede ao tiro. Nem toda parede é parede — abra passagem.',
+  'training.step.core': 'Exercício 13 — O NÚCLEO: aproxime-se do pedestal e interaja com E.',
   'training.step.core.touch':
-    'Exercício 4 — O NÚCLEO: aproxime-se do pedestal e use o botão de interação.',
+    'Exercício 13 — O NÚCLEO: aproxime-se do pedestal e use o botão de interação.',
+  'training.step.ascend':
+    'Exercício 14 — SUBIR: com o Núcleo na mão o poço selou. A saída é por onde você entrou — volte à entrada deste setor e interaja com E.',
+  'training.step.ascend.touch':
+    'Exercício 14 — SUBIR: com o Núcleo na mão o poço selou. A saída é por onde você entrou — volte à entrada deste setor e use o botão de interação.',
   'training.step.extract':
     'Exercício final — EXTRAÇÃO: volte à plataforma de entrada e interaja com E. Carga só conta fora do Veio.',
   'training.step.extract.touch':
     'Exercício final — EXTRAÇÃO: volte à plataforma de entrada e use o botão de interação. Carga só conta fora do Veio.',
   'training.done.move': '✓ deslocamento registrado',
+  'training.done.mine': '✓ lascas na carga',
   'training.done.clear': '✓ neutralização registrada',
   'training.done.dash': '✓ evasiva registrada',
+  'training.done.hold': '✓ escaneamento concluído — cofre localizado',
+  'training.done.module': '✓ hardware acoplado',
+  'training.done.echo': '✓ Eco sintonizado',
+  'training.done.ability': '✓ Eco disparado',
+  'training.done.breach': '✓ passagem aberta',
+  'training.done.ascend': '✓ setor vencido — falta a plataforma',
   'training.tip.heat':
     'O cano saturou. Solte o gatilho e deixe o calor cair — ritmo é parte do armamento.',
+  'training.tip.purge':
+    'O cofre também rendeu uma CÉLULA DE PURGA. F gasta uma: zera o calor, destrava o cano e dissipa fogo, gás e esporos à sua volta. Você desce com poucas.',
+  'training.tip.contamination':
+    'A barra de CONTAMINAÇÃO, no alto, sobe sozinha com o tempo no Veio. Descer alivia; subir cobra. Quando ela satura, o ar morde — e a única resposta é já estar saindo.',
+  // O gancho do arquivo. O jogador acaba de gerar um documento sem saber que
+  // documentos existem; o debriefing termina de contar.
+  'training.tip.archive':
+    'DESCOBERTA REGISTRADA. O que acontece com você vira ficha: o REGISTRO guarda o fato, os ARQUIVOS AURIX explicam o que a companhia sabe sobre ele. Os dois ficam no terminal, no fim do exercício.',
   'training.complete.title': 'EXERCÍCIO HOMOLOGADO',
   'training.complete.body':
     'Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende. O Veio lá embaixo rende.',
+  // O bloco dos documentos: a única aula do exercício que não cabe dentro de
+  // um setor, porque o Registro e os Arquivos vivem no TERMINAL. Fica aqui, no
+  // formulário, com o botão que leva direto a eles — dizer onde é uma coisa,
+  // abrir a porta é outra.
+  'training.complete.archive.title': 'LEITURA COMPLEMENTAR',
+  'training.complete.archive.body':
+    'Cada Ativo que você encontrar e cada reação que você provocar abrem uma ficha. O REGISTRO lista o que já aconteceu com você; dentro dele, "Ver docs" leva aos ARQUIVOS AURIX, onde a companhia guarda o que sabe — e o que preferia não ter escrito. Documento não lido continua acontecendo com você.',
+  'training.complete.archive': 'ABRIR OS ARQUIVOS',
   'training.complete.descend': 'AUTORIZAR DESCIDA',
   'training.complete.terminal': 'VOLTAR AO TERMINAL',
   // Extração de mãos vazias: a saída é registrada, o exercício não. A voz
@@ -1143,6 +1216,11 @@ export const PT_BR = {
   'training.incomplete.body':
     'Extração sem carga. O contrato do exercício pede o Núcleo na plataforma — a companhia registra a saída, mas não homologa. Repita a operação.',
   'training.incomplete.retry': 'REPETIR EXERCÍCIO',
+  // O reinício a prova de falha. A voz não repreende e não conta mortes: o
+  // exercício reconstrói o trecho e devolve o operador a ele.
+  'training.restart.sector': 'UNIDADE PERDIDA — chassi de reposição no início deste setor.',
+  'training.restart.return':
+    'UNIDADE PERDIDA — chassi de reposição no poço, com o Núcleo. O caminho de volta continua.',
 
   // ---------------------------------------------------------------------
   // Arquivo desbloqueado (o aviso, nao o painel)
