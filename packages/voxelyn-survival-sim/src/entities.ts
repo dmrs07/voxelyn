@@ -143,6 +143,7 @@ import {
   MAGNETARCH_CRUSH_DAMAGE,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
+  MAGNETARCH_EXPOSED_ARMOR,
   MAGNETARCH_FIELD_RANGE,
   MAGNETARCH_FIELD_TICK_INTERVAL,
   MAGNETARCH_FLIP_WINDUP_TICKS,
@@ -394,7 +395,8 @@ import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
 import { coopEnemyHp, coopPack, coopPackCapped } from './coop.js';
 import { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
-import { magnetStanding } from './magnet.js';
+import { magnetField, magnetStanding } from './magnet.js';
+import { claimMagnetShards, routeMagnetShards, stepMagnetShards } from './magnet-shards.js';
 import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
@@ -1146,6 +1148,15 @@ export const damageEntity = (
   if (!hazard && ent.archetype === 'lung_matrix') {
     events.push({ t: 'boss_state', archetype: 'lung_matrix', state: 'wound', x: ent.x, y: ent.y });
   }
+  // O NUCLEO EXPOSTO do Magnetarca: o descompasso que uma massa fraturada
+  // provoca ao se despedacar nele. E a familia inversa das couracas acima — o
+  // bioma intacto defende os outros chefes, e aqui e o proprio material dele que
+  // se volta contra o corpo. Multiplicador e nao dano fixo de proposito: o
+  // premio de ter preparado a massa tem de escalar com o que o jogador consegue
+  // fazer na janela, senao ele vira um numero que chega sozinho.
+  if (ent.archetype === 'magnetarch' && state.tick < state.bossRuntime.magnetExposedUntil) {
+    amount *= MAGNETARCH_EXPOSED_ARMOR;
+  }
   if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
     amount *= ARCHCANTOR_SILENT_ARMOR;
     markDiscovery(state.stats, DISCOVERY_CATHEDRAL_SILENCED);
@@ -1182,6 +1193,15 @@ export const damageEntity = (
   if (ent.hp > 0) return;
   ent.hp = 0;
   ent.alive = false;
+  // O CAMPO MORRE COM ELE, e com o campo o ferro. Uma massa em voo depende do
+  // passo do chefe para andar (`stepMagnetShards` roda dentro dele), entao sem
+  // esta linha ela ficaria congelada no ar pelo resto da run — desenhada,
+  // hasheada e prometendo um atropelo que nunca vem. O descompasso tambem sai:
+  // ele so significa alguma coisa enquanto ha nucleo para expor.
+  if (ent.archetype === 'magnetarch') {
+    state.bossRuntime.magnetShards = [];
+    state.bossRuntime.magnetExposedUntil = 0;
+  }
   if (ent.archetype === 'sheet_leviathan') {
     state.bossRuntime.protectiveBubbles = [];
     state.bossRuntime.leviathanShockAt = -1;
@@ -7414,6 +7434,21 @@ const magnetarchStep = (
     rt.awake = true;
     rt.magnetFlipAt = state.tick + MAGNETARCH_CYCLE_TICKS;
     enemy.mood = MAGNET_ATTRACT;
+    // O campo RECLAMA a sucata que a camara ja tinha. Ela nasce aqui e nao num
+    // golpe: o Ferrifero e feito de ferro solto, e o primeiro recolhimento e a
+    // apresentacao da regra — nao uma surpresa no meio da luta.
+    claimMagnetShards(state, enemy);
+    // E JA AS RECOLHE. O encontro abre em atracao, e atracao recolhe: sem esta
+    // linha o ferro so se mexia na PRIMEIRA INVERSAO, e a medicao mostrou o
+    // custo disso — o encontro inteiro cabia em um ciclo e meio, entao o ciclo
+    // de ida e volta do ferro nao chegava a fechar uma vez.
+    //
+    // Como a abertura pega as massas ainda na faixa, as rotas sao curtas e
+    // radiais, longe de quem acabou de entrar no campo: o primeiro
+    // recolhimento e uma DEMONSTRACAO, e nao um golpe. O jogador ve o ferro
+    // atravessar a arena antes de ele ter chance de cobrar alguma coisa, que e
+    // a unica forma de a regra ser aprendida sem ser paga.
+    routeMagnetShards(state, enemy, player, true);
     events.push({ t: 'boss_awake', archetype: 'magnetarch', x: enemy.x, y: enemy.y });
     events.push({
       t: 'boss_state',
@@ -7432,6 +7467,12 @@ const magnetarchStep = (
   if (untilFlip <= 0) {
     enemy.mood = enemy.mood === MAGNET_ATTRACT ? MAGNET_REPEL : MAGNET_ATTRACT;
     rt.magnetFlipAt = state.tick + MAGNETARCH_CYCLE_TICKS;
+    // A POLARIDADE NOVA MOVE O FERRO JUNTO. E o mesmo comando para os dois: o
+    // campo mudou de lado, e o que ele carrega muda com ele — atraindo, as
+    // massas voltam; repelindo, saem. Rotear aqui, e nao num relogio proprio, e
+    // o que faz o ciclo do ferro ser LEGIVEL pela polaridade que o jogador ja
+    // aprendeu a ler.
+    routeMagnetShards(state, enemy, player, enemy.mood === MAGNET_ATTRACT);
     events.push({
       t: 'boss_state',
       archetype: 'magnetarch',
@@ -7459,10 +7500,18 @@ const magnetarchStep = (
     });
   }
 
-  // A FOLGA E REAL: nem puxao nem cobranca. Um telegrafo que so mudasse a cor
-  // do anel seria decoracao; o que ensina a regra e a janela em que a resposta
-  // do jogador (atravessar a faixa para a outra borda) cabe sem custo.
-  if (rt.magnetFlipAt - state.tick <= MAGNETARCH_FLIP_WINDUP_TICKS) return;
+  // AS MASSAS ANDAM SEMPRE, inclusive com o campo calado. O que a folga suspende
+  // e o deslocamento dos CORPOS; ferro ja em voo tem inercia, e congela-lo no ar
+  // seria a unica coisa desta luta que nao se explica sozinha.
+  stepMagnetShards(state, enemy, events);
+
+  // O CAMPO CALADO nao puxa e nao cobra. Sao dois estados com a mesma
+  // consequencia e significados opostos — a FOLGA da inversao (o aviso) e o
+  // DESCOMPASSO de uma massa fraturada (o premio) —, e quem responde por eles e
+  // `magnetField`, a mesma leitura que o cliente desenha. Duas comparacoes
+  // escritas a mao dos dois lados sao como o anel passa a mentir sobre o dano.
+  const field = magnetField(state.tick, rt.magnetFlipAt, enemy.mood ?? 0, rt.magnetExposedUntil);
+  if (field.quiet) return;
 
   // O CAMPO NAO PERGUNTA DE QUEM E O CORPO. Ele valia so para o alvo mais
   // proximo — o `player` que o laco de inimigos escolhe —, e numa sala de dois

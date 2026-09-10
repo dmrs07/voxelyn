@@ -3189,7 +3189,33 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  * respeitada, sem teleporte — porque a quina no caminho continua sendo o
  * contra-jogo geometrico do campo.
  */
-export const MAGNETARCH_HP = 720;
+/**
+ * A vida, MEDIDA e nao escolhida.
+ *
+ * Com 720 o encontro durava 14,7 s contra um alvo que so atira (bot imortal,
+ * mira perfeita, parado na faixa) — e nesse tempo cabia UMA inversao. O ciclo
+ * do ferro leva um ciclo inteiro para fechar: o campo recolhe na abertura,
+ * arremessa na repulsao, o jogador sabota, e o pagamento chega no recolhimento
+ * seguinte, por volta dos 20 s. Com 720, o chefe morria aos 19,8 s — cinco
+ * decimos de segundo ANTES de a massa fraturada chegar nele. O contra-jogo
+ * caracteristico da luta nao cabia na luta.
+ *
+ * A varredura (ver a tabela no documento dos chefes) mediu os dois caminhos:
+ *
+ *   vida    ignorando   sabotando
+ *    720      14,7 s      19,8 s   (0 estilhacos: ele morre antes)
+ *    900      19,5 s      19,8 s
+ *   1050      22,0 s      19,8 s
+ *   1200      26,3 s      20,8 s
+ *   1400      29,8 s      22,8 s
+ *
+ * 1200 e onde SABER a luta separa de nao saber: 21% mais rapido, e o caminho
+ * sabotado cai na mediana dos chefes do jogo (~20 s) enquanto o ignorado paga
+ * seis segundos a mais. Acima disso o caminho ignorado vira uma luta plana de
+ * trinta segundos — que e exatamente o defeito que este rework existe para
+ * corrigir, so que mais longo.
+ */
+export const MAGNETARCH_HP = 1200;
 /**
  * FIXO, como o Pulmao e o Coracao — e pelo mesmo motivo dos dois: a luta nao e
  * contra um corpo, e contra a sala.
@@ -3205,8 +3231,28 @@ export const MAGNETARCH_HP = 720;
  */
 export const MAGNETARCH_SPEED = 0;
 export const MAGNETARCH_RADIUS = 0.8;
-/** Quanto dura CADA polaridade, telegrafo incluido. */
-export const MAGNETARCH_CYCLE_TICKS = 170;
+/**
+ * Quanto dura CADA polaridade, telegrafo incluido.
+ *
+ * Era 170 (8,5 s), e o numero caiu por MEDICAO e nao por gosto. O ciclo do
+ * ferro tem periodo de um ciclo inteiro — ele arremessa na repulsao, o jogador
+ * sabota, e o pagamento chega no recolhimento seguinte —, entao a polaridade
+ * decide quando o contra-jogo caracteristico da luta acontece. Onde ele cai,
+ * em fracao da vida do chefe (bot imortal, mira perfeita, vida 1.200):
+ *
+ *   polaridade   primeiro estilhaco
+ *    8,5 s        aos 19,8 s, com ele a  6% de vida  (e um golpe de misericordia)
+ *    7,0 s        aos 16,8 s, a 19%
+ *    6,0 s        aos 14,8 s, a 33%                  <- aqui
+ *    5,0 s        aos 22,8 s, a  3%  (a janela de sabotagem encolhe demais e o
+ *                                     recolhimento passa sem a massa pronta)
+ *
+ * Seis segundos e o unico ponto em que a janela de sabotagem ainda cabe na
+ * repulsao E o pagamento chega com luta pela frente. De quebra ele responde ao
+ * outro defeito do encontro — "voce resolve a distancia e repete o movimento":
+ * a faixa troca de lado com o dobro da frequencia de antes.
+ */
+export const MAGNETARCH_CYCLE_TICKS = 120;
 /**
  * O TELEGRAFO DA INVERSAO: o fim de cada ciclo em que o campo se cala.
  *
@@ -3230,6 +3276,109 @@ export const MAGNETARCH_CRUSH_DAMAGE = 16;
 export const MAGNETARCH_TETHER_RANGE = 9;
 export const MAGNETARCH_TETHER_DAMAGE = 14;
 export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;
+
+// ---------------------------------------------------------------------------
+// O FERRO QUE VOLTA — as massas que o campo carrega
+// ---------------------------------------------------------------------------
+//
+// A promessa que faltava cumprir. A lore dele e um campo que move material
+// ferroso, e o estrato inteiro e minerio e sucata; mecanicamente, porem, a
+// unica coisa que o campo movia era o Prospector. Depois de aprender a
+// distancia, o encontro nao pedia mais nenhuma decisao — so repetir o passo
+// contra o campo enquanto atira.
+//
+// O ciclo do ferro fecha isso, e ele e a leitura do proprio campo aplicada a
+// materia: ATRAINDO ele recolhe as massas cravadas na arena; REPELINDO ele as
+// arremessa de volta para fora. Enquanto uma massa esta cravada la fora, ela e
+// alvo — e uma massa FRATURADA nao aguenta o recolhimento: ela se despedaca
+// contra os aneis, cobra do proprio chefe e desregula o campo.
+//
+// A decisao que isso cria e a razao de tudo isto existir: continuar acertando
+// o chefe, ou investir tres tiros numa massa para transformar o proximo
+// recolhimento numa janela?
+//
+// Nada disto e solido: uma massa cravada nao fecha rota nem tampa celula. A
+// camara gerada continua atravessavel em qualquer combinacao de massas — que e
+// a unica coisa que um objeto novo no chao NAO pode quebrar.
+
+/**
+ * Quantas massas o campo controla de uma vez.
+ *
+ * Tres, e grandes. A alternativa (muitas pequenas) transformaria a arena numa
+ * chuva de riscos e apagaria a decisao: com tres, cada uma e um objeto que se
+ * reconhece de longe, com integridade propria e uma rota anunciada que da para
+ * ler antes de sair. Elas nao repovoam — a que se despedaca acabou. Uma luta
+ * curta com material infinito seria farm; com material finito, ela e uma
+ * conta: quantas voce consegue preparar antes que ele caia.
+ */
+export const MAGNETARCH_SHARDS = 3;
+/**
+ * A integridade de uma massa cravada. Tres tiros do disparo basico (14 cada),
+ * de proposito.
+ *
+ * A arma basica TEM de conseguir fraturar — o contra-jogo caracteristico do
+ * encontro nao pode morar num modulo. Tres tiros e o preco que cabe no
+ * telegrafo do recolhimento (26 ticks contra os 10 que os tres levam), entao a
+ * escolha e de verdade: da tempo, mas custa a janela inteira de mira no chefe.
+ */
+export const MAGNETARCH_SHARD_HP = 42;
+/** O corpo da massa: o raio em que o tiro a acerta e em que ela atropela. */
+export const MAGNETARCH_SHARD_RADIUS = 0.7;
+/** A massa em voo, em tiles/s. Mais lenta que o bolt (13) e que a esquiva. */
+export const MAGNETARCH_SHARD_SPEED = 9;
+/**
+ * O telegrafo de cada movimento da massa — arremesso e recolhimento.
+ *
+ * A rota nasce marcada no chao e CONGELA ali, como as cargas da Salva de
+ * Demolicao do Diamandis e pela mesma razao: sair da linha e a resposta
+ * inteira, e ela so existe porque a linha fica onde nasceu.
+ */
+export const MAGNETARCH_SHARD_WINDUP_TICKS = 26;
+/** O que uma massa cobra de quem ela atropela. */
+export const MAGNETARCH_SHARD_DAMAGE = 18;
+/** Intervalo minimo entre duas cobrancas da MESMA massa. */
+export const MAGNETARCH_SHARD_HIT_TICKS = 10;
+/**
+ * O que uma massa FRATURADA cobra do chefe ao se despedacar nele.
+ *
+ * Sete tiros de retorno para tres investidos. O saldo e generoso de proposito:
+ * este e o momento caracteristico da luta, e um contra-jogo que empata em dano
+ * e um contra-jogo que ninguem repete. O teto e a materia — tres massas, e
+ * elas nao voltam.
+ */
+export const MAGNETARCH_SHARD_RETURN_DAMAGE = 96;
+/**
+ * O DESCOMPASSO: quanto tempo o campo fica desregulado depois do estilhaco.
+ *
+ * Nao e so um multiplicador de dano — o campo PARA (nao puxa e nao cobra),
+ * como na folga da inversao. E a diferenca entre "ele levou dano extra" e "voce
+ * abriu uma janela": a janela e util porque nela da para ficar parado mirando.
+ */
+export const MAGNETARCH_EXPOSED_TICKS = 60;
+/** Quanto o nucleo exposto amplifica o dano que entra. */
+export const MAGNETARCH_EXPOSED_ARMOR = 1.6;
+/**
+ * A abertura do leque das rotas de arremesso, em radianos.
+ *
+ * As tres massas saem para a posicao que o alvo ocupava no instante do
+ * telegrafo, abertas em leque — tres corredores legiveis em vez de tres pedras
+ * na mesma linha. Mesmo numero da Salva Litoclasta do Guardiao: 22 graus.
+ */
+export const MAGNETARCH_SHARD_FAN = 0.38;
+/**
+ * Quanto a massa arremessada VIAJA, em tiles, e ate onde ela pode parar.
+ *
+ * O arremesso mira a posicao que o alvo ocupava e PASSA por ela — uma rota que
+ * terminasse nos pes do jogador premiaria ficar parado. Mas o destino e preso
+ * ao anel externo (`MAGNETARCH_TETHER_RANGE`): a primeira versao jogava a massa
+ * ate a borda do campo, e ela pousava a treze tiles, FORA da faixa. O efeito
+ * era o oposto do desenhado — para sabotar, o jogador tinha de sair da faixa e
+ * pagar o arco de retorno pelo privilegio de preparar o contra-jogo.
+ *
+ * Com o teto no anel externo, o ferro pousa dentro da mesma sala em que a luta
+ * acontece, e sabotar deixa de exigir sair do unico lugar seguro.
+ */
+export const MAGNETARCH_SHARD_THROW = 8;
 
 // ---------------------------------------------------------------------------
 // MINIGUN — o canhao rotativo da Aurix

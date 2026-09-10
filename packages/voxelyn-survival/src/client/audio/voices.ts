@@ -266,7 +266,10 @@ export type VoiceId =
   | 'magnetarchRepel'
   | 'magnetarchFlip'
   | 'magnetarchCrush'
-  | 'magnetarchArc';
+  | 'magnetarchArc'
+  | 'magnetarchHaul'
+  | 'magnetarchCrack'
+  | 'magnetarchShatter';
 
 export type VoiceSpec = {
   /**
@@ -681,6 +684,12 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   magnetarchFlip: { priority: 10, gain: 0.55, minIntervalMs: 0, spatial: false },
   magnetarchCrush: { priority: 9, gain: 0.6, minIntervalMs: 200, spatial: true },
   magnetarchArc: { priority: 9, gain: 0.55, minIntervalMs: 200, spatial: true },
+  // As tres do ciclo do ferro sao ESPACIAIS: o corredor de onde a massa vem, a
+  // massa que o jogador acabou de rachar e o estilhaco no corpo do chefe sao
+  // todos lugares, e saber de que lado eles estao e metade da leitura.
+  magnetarchHaul: { priority: 9, gain: 0.5, minIntervalMs: 90, spatial: true },
+  magnetarchCrack: { priority: 8, gain: 0.5, minIntervalMs: 60, spatial: true },
+  magnetarchShatter: { priority: 10, gain: 0.7, minIntervalMs: 120, spatial: true },
 };
 
 export const voiceSpec = (id: VoiceId): VoiceSpec => VOICE_SPECS[id];

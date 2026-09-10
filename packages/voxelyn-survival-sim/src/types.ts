@@ -759,6 +759,51 @@ export type ProtectiveBubble = { x: number; y: number; radius: number };
  */
 export type Sinkhole = { x: number; y: number; at: number };
 
+/**
+ * Uma massa de minerio e sucata sob o campo do Magnetarca.
+ *
+ * O ciclo dela e o ciclo do campo: atraindo ele a RECOLHE, repelindo ele a
+ * ARREMESSA. Entre os dois ela fica cravada onde parou, e cravada ela e alvo —
+ * fratura-la e o contra-jogo caracteristico do encontro.
+ *
+ * `x, y` e onde ela esta; `tx, ty` e o destino JA MARCADO no chao (o corpo do
+ * chefe no recolhimento, um ponto da arena no arremesso). O destino congela no
+ * telegrafo e nao persegue: sair da linha e a resposta inteira, e ela so existe
+ * porque a linha fica onde nasceu.
+ */
+export type MagnetShard = {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  /** Tick em que o estado atual comecou. */
+  at: number;
+  /** `SHARD_LODGED`, `SHARD_HELD`, `SHARD_WINDUP` ou `SHARD_FLIGHT`. */
+  state: number;
+  /** 1 depois de fraturada. Fraturada ela nao sobrevive ao recolhimento. */
+  cracked: number;
+  /** Integridade restante. So cai enquanto ela esta cravada. */
+  hp: number;
+  /** Ultimo tick em que ESTA massa cobrou de alguem, ou -1. */
+  hitAt: number;
+};
+
+/** Cravada onde parou: parada, e ALVO. */
+export const SHARD_LODGED = 0;
+/** A rota esta marcada no chao e ainda nao saiu. */
+export const SHARD_WINDUP = 1;
+/** Em voo pela rota marcada. */
+export const SHARD_FLIGHT = 2;
+/**
+ * Reincorporada ao corpo: o recolhimento deu certo e ela voltou inteira.
+ *
+ * Estado proprio e nao "cravada em cima dele", por duas razoes que sao a mesma:
+ * ela nao pode ser recolhida de novo (o recolhimento so olha para as cravadas)
+ * e ela nao pode ser alvo (o tiro so encontra as cravadas). A hora de sabotar e
+ * enquanto a massa esta LA FORA, e o estado e o que diz isso sem comentario.
+ */
+export const SHARD_HELD = 3;
+
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
   awake: boolean;
@@ -997,6 +1042,26 @@ export type BossRuntime = {
    */
   magnetWarnedAt: number;
   /**
+   * As MASSAS que o campo carrega: minerio e sucata do proprio estrato.
+   *
+   * Estado autoritativo e hasheado, e no wire pela mesma razao das crateras da
+   * Fome: quem reconecta no meio de um recolhimento nunca recebeu a marca da
+   * rota, e a massa atropelaria vindo de um chao que, para ele, estava parado.
+   *
+   * Elas nao sao SOLIDAS e nao escrevem celula nenhuma: uma massa cravada nao
+   * fecha rota nem tampa objetivo, em nenhuma combinacao. E a unica garantia
+   * que um objeto novo no chao de uma camara gerada tem de dar.
+   */
+  magnetShards: MagnetShard[];
+  /**
+   * Ate quando o nucleo do Magnetarca esta EXPOSTO — o descompasso que uma
+   * massa fraturada provoca ao se despedacar nele. Zero e "nunca aconteceu".
+   *
+   * Hasheado: decide dano (o multiplicador no funil) e decide posicao (durante
+   * ele o campo nao puxa).
+   */
+  magnetExposedUntil: number;
+  /**
    * O CORO CARDINAL: a entidade que ocupa cada assento da formacao, ou 0.
    *
    * Quatro ids e nao quatro coordenadas. A posicao de um guarda e DERIVADA —
@@ -1093,9 +1158,10 @@ export type BossAbility =
   | 'wave'
   // Rainha da Geada.
   | 'freeze'
-  // Magnetarca.
+  // Magnetarca: as duas bordas do campo, e a massa saindo da marca.
   | 'crush'
-  | 'tether';
+  | 'tether'
+  | 'shard';
 
 /**
  * Os momentos de ESTADO/PRESENCA de chefe (`boss_state`): nem preparacao nem
@@ -1139,6 +1205,11 @@ export type BossMoment =
   | 'attract'
   | 'repel'
   | 'invert'
+  // Magnetarca, o ciclo do ferro: a massa RACHOU (a limalha escapa — o unico
+  // sinal de que os tres tiros bastaram) e a massa fraturada se DESPEDACOU
+  // contra os aneis, que e o instante da janela.
+  | 'crack'
+  | 'shatter'
   // Cerzideira: a subida pelo fio vertical, a descida e o frenesi.
   | 'ascend'
   | 'descend'

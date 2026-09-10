@@ -3258,6 +3258,64 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     });
     burst(ctx, out, t0 + 0.3, noise, { peak: 0.24, decay: 0.05, type: 'highpass', from: 3000 });
   },
+  /**
+   * A MASSA SAINDO DA MARCA. Ferro pesado arrancado do chao: um raspao grave e
+   * curto, e nao o estalo agudo do arco. Os dois sons do ciclo do ferro tem de
+   * ser distinguiveis de olhos fechados — um diz "a borda cobrou", o outro diz
+   * "tem pedra vindo pelo corredor".
+   */
+  magnetarchHaul: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.34,
+      decay: 0.26,
+      type: 'bandpass',
+      from: 900,
+      to: 260,
+      q: 2.4,
+      attack: 0.01,
+    });
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 180,
+      to: 70,
+      peak: 0.2,
+      decay: 0.3,
+      attack: 0.005,
+    });
+  },
+  /**
+   * A RACHADURA: o instante em que a massa perde a estrutura. Agudo e seco, e
+   * de proposito diferente de qualquer coisa que o chefe emite — quem produziu
+   * este som foi o jogador.
+   */
+  magnetarchCrack: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.14,
+      type: 'highpass',
+      from: 2600,
+      attack: 0.002,
+    });
+    tone(ctx, out, t0, { type: 'triangle', from: 1400, to: 2400, peak: 0.14, decay: 0.12 });
+  },
+  /**
+   * O ESTILHACO contra os aneis: a recompensa. Grave, largo e com cauda — e o
+   * unico momento da luta em que alguma coisa se despedaca, e ele precisa soar
+   * como um evento e nao como mais um golpe.
+   */
+  magnetarchShatter: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.5,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 1800,
+      to: 300,
+      q: 1.4,
+      attack: 0.002,
+    });
+    tone(ctx, out, t0, { type: 'sawtooth', from: 420, to: 60, peak: 0.28, decay: 0.6 });
+    burst(ctx, out, t0 + 0.08, noise, { peak: 0.3, decay: 0.3, type: 'highpass', from: 1800 });
+  },
 };
 
 /** Buffer de ruido branco reaproveitado por todas as rajadas. */

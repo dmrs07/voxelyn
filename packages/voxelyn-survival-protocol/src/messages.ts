@@ -455,6 +455,38 @@ export type WorldFlags = {
    */
   magnetFlipAt?: number;
   /**
+   * AS MASSAS do ciclo do ferro do Magnetarca: onde cada uma esta, para onde a
+   * rota marcada leva, desde quando, em que estado, se ja fraturou, quanta
+   * integridade resta e quando ela cobrou pela ultima vez.
+   *
+   * Viajam pelo mesmo motivo das crateras da Fome: quem RECONECTA no meio de um
+   * recolhimento nunca recebeu a marca da rota, e a massa o atropelaria vindo
+   * de um chao que, para ele, esta parado. E a integridade tem de viajar junto
+   * com a posicao — sem ela, o parceiro de co-op nao veria a rachadura que o
+   * outro abriu e gastaria tres tiros num ferro ja preparado.
+   *
+   * Quase sempre tres ou menos, e elas nao repovoam. Ausente em servidores
+   * anteriores ao ciclo do ferro: lista vazia.
+   */
+  magnetShards?: Array<{
+    x: number;
+    y: number;
+    tx: number;
+    ty: number;
+    at: number;
+    state: number;
+    cracked: number;
+    hp: number;
+    hitAt: number;
+  }>;
+  /**
+   * Ate quando o nucleo do Magnetarca esta EXPOSTO — o descompasso do campo. O
+   * cliente precisa dele para desenhar a janela: durante ela o campo nao cobra,
+   * e uma borda desenhada quente ali mandaria o jogador embora do unico momento
+   * em que ele devia estar parado mirando.
+   */
+  magnetExposedUntil?: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

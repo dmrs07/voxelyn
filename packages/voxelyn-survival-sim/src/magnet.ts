@@ -26,16 +26,35 @@ import {
 } from './constants.js';
 import { MAGNET_ATTRACT } from './types.js';
 
-/** As duas polaridades, mais a folga em que nao vale nenhuma das duas. */
-export type MagnetPolarity = 'attract' | 'repel' | 'inverting';
+/**
+ * As duas polaridades, mais os dois estados em que nao vale nenhuma delas: a
+ * FOLGA da inversao (o campo trocando de lado) e o DESCOMPASSO (o campo
+ * desregulado por uma massa fraturada que se despedacou nele).
+ *
+ * Os dois calam o campo, e mesmo assim sao estados distintos porque dizem
+ * coisas opostas ao jogador: a folga e o aviso de que ele precisa se mover, o
+ * descompasso e o premio por ele ter preparado alguma coisa. Um estado so, com
+ * um booleano `quiet`, apagaria essa diferenca justamente no desenho.
+ */
+export type MagnetPolarity = 'attract' | 'repel' | 'inverting' | 'exposed';
 
 export type MagnetField = {
   /** Se o campo ja acordou. Antes disso nada aqui vale — nem cobra, nem desenha. */
   live: boolean;
-  /** O que vale AGORA. `inverting` e a folga: o campo esta calado. */
+  /** O que vale AGORA. */
   polarity: MagnetPolarity;
+  /**
+   * O campo esta CALADO: nao puxa e nao cobra. Verdadeiro na folga e no
+   * descompasso.
+   *
+   * Derivado e nao um quarto estado, porque e exatamente esta pergunta que a
+   * simulacao faz para decidir se cobra — e e a mesma que o desenho faz para
+   * decidir se a borda promete dano. Duas comparacoes escritas a mao dos dois
+   * lados sao como o anel passa a mentir.
+   */
+  quiet: boolean;
   /** O que vale quando a folga fechar. Fora dela, e o que ja vale. */
-  next: Exclude<MagnetPolarity, 'inverting'>;
+  next: 'attract' | 'repel';
   /** Ticks ate a proxima inversao (>= 0). */
   ticksToFlip: number;
   /**
@@ -85,12 +104,18 @@ export const MAGNET_BAND_OUTER = MAGNETARCH_TETHER_RANGE;
  * viaja, e um segundo campo dizendo "estou invertendo" so criaria uma segunda
  * verdade capaz de discordar da primeira num resync.
  */
-export const magnetField = (tick: number, flipAt: number, mood: number): MagnetField => {
+export const magnetField = (
+  tick: number,
+  flipAt: number,
+  mood: number,
+  exposedUntil = 0,
+): MagnetField => {
   const current = mood === MAGNET_ATTRACT ? 'attract' : 'repel';
   if (flipAt < 0) {
     return {
       live: false,
       polarity: current,
+      quiet: true,
       next: current,
       ticksToFlip: 0,
       progress: 0,
@@ -100,18 +125,23 @@ export const magnetField = (tick: number, flipAt: number, mood: number): MagnetF
   }
   const ticksToFlip = Math.max(0, flipAt - tick);
   const inverting = ticksToFlip <= MAGNETARCH_FLIP_WINDUP_TICKS;
+  // O DESCOMPASSO vence a folga na leitura: ele e mais raro, e mais curto e e o
+  // unico dos dois que o jogador produziu. Um descompasso desenhado como folga
+  // devolveria como rotina a coisa que ele acabou de conquistar.
+  const exposed = tick < exposedUntil;
   // O que vem DEPOIS da folga e o oposto do que vale agora — a inversao ja esta
   // decidida no instante em que o campo se cala, e e por isso que ela pode ser
   // desenhada durante a folga em vez de anunciada depois.
   const next = inverting ? (current === 'attract' ? 'repel' : 'attract') : current;
   return {
     live: true,
-    polarity: inverting ? 'inverting' : current,
+    polarity: exposed ? 'exposed' : inverting ? 'inverting' : current,
+    quiet: exposed || inverting,
     next,
     ticksToFlip,
     progress: 1 - Math.min(MAGNETARCH_CYCLE_TICKS, ticksToFlip) / MAGNETARCH_CYCLE_TICKS,
     charge: inverting ? 1 - ticksToFlip / Math.max(1, MAGNETARCH_FLIP_WINDUP_TICKS) : 0,
-    edge: inverting ? -1 : current === 'attract' ? MAGNET_BAND_INNER : MAGNET_BAND_OUTER,
+    edge: exposed || inverting ? -1 : current === 'attract' ? MAGNET_BAND_INNER : MAGNET_BAND_OUTER,
   };
 };
 

@@ -785,6 +785,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'toast.magnetarch.attract': 'ATTRACTION — STAY OUT OF THE INNER RING',
   'toast.magnetarch.repel': 'REPULSION — DO NOT LEAVE THE OUTER RING',
   'toast.magnetarch.invert': 'THE FIELD FALLS SILENT — POLARITY WILL INVERT',
+  'toast.magnetarch.crack': 'MASS FRACTURED — HE WILL HAUL IT BACK LIKE THAT',
+  'toast.magnetarch.shatter': 'CORE EXPOSED — THE FIELD LOST ITS BEAT',
   'toast.core.taken': 'CORE EXTRACTED — RETURN TO THE ENTRANCE!',
   'voice.diamandis.unmapped': 'DIAMANDIS: AREA NOT MAPPED.',
   'voice.diamandis.standClear': 'DIAMANDIS: STAND CLEAR.',

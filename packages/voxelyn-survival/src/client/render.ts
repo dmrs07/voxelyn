@@ -109,7 +109,14 @@ import {
   MAGNET_BAND_OUTER,
   MAGNETARCH_FIELD_RANGE,
   MAGNETARCH_FLIP_WINDUP_TICKS,
+  MAGNETARCH_SHARD_HP,
+  MAGNETARCH_SHARD_RADIUS,
+  MAGNETARCH_SHARD_WINDUP_TICKS,
+  SHARD_FLIGHT,
+  SHARD_HELD,
+  SHARD_WINDUP,
   magnetField,
+  type MagnetShard,
 } from '@voxelyn/survival-sim';
 import { MAGNET_FILINGS, magnetFiling } from './magnet-filings';
 import {
@@ -2708,14 +2715,35 @@ export class SurvivalRenderer {
                   ? 'toast.magnetarch.attract'
                   : ev.state === 'repel'
                     ? 'toast.magnetarch.repel'
-                    : null;
+                    : ev.state === 'shatter'
+                      ? 'toast.magnetarch.shatter'
+                      : null;
             if (magnetKey) {
               this.messages.push({
                 text: t(magnetKey),
                 until: nowMs + 2200,
-                tone: ev.state === 'invert' ? 'warn' : undefined,
+                tone: ev.state === 'invert' ? 'warn' : ev.state === 'shatter' ? 'good' : undefined,
               });
               this.addFlash(ev.x, ev.y, 2.4, 0.5, nowMs, 260);
+            }
+            // O ESTILHACO e o unico momento da luta em que alguma coisa se
+            // parte: clarao largo, estilhaco e solavanco. Ele e a recompensa
+            // por ter preparado a massa, e uma recompensa que chega em silencio
+            // nao ensina que valeu a pena.
+            if (ev.state === 'shatter') {
+              const fx = this.quality.maxFx / PRESETS.high.maxFx;
+              this.addFlash(ev.x, ev.y, 5.5, 1, nowMs, 440);
+              this.particles.hit(ev.x, ev.y, 'debris', 34, fx);
+              this.particles.hit(ev.x, ev.y, 'spark', 26, fx);
+              if (!prefersReducedMotion()) this.shake = { power: 6, until: nowMs + 340 };
+            }
+            // A RACHADURA e menor e e do jogador: um estalo de limalha no ponto
+            // exato da massa, sem solavanco — ele nao levou nada, ele preparou.
+            if (ev.state === 'crack') {
+              const fx = this.quality.maxFx / PRESETS.high.maxFx;
+              this.addFlash(ev.x, ev.y, 1.8, 0.6, nowMs, 220);
+              this.particles.hit(ev.x, ev.y, 'spark', 12, fx);
+              this.messages.push({ text: t('toast.magnetarch.crack'), until: nowMs + 1800 });
             }
             break;
           }
@@ -3809,6 +3837,19 @@ export class SurvivalRenderer {
           field,
           nowMs / 1000,
           this.quality.maxFx / PRESETS.high.maxFx,
+        );
+      }
+      // AS MASSAS do ciclo do ferro. Depois do campo e antes de qualquer corpo:
+      // a rota marcada e chao, e o jogador precisa ver os proprios pes dentro
+      // ou fora dela.
+      if (state.bossRuntime.magnetShards.length > 0) {
+        this.drawMagnetShards(
+          ctx,
+          toScreen,
+          z,
+          state.bossRuntime.magnetShards,
+          state.tick,
+          nowMs / 1000,
         );
       }
     }
@@ -7348,12 +7389,21 @@ export class SurvivalRenderer {
     const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
     const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
     const inverting = field.polarity === 'inverting';
-    // Quem cobra AGORA, e quem vai cobrar quando a folga fechar.
-    const armed = inverting
-      ? field.next === 'attract'
-        ? MAGNET_BAND_INNER
-        : MAGNET_BAND_OUTER
-      : field.edge;
+    // O DESCOMPASSO: o campo parou porque uma massa fraturada se despedacou
+    // nele. Le como a folga (nada cobra) e desenha ao contrario dela — a folga
+    // manda o jogador se mover, e esta manda ficar e atirar.
+    const exposed = field.polarity === 'exposed';
+    // Quem cobra AGORA, e quem vai cobrar quando a folga fechar. No descompasso
+    // nao ha nenhuma das duas: -1 apaga as duas bordas, porque desenhar uma
+    // borda quente na unica janela em que da para ficar parado mandaria o
+    // jogador embora dela.
+    const armed = exposed
+      ? -1
+      : inverting
+        ? field.next === 'attract'
+          ? MAGNET_BAND_INNER
+          : MAGNET_BAND_OUTER
+        : field.edge;
     // O sentido da limalha e o da polaridade que esta VALENDO. Na folga nao ha
     // nenhuma valendo, e o que se congela e a que estava saindo — ou seja, a
     // oposta da que entra: por isso `next === 'attract'` significa que a
@@ -7373,8 +7423,20 @@ export class SurvivalRenderer {
     ctx.beginPath();
     ctx.ellipse(mx, my, ringX(MAGNET_BAND_OUTER), ringY(MAGNET_BAND_OUTER), 0, 0, Math.PI * 2);
     ctx.ellipse(mx, my, ringX(MAGNET_BAND_INNER), ringY(MAGNET_BAND_INNER), 0, 0, Math.PI * 2);
-    ctx.fillStyle = inverting ? 'rgba(126,200,168,0.16)' : 'rgba(126,200,168,0.1)';
+    ctx.fillStyle = field.quiet ? 'rgba(126,200,168,0.16)' : 'rgba(126,200,168,0.1)';
     ctx.fill('evenodd');
+
+    // 1b. O NUCLEO EXPOSTO. Um disco quente sobre o corpo, so no descompasso: a
+    //     janela precisa de um alvo, e o alvo e ele. E a unica coisa desta
+    //     lamina que aponta para DENTRO — todo o resto da luta empurra o olho
+    //     para os aneis.
+    if (exposed) {
+      const beat = 0.55 + 0.45 * Math.abs(Math.sin(seconds * 7));
+      ctx.fillStyle = `rgba(255,138,92,${0.3 * beat})`;
+      ctx.beginPath();
+      ctx.ellipse(mx, my, ringX(2.2), ringY(2.2), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // 2. AS DUAS BORDAS. A que cobra e quente e grossa; a outra e um traco
     //    apagado — ela continua sendo geometria util (o outro lado da faixa),
@@ -7397,7 +7459,7 @@ export class SurvivalRenderer {
     //     chega no ultimo segundo e meio, e a decisao de atravessar a faixa e
     //     de antes disso. Some na folga: la o que restou de tempo ja e a
     //     pulsacao da carga, e dois relogios diriam a mesma coisa duas vezes.
-    if (!inverting) {
+    if (!field.quiet) {
       const swept = field.progress;
       ctx.strokeStyle = 'rgba(255,214,170,0.5)';
       ctx.lineWidth = Math.max(1, z * 0.9);
@@ -7425,6 +7487,9 @@ export class SurvivalRenderer {
     const flow = inverting
       ? seconds - (field.charge * MAGNETARCH_FLIP_WINDUP_TICKS) / TICK_HZ
       : seconds;
+    // No descompasso a limalha some quase por inteiro: o campo nao esta
+    // carregando nada, e materia atravessando a sala diria o contrario.
+    const filingAlpha = exposed ? 0.06 : inverting ? 0.1 : 0.34;
     const filings = Math.max(24, Math.round(MAGNET_FILINGS * fxScale));
     ctx.lineWidth = Math.max(1, z * 0.5);
     ctx.lineCap = 'round';
@@ -7432,7 +7497,7 @@ export class SurvivalRenderer {
       const f = magnetFiling(i, filings, flow, outward, MAGNET_BAND_INNER, MAGNETARCH_FIELD_RANGE);
       const [tx, ty] = toScreen(cx + f.x, cy + f.y);
       const [hx, hy] = toScreen(cx + f.hx, cy + f.hy);
-      ctx.strokeStyle = `rgba(198,206,216,${f.alpha * (inverting ? 0.1 : 0.34)})`;
+      ctx.strokeStyle = `rgba(198,206,216,${f.alpha * filingAlpha})`;
       ctx.beginPath();
       ctx.moveTo(tx, ty);
       ctx.lineTo(hx, hy);
@@ -7457,6 +7522,136 @@ export class SurvivalRenderer {
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  /**
+   * AS MASSAS DE FERRO no chao: a rota marcada, o corpo e a rachadura.
+   *
+   * Tres estados, tres leituras, e a ordem delas e a ordem em que o jogador
+   * precisa decidir:
+   *
+   * 1. A ROTA MARCADA (telegrafo): uma faixa no chao da massa ate o destino,
+   *    que ENCHE conforme o prazo corre. Ela congela onde nasceu — sair da
+   *    linha e a resposta inteira, e isso so vale porque a linha nao persegue.
+   * 2. O CORPO: um bloco de minerio. Integro, ele e um alvo (a barra de
+   *    integridade aparece assim que ele leva o primeiro tiro — antes disso
+   *    seria ruido sobre um objeto que ninguem tocou). FRATURADO, ele racha e
+   *    solta limalha: e o unico sinal de que os tres tiros bastaram, e a
+   *    decisao seguinte (parar ou gastar mais) e tomada em cima dele.
+   * 3. Em VOO ele ganha rastro, porque ai o que importa e de onde ele vem.
+   *
+   * A massa REINCORPORADA (`SHARD_HELD`) nao e desenhada no chao de proposito:
+   * ela esta dentro do corpo, nao e alvo, e desenha-la ali prometeria um tiro
+   * que nao vai acontecer.
+   */
+  private drawMagnetShards(
+    ctx: CanvasRenderingContext2D,
+    toScreen: (x: number, y: number) => [number, number],
+    z: number,
+    shards: readonly MagnetShard[],
+    tick: number,
+    seconds: number,
+  ): void {
+    for (const shard of shards) {
+      if (shard.state === SHARD_HELD) continue;
+      const [sx, sy] = toScreen(shard.x, shard.y);
+
+      // 1. A ROTA. So no telegrafo: depois que a massa sai, ela mesma e o
+      //    aviso, e uma linha sobrevivendo ao disparo diria que ainda ha algo
+      //    por vir naquele corredor.
+      if (shard.state === SHARD_WINDUP) {
+        const ready = Math.max(0, Math.min(1, (tick - shard.at) / MAGNETARCH_SHARD_WINDUP_TICKS));
+        const [tx, ty] = toScreen(shard.tx, shard.ty);
+        ctx.save();
+        ctx.lineCap = 'butt';
+        // O corredor inteiro, apagado: onde a massa VAI passar.
+        ctx.strokeStyle = 'rgba(224,86,58,0.22)';
+        ctx.lineWidth = Math.max(2, z * MAGNETARCH_SHARD_RADIUS * 2.2);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        // E o mesmo corredor ENCHENDO: o prazo, desenhado como distancia. Duas
+        // leituras separadas pela mesma razao da marca de estalactite do
+        // Coracao — uma diz onde, a outra diz quando.
+        ctx.strokeStyle = `rgba(255,138,92,${0.3 + ready * 0.4})`;
+        ctx.lineWidth = Math.max(2, z * MAGNETARCH_SHARD_RADIUS * 2.2);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + (tx - sx) * ready, sy + (ty - sy) * ready);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 2. O RASTRO de quem ja saiu: de onde ela vem, em quatro tracos curtos.
+      if (shard.state === SHARD_FLIGHT) {
+        const dx = shard.tx - shard.x;
+        const dy = shard.ty - shard.y;
+        const len = Math.hypot(dx, dy) || 1;
+        ctx.save();
+        for (let k = 1; k <= 4; k++) {
+          const back = k * 0.45;
+          const [bx, by] = toScreen(shard.x - (dx / len) * back, shard.y - (dy / len) * back);
+          ctx.fillStyle = `rgba(198,206,216,${0.26 - k * 0.05})`;
+          ctx.beginPath();
+          ctx.ellipse(bx, by, z * 3.2, z * 1.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // 3. O CORPO. Um bloco irregular e escuro, de minerio: seis lados fixos
+      //    pelo indice, para ele nao pulsar de forma a cada quadro.
+      const r = z * MAGNETARCH_SHARD_RADIUS * 5.2;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2 + shard.at * 0.37;
+        const rr = r * (0.78 + 0.22 * Math.abs(Math.sin(k * 2.3 + shard.at)));
+        const px = Math.cos(a) * rr;
+        const py = Math.sin(a) * rr * 0.55;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = shard.cracked ? 'rgba(78,62,54,0.92)' : 'rgba(58,54,58,0.94)';
+      ctx.fill();
+      ctx.strokeStyle = shard.cracked ? 'rgba(224,86,58,0.75)' : 'rgba(146,158,170,0.5)';
+      ctx.lineWidth = Math.max(1, z * 0.5);
+      ctx.stroke();
+
+      if (shard.cracked) {
+        // A RACHADURA, e a limalha escapando por ela. E o estado que decide a
+        // luta: sem um sinal proprio, tres tiros bem gastos ficariam
+        // indistinguiveis de dois.
+        ctx.strokeStyle = 'rgba(255,196,120,0.85)';
+        ctx.lineWidth = Math.max(1, z * 0.45);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r * 0.12);
+        ctx.lineTo(-r * 0.1, r * 0.16);
+        ctx.lineTo(r * 0.25, -r * 0.2);
+        ctx.lineTo(r * 0.66, r * 0.1);
+        ctx.stroke();
+        for (let k = 0; k < 5; k++) {
+          const drift = ((seconds * 0.9 + k * 0.21) % 1) ** 1.4;
+          ctx.fillStyle = `rgba(255,196,120,${0.5 * (1 - drift)})`;
+          ctx.beginPath();
+          ctx.arc((k - 2) * r * 0.3, -drift * r * 1.5, Math.max(0.6, z * 0.35), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (shard.hp < MAGNETARCH_SHARD_HP) {
+        // A INTEGRIDADE so aparece depois do primeiro tiro. Antes disso ela
+        // seria uma barra sobre um objeto que ninguem tocou — ruido no chao de
+        // uma luta que ja pede leitura de duas bordas e de tres corredores.
+        const frac = Math.max(0, shard.hp / MAGNETARCH_SHARD_HP);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(-r * 0.8, -r * 1.15, r * 1.6, Math.max(1.5, z * 0.9));
+        ctx.fillStyle = 'rgba(255,196,120,0.9)';
+        ctx.fillRect(-r * 0.8, -r * 1.15, r * 1.6 * frac, Math.max(1.5, z * 0.9));
+      }
+      ctx.restore();
+    }
   }
 
   private drawSandVortex(

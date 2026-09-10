@@ -518,6 +518,12 @@ export class NetClient {
     // e "o campo ainda dorme", que e o que uma simulacao sem folga quer dizer:
     // o desenho fica sem a folga, e nunca com uma folga inventada.
     state.bossRuntime.magnetFlipAt = world.magnetFlipAt ?? -1;
+    state.bossRuntime.magnetExposedUntil = world.magnetExposedUntil ?? 0;
+    // AS MASSAS do ciclo do ferro, do servidor e nao dos eventos: quem reconecta
+    // com um recolhimento em curso nunca recebeu a marca da rota, e o ferro o
+    // atropelaria vindo de um chao que, para ele, esta parado. Servidor antigo:
+    // nenhuma.
+    state.bossRuntime.magnetShards = (world.magnetShards ?? []).map((shard) => ({ ...shard }));
     // OS SUMIDOUROS da Fome, do servidor e nao dos eventos: quem reconecta com
     // tres crateras abertas nunca recebeu os pousos que as abriram, e o chao
     // puxa dele do mesmo jeito. Servidor antigo: nenhum.

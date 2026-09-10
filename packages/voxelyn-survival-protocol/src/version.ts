@@ -257,7 +257,14 @@
 //     a folga — prometendo esmagamento no tick em que o servidor ja cobra pelo
 //     arco de retorno. `BossMoment` aceita `invert`, o instante em que a folga
 //     abre: um cliente antigo receberia um estado que ele nao conhece.
-export const PROTOCOL_VERSION = 42;
+// 43: O CICLO DO FERRO do Magnetarca. `WorldFlags` ganha `magnetShards` (as
+//     massas de minerio e sucata: posicao, rota marcada, estado, fratura,
+//     integridade e ultima cobranca) e `magnetExposedUntil` (o descompasso do
+//     campo depois de um estilhaco). `BossAbility` aceita `shard` e
+//     `BossMoment` aceita `crack` e `shatter`. Um cliente de 42 nao desenharia
+//     nem as massas nem as rotas marcadas no chao — e as rotas SAO o telegrafo:
+//     sem elas o ferro atravessa a arena sem sinal.
+export const PROTOCOL_VERSION = 43;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1105,7 +1112,25 @@ export const PROTOCOL_VERSION = 42;
 //     folga de 30 ticks em que ele nao puxa nem cobra — o telegrafo da
 //     inversao. `MAGNETARCH_SPEED` vai a zero: ele ja nao andava, e agora a
 //     ficha diz isso.
-export const SIMULATION_VERSION = 81;
+// 82: O CICLO DO FERRO. O campo do Magnetarca passa a mover a MATERIA que a
+//     lore dele sempre descreveu: atraindo ele recolhe as massas cravadas na
+//     arena, repelindo ele as arremessa de volta, e entre um e outro elas sao
+//     alvo. Tres tiros do disparo basico fraturam uma massa; fraturada, ela nao
+//     sobrevive ao recolhimento — se despedaca contra os aneis, cobra 96 do
+//     proprio chefe e deixa o nucleo exposto por 3 s (o campo para de cobrar e
+//     o dano entra a 1,6x). O material e finito: a massa que se despedaca
+//     acabou.
+//
+//     A vida sobe de 720 para 1.200 pelo motivo medido: com 720 o chefe morria
+//     aos 19,8 s, meio segundo ANTES de a primeira massa fraturada chegar nele
+//     — o contra-jogo caracteristico da luta nao cabia na luta. Em 1.200,
+//     sabotar termina em 20,8 s e ignorar em 26,3 s. E a polaridade cai de 8,5 s
+//     para 6 s (`MAGNETARCH_CYCLE_TICKS` 170 -> 120), tambem medido: e o unico
+//     ponto em que a janela de sabotagem cabe na repulsao E o pagamento chega
+//     com luta pela frente (primeiro estilhaco a 33% da vida, contra 6% em
+//     8,5 s). Ver a varredura em
+//     `docs/bosses/voxelyn-survival-chefes-por-bioma.md`.
+export const SIMULATION_VERSION = 82;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -1509,6 +1509,113 @@ imobilidade é o que sustenta o resto, porque a faixa só é legível como **lug
 dois anéis onde nasceram. Ele é o terceiro chefe fixo, com o Pulmão e o Coração, e pelo
 mesmo motivo dos dois: a luta não é contra um corpo, é contra a sala.
 
+### O ciclo do ferro (`SIMULATION_VERSION` 82, `PROTOCOL_VERSION` 43)
+
+O campo já era legível. O que ele ainda não era é **decidível**: depois de aprender
+onde ficar, o encontro não pedia mais nada — você resolvia a distância e repetia o
+passo contra o campo enquanto atirava. E havia uma promessa aberta desde a lore: o
+campo dele move **material ferroso**, o estrato inteiro é minério e sucata, e a única
+coisa que o campo movia era o Prospector.
+
+O ciclo do ferro é a mesma regra do campo aplicada à matéria — nenhum sistema novo:
+
+| Polaridade   | O que o campo faz com o ferro              | O que o jogador decide                                     |
+| ------------ | ------------------------------------------ | ---------------------------------------------------------- |
+| **Atração**  | **recolhe** as massas cravadas na arena    | sair das rotas de recolhimento — e colher o que preparou   |
+| **Repulsão** | **arremessa** as massas de volta para fora | sair dos corredores — e escolher em qual massa gastar tiro |
+
+Entre uma e outra a massa fica cravada onde parou, e cravada ela é **alvo**. Três tiros
+do disparo básico a fraturam. Uma massa fraturada não sobrevive ao recolhimento: ela se
+despedaça contra os anéis, cobra **96** do próprio chefe e deixa o **núcleo exposto**
+por 3 s — o campo para de cobrar e o dano entra a **1,6×**.
+
+Quatro decisões que sustentam o resto:
+
+- **A arma básica tem de fraturar.** O contra-jogo característico do encontro não pode
+  morar num módulo. Três tiros cabem no telégrafo do recolhimento (26 ticks contra os
+  10 que os três levam), então a escolha é real: dá tempo, mas custa a janela de mira.
+- **O material é finito e não repovoa.** A massa que se despedaça acabou. Uma luta
+  curta com material infinito seria farm; com material finito ela vira uma conta —
+  quantas você prepara antes de ele cair.
+- **A hora de sabotar é enquanto a massa está lá fora.** A massa recolhida inteira é
+  **reincorporada** (`SHARD_HELD`): some dentro do corpo, não é alvo e sai de novo no
+  próximo arremesso. O estado existe para dizer isso sem comentário.
+- **A massa em voo não pode ser abatida.** Derrubá-la no ar transformaria o pedido
+  ("prepare a próxima") em reflexo ("derrube esta").
+- **Nada disto é sólido.** Uma massa cravada não escreve célula, não fecha rota e não
+  tampa objetivo. A câmara gerada continua atravessável em qualquer combinação, por
+  construção — e há um teste que impede alguém de trocar isso por um bloco sólido.
+
+A faixa continua protegendo do **campo**, e nunca prometeu proteger do **ferro**: as
+rotas das massas têm marcação própria no chão, que enche conforme o prazo corre. É a
+decisão que faltava — _"estou na faixa, mas aquela peça vai passar por aqui"_.
+
+#### A duração, medida antes de distribuir novidade
+
+A pergunta certa veio antes do código: 8,5 s por polaridade davam 17 s para um ciclo
+completo, e o disparo básico contra 720 de vida dava ~13 s teóricos. Medindo o
+encontro de verdade (bot imortal, mira perfeita, parado na faixa), o número real era
+**14,7 s e uma única inversão** — o ciclo de ida e volta do ferro **não chegava a
+fechar uma vez**. Na primeira versão do protótipo o chefe morria aos 19,8 s, meio
+segundo antes de a primeira massa fraturada alcançá-lo.
+
+Para comparação, a mesma medição nos outros chefes: Guardião 9,8 s · Bispo 14,4 s ·
+Pulmão 14,2 s · Arquicantor 18,8 s · Rainha 27,1 s · Diamandis 36,3 s · Fornalha
+37,8 s · Cerzideira 61,7 s · Devorador 66,8 s. O Magnetarca estava no piso da lista
+carregando a mecânica mais elaborada dos donos de estrato.
+
+Duas correções saíram daí, e as duas são medidas e não escolhidas:
+
+1. **A abertura já recolhe.** O encontro começa em atração, e atração recolhe — o ferro
+   só se mexia na primeira inversão. Como a abertura pega as massas ainda na faixa, as
+   rotas são curtas e radiais, longe de quem acabou de entrar: o primeiro recolhimento
+   é uma **demonstração**, e não um golpe. A regra é aprendida sem ser paga.
+2. **A vida vai de 720 para 1.200.** A varredura:
+
+   | Vida     | Ignorando o ferro | Sabotando                               |
+   | -------- | ----------------- | --------------------------------------- |
+   | 720      | 14,7 s            | 19,8 s (0 estilhaços — ele morre antes) |
+   | 900      | 19,5 s            | 19,8 s                                  |
+   | 1050     | 22,0 s            | 19,8 s                                  |
+   | **1200** | **26,3 s**        | **20,8 s**                              |
+   | 1400     | 29,8 s            | 22,8 s                                  |
+
+   1.200 é onde **saber a luta separa de não saber**: com a polaridade de 8,5 s, 21%
+   mais rápido, e acima disso o caminho ignorado vira uma luta plana de trinta segundos
+   — que é o defeito que este rework existe para corrigir, só que mais longo.
+
+3. **A polaridade cai de 8,5 s para 6 s.** Com a vida certa e a abertura certa, o
+   pagamento ainda chegava tarde demais — o primeiro estilhaço acontecia com o chefe já
+   a **6% de vida**, ou seja, como golpe de misericórdia e não como janela. O período
+   do ciclo do ferro é uma polaridade inteira (arremessa, sabota, recolhe), então é a
+   polaridade que decide onde o contra-jogo acontece:
+
+   | Polaridade | Primeiro estilhaço | Vida do chefe nele                                              |
+   | ---------- | ------------------ | --------------------------------------------------------------- |
+   | 8,5 s      | 19,8 s             | 6%                                                              |
+   | 7,0 s      | 16,8 s             | 19%                                                             |
+   | **6,0 s**  | **14,8 s**         | **33%**                                                         |
+   | 5,0 s      | 22,8 s             | 3% (a janela de sabotagem encolhe e o recolhimento passa vazio) |
+
+   Seis segundos é o único ponto em que a janela de sabotagem ainda cabe na repulsão
+   **e** o pagamento chega com luta pela frente. De quebra ele responde ao outro
+   defeito do encontro — _"você resolve a distância e repete o movimento"_: a faixa
+   passa a trocar de lado com o dobro da frequência.
+
+#### O que a medição diz sobre a segunda fase
+
+Com três massas finitas, o protótipo entrega **um** pagamento grande, e não um laço que
+se repete: o jogador racha as três durante a repulsão e as três se despedaçam juntas no
+recolhimento seguinte. Depois disso o encontro volta a ser o campo puro.
+
+Isso é um argumento a favor dos **aglomerados de limalha** da segunda fase, e mais forte
+do que parecia: eles não são tempero, são o **combustível do laço**. Uma massa que se
+despedaça vira limalha; limalha que se reúne devolve material ao ciclo, e só então o
+"prepare o próximo ciclo" se repete em vez de acontecer uma vez. O limiar de vida da
+virada também depende disso — a 60% de 1.200, a fase entraria por volta dos 9 s, antes
+mesmo da primeira inversão anunciada; medido, o ponto que cai **junto** com o primeiro
+estilhaço é mais perto de 45%.
+
 ### O objetivo não encosta mais na moldura
 
 `bfsFarthest` procura o ponto mais distante da entrada, e o mais distante costuma ser

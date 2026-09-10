@@ -811,6 +811,11 @@ export const PT_BR = {
   'toast.magnetarch.attract': 'ATRAÇÃO — FIQUE FORA DO ANEL INTERNO',
   'toast.magnetarch.repel': 'REPULSÃO — NÃO SAIA DO ANEL EXTERNO',
   'toast.magnetarch.invert': 'O CAMPO SE CALA — A POLARIDADE VAI INVERTER',
+  // O ciclo do ferro. A rachadura diz que os tiros bastaram (a decisao seguinte
+  // e parar de gastar); o estilhaco diz o que o jogador ganhou com isso — e
+  // "nucleo exposto" e a frase util, nao "voce causou dano".
+  'toast.magnetarch.crack': 'MASSA FRATURADA — ELE VAI RECOLHÊ-LA ASSIM',
+  'toast.magnetarch.shatter': 'NÚCLEO EXPOSTO — O CAMPO PERDEU O COMPASSO',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   // As FALAS do Diamandis, como legenda. A voz e sintetizada em fonemas e as
   // palavras nao ficam inteligiveis — a legenda devolve a palavra, no mesmo
