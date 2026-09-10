@@ -1171,6 +1171,19 @@ const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
 const MUZZLE_LIGHT: Tint = { color: 'rgb(255, 209, 102)', alpha: 0.26 };
 
 /**
+ * Onde a silhueta e carimbada para formar o contorno aceso: os dois lados, o
+ * chao e as duas quinas de baixo. O topo fica de fora de proposito — ver
+ * `drawEntityRim`.
+ */
+const RIM_OFFSETS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [1, 0],
+  [0, 1],
+  [-1, 1],
+  [1, 1],
+];
+
+/**
  * Abaixo disto o cano fica com a propria cor.
  *
  * Existe porque calor residual e permanente: o decaimento por tick nunca chega a
@@ -1277,6 +1290,8 @@ export class SpriteBank {
   /** Uma liquidacao por atlas. Ver "Liquidacao dos atlas". */
   private readonly settlements = new Map<string, Settlement>();
   private tintBuffer: HTMLCanvasElement | null = null;
+  /** Buffer do contorno aceso. Ver `drawEntityRim`. */
+  private rimBuffer: HTMLCanvasElement | null = null;
   /**
    * Halo ligado. Vem do preset de qualidade e nao de uma constante: e o unico
    * efeito desta classe que e puro enfeite, entao e o primeiro a sair quando o
@@ -1847,21 +1862,7 @@ export class SpriteBank {
     frameOverride?: number,
   ): void {
     const { manifest, image } = loaded;
-    const fallbackAnimation =
-      animation === 'special' && !manifest.animations.special ? 'attack' : animation;
-    const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
-    const direction =
-      manifest.directions === 8
-        ? dirFromFacing8(facingX, facingY)
-        : manifest.directions > 1
-          ? dirFromFacing(facingX, facingY)
-          : manifest.authoredDirs[0];
-    const count = manifest.animations[useAnimation].frames;
-    const frame =
-      frameOverride === undefined
-        ? frameAtTime(manifest, useAnimation, elapsedMs)
-        : ((Math.floor(frameOverride) % count) + count) % count;
-    const rect = resolveFrame(manifest, useAnimation, direction, frame);
+    const rect = this.frameRectFor(loaded, animation, facingX, facingY, elapsedMs, frameOverride);
     const dw = manifest.frameWidth * zoom;
     const dh = manifest.frameHeight * zoom;
     const dx = footX - manifest.anchorX * zoom;
@@ -2050,6 +2051,118 @@ export class SpriteBank {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = inherited;
     ctx.imageSmoothingEnabled = false;
+  }
+
+  /**
+   * O QUADRO deste corpo neste instante: animacao resolvida, rumo resolvido e
+   * o retangulo dele no atlas.
+   *
+   * Vive separado do desenho porque duas passadas precisam do MESMO quadro: o
+   * corpo e o contorno aceso que sai atras dele (`drawEntityRim`). Se cada uma
+   * resolvesse por conta propria, bastaria uma virar a regra de recuo de
+   * animacao para o contorno passar a desenhar a silhueta de outro quadro —
+   * um fantasma um passo atrasado colado no bicho.
+   */
+  private frameRectFor(
+    loaded: Loaded,
+    animation: string,
+    facingX: number,
+    facingY: number,
+    elapsedMs: number,
+    frameOverride?: number,
+  ): { sx: number; sy: number; sw: number; sh: number; flip?: boolean } {
+    const { manifest } = loaded;
+    const fallbackAnimation =
+      animation === 'special' && !manifest.animations.special ? 'attack' : animation;
+    const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
+    const direction =
+      manifest.directions === 8
+        ? dirFromFacing8(facingX, facingY)
+        : manifest.directions > 1
+          ? dirFromFacing(facingX, facingY)
+          : manifest.authoredDirs[0];
+    const count = manifest.animations[useAnimation].frames;
+    const frame =
+      frameOverride === undefined
+        ? frameAtTime(manifest, useAnimation, elapsedMs)
+        : ((Math.floor(frameOverride) % count) + count) % count;
+    return resolveFrame(manifest, useAnimation, direction, frame);
+  }
+
+  /**
+   * O CONTORNO ACESO: a silhueta do corpo numa cor so, carimbada UM PIXEL DE
+   * ATLAS para os lados e para BAIXO, por tras do sprite.
+   *
+   * Para baixo e para os lados, nunca para cima, e essa assimetria e a coisa
+   * toda: um contorno fechado em volta do bicho e o brilho de "unidade
+   * selecionada" de jogo de estrategia, e foi o que a marca de elite antiga
+   * parecia. Deixando o topo no escuro, a mesma passada vira LUZ VINDA DE
+   * BAIXO — do chao que esta queimando debaixo dele (ver `elite-mark.ts`) —, e
+   * a leitura deixa de ser "esta marcado" e passa a ser "esta aceso".
+   *
+   * Um pixel de atlas, e nao um de tela: no zoom 2x do jogo o contorno sai com
+   * a mesma espessura do outline autorado nos sprites (Art Bible §5), e nao
+   * engorda quando a camera abre.
+   *
+   * A silhueta e montada num buffer proprio ANTES de ir para a tela. Carimbar
+   * as cinco copias direto no canvas somaria alpha nas sobreposicoes e devolveria
+   * um contorno manchado, mais forte nas quinas do que nos lados.
+   */
+  drawEntityRim(
+    ctx: CanvasRenderingContext2D,
+    archetype: string,
+    animation: SpriteAnimationSelection,
+    facingX: number,
+    facingY: number,
+    elapsedMs: number,
+    footX: number,
+    footY: number,
+    zoom: number,
+    tint: Tint,
+  ): boolean {
+    if (tint.alpha <= 0) return false;
+    const anim = typeof animation === 'string' ? animation : animation.upper.animation;
+    const loaded = this.spriteForAnimation(archetype, anim);
+    if (!loaded || !loaded.ready) return false;
+    const { manifest, image } = loaded;
+    const rect = this.frameRectFor(loaded, anim, facingX, facingY, elapsedMs);
+    const width = manifest.frameWidth;
+    const height = manifest.frameHeight;
+    const silhouette = this.tintedFrame(image, rect, width, height, {
+      color: tint.color,
+      alpha: 1,
+    });
+
+    if (!this.rimBuffer) this.rimBuffer = document.createElement('canvas');
+    const buffer = this.rimBuffer;
+    const bw = width + 2;
+    const bh = height + 2;
+    if (buffer.width !== bw || buffer.height !== bh) {
+      buffer.width = bw;
+      buffer.height = bh;
+    }
+    const bctx = buffer.getContext('2d');
+    if (!bctx) return false;
+    bctx.clearRect(0, 0, bw, bh);
+    bctx.imageSmoothingEnabled = false;
+    for (const [ox, oy] of RIM_OFFSETS) bctx.drawImage(silhouette, 1 + ox, 1 + oy);
+
+    const dw = bw * zoom;
+    const dh = bh * zoom;
+    const dy = footY - (manifest.anchorY + 1) * zoom;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = ctx.globalAlpha * tint.alpha;
+    if (rect.flip) {
+      ctx.translate(footX, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-footX, 0);
+      ctx.drawImage(buffer, footX - (width - manifest.anchorX + 1) * zoom, dy, dw, dh);
+    } else {
+      ctx.drawImage(buffer, footX - (manifest.anchorX + 1) * zoom, dy, dw, dh);
+    }
+    ctx.restore();
+    return true;
   }
 
   private tintedFrame(

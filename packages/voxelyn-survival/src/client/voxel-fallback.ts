@@ -28,7 +28,6 @@ type VoxelEntityOptions = {
   radius: number;
   brightness: number;
   archetype: string;
-  elite: boolean;
   nowMs: number;
   allyTint?: boolean;
   /**
@@ -125,7 +124,7 @@ const limb = (
  * and unique silhouettes instead of the previous flat ellipse.
  */
 export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEntityOptions): void => {
-  const { sx, sy, z, radius, brightness, archetype, elite, nowMs, allyTint, charged } = options;
+  const { sx, sy, z, radius, brightness, archetype, nowMs, allyTint, charged } = options;
   const size = radius * 32 * 0.9 * z;
   const light = Math.max(0.35, Math.min(1.15, 0.5 + brightness * 0.7));
   const bob = Math.round(Math.sin(nowMs * 0.006 + sx * 0.01) * Math.max(1, z * 0.6));
@@ -352,15 +351,14 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
     }
   }
 
-  if (elite) {
-    ctx.strokeStyle = PAL.fire;
-    ctx.lineWidth = Math.max(1.5, z);
-    ctx.setLineDash([Math.max(3, z * 2), Math.max(2, z)]);
-    ctx.beginPath();
-    ctx.ellipse(sx, sy - size * 0.45, size * 1.15, size * 0.68, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
+  // A MARCA DE ELITE NAO MORA MAIS AQUI.
+  //
+  // Este recuo desenhava uma elipse TRACEJADA nos pes enquanto o caminho de
+  // sprite desenhava uma elipse INTEIRA: o mesmo estado da mesma criatura com
+  // dois desenhos diferentes, escolhidos por um detalhe que o jogador nao
+  // controla — se o atlas ja tinha chegado. Hoje a marca e uma so
+  // (`elite-mark.ts`) e quem desenha e o CHAMADOR, antes e depois do corpo,
+  // valendo para os dois caminhos.
 
   ctx.restore();
 };
