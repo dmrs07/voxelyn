@@ -39,6 +39,7 @@ import {
   SEISMIC_DAMAGE,
   SEISMIC_STUN_TICKS,
   SLIPSTREAM_COOLDOWN_TICKS,
+  SLIPSTREAM_SPEED_MUL,
   SLIPSTREAM_TICKS,
   VENT_COOLDOWN_TICKS,
   VENT_RADIUS,
@@ -140,11 +141,42 @@ export const recordResonance = (tally: ResonanceTally, kind: ResonanceKind, amou
 const RESONANCE_CAP = 999;
 
 /**
- * As duas habilidades que os Ecos demonstram no poço.
+ * Um numero em (0, 1), deterministico da (seed, setor, id).
  *
- * Ordena as reações pelo que o jogador mais provocou e devolve as duas primeiras
- * habilidades que ele ainda não está usando. Empate é desfeito pela seed do setor
- * — não por `Math.random()`, que quebraria o replay.
+ * E o "dado" do draft. Nao e `Math.random()` porque o replay e o co-op
+ * precisam tirar o MESMO Eco nas duas maquinas; e nao e a seed crua porque a
+ * seed crua daria o mesmo resultado em todo setor da run.
+ */
+const draftUnit = (seed: number, sector: number, id: string): number => {
+  let h = (seed ^ Math.imul(sector + 1, 0x9e3779b9)) >>> 0;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d) >>> 0;
+  h ^= h >>> 12;
+  return (h + 0.5) / 4294967296;
+};
+
+/**
+ * As duas habilidades que os Ecos demonstram no poço — um DRAFT, nao um ranking.
+ *
+ * A versao anterior ordenava pelo que o jogador mais provocou e cortava as
+ * duas primeiras. Com tres habilidades isso passava despercebido; com seis,
+ * quem desbloqueia todas num setor via SEMPRE as mesmas duas — as outras
+ * quatro existiam so na ficha. Um Eco que nunca aparece nao foi desenhado.
+ *
+ * Agora e um sorteio ponderado sem reposicao (Efraimidis–Spirakis): cada
+ * candidata desbloqueada recebe a chave `u^(1/peso)`, com `u` deterministico
+ * da (seed, setor, id) e `peso` = 1 + log2(quantas vezes passou do limiar).
+ * As duas maiores chaves saem. Tres propriedades, todas testadas:
+ *
+ * 1. JUSTO: com tudo desbloqueado por igual, cada Eco tem a mesma chance.
+ * 2. INCLINADO: o que o jogador mais praticou continua aparecendo mais —
+ *    peso maior e chave maior em media —, so nao aparece SEMPRE.
+ * 3. DETERMINISTICO: mesma run, mesmo setor, mesma dupla; setores diferentes
+ *    da mesma run tiram duplas diferentes.
+ *
+ * Na tela, a dupla vem com a mais praticada primeiro: a ordem de exibicao e
+ * leitura, nao sorte.
  *
  * Devolve menos de duas (ou nenhuma) quando não há candidata: sem ressonância
  * nenhuma o Veio não tem o que demonstrar, e um poço que sempre oferece algo
@@ -156,23 +188,29 @@ export const resonanceOffers = (
   seed: number,
   sector: number,
 ): AbilityId[] => {
-  const candidates = (Object.keys(ABILITY_DEFINITIONS) as AbilityId[])
+  const unlocked = (Object.keys(ABILITY_DEFINITIONS) as AbilityId[])
     .filter((id) => id !== current)
     .map((id) => {
       const { resonance: kind, threshold } = ABILITY_DEFINITIONS[id];
       // Normalise by the unlock threshold: one spent purge is not drowned by six dodges.
-      return { id, score: kind && tally[kind] >= threshold ? tally[kind] / threshold : -1 };
+      // Peso = 1 + log2(vezes acima do limiar): o habito conta, mas nao
+      // esmaga. Com a razao crua, doze incendios contra um de cada outro
+      // punham o Sopro em 100% dos sorteios — e isso e o ranking de volta.
+      const ratio = kind && tally[kind] >= threshold ? tally[kind] / threshold : 0;
+      return { id, weight: ratio > 0 ? 1 + Math.log2(ratio) : 0 };
     })
-    // O pulso tem score -1 e some aqui: ele é o ponto de partida, não um prêmio.
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      // Desempate determinístico: mesma run, mesmo setor, mesma oferta.
-      const ta = Math.imul(seed ^ Math.imul(sector + 1, 0x9e3779b9), a.id.length + 1) >>> 0;
-      const tb = Math.imul(seed ^ Math.imul(sector + 1, 0x9e3779b9), b.id.length + 1) >>> 0;
-      return ta === tb ? a.id.localeCompare(b.id) : ta - tb;
-    });
-  return candidates.slice(0, 2).map((entry) => entry.id);
+    // O pulso tem peso 0 e some aqui: ele é o ponto de partida, não um prêmio.
+    .filter((entry) => entry.weight > 0);
+  const drawn = unlocked
+    .map((entry) => ({
+      ...entry,
+      key: Math.pow(draftUnit(seed, sector, entry.id), 1 / entry.weight),
+    }))
+    .sort((a, b) => b.key - a.key || a.id.localeCompare(b.id))
+    .slice(0, 2);
+  return drawn
+    .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id))
+    .map((entry) => entry.id);
 };
 
 /**
@@ -202,7 +240,7 @@ export const fallbackOffer = (current: AbilityId, seed: number, sector: number):
 export const ABILITY_SHAPE = {
   pulse: { radius: ABILITY_RADIUS, knockback: ABILITY_KNOCKBACK },
   seismic: { radius: SEISMIC_RADIUS, damage: SEISMIC_DAMAGE, stun: SEISMIC_STUN_TICKS },
-  slipstream: { ticks: SLIPSTREAM_TICKS },
+  slipstream: { ticks: SLIPSTREAM_TICKS, speed: SLIPSTREAM_SPEED_MUL },
   vent: { radius: VENT_RADIUS },
   flamethrower: { range: FLAMETHROWER_RANGE, arc: FLAMETHROWER_ARC },
   seeker: { damage: SEEKER_DAMAGE, speed: SEEKER_SPEED, ttl: SEEKER_TTL },

@@ -1,4 +1,9 @@
-import { drawAbilityGlyph } from './ability-icons';
+import {
+  AbilityMorphTracker,
+  drawAbilityActiveRing,
+  drawAbilityGlyph,
+  drawAbilityMorph,
+} from './ability-icons';
 // A BARRA DE COMANDOS do desktop: as teclas e as recargas, sempre na tela.
 //
 // ---------------------------------------------------------------------------
@@ -35,7 +40,7 @@ import { drawAbilityGlyph } from './ability-icons';
 // A repouso ela e um sussurro; o que puxa o olho e o que MUDA — a tecla que
 // esta apertada, a recarga correndo, o pulso do "voltou".
 
-import { TICK_HZ, type SurvivalState } from '@voxelyn/survival-sim';
+import { SLIPSTREAM_TICKS, TICK_HZ, type SurvivalState } from '@voxelyn/survival-sim';
 import { abilityPresentation } from './ability-presentation';
 import {
   abilityCooldownDurationTicks,
@@ -238,6 +243,8 @@ export class DesktopControlBar {
   private readonly seenPressSeq: Record<DesktopCooldownId, number> = { dodge: 0, ability: 0 };
   private readonly readyPulseUntil = new Map<DesktopCooldownId, number>();
   private readonly cooling = new Set<DesktopCooldownId>();
+  /** O re-eco do glifo de habilidade na barra. */
+  private readonly abilityMorph = new AbilityMorphTracker();
   private lastState: SurvivalState | null = null;
   /** Relogio em que a run atual apareceu — a origem do realce de entrada. */
   private startedAtMs = 0;
@@ -472,15 +479,40 @@ export class DesktopControlBar {
       capX += cw + 4 * scale;
     });
 
-    if (control.id === 'ability')
-      drawAbilityGlyph(
-        ctx,
-        state.playerExtra.ability,
-        x + w - 13 * scale,
-        y + 12 * scale,
-        16 * scale,
-        abilityPresentation(state.playerExtra.ability).color,
-      );
+    if (control.id === 'ability') {
+      const ability = state.playerExtra.ability;
+      const color = abilityPresentation(ability).color;
+      const gx = x + w - 13 * scale;
+      const gy = y + 12 * scale;
+      // O RE-ECO: a troca no poco contada em ~0,7 s em vez de um corte.
+      const morph = this.abilityMorph.observe(state, ability, nowMs);
+      if (morph) {
+        drawAbilityMorph(
+          ctx,
+          morph.from,
+          morph.to,
+          morph.t,
+          gx,
+          gy,
+          16 * scale,
+          abilityPresentation(morph.from).color,
+          color,
+        );
+      } else {
+        drawAbilityGlyph(ctx, ability, gx, gy, 16 * scale, color);
+      }
+      if (state.playerExtra.sprintUntil > state.tick) {
+        drawAbilityActiveRing(
+          ctx,
+          gx,
+          gy,
+          11 * scale,
+          color,
+          (state.playerExtra.sprintUntil - state.tick) / SLIPSTREAM_TICKS,
+          nowMs,
+        );
+      }
+    }
 
     // ROTULO, ja resolvido pelo chamador — e a MESMA string que dimensionou o
     // compartimento, que e a unica forma de a largura e o texto concordarem.

@@ -710,6 +710,8 @@ export class NetClient {
           state.playerExtras[slot].frostbitten = snap.frostbitten ?? false;
           state.playerExtras[slot].cocoonUntil = snap.cocoonUntil ?? 0;
           state.playerExtras[slot].webbedUntil = snap.webbedUntil ?? 0;
+          // A Disparada do parceiro: o rastro dele sai do estado, como o frio.
+          state.playerExtras[slot].sprintUntil = snap.sprintUntil ?? 0;
           pl.action = snap.action
             ? {
                 kind: snap.action.kind,
@@ -867,6 +869,7 @@ export class NetClient {
       ex.abilityCooldownUntil = this.viewer.abilityCooldownUntil;
       ex.channelingUntil = this.viewer.channelingUntil;
       ex.thermalGuardUntil = this.viewer.thermalGuardUntil;
+      ex.sprintUntil = this.viewer.sprintUntil;
       // A habilidade equipada viaja junto: os timers sozinhos nao bastam — a
       // duracao do radial e a projecao do canal saem do cooldown DELA, e o
       // espelho local nascia com `pulse` e nunca sabia da troca no poco.

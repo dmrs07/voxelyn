@@ -122,6 +122,12 @@ export type EntitySnapshot = {
   /** O CASULO da rede da Cerzideira e os fios que ficam depois (players). */
   cocoonUntil?: number;
   webbedUntil?: number;
+  /**
+   * A DISPARADA do parceiro (players): ate quando ele corre. Viaja na entidade,
+   * e nao so no viewer privado, porque o parceiro precisa VER o rastro — e
+   * quem reconecta no meio da corrida tambem.
+   */
+  sprintUntil?: number;
   facingX?: number;
   facingY?: number;
   /** Tick autoritativo ate o qual a entidade permanece atordoada. */
@@ -183,6 +189,8 @@ export type ViewerState = {
    */
   channelingUntil: number;
   thermalGuardUntil: number;
+  /** Ate quando a Disparada corre; 0 fora dela. O HUD acende o botao com ele. */
+  sprintUntil: number;
   /**
    * A habilidade EQUIPADA. Os timers acima nao bastam: a duracao do radial e a
    * projecao do canal saem do cooldown DESTA habilidade, e o espelho local do

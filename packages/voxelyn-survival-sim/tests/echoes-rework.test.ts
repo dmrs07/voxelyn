@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
 import {
+  ABILITY_DEFINITIONS,
   abilityDefinition,
   canChooseEcho,
   emptyResonance,
@@ -16,7 +17,11 @@ import {
   SURF_FIRE,
   SURF_GAS,
   SURF_NONE,
+  SLIPSTREAM_SPEED_MUL,
+  SLIPSTREAM_TICKS,
+  SURF_DEEP_WATER,
   SURF_SPORES,
+  SURF_WATER,
   WELL_CHOICE_REACH,
   WELL_COMBAT_RADIUS,
 } from '../src/constants';
@@ -130,6 +135,53 @@ describe('Echo unlocks and selection', () => {
       expect(resonanceOffers(tally, 'pulse', 7, 2)).toContain(id);
       expect(resonanceOffers(tally, id, 7, 2)).not.toContain(id);
     }
+  });
+  it('drafts fairly: with everything unlocked, no pair monopolises the well', () => {
+    const tally = emptyResonance();
+    for (const id of Object.keys(ABILITY_DEFINITIONS) as AbilityId[]) {
+      const d = abilityDefinition(id);
+      if (d.resonance) tally[d.resonance] = Math.max(tally[d.resonance], d.threshold);
+    }
+    const seen: Partial<Record<AbilityId, number>> = {};
+    const runs = 400;
+    for (let n = 1; n <= runs; n++) {
+      const offers = resonanceOffers(tally, 'pulse', n * 7919, 2);
+      expect(offers).toHaveLength(2);
+      for (const id of offers) seen[id] = (seen[id] ?? 0) + 1;
+    }
+    const ids = Object.keys(seen) as AbilityId[];
+    expect(ids).toHaveLength(6);
+    // Fatia justa: 2 de 6 por run. Ninguem abaixo de metade dela, ninguem
+    // acima de uma vez e meia — o antigo "top 2" dava 400 para duas e 0 para
+    // as outras quatro.
+    const fair = (runs * 2) / 6;
+    for (const id of ids) {
+      expect(seen[id]!).toBeGreaterThan(fair * 0.5);
+      expect(seen[id]!).toBeLessThan(fair * 1.5);
+    }
+  });
+  it('the draft still leans toward what the player did most, and changes by sector', () => {
+    const tally = emptyResonance();
+    for (const id of Object.keys(ABILITY_DEFINITIONS) as AbilityId[]) {
+      const d = abilityDefinition(id);
+      if (d.resonance) tally[d.resonance] = Math.max(tally[d.resonance], d.threshold);
+    }
+    tally.fire = abilityDefinition('flamethrower').threshold * 12;
+    let fire = 0;
+    let arc = 0;
+    for (let n = 1; n <= 400; n++) {
+      const offers = resonanceOffers(tally, 'pulse', n * 104729, 3);
+      if (offers.includes('flamethrower')) fire++;
+      if (offers.includes('arc')) arc++;
+      // Na tela, a mais praticada vem primeiro.
+      if (offers.includes('flamethrower')) expect(offers[0]).toBe('flamethrower');
+    }
+    expect(fire).toBeGreaterThan(arc * 1.5);
+    expect(fire).toBeLessThan(400);
+    const pairs = new Set<string>();
+    for (let sector = 1; sector <= 8; sector++)
+      pairs.add(resonanceOffers(tally, 'pulse', 5, sector).join('+'));
+    expect(pairs.size).toBeGreaterThan(1);
   });
   it('counts a dodge only when it starts and a purge only when a cell is spent', () => {
     const s = arena();
@@ -278,15 +330,65 @@ describe('new Echo abilities', () => {
     expect(near.stunnedUntil).toBeGreaterThan(s.tick);
     expect(blocked.hp).toBe(hp[1]);
   });
-  it('slipstream follows aim, collides with walls and does not farm dodges', () => {
+  it('sprint runs on the move stick at +70% for 8 s, ignoring the aim and granting no iframes', () => {
     const s = arena('slipstream');
-    for (let y = 35; y < 46; y++) s.solid[y * s.config.width + 43] = SOLID_ROCK;
-    cast(s);
-    expect(s.playerExtra.iframesUntil).toBeGreaterThan(s.tick);
-    for (let n = 0; n < 12; n++) stepRun(s, [emptyCommand()]);
-    expect(s.player.x).toBeGreaterThan(41);
-    expect(s.player.x).toBeLessThan(43);
+    // Mira para o norte, direcional para o leste: o corpo vai para o leste.
+    stepRun(s, [{ ...emptyCommand(), ability: true, aim: { x: 0, y: -1 } }]);
+    expect(s.playerExtra.sprintUntil - s.tick).toBe(SLIPSTREAM_TICKS);
+    expect(s.playerExtra.iframesUntil).toBeLessThanOrEqual(s.tick);
+    const y0 = s.player.y;
+    for (let n = 0; n < 10; n++) stepRun(s, [{ ...emptyCommand(), move: { x: 1, y: 0 } }]);
+    expect(s.player.y).toBeCloseTo(y0, 5);
+    const walked = arena('slipstream');
+    for (let n = 0; n < 10; n++) stepRun(walked, [{ ...emptyCommand(), move: { x: 1, y: 0 } }]);
+    expect((s.player.x - 40.5) / (walked.player.x - 40.5)).toBeCloseTo(SLIPSTREAM_SPEED_MUL, 2);
+    // Correr nao e esquivar: nada de credito de evasao.
     expect(s.playerExtra.resonance.evasion).toBe(0);
+    // O relogio acaba sozinho e o passo volta ao normal.
+    for (let n = 0; n < SLIPSTREAM_TICKS; n++) stepRun(s, [emptyCommand()]);
+    expect(s.playerExtra.sprintUntil).toBeLessThanOrEqual(s.tick);
+  });
+  it('sprint crosses deep water and shrugs off shallow water drag; walking drowns', () => {
+    const lay = (state: SurvivalState): void => {
+      const row = 40 * state.config.width;
+      for (let x = 42; x <= 44; x++) state.surface[row + x] = SURF_DEEP_WATER;
+      for (let x = 45; x <= 47; x++) state.surface[row + x] = SURF_WATER;
+    };
+    const s = arena('slipstream');
+    lay(s);
+    cast(s);
+    const run = { ...emptyCommand(), move: { x: 1, y: 0 } };
+    for (let n = 0; n < 40 && s.player.x < 48; n++) stepRun(s, [run]);
+    expect(s.player.alive).toBe(true);
+    expect(s.player.x).toBeGreaterThanOrEqual(48);
+    // Sem correr, a primeira celula funda afoga.
+    const d = arena('slipstream');
+    lay(d);
+    for (let n = 0; n < 40 && d.player.alive; n++) stepRun(d, [run]);
+    expect(d.player.alive).toBe(false);
+  });
+  it('a sprint that ends over deep water sinks; walls still stop the runner; the clock is hashed', () => {
+    const s = arena('slipstream');
+    const row = 40 * s.config.width;
+    for (let x = 42; x <= 60; x++) s.surface[row + x] = SURF_DEEP_WATER;
+    cast(s);
+    const run = { ...emptyCommand(), move: { x: 1, y: 0 } };
+    // Entra na agua e PARA no meio dela, correndo no lugar ate o relogio vencer.
+    for (let n = 0; n < 6; n++) stepRun(s, [run]);
+    expect(s.player.alive).toBe(true);
+    expect(s.player.x).toBeGreaterThan(42);
+    while (s.playerExtra.sprintUntil > s.tick) stepRun(s, [emptyCommand()]);
+    expect(s.player.alive).toBe(false);
+
+    const w = arena('slipstream');
+    for (let y = 35; y < 46; y++) w.solid[y * w.config.width + 43] = SOLID_ROCK;
+    cast(w);
+    for (let n = 0; n < 20; n++) stepRun(w, [run]);
+    expect(w.player.x).toBeLessThan(43);
+    const other = structuredClone(w);
+    other.playerExtra = other.playerExtras[0];
+    other.playerExtra.sprintUntil++;
+    expect(hashAuthoritativeState(w)).not.toBe(hashAuthoritativeState(other));
   });
   it('vent resets heat and local hazards without healing or spending purge cells', () => {
     const s = arena('vent');

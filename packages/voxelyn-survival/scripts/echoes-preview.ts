@@ -6,6 +6,8 @@ import {
   SOLID_NONE,
   SURF_NONE,
   SURF_BIOFLUID,
+  SURF_DEEP_WATER,
+  SURF_WATER,
   type AbilityId,
 } from '../../voxelyn-survival-sim/src/index';
 import { spawnEnemy } from '../../voxelyn-survival-sim/src/entities';
@@ -20,7 +22,7 @@ import { setLocale } from '../src/client/i18n';
 const query = new URLSearchParams(location.search);
 setLocale(query.get('lang') === 'en' ? 'en' : 'pt-BR');
 if (!query.has('embedded')) {
-  document.body.innerHTML = `<nav><b>Echoes 2.0 · revisão</b><label>Cena <select id="scene"><option value="cards">Escolha · Sopro / Arco</option><option value="new">Novos · Onda / Passo</option><option value="vent">Purga / Respiro</option><option value="fallback">Primeira descida</option><option value="arc">Arco condutivo</option><option value="fire">Sopro térmico</option><option value="icons">Ícones</option></select></label><label>Tela <select id="viewport"><option value="1280x800">Desktop · 1280×800</option><option value="390x844">Celular · 390×844</option><option value="740x360">Paisagem · 740×360</option></select></label><label>Idioma <select id="lang"><option value="pt-BR">Português</option><option value="en">English</option></select></label></nav><iframe title="Prévia jogável dos Echoes"></iframe>`;
+  document.body.innerHTML = `<nav><b>Echoes 2.0 · revisão</b><label>Cena <select id="scene"><option value="cards">Escolha · Sopro / Arco</option><option value="new">Novos · Onda / Passo</option><option value="vent">Purga / Respiro</option><option value="fallback">Primeira descida</option><option value="arc">Arco condutivo</option><option value="fire">Sopro térmico</option><option value="sprint">Disparada</option><option value="icons">Ícones</option></select></label><label>Tela <select id="viewport"><option value="1280x800">Desktop · 1280×800</option><option value="390x844">Celular · 390×844</option><option value="740x360">Paisagem · 740×360</option></select></label><label>Idioma <select id="lang"><option value="pt-BR">Português</option><option value="en">English</option></select></label></nav><iframe title="Prévia jogável dos Echoes"></iframe>`;
   const frame = document.querySelector('iframe')!;
   const controls = ['scene', 'viewport', 'lang'].map(
     (id) => document.getElementById(id) as HTMLSelectElement,
@@ -107,6 +109,12 @@ if (!query.has('embedded')) {
       state.playerExtra.resonance.evasion = 12;
     }
     if (scene === 'vent') state.playerExtra.resonance.purge = 1;
+    if (scene === 'sprint') {
+      state.playerExtra.ability = 'slipstream';
+      const row = Math.floor(y) * state.config.width;
+      for (let dx = 3; dx <= 5; dx++) state.surface[row + Math.floor(x + dx)] = SURF_DEEP_WATER;
+      for (let dx = 6; dx <= 8; dx++) state.surface[row + Math.floor(x + dx)] = SURF_WATER;
+    }
     if (scene === 'arc' || scene === 'fire') {
       state.playerExtra.ability = scene === 'arc' ? 'arc' : 'flamethrower';
       for (const [dx, dy] of [
@@ -141,6 +149,21 @@ if (!query.has('embedded')) {
     const command = panel.consume();
     if (command)
       renderer.ingestEvents(stepRun(state, [{ ...emptyCommand(), ...command }]).events, now);
+    // DISPARADA: corre para o leste sobre o vao de agua funda e a lamina
+    // rasa, a 20 Hz, e repete quando o relogio acaba.
+    if (scene === 'sprint') {
+      if (simTime >= 600 && !captured) {
+        renderer.ingestEvents(stepRun(state, [{ ...emptyCommand(), ability: true }]).events, now);
+        captured = true;
+      }
+      if (captured && Math.floor(simTime / 50) > state.tick) {
+        renderer.ingestEvents(
+          stepRun(state, [{ ...emptyCommand(), move: { x: 1, y: 0 } }]).events,
+          now,
+        );
+      }
+      if (simTime > 4500 || !state.player.alive) reset();
+    }
     const animated = scene === 'arc' || scene === 'fire';
     if (animated && simTime >= 1000 && !captured) {
       const events = stepRun(state, [

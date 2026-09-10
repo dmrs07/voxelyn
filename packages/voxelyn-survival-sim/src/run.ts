@@ -273,10 +273,19 @@ const playerSurfaceSpeedMul = (
   // Cheio de fios depois do casulo: 10% do passo, ate o relogio acabar.
   const webbed = extra.webbedUntil > state.tick ? WEB_COCOON_SLOW : 1;
   const web = webSpeedMul(state, player) * webbed;
-  const base = surfaceSpeedMul(state, player);
+  // DISPARADA ignora o freio de LIQUIDO (poca, lamina): e a parte "atravessa
+  // agua funda" da habilidade. A teia continua pegando — seda nao e agua.
+  const base = isSprinting(state, extra) ? 1 : surfaceSpeedMul(state, player);
   if (base >= 1) return base * web;
   return (1 - (1 - base) * tuning.liquidSlowScale) * web;
 };
+
+const isSprinting = (state: SurvivalState, extra: PlayerExtra): boolean =>
+  extra.sprintUntil > state.tick;
+
+/** O passo da DISPARADA: x1,7 enquanto o relogio vive, 1 fora dela. */
+const sprintSpeedMul = (state: SurvivalState, extra: PlayerExtra): number =>
+  isSprinting(state, extra) ? ABILITY_SHAPE.slipstream.speed : 1;
 
 const makePlayer = (slot: number, x: number, y: number, tuning: PlayerTuning): Entity => ({
   id: slot + 1,
@@ -308,6 +317,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   nextShotAt: 0,
   channelingUntil: 0,
   thermalGuardUntil: 0,
+  sprintUntil: 0,
   dodgeUntil: 0,
   iframesUntil: 0,
   cocoonUntil: 0,
@@ -351,6 +361,7 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.nextShotAt = 0;
   extra.channelingUntil = 0;
   extra.thermalGuardUntil = 0;
+  extra.sprintUntil = 0;
   extra.dodgeUntil = 0;
   extra.iframesUntil = 0;
   extra.cocoonUntil = 0;
@@ -1074,12 +1085,12 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
       return;
     }
     case 'slipstream': {
-      // Reuses the swept movement/collision and dodge pose; never teleports through walls.
-      extra.dodgeDir = { x: dx, y: dy };
-      extra.dodgeUntil = state.tick + ABILITY_SHAPE.slipstream.ticks + 1;
-      extra.iframesUntil = Math.max(extra.iframesUntil, extra.dodgeUntil);
-      extra.dodgeCooldownUntil = Math.max(extra.dodgeCooldownUntil, extra.dodgeUntil);
-      events.push({ t: 'dodge', x: player.x, y: player.y });
+      // DISPARADA so liga o relogio. O passo sai do movimento comum — direcao
+      // do direcional, colisao de sempre — multiplicado enquanto o relogio
+      // vive (`sprintSpeedMul`), e a travessia de agua funda vive em
+      // `applyIceLoad`. Nada de `dodgeDir` nem de quadros de invulnerabilidade:
+      // correr nao e dash, e fugir continua sendo correr.
+      extra.sprintUntil = state.tick + ABILITY_SHAPE.slipstream.ticks;
       return;
     }
     case 'vent': {
@@ -1804,8 +1815,12 @@ const applyIceLoad = (
   events: SemanticEvent[],
 ): void => {
   const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  // A DISPARADA corre POR CIMA: agua funda e gelo que cede nao pegam quem
+  // esta correndo — o gelo continua rachando e cedendo atras dele. O relogio
+  // que ACABA com o pe na agua e a rede de seguranca do fim do tick que cobra.
+  const sprinting = isSprinting(state, extra);
   const crossed = cellsCrossed(state, fromX, fromY, player.x, player.y);
-  if (crossed.length === 0) return;
   const seen = new Set<number>();
   for (const i of crossed) {
     if (seen.has(i)) continue;
@@ -1814,10 +1829,11 @@ const applyIceLoad = (
     // leitura: atravessar um vao de agua profunda no embalo nao e uma travessia
     // bem-sucedida, e o segmento acaba ali.
     if (drownsAt(state, i)) {
+      if (sprinting) continue;
       plungeIntoDeepWater(state, slot, i, events);
       return;
     }
-    if (advanceIceCrack(state, i, events) === 'collapsed') {
+    if (advanceIceCrack(state, i, events) === 'collapsed' && !sprinting) {
       plungeIntoDeepWater(state, slot, i, events);
       return;
     }
@@ -2063,7 +2079,10 @@ const stepPlayer = (
     let desiredY = 0;
     if (moveLen > 0.01) {
       const clamped = Math.min(1, moveLen);
-      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
+      const speed =
+        tuning.moveSpeed *
+        playerSurfaceSpeedMul(state, player, tuning) *
+        sprintSpeedMul(state, extra);
       desiredX = (cmd.move.x / moveLen) * clamped * speed;
       desiredY = (cmd.move.y / moveLen) * clamped * speed;
     }
@@ -2088,7 +2107,10 @@ const stepPlayer = (
       const clamped = Math.min(1, moveLen);
       const nx = (cmd.move.x / moveLen) * clamped;
       const ny = (cmd.move.y / moveLen) * clamped;
-      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
+      const speed =
+        tuning.moveSpeed *
+        playerSurfaceSpeedMul(state, player, tuning) *
+        sprintSpeedMul(state, extra);
       moveEntity(state, player, nx * speed * dt, ny * speed * dt);
     }
   }
@@ -3564,9 +3586,15 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   // Uma varredura por tick sobre os slots (dois, no maximo) — barata, e o unico
   // lugar em que a pergunta e feita sobre TODO deslocamento, venha ele de onde
   // vier.
+  //
+  // A DISPARADA e a unica excecao, e e escrita aqui mesmo: enquanto corre, o
+  // Prospector esta POR CIMA da agua. No tick em que o relogio vence, esta
+  // varredura o encontra parado sobre o buraco e o afunda — parar em cima
+  // do vao no ultimo passo da corrida nao e travessia.
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
-    if (!state.playerExtras[slot].joined || !p.alive) continue;
+    const extra = state.playerExtras[slot];
+    if (!extra.joined || !p.alive || isSprinting(state, extra)) continue;
     const i = cellIndexAt(state, p.x, p.y);
     if (drownsAt(state, i)) plungeIntoDeepWater(state, slot, i, events);
   }
@@ -3735,6 +3763,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(p.facing.y * 1000));
     mix(e.channelingUntil);
     mix(e.thermalGuardUntil);
+    mix(e.sprintUntil);
     // O casulo e os fios da rede: imunidade e passo sao autoritativos.
     mix(e.cocoonUntil);
     mix(e.webbedUntil);

@@ -102,7 +102,7 @@ const ABILITY_LABELS: Record<AbilityId, string> = {
   pulse: 'Pulso Cinético',
   flamethrower: 'Sopro (lança-chamas)',
   seismic: 'Onda Sísmica',
-  slipstream: 'Passo de Fuga',
+  slipstream: 'Disparada',
   vent: 'Respiro de Emergência',
   seeker: 'Perseguidor',
   arc: 'Arco Condutivo',

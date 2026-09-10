@@ -1796,8 +1796,23 @@ export const SEISMIC_COOLDOWN_TICKS = 180;
 export const SEISMIC_RADIUS = 3.8;
 export const SEISMIC_DAMAGE = 18;
 export const SEISMIC_STUN_TICKS = 16;
-export const SLIPSTREAM_COOLDOWN_TICKS = 160;
-export const SLIPSTREAM_TICKS = 10;
+/**
+ * DISPARADA — o Sprint do ladino: +70% de velocidade por 8 s.
+ *
+ * E corrida, nao arrancada: a direcao e a do DIRECIONAL, tick a tick, e a
+ * mira nao manda em nada. O que ela da alem do passo e a travessia — enquanto
+ * corre o Prospector atravessa agua profunda sem afundar e ignora o freio de
+ * poca e de lamina. E o "atravessa agua funda" do original, traduzido para o
+ * unico liquido que mata aqui. O que ela NAO da e protecao: fugir continua
+ * sendo correr, e o que acerta no caminho entra inteiro.
+ *
+ * Recarga contada do cast: 8 s correndo, 12 s andando. Mais curta e a
+ * habilidade vira passo padrao; mais longa e o jogador nunca a usa para
+ * chegar, so para fugir.
+ */
+export const SLIPSTREAM_COOLDOWN_TICKS = 400; // 20 s
+export const SLIPSTREAM_TICKS = 160; // 8 s
+export const SLIPSTREAM_SPEED_MUL = 1.7;
 export const VENT_COOLDOWN_TICKS = 220;
 export const VENT_RADIUS = 3.5;
 

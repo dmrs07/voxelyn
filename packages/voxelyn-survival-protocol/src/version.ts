@@ -248,7 +248,9 @@
 //     servidor recusa os comandos dele. `EnemyArchetype` aceita
 //     `silk_spiderling` (a aranhinha da rocha suturada).
 // 40: echo evidence and thermal guard in snapshots; bit 7 tags echo choices in command logs.
-export const PROTOCOL_VERSION = 40;
+// 41: o viewer ganha `sprintUntil` (a Disparada). Um cliente de 40 nao acenderia
+//     o botao nem saberia por que o parceiro atravessou a agua funda.
+export const PROTOCOL_VERSION = 41;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1069,7 +1071,15 @@ export const PROTOCOL_VERSION = 40;
 //     e uma so (nada nasce empilhado por causa da escala). O caminho solo e
 //     byte-identico ao da 78 — nenhuma tirada de `rng` mudou de ordem —, mas
 //     todo hash de co-op da 78 deixa de bater.
-export const SIMULATION_VERSION = 79;
+// 80: A DISPARADA. O Passo de Fuga deixa de ser uma arrancada na mira com
+//     invulnerabilidade e vira o Sprint: +70% de passo por 8 s na direcao do
+//     DIRECIONAL, atravessa agua profunda e ignora o freio de liquido, sem
+//     quadros de invulnerabilidade; recarga de 20 s. E O DRAFT DO POCO: as
+//     duas ofertas saem de um sorteio ponderado sem reposicao entre TODAS as
+//     habilidades desbloqueadas (antes: as duas de maior contagem, sempre as
+//     mesmas com tudo desbloqueado). Replays de 79 que usaram o Passo ou
+//     chegaram ao poco com tres ou mais Ecos nao batem.
+export const SIMULATION_VERSION = 80;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
