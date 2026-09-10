@@ -43,6 +43,7 @@ import {
   VENT_COOLDOWN_TICKS,
   VENT_RADIUS,
   WELL_CHOICE_REACH,
+  WELL_COMBAT_RADIUS,
   ABILITY_COOLDOWN_TICKS,
   ABILITY_KNOCKBACK,
   ABILITY_RADIUS,
@@ -58,12 +59,15 @@ import {
   SEEKER_SPEED,
   SEEKER_TTL,
 } from './constants.js';
-import type {
-  AbilityId,
-  EchoUnlock,
-  ResonanceKind,
-  ResonanceTally,
-  SurvivalState,
+import {
+  LURKER_HIDDEN,
+  MINER_MOOD_ENRAGED,
+  type AbilityId,
+  type EchoUnlock,
+  type Entity,
+  type ResonanceKind,
+  type ResonanceTally,
+  type SurvivalState,
 } from './types.js';
 
 export type AbilityDefinition = {
@@ -221,6 +225,47 @@ export const echoUnlock = (
   };
 };
 
+/**
+ * Este inimigo e uma AMEACA que segura o poco fechado?
+ *
+ * A mesma leitura de postura da assistencia de combate (IA-01): o Minerador
+ * so conta enfurecido; passivo ou fugindo, ele esta trabalhando ou indo
+ * embora. Ninhada e aranhinha nao mordem (contato zero) — sao materia, nao
+ * luta. O espreitador ESCONDIDO nao conta de proposito: ele fica enterrado
+ * ao lado do poco esperando, e um painel que nunca abre por causa de um bicho
+ * que o jogador nao consegue ver nem alcancar seria um bug sem mensagem.
+ */
+const holdsWellClosed = (enemy: Entity): boolean => {
+  if (!enemy.alive) return false;
+  if (enemy.archetype === 'miner') return enemy.mood === MINER_MOOD_ENRAGED;
+  if (enemy.archetype === 'devourer_brood' || enemy.archetype === 'silk_spiderling') return false;
+  if (
+    (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
+    (enemy.mood ?? LURKER_HIDDEN) === LURKER_HIDDEN
+  ) {
+    return false;
+  }
+  return true;
+};
+
+/**
+ * O jogador esta EM COMBATE para efeito do poco: ha ameaca viva a menos de
+ * `WELL_COMBAT_RADIUS` dele. Exportado porque o cliente pode querer dizer
+ * "o poco espera o combate acabar" em vez de simplesmente nao abrir nada.
+ */
+export const wellInCombat = (
+  state: SurvivalState,
+  slot = state.players.indexOf(state.player),
+): boolean => {
+  const player = state.players[slot];
+  if (!player) return false;
+  return state.enemies.some(
+    (enemy) =>
+      holdsWellClosed(enemy) &&
+      Math.hypot(enemy.x - player.x, enemy.y - player.y) <= WELL_COMBAT_RADIUS,
+  );
+};
+
 /** Same eligibility in the authoritative sim and in the card UI. */
 export const canChooseEcho = (
   state: SurvivalState,
@@ -237,6 +282,8 @@ export const canChooseEcho = (
     extra.cocoonUntil <= state.tick &&
     player.stunnedUntil <= state.tick &&
     !extra.pendingModuleChoice &&
+    // Em combate o poco espera: nada de menu no meio da luta.
+    !wellInCombat(state, slot) &&
     state.wellOffers.some((offer) => offer.takenBy === null) &&
     Math.hypot(player.x - state.corePos.x - 0.5, player.y - state.corePos.y - 0.5) <=
       WELL_CHOICE_REACH

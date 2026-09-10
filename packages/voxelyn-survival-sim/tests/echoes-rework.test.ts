@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
-import { abilityDefinition, emptyResonance, resonanceOffers } from '../src/abilities';
+import {
+  abilityDefinition,
+  canChooseEcho,
+  emptyResonance,
+  resonanceOffers,
+  wellInCombat,
+} from '../src/abilities';
 import { damageEntity, spawnEnemy } from '../src/entities';
 import {
   FLAMETHROWER_CHANNEL_TICKS,
@@ -12,8 +18,16 @@ import {
   SURF_NONE,
   SURF_SPORES,
   WELL_CHOICE_REACH,
+  WELL_COMBAT_RADIUS,
 } from '../src/constants';
-import type { AbilityId, SurvivalState } from '../src/types';
+import {
+  LURKER_EXPOSED,
+  LURKER_HIDDEN,
+  MINER_MOOD_ENRAGED,
+  MINER_MOOD_PASSIVE,
+  type AbilityId,
+  type SurvivalState,
+} from '../src/types';
 
 const arena = (ability: AbilityId = 'pulse', playerCount = 1): SurvivalState => {
   const state = createRun({ seed: 207, playerCount });
@@ -175,6 +189,50 @@ describe('Echo unlocks and selection', () => {
       stepRun(s, [{ ...emptyCommand(), choiceKind: 'echo', choose: 0 }]);
       expect(s.playerExtra.ability).toBe('pulse');
     }
+  });
+  it('waits out combat: a live threat nearby keeps the panel shut and refuses the pick', () => {
+    const s = arena();
+    reveal(s);
+    const stalker = spawnEnemy(s, 'stalker', s.player.x + 4, s.player.y, false);
+    stalker.x = s.player.x + 4;
+    stalker.y = s.player.y;
+    expect(wellInCombat(s)).toBe(true);
+    expect(canChooseEcho(s)).toBe(false);
+    stepRun(s, [{ ...emptyCommand(), choiceKind: 'echo', choose: 0 }]);
+    expect(s.playerExtra.ability).toBe('pulse');
+    expect(s.wellOffers.every((o) => o.takenBy === null)).toBe(true);
+
+    // O bicho morre: o poco abre de novo sozinho, sem precisar sair e voltar.
+    stalker.alive = false;
+    expect(wellInCombat(s)).toBe(false);
+    expect(canChooseEcho(s)).toBe(true);
+    stepRun(s, [{ ...emptyCommand(), choiceKind: 'echo', choose: 0 }]);
+    expect(s.playerExtra.ability).toBe('flamethrower');
+  });
+  it('only a threat counts as combat: distance, passive miners, brood and hidden lurkers do not', () => {
+    const s = arena();
+    reveal(s);
+    const place = (enemy: ReturnType<typeof spawnEnemy>, dx: number): void => {
+      enemy.x = s.player.x + dx;
+      enemy.y = s.player.y;
+    };
+    place(spawnEnemy(s, 'stalker', 0, 0, false), WELL_COMBAT_RADIUS + 1);
+    const miner = spawnEnemy(s, 'miner', 0, 0, false);
+    place(miner, 3);
+    miner.mood = MINER_MOOD_PASSIVE;
+    place(spawnEnemy(s, 'devourer_brood', 0, 0, false), 2);
+    const lurker = spawnEnemy(s, 'mud_lamprey', 0, 0, false);
+    place(lurker, 3);
+    lurker.mood = LURKER_HIDDEN;
+    expect(wellInCombat(s)).toBe(false);
+    expect(canChooseEcho(s)).toBe(true);
+
+    // O mesmo Minerador enfurecido, ou o mesmo espreitador exposto, fecham o poco.
+    miner.mood = MINER_MOOD_ENRAGED;
+    expect(wellInCombat(s)).toBe(true);
+    miner.mood = MINER_MOOD_PASSIVE;
+    lurker.mood = LURKER_EXPOSED;
+    expect(wellInCombat(s)).toBe(true);
   });
   it('arbitrates simultaneous co-op choices once', () => {
     const s = arena('pulse', 2);

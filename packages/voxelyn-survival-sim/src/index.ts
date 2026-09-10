@@ -178,6 +178,7 @@ export {
 
 export {
   canChooseEcho,
+  wellInCombat,
   echoUnlock,
   ABILITY_DEFINITIONS,
   ABILITY_SHAPE,

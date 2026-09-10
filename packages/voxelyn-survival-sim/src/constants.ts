@@ -1835,6 +1835,19 @@ export const WELL_OFFER_REVEAL = 7.5;
 export const WELL_OFFER_REACH = 1.4;
 /** Shared card selection is accepted only within the well's immediate area. */
 export const WELL_CHOICE_REACH = 4.2;
+/**
+ * Raio, a partir do JOGADOR, em que um inimigo hostil vivo conta como "em
+ * combate" para o poco. Em combate o painel de sintonia nao abre e a escolha e
+ * recusada: a tela e um menu, e um menu no meio de uma luta e onde o jogador
+ * morre lendo. Ele espera o ultimo bicho cair ou sair de perto.
+ *
+ * Dez tiles e mais que o alcance de cuspe do Cuspidor e menos que meio
+ * setor: o que esta a essa distancia vai chegar antes de o jogador terminar
+ * de ler dois cards. Mede so INIMIGOS, e nao dano recente ou chao pegando
+ * fogo, porque e a unica leitura que o espelho do co-op tambem tem — o
+ * cliente online decide se mostra o painel com o mesmo predicado do servidor.
+ */
+export const WELL_COMBAT_RADIUS = 10;
 /** Quao longe do poco os dois Ecos ficam, um de cada lado. */
 export const WELL_OFFER_SPREAD = 2.4;
 export const ABILITY_KNOCKBACK = 3.2;
