@@ -527,8 +527,19 @@ export class AudioDirector {
         // A vinheta toca no MESMO evento que o boot sintetizado e a barra de
         // vida se montando (cues.ts); o leito em loop so acorda quando ela
         // termina (duracao real do buffer decodificado, nao um numero fixo).
-        this.bossVinhetaBus?.wake();
-        this.diamandisIntroUntilMs = nowMs + (this.bossVinhetaBus?.durationSec ?? 0) * 1000;
+        //
+        // So arma se JA decodificou: `wake()` antes disso deixaria o bus
+        // "ligado" (silenced=false) sem fonte nenhuma tocando, e `load()`
+        // anexaria a fonte sozinho quando o decode terminasse — tarde,
+        // sobrepondo o leito que ja estaria em andamento. Sem a vinheta
+        // pronta a tempo, o encontro segue sem ela: o leito entra na hora.
+        const vinheta = this.bossVinhetaBus;
+        if (vinheta?.ready) {
+          vinheta.wake();
+          this.diamandisIntroUntilMs = nowMs + vinheta.durationSec * 1000;
+        } else {
+          this.diamandisIntroUntilMs = nowMs;
+        }
       }
     }
     const listener = this.listenerPosition(state);
@@ -692,11 +703,17 @@ export class AudioDirector {
   /** A trilha de encontro deve soar neste quadro? Ver `bossTrackPlaying`. */
   private bossTrackActive(state: SurvivalState): boolean {
     const boss = this.sectorBossBody(state);
+    // QUALQUER um dos dois assets pronto basta: a vinheta e bem menor que o
+    // leito e pode decodificar primeiro. Se so ela estiver pronta, e ELA que
+    // deve calar a trilha da run — esperar o leito tambem estar pronto
+    // deixaria a vinheta ja armada por `ingest()` ser calada aqui por baixo,
+    // por causa de um arquivo que nem e o dela.
+    const ready = (this.bossTrackBus?.ready ?? false) || (this.bossVinhetaBus?.ready ?? false);
     return bossTrackPlaying(
       state.sectorBoss.archetype,
       state.bossRuntime.awake,
       boss !== null,
-      this.bossTrackBus?.ready ?? false,
+      ready,
     );
   }
 
