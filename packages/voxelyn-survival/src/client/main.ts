@@ -313,7 +313,6 @@ const resize = (): void => {
   renderer.setSafeArea(safeArea);
   renderer.resize();
   input.layoutButtons(window.innerWidth, window.innerHeight, safeArea);
-  echoChoice.setSafeArea(safeArea);
 };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));

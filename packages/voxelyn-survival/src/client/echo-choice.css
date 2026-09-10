@@ -193,8 +193,14 @@
   line-height: 1.4;
   text-align: center;
 }
+/*
+ * No toque o painel PODE cobrir os controles: enquanto ele esta aberto a
+ * decisao e o jogo, e tocar um card ou "Manter" devolve a tela inteira.
+ * (Com inimigo perto ele nem abre — ver `canChooseEcho`.) Reservar espaco
+ * para joystick e botoes deixava ~200 px para um menu de ~400 e ele rolava.
+ */
 .echo-choice[data-touch='true'] {
-  max-height: calc(100dvh - 252px - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 76px - env(safe-area-inset-bottom));
 }
 /*
  * TELA PEQUENA EM RETRATO. O painel ficava alto demais: dois cards
@@ -211,6 +217,7 @@
     padding: 12px;
     left: 8px;
     right: 8px;
+    max-height: calc(100dvh - 76px - env(safe-area-inset-bottom));
   }
   .echo-choice .echo-eyebrow,
   .echo-hint,
@@ -283,28 +290,64 @@
     font-size: 11px;
   }
 }
-/* Celulares estreitos de verdade: duas colunas de 140 px nao se leem. */
-@media (max-width: 339px) and (orientation: portrait) {
+/* Celular de 320 px: sem subtitulo e com o texto no minimo, ainda cabe. */
+@media (max-width: 340px) and (orientation: portrait) {
+  .echo-choice {
+    padding: 10px;
+  }
+  .echo-choice .echo-subtitle {
+    display: none;
+  }
+  .echo-choice .echo-title {
+    margin-bottom: 8px;
+  }
+  .echo-choice .echo-card {
+    padding: 8px;
+    gap: 6px;
+  }
+  .echo-icon {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    padding: 4px;
+  }
+  .echo-name {
+    font-size: 11px;
+  }
+  .echo-effect {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .echo-unlock {
+    font-size: 9px;
+  }
+  .echo-cta {
+    padding: 5px 2px;
+    font-size: 9px;
+  }
+}
+/* Abaixo disto duas colunas nao se leem; uma coluna rola, e e o menor mal. */
+@media (max-width: 299px) and (orientation: portrait) {
   .echo-cards {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 /*
- * ALTURA MEDIA (laptop pequeno, tablet em paisagem, janela reduzida).
+ * ALTURA MEDIA (laptop pequeno, tablet em paisagem, janela reduzida). So
+ * acima de 600 px de largura: em retrato no celular a regra de cima ja
+ * decidiu, e esta, vindo depois no arquivo, desfazia a compactacao dela.
  * Entre 520 e 700 px o painel inteiro ainda nao cabe com a tipografia de
  * desktop, e rolava. Aqui so se aperta o que e folga: dica de uso some,
  * paddings e entrelinhas encolhem, o texto continua no tamanho de leitura.
  */
-@media (max-height: 700px) and (min-height: 521px) {
+@media (max-height: 700px) and (min-height: 521px) and (min-width: 601px) {
   .echo-choice {
     top: max(60px, env(safe-area-inset-top));
     padding: 14px 16px;
     max-height: calc(100dvh - 118px - env(safe-area-inset-bottom));
   }
   .echo-choice[data-touch='true'] {
-    left: var(--echo-lane-left, max(150px, env(safe-area-inset-left)));
-    right: var(--echo-lane-right, max(150px, env(safe-area-inset-right)));
-    max-height: calc(100dvh - 80px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 72px - env(safe-area-inset-bottom));
   }
   .echo-choice .echo-eyebrow,
   .echo-hint,
@@ -359,11 +402,9 @@
   }
 }
 /*
- * TELA BAIXA (paisagem no celular, janela pequena no desktop). Reservar
- * 146 px de rodape para os controles de toque deixava ~200 px para um
- * painel que precisa de ~280: rolava sempre. Em paisagem os joysticks
- * ocupam os CANTOS, nao a base — entao o painel recua dos lados e usa a
- * altura inteira, entre os dois polegares.
+ * TELA BAIXA (paisagem no celular, janela pequena no desktop). O painel usa
+ * a altura quase inteira e a largura da tela — no toque, por cima dos
+ * controles — e corta o que e folga: olho, subtitulo, dica, rotulo de tecla.
  */
 @media (max-height: 520px) {
   .echo-choice {
@@ -372,27 +413,30 @@
     max-height: calc(100dvh - 14px - env(safe-area-inset-bottom));
   }
   .echo-choice[data-touch='true'] {
-    left: var(--echo-lane-left, max(150px, env(safe-area-inset-left)));
-    right: var(--echo-lane-right, max(150px, env(safe-area-inset-right)));
     max-height: calc(100dvh - 14px - env(safe-area-inset-bottom));
   }
   .echo-choice .echo-eyebrow,
-  .echo-choice .echo-subtitle,
   .echo-hint,
   .echo-choice .echo-live {
     display: none;
   }
   .echo-choice .echo-title {
-    font-size: 14px;
+    font-size: 15px;
     letter-spacing: 1.5px;
-    margin-bottom: 8px;
+  }
+  .echo-choice .echo-subtitle {
+    flex: 1 1 100%;
+    order: 1;
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 4px 0 8px;
   }
   .echo-cards {
     gap: 8px;
   }
   .echo-choice .echo-card {
-    padding: 7px 9px;
-    gap: 5px;
+    padding: 9px 11px;
+    gap: 7px;
   }
   .echo-card-top {
     gap: 8px;
@@ -414,14 +458,14 @@
     font-size: 10px;
   }
   .echo-effect {
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 12px;
+    line-height: 1.45;
   }
   .echo-unlock {
-    gap: 2px;
-    padding-top: 5px;
-    font-size: 10px;
-    line-height: 1.3;
+    gap: 3px;
+    padding-top: 6px;
+    font-size: 11px;
+    line-height: 1.35;
   }
   .echo-unlock strong {
     font-size: 8px;
@@ -476,54 +520,6 @@
   .echo-choice[data-touch='true'] .echo-unlock {
     padding-bottom: 2px;
   }
-}
-/*
- * FAIXA ESTREITA (celular pequeno em paisagem, ~270 px entre os controles).
- * Dois cards de 120 px so se leem com o texto no minimo; ainda assim e melhor
- * que uma coluna, que nao cabe em 360 px de altura e volta a rolar.
- */
-.echo-choice[data-lane='narrow'] {
-  padding: 6px 8px;
-}
-.echo-choice[data-lane='narrow'] .echo-cards {
-  gap: 6px;
-}
-.echo-choice[data-lane='narrow'] .echo-card {
-  padding: 6px;
-  gap: 4px;
-}
-/* O rotulo cede; o MOTIVO ("12 registros de combustao...") fica. */
-.echo-choice[data-lane='narrow'] .echo-unlock strong {
-  display: none;
-}
-.echo-choice[data-lane='narrow'] .echo-icon {
-  width: 26px;
-  height: 26px;
-  flex-basis: 26px;
-  padding: 4px;
-}
-.echo-choice[data-lane='narrow'] .echo-name {
-  font-size: 11px;
-}
-.echo-choice[data-lane='narrow'] .echo-cooldown {
-  font-size: 9px;
-}
-.echo-choice[data-lane='narrow'] .echo-effect {
-  font-size: 10px;
-  line-height: 1.4;
-}
-.echo-choice[data-lane='narrow'] .echo-unlock {
-  font-size: 9px;
-  padding-top: 5px;
-}
-.echo-choice[data-lane='narrow'] .echo-cta {
-  padding: 4px 2px;
-  font-size: 9px;
-}
-.echo-choice[data-lane='narrow'] .echo-keep {
-  min-height: 28px;
-  padding: 5px 10px;
-  font-size: 10px;
 }
 @media (prefers-reduced-motion: reduce) {
   .echo-choice * {

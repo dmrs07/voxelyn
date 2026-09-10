@@ -2,12 +2,7 @@ import { canChooseEcho, type PlayerCommand, type SurvivalState } from '@voxelyn/
 import { abilityDetails, abilityPresentation, echoUnlockText } from './ability-presentation';
 import { abilityIconSvg } from './ability-icons';
 import { getLocale, t } from './i18n';
-import {
-  MOVE_JOYSTICK_RADIUS,
-  isEditingText,
-  touchControlGeometry,
-  type TouchSafeArea,
-} from './input';
+import { isEditingText } from './input';
 import './echo-choice.css';
 
 type EchoCommand = Pick<PlayerCommand, 'choose' | 'choiceKind'>;
@@ -26,7 +21,6 @@ export class EchoChoicePanel {
   private submitted = '';
   private choices = 0;
   private focusBeforeOpen: HTMLElement | null = null;
-  private safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {};
 
   constructor() {
     this.element.className = 'echo-choice';
@@ -75,41 +69,6 @@ export class EchoChoicePanel {
       this.focusBeforeOpen?.focus({ preventScroll: true });
   }
 
-  /** A mesma area segura que posiciona os controles de toque (main.ts, resize). */
-  setSafeArea(safe: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>>): void {
-    this.safeArea = safe;
-  }
-
-  /**
-   * Em PAISAGEM com toque o painel vive na FAIXA entre o joystick de movimento
-   * (esquerda) e o aglomerado de botoes de acao (direita), e nao numa margem
-   * fixa: a largura desse aglomerado depende da tela (raio e passo dos botoes
-   * escalam com a altura), e 150 px de recuo cobriam o botao de habilidade em
-   * qualquer celular largo. A conta e a MESMA de `touchControlGeometry`, entao
-   * o painel e os botoes nunca discordam sobre onde cada um esta. Fora desse
-   * caso o CSS decide sozinho.
-   */
-  private layoutLane(touch: boolean): void {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const style = this.element.style;
-    if (!touch || width <= height) {
-      style.removeProperty('--echo-lane-left');
-      style.removeProperty('--echo-lane-right');
-      delete this.element.dataset.lane;
-      return;
-    }
-    const g = touchControlGeometry(width, height, this.safeArea);
-    // Folga visual (o desenho do controle), nao a area de toque: o painel
-    // engole os toques que caem nele, entao a zona de ativacao pode ficar
-    // por baixo; o que nao pode e o DESENHO do botao sumir atras do card.
-    const left = Math.round(g.moveX + MOVE_JOYSTICK_RADIUS + 10);
-    const right = Math.round(width - (g.aimX - g.step * 2 - g.buttonRadius) + 10);
-    style.setProperty('--echo-lane-left', `${left}px`);
-    style.setProperty('--echo-lane-right', `${right}px`);
-    this.element.dataset.lane = width - left - right < 320 ? 'narrow' : 'wide';
-  }
-
   hide(): void {
     this.restoreFocus();
     this.element.hidden = true;
@@ -133,7 +92,6 @@ export class EchoChoicePanel {
       getLocale(),
     ]);
     this.element.dataset.touch = String(touch);
-    this.layoutLane(touch);
     if (signature === this.submitted) return;
     if (signature === this.signature) {
       this.element.hidden = false;
