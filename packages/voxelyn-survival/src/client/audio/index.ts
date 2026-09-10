@@ -44,10 +44,12 @@ import { CueMixer, NEAR_CUTOFF_HZ, distanceGain } from './mixer';
 import { MusicBus } from './music-bus';
 import {
   BOSS_SOUNDTRACK_URL,
+  BOSS_VINHETA_URL,
   MENU_SOUNDTRACK_URL,
   SOUNDTRACK_URL,
   bossBaseGain,
   bossTrackPlaying,
+  bossVinhetaBaseGain,
   menuBaseGain,
   resolveMusicSource,
   type MusicSource,
@@ -147,11 +149,25 @@ export class AudioDirector {
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
   /**
-   * A trilha de ENCONTRO (hoje, o Diamandis). Assume enquanto o dono do setor
-   * com trilha esta acordado e de pe; a trilha da run cala e volta quando ele
-   * cai. Mesmo bus, mesmo contrato; so o ciclo de vida e outro.
+   * O LEITO em loop do ENCONTRO (hoje, o Diamandis). Assume enquanto o dono
+   * do setor com trilha esta acordado e de pe; a trilha da run cala e volta
+   * quando ele cai. Mesmo bus, mesmo contrato; so o ciclo de vida e outro.
    */
   private bossTrackBus: SoundtrackBus | null = null;
+  /**
+   * A vinheta de abertura do encontro: passagem UNICA (loop=false), disparada
+   * pelo evento `boss_awake` em `ingest()`. `bossTrackBus` so acorda depois
+   * dela terminar (ver `diamandisIntroUntilMs`) — os dois sao arquivos
+   * separados de proposito, para o leito poder repetir sem repetir a vinheta.
+   */
+  private bossVinhetaBus: SoundtrackBus | null = null;
+  /**
+   * Quando (em nowMs) o leito do encontro pode acordar: o fim da vinheta que
+   * comecou no ultimo `boss_awake`. Zero por padrao — sem vinheta tocada
+   * ainda (ou arquivo nao decodificado, duracao 0), o leito entra na hora,
+   * como sempre entrou. Zerado em `reset()` para a proxima run.
+   */
+  private diamandisIntroUntilMs = 0;
 
   /** A virgula sonora decodificada (ou a promessa dela). Ver `prepareIdentitySting`. */
   private identSting: Promise<AudioBuffer | null> | null = null;
@@ -241,6 +257,7 @@ export class AudioDirector {
       this.soundtrackBus?.silence();
       this.menuTrackBus?.silence();
       this.bossTrackBus?.silence();
+      this.bossVinhetaBus?.silence();
     } else if (this.screen === 'menu') {
       // Desmutou no terminal: a trilha de menu volta sozinha — nao ha
       // update() de run para religa-la, entao o religamento mora aqui.
@@ -255,6 +272,7 @@ export class AudioDirector {
     this.soundtrackBus?.setVolume(this.musicVolume);
     this.menuTrackBus?.setVolume(this.musicVolume);
     this.bossTrackBus?.setVolume(this.musicVolume);
+    this.bossVinhetaBus?.setVolume(this.musicVolume);
   }
 
   /**
@@ -482,6 +500,12 @@ export class AudioDirector {
       this.bossTrackBus.start();
       this.bossTrackBus.setVolume(this.musicVolume);
       void this.bossTrackBus.load(BOSS_SOUNDTRACK_URL);
+      // A vinheta e passagem UNICA (loop=false): toca uma vez por `boss_awake`
+      // e nunca mais ate a proxima run (ver `ingest`/`reset`).
+      this.bossVinhetaBus = new SoundtrackBus(ctx, master, bossVinhetaBaseGain, false);
+      this.bossVinhetaBus.start();
+      this.bossVinhetaBus.setVolume(this.musicVolume);
+      void this.bossVinhetaBus.load(BOSS_VINHETA_URL);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -498,6 +522,15 @@ export class AudioDirector {
       }
     }
     if (!this.ready || this.muted || events.length === 0) return;
+    for (const ev of events) {
+      if (ev.t === 'boss_awake' && ev.archetype === 'diamandis') {
+        // A vinheta toca no MESMO evento que o boot sintetizado e a barra de
+        // vida se montando (cues.ts); o leito em loop so acorda quando ela
+        // termina (duracao real do buffer decodificado, nao um numero fixo).
+        this.bossVinhetaBus?.wake();
+        this.diamandisIntroUntilMs = nowMs + (this.bossVinhetaBus?.durationSec ?? 0) * 1000;
+      }
+    }
     const listener = this.listenerPosition(state);
     const cues = cuesForEvents(events, {
       worldWidth: this.worldWidth,
@@ -529,9 +562,15 @@ export class AudioDirector {
       this.menuTrackBus?.silence();
       this.musicBus?.silence();
       this.soundtrackBus?.silence();
-      this.bossTrackBus?.wake();
+      // O leito so entra depois que a vinheta de abertura terminar — enquanto
+      // ela ainda toca (ou se nunca tocou, o padrao e zero) ele fica calado.
+      // Sem vinheta decodificada o prazo e zero e o leito entra na hora, como
+      // sempre entrou: o encontro nunca fica mudo esperando um arquivo que
+      // nao chegou.
+      if (nowMs >= this.diamandisIntroUntilMs) this.bossTrackBus?.wake();
     } else if (state.phase === 'running') {
       this.bossTrackBus?.silence();
+      this.bossVinhetaBus?.silence();
       // Cinto de seguranca: update() com run correndo implica tela de run —
       // se algum caminho novo esquecer o setScreen, a trilha de menu nao
       // pode vazar por baixo da descida. silence() ja silenciado e gratis.
@@ -579,6 +618,7 @@ export class AudioDirector {
       this.musicBus?.silence();
       this.soundtrackBus?.silence();
       this.bossTrackBus?.silence();
+      this.bossVinhetaBus?.silence();
     }
 
     // O MOTOR do canhao rotativo segue o ESTADO autoritativo do jogador local,
@@ -641,6 +681,11 @@ export class AudioDirector {
     this.musicBus?.silence();
     this.soundtrackBus?.silence();
     this.bossTrackBus?.silence();
+    this.bossVinhetaBus?.silence();
+    // Passagem unica: libera a fonte ja tocada para o proximo `boss_awake`
+    // (a proxima run) poder acorda-la de novo.
+    this.bossVinhetaBus?.resetOneShot();
+    this.diamandisIntroUntilMs = 0;
     this.activeSource = null;
   }
 
@@ -852,6 +897,7 @@ export class AudioDirector {
       this.musicBus?.duck();
       this.soundtrackBus?.duck();
       this.bossTrackBus?.duck();
+      this.bossVinhetaBus?.duck();
     }
 
     const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD - elapsedSeconds;

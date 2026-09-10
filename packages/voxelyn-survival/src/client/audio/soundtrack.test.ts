@@ -9,11 +9,14 @@ import {
   COMPOSED_TRIM_MIN,
   BOSS_SOUNDTRACK_URL,
   BOSS_TRIM,
+  BOSS_VINHETA_TRIM,
+  BOSS_VINHETA_URL,
   MENU_SOUNDTRACK_URL,
   MENU_TRIM,
   SOUNDTRACK_URL,
   bossBaseGain,
   bossTrackPlaying,
+  bossVinhetaBaseGain,
   composedBaseGain,
   isMusicSource,
   menuBaseGain,
@@ -75,7 +78,10 @@ describe('contrato da trilha composta', () => {
       10 ** ((alvo - lufsDoArquivo) / 20) / MUSIC_CEILING;
     expect(trimPara(-17.1)).toBeCloseTo(COMPOSED_TRIM, 2);
     expect(trimPara(-15.0)).toBeCloseTo(MENU_TRIM, 2);
-    expect(trimPara(-8.2)).toBeCloseTo(BOSS_TRIM, 2);
+    expect(trimPara(-8.1)).toBeCloseTo(BOSS_TRIM, 2);
+    // A vinheta e curta e dinamica: o calculo bruto (2.76) satura no teto —
+    // e por isso BOSS_VINHETA_TRIM e o proprio teto, nao o valor bruto.
+    expect(Math.min(COMPOSED_TRIM_MAX, trimPara(-21.1))).toBeCloseTo(BOSS_VINHETA_TRIM, 2);
   });
 
   it('composedBaseGain satura o slider em [0,1]', () => {
@@ -122,6 +128,20 @@ describe('resolucao de fonte (fallback para o backup procedural)', () => {
     expect(bossBaseGain(1) * MUSIC_DUCK_FACTOR).toBeLessThan(SMALLEST_TELEGRAPH_GAIN);
     expect(bossBaseGain(-1)).toBe(0);
     expect(bossBaseGain(0.5)).toBeCloseTo(bossBaseGain(1) / 2, 10);
+  });
+
+  it('a vinheta do Diamandis: arquivo proprio, separado do leito, e lossy de proposito', () => {
+    // Ate 2026-09-09 vinheta e leito eram um so arquivo; o compositor separou
+    // os masters para a vinheta nao repetir a cada volta do loop do leito.
+    expect(BOSS_VINHETA_URL.endsWith('.mp3')).toBe(true);
+    expect(BOSS_VINHETA_URL.startsWith('/')).toBe(false);
+    expect(BOSS_VINHETA_URL).not.toBe(BOSS_SOUNDTRACK_URL);
+    expect(BOSS_VINHETA_URL).not.toBe(SOUNDTRACK_URL);
+    expect(BOSS_VINHETA_URL).not.toBe(MENU_SOUNDTRACK_URL);
+    expect(BOSS_VINHETA_TRIM).toBeGreaterThanOrEqual(COMPOSED_TRIM_MIN);
+    expect(BOSS_VINHETA_TRIM).toBeLessThanOrEqual(COMPOSED_TRIM_MAX);
+    expect(bossVinhetaBaseGain(-1)).toBe(0);
+    expect(bossVinhetaBaseGain(0.5)).toBeCloseTo(bossVinhetaBaseGain(1) / 2, 10);
   });
 
   it('a trilha de encontro so soa com o dono certo, acordado, de pe e decodificado', () => {

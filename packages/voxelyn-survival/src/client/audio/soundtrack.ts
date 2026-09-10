@@ -132,11 +132,18 @@ export const menuBaseGain = (musicVolume: number): number => trackBaseGain(MENU_
 // ---------------------------------------------------------------------------
 
 /**
- * Terceiro slot do pipeline: a trilha do encontro com o Diamandis. Toca em
- * loop enquanto o dono do setor e o Diamandis, ele ja notou o jogador e esta
+ * Terceiro slot do pipeline: o LEITO em loop do encontro com o Diamandis.
+ * Toca enquanto o dono do setor e o Diamandis, ele ja notou o jogador e esta
  * de pe; a trilha da run (composta ou procedural) cala enquanto isso e volta
  * quando ele cai — o sting do desligamento soa sobre o silencio dela, como o
  * `died` soa sobre o silencio da run.
+ *
+ * NAO carrega a vinheta de abertura do encontro — essa e um arquivo proprio
+ * (`BOSS_VINHETA_URL`, logo abaixo), tocada UMA VEZ pelo AudioDirector quando
+ * o Diamandis acorda, antes deste leito entrar. Os dois vieram juntos num so
+ * arquivo ate 2026-09-09: com loop=true no `AudioBufferSourceNode`, a vinheta
+ * embutida repetia a CADA volta do leito, cerca de uma vez por minuto de
+ * combate — o compositor separou os masters para corrigir exatamente isso.
  *
  * O ASSET E LOSSY, e isso e deliberado e documentado, nao um descuido: o
  * master chegou como mp3 a 320 kbps (nao existe WAV/FLAC dele). Reempacotar
@@ -149,17 +156,47 @@ export const menuBaseGain = (musicVolume: number): number => trackBaseGain(MENU_
 export const BOSS_SOUNDTRACK_URL = 'audio/voxelyn-survival-diamandis.mp3';
 
 /**
- * Trim da trilha do Diamandis, mesmo papel do COMPOSED_TRIM.
+ * Trim do leito do Diamandis, mesmo papel do COMPOSED_TRIM.
  *
- * Calibrado para o master recebido em 2026-09-09 ("BOSS_FIGHT_DIAMANDS3"):
- * -8,2 LUFS integrado, true peak +0,4 dBTP, 84,72 s, estereo com o lado
- * 7,1 dB abaixo do centro -> 0.63 poe o leito em -21 LUFS com o slider no
- * maximo. Trocou o master, rode o script de novo.
+ * Calibrado para o master recebido em 2026-09-10 ("BOSS_FIGHT_DIAMANDS3_1",
+ * ja sem a vinheta embutida): -8,1 LUFS integrado, true peak +0,5 dBTP,
+ * 81,42 s, estereo com o lado 7,1 dB abaixo do centro -> 0.62 poe o leito em
+ * -21 LUFS com o slider no maximo. Trocou o master, rode o script de novo.
  */
-export const BOSS_TRIM = 0.63;
+export const BOSS_TRIM = 0.62;
 
-/** Ganho base da trilha de encontro sob o slider. */
+/** Ganho base do leito de encontro sob o slider. */
 export const bossBaseGain = (musicVolume: number): number => trackBaseGain(BOSS_TRIM, musicVolume);
+
+/**
+ * A vinheta de abertura do encontro com o Diamandis: uma passagem UNICA
+ * (nao repete) que anuncia a luta, tocada quando o evento `boss_awake` chega
+ * para o arquetipo `diamandis` — o mesmo instante do boot sintetizado
+ * (`diamandisBoot`) e da barra de vida se montando. O leito em loop
+ * (`BOSS_SOUNDTRACK_URL`) so entra depois dela terminar; ver `diamandisIntroUntilMs`
+ * no AudioDirector. Mesmo tratamento de lossy do leito, mesmo motivo: o
+ * master do compositor so existe em mp3.
+ */
+export const BOSS_VINHETA_URL = 'audio/voxelyn-survival-diamandis-vinheta.mp3';
+
+/**
+ * Trim da vinheta, mesmo papel do COMPOSED_TRIM.
+ *
+ * Calibrado para o master recebido em 2026-09-10 ("BOSS_FIGHT_DIAMANDS -
+ * vinheta"): -21,1 LUFS integrado (uma passagem curta e dinamica, nao um
+ * leito sustentado — o pico real soa bem mais presente que a media), true
+ * peak -5,1 dBTP, 8,72 s. O calculo bruto (2.76) SATURA no teto de
+ * COMPOSED_TRIM_MAX: 2.00 e o valor mais alto que o contrato de mixagem
+ * permite sem reabrir a faixa sa. Ficar ~2,8 dB abaixo do alvo de -21 LUFS
+ * e aceitavel aqui porque a vinheta toca sozinha, sobre o silencio do leito
+ * que ainda nao entrou — nao esta competindo por espaco como um leito
+ * continuo estaria. Trocou o master, rode o script de novo.
+ */
+export const BOSS_VINHETA_TRIM = 2.0;
+
+/** Ganho base da vinheta de encontro sob o slider. */
+export const bossVinhetaBaseGain = (musicVolume: number): number =>
+  trackBaseGain(BOSS_VINHETA_TRIM, musicVolume);
 
 /**
  * Os chefes que TEM trilha propria. Uma tabela, e nao um `=== 'diamandis'`
