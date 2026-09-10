@@ -33,6 +33,7 @@ import {
   moduleLayerSpriteId,
 } from '@voxelyn/survival-content';
 import { armFaceLight, orderFacesForDraw } from './face-light';
+import { ELITE_RIM_OFFSETS } from './elite-mark';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import playerLowerManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.json';
@@ -1171,19 +1172,6 @@ const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
 const MUZZLE_LIGHT: Tint = { color: 'rgb(255, 209, 102)', alpha: 0.26 };
 
 /**
- * Onde a silhueta e carimbada para formar o contorno aceso: os dois lados, o
- * chao e as duas quinas de baixo. O topo fica de fora de proposito — ver
- * `drawEntityRim`.
- */
-const RIM_OFFSETS: readonly (readonly [number, number])[] = [
-  [-1, 0],
-  [1, 0],
-  [0, 1],
-  [-1, 1],
-  [1, 1],
-];
-
-/**
  * Abaixo disto o cano fica com a propria cor.
  *
  * Existe porque calor residual e permanente: o decaimento por tick nunca chega a
@@ -2145,7 +2133,7 @@ export class SpriteBank {
     if (!bctx) return false;
     bctx.clearRect(0, 0, bw, bh);
     bctx.imageSmoothingEnabled = false;
-    for (const [ox, oy] of RIM_OFFSETS) bctx.drawImage(silhouette, 1 + ox, 1 + oy);
+    for (const [ox, oy] of ELITE_RIM_OFFSETS) bctx.drawImage(silhouette, 1 + ox, 1 + oy);
 
     const dw = bw * zoom;
     const dh = bh * zoom;

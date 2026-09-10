@@ -104,6 +104,24 @@ const SPARK = mixHex(PAL.fire, PAL.loot, 0.5);
  */
 export const ELITE_BODY_SCALE = 1.25;
 
+/**
+ * Onde a silhueta e carimbada para formar o contorno aceso: os dois lados, o
+ * chao e as duas quinas de baixo. O topo fica de fora de proposito — e a
+ * assimetria que troca "esta marcado" por "esta aceso por baixo". Ver
+ * `SpriteBank.drawEntityRim`.
+ *
+ * Mora aqui, e nao no banco de sprites, porque o recuo de voxel carimba a mesma
+ * silhueta com os mesmos rumos: o contorno do elite tem de ter a MESMA forma
+ * tenha o atlas chegado ou nao.
+ */
+export const ELITE_RIM_OFFSETS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [1, 0],
+  [0, 1],
+  [-1, 1],
+  [1, 1],
+];
+
 /** Periodo da respiracao, em ms. Lento: um bicho grande respira devagar. */
 export const ELITE_BREATH_MS = 2600;
 /** Opacidade do tint no fundo da respiracao (carvao) e no alto dela (brasa). */

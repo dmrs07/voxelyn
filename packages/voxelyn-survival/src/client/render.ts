@@ -5134,8 +5134,36 @@ export class SurvivalRenderer {
               );
             }
           };
-          const paint = (override: Tint | undefined): boolean =>
-            this.sprites.drawEntity(
+          const paint = (override: Tint | undefined): boolean => {
+            // O CONTORNO ACESO do elite sai DAQUI DE DENTRO, junto do corpo.
+            //
+            // Ele acompanha o CORPO — `bodyX`/`bodyDrawY`, com o espasmo e o
+            // salto dentro —, ao contrario do chao, que fica no pe. E precisa
+            // sair na mesma passada que o corpo porque o corpo nem sempre e UMA
+            // passada: debaixo do Diluvio ele e desenhado duas vezes, recortado
+            // na lamina (`drawCutByWaterline`), com veu azul e transparencia na
+            // metade submersa. Um contorno desenhado por fora dessas passadas
+            // continuaria inteiro e aceso debaixo d'agua — um risco laranja sob
+            // a lamina, justamente onde o corpo esta azul e apagado.
+            //
+            // E por isso ele tambem herda o `override`: submerso, o contorno usa
+            // o mesmo veu do corpo. Duas cores para o mesmo bicho na mesma agua
+            // seriam dois bichos.
+            if (eliteMark) {
+              this.sprites.drawEntityRim(
+                ctx,
+                enemy.archetype,
+                presented.anim,
+                presented.facingX,
+                presented.facingY,
+                presented.elapsedMs,
+                bodyX,
+                bodyDrawY,
+                bodyZoom,
+                override ?? eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
+              );
+            }
+            return this.sprites.drawEntity(
               ctx,
               enemy.archetype,
               presented.anim,
@@ -5179,6 +5207,7 @@ export class SurvivalRenderer {
               bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
               bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
             );
+          };
           // A POSE DO CHASSI da broca (drill-machine.ts): compressao, mergulho
           // do nariz e chacoalho, em volta do PE — o sprite continua sendo o
           // sprite, e a sombra e a barra ficam no chao. O mergulho e uma
@@ -5209,24 +5238,6 @@ export class SurvivalRenderer {
             ctx.translate(-bodyX, -bodyDrawY);
           }
           drawParts(true);
-          // O CONTORNO ACESO do elite acompanha o CORPO — `bodyX`/`bodyDrawY`,
-          // com o espasmo e o salto dentro —, ao contrario do chao acima. Ele e
-          // a luz da brasa batendo na casca do bicho: descolar do corpo por um
-          // quadro leria como um segundo bicho atras do primeiro.
-          if (eliteMark) {
-            this.sprites.drawEntityRim(
-              ctx,
-              enemy.archetype,
-              presented.anim,
-              presented.facingX,
-              presented.facingY,
-              presented.elapsedMs,
-              bodyX,
-              bodyDrawY,
-              bodyZoom,
-              eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
-            );
-          }
           // Todo corpo que nao nada e CORTADO pela lamina: e a linha d'agua
           // que o jogador le para saber quanto a sala ja encheu.
           const drew =
@@ -5345,9 +5356,16 @@ export class SurvivalRenderer {
               sy: drawY,
               z,
               // O recuo desenha o mesmo bicho que o atlas desenharia, entao
-              // cresce pelo mesmo fator: um elite que muda de tamanho conforme
-              // o atlas chegou seria a mesma incoerencia que a marca tracejada.
+              // recebe a mesma marca: tamanho, carvao e contorno aceso. Um elite
+              // que muda de aparencia conforme o atlas chegou ou nao seria a
+              // mesma incoerencia da elipse tracejada que este recuo desenhava.
               radius: enemy.elite ? enemy.radius * ELITE_BODY_SCALE : enemy.radius,
+              elite: eliteMark
+                ? {
+                    tint: eliteTint(nowMs, enemy.id, eliteMark.reducedMotion),
+                    rim: eliteRim(nowMs, enemy.id, eliteMark.reducedMotion),
+                  }
+                : undefined,
               brightness: b,
               archetype: enemy.archetype,
               nowMs,

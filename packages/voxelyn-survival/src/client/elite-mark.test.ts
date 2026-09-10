@@ -17,6 +17,13 @@
 //    mesma marca (duas maquinas de uma sala de co-op veem o mesmo bicho).
 // 6. MOVIMENTO REDUZIDO PARA A MARCA, e nao a apaga: continua havendo elite na
 //    tela, so nao ha pulso.
+// 7. O CONTORNO SAI NA MESMA PASSADA QUE O CORPO. Este e o unico teste que le
+//    o renderer, e existe porque a falha e invisivel em terra: so debaixo do
+//    Diluvio, onde o corpo e desenhado duas vezes e recortado na lamina, e que
+//    um contorno solto apareceria inteiro e aceso sob a agua.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ELITE_EMBERS,
@@ -190,5 +197,23 @@ describe('as brasas', () => {
     expect(parado.some((e) => e.alpha > 0.2)).toBe(true);
     // Espalhadas: nenhuma altura repetida, senao seriam uma fileira so.
     expect(new Set(parado.map((e) => e.dy.toFixed(3))).size).toBe(ELITE_EMBERS);
+  });
+});
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+describe('o contorno, no renderer', () => {
+  it('e desenhado DENTRO da mesma passada do corpo', () => {
+    // `drawCutByWaterline` recebe `paint` e o chama DUAS vezes, recortado acima
+    // e abaixo da lamina, com veu azul na metade submersa. O contorno tem de
+    // estar dentro desse `paint` — fora dele, o elite submerso mostraria um
+    // risco laranja inteiro por baixo da agua.
+    const src = readFileSync(join(HERE, 'render.ts'), 'utf8');
+    const paint = src.indexOf('const paint = (override: Tint | undefined)');
+    expect(paint).toBeGreaterThan(0);
+    const rim = src.indexOf('drawEntityRim(', paint);
+    const body = src.indexOf('this.sprites.drawEntity(', paint);
+    expect(rim).toBeGreaterThan(paint);
+    expect(rim).toBeLessThan(body);
   });
 });
