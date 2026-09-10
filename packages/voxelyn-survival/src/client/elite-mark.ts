@@ -25,9 +25,9 @@
 // ---------------------------------------------------------------------------
 //
 // A premissa: um elite nao e um bicho comum com um adesivo. E um bicho que
-// sobreviveu a alguma coisa. A marca conta isso em tres camadas que dividem UM
-// relogio so — a respiracao (`eliteBreath`) —, e e essa unidade que faz as tres
-// lerem como um corpo e nao como tres efeitos empilhados:
+// sobreviveu a alguma coisa. A marca conta isso em quatro camadas que dividem UM
+// relogio so — a respiracao (`eliteBreath`) —, e e essa unidade que faz as quatro
+// lerem como um corpo e nao como quatro efeitos empilhados:
 //
 // - O CORPO CARBONIZADO. O tint deixa de clarear e passa a ESCURECER: carvao
 //   com sangue seco no fundo da respiracao, brasa viva no alto dela. Contra os
@@ -36,15 +36,21 @@
 //   trabalho a qualquer distancia, que era o que o veu laranja perdia.
 //
 // - O CHAO ESTRAGADO. Debaixo dele, uma poca de fuligem que come a luz do piso,
-//   e sobre a poca um anel de brasa PARTIDO — arcos com falhas, girando devagar,
-//   nunca uma circunferencia inteira. Um circulo fechado e um icone; um anel
-//   partido e uma coisa queimando. O raio e o MESMO do anel antigo: a marca
-//   continua medindo a celula que a criatura ocupa, e nao poderia crescer sem
-//   mentir sobre isso.
+//   e sobre a poca um HEXAGONO queimado: seis riscos de brasa com as quinas
+//   abertas, parado, cada lado tremulando no seu proprio tempo. Seis lados retos
+//   sao da familia do losango do tile e da faceta do voxel — a elipse lisa de
+//   antes era a unica curva perfeita da tela, e por isso lia como interface. O
+//   raio e o MESMO do anel antigo: a marca continua medindo a celula que a
+//   criatura ocupa, e nao poderia crescer sem mentir sobre isso.
 //
 // - O CALOR SUBINDO. Brasas soltando do chao em volta dele, morrendo na altura
 //   do peito. E o unico movimento vertical da marca, e e ele que separa "isto
 //   esta aceso agora" de "isto tem uma textura quente pintada".
+//
+// - A BARRA MARCADA. Quatro cantoneiras de brasa nas quinas da barra de vida
+//   (`drawEliteBarFrame`), na mesma familia das quinas do hexagono: quando o
+//   jogador ja esta trocando dano, a barra confirma com quem ele esta lidando
+//   sem que nada precise ser escrito na tela.
 //
 // Tudo deriva do relogio e do ID da criatura. Nada e sorteado por quadro: duas
 // maquinas da mesma sala desenham a mesma marca, e a mesma criatura tem sempre
@@ -80,12 +86,15 @@ export const ELITE_BREATH_MS = 2600;
 export const ELITE_TINT_CHAR = 0.34;
 export const ELITE_TINT_EMBER = 0.2;
 
-/** Raio do anel, em multiplos do tamanho do corpo. E o do anel antigo. */
+/** Raio da marca, em multiplos do tamanho do corpo. E o do anel antigo. */
 export const ELITE_RING_RX = 1.05;
 export const ELITE_RING_RY = 0.55;
-/** Quantos arcos formam o anel partido, e quanto de cada passo eles ocupam. */
-export const ELITE_RING_ARCS = 5;
-const ARC_FILL = 0.58;
+/** Quantos lados tem a marca no chao. */
+export const ELITE_HEX_SIDES = 6;
+/** Quanto de cada lado fica ACESO; o resto e a falha nas quinas. */
+const HEX_EDGE_FILL = 0.76;
+/** Periodo do tremular de um lado, em ms. */
+const HEX_FLICKER_MS = 1450;
 /** Quantas brasas sobem do chao ao mesmo tempo. */
 export const ELITE_EMBERS = 5;
 /** Quanto tempo uma brasa leva do chao ate apagar, em ms. */
@@ -188,6 +197,77 @@ export const eliteEmbers = (
   return out;
 };
 
+/** Um lado do hexagono, em px de tela a partir do pe da criatura. */
+export type EliteHexEdge = {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  /** 0..1, quanto ESTE lado esta aceso neste instante. */
+  heat: number;
+};
+
+/** As seis quinas da marca, em px de tela a partir do pe. */
+export const eliteHexCorners = (size: number): [number, number][] => {
+  const out: [number, number][] = [];
+  for (let i = 0; i < ELITE_HEX_SIDES; i++) {
+    const a = (i / ELITE_HEX_SIDES) * TAU;
+    out.push([Math.cos(a) * size * ELITE_RING_RX, Math.sin(a) * size * ELITE_RING_RY]);
+  }
+  return out;
+};
+
+/**
+ * O HEXAGONO QUEIMADO no chao — a marca que diz qual celula e dele.
+ *
+ * Por que seis lados retos e nao a elipse de antes: um circulo perfeito
+ * desenhado a `ctx.ellipse` e a unica curva lisa da tela num jogo em que tudo e
+ * faceta e pixel, e por isso lia como interface colada por cima do mundo. Um
+ * poligono e da mesma familia do losango do tile e da faceta do voxel — e as
+ * seis quinas sao os pontos onde a brasa fica mais viva, que uma curva nao tem.
+ *
+ * NAO GIRA. Um hexagono girando e runa de magia; parado e alinhado com a grade,
+ * ele le como uma coisa QUEIMADA no chao, que e o que a marca conta. O que se
+ * move e o calor: cada lado tremula no seu proprio tempo, entao a figura nunca
+ * esta acesa por inteiro ao mesmo tempo — e nenhum lado apaga de vez.
+ *
+ * Cada lado e cortado nas duas pontas: as quinas ficam ABERTAS. Fechado, o
+ * hexagono vira um contorno desenhado; aberto, vira seis riscos de brasa que o
+ * olho fecha sozinho.
+ */
+export const eliteHex = (
+  size: number,
+  nowMs: number,
+  seed: number,
+  reducedMotion: boolean,
+): EliteHexEdge[] => {
+  const corners = eliteHexCorners(size);
+  const out: EliteHexEdge[] = [];
+  for (let i = 0; i < ELITE_HEX_SIDES; i++) {
+    const [ax, ay] = corners[i];
+    const [bx, by] = corners[(i + 1) % ELITE_HEX_SIDES];
+    const r = hash01(seed + i * 977);
+    // A falha de cada lado e um pouco diferente: seis cortes iguais em volta da
+    // figura voltam a ser um icone, so que pontilhado.
+    const fill = HEX_EDGE_FILL * (0.82 + r * 0.3);
+    const edge = (1 - Math.min(0.95, fill)) / 2;
+    const phase = r * TAU;
+    const flicker = reducedMotion
+      ? 0.5 + 0.5 * Math.sin(phase)
+      : 0.5 + 0.5 * Math.sin((nowMs / HEX_FLICKER_MS) * TAU + phase);
+    out.push({
+      x0: ax + (bx - ax) * edge,
+      y0: ay + (by - ay) * edge,
+      x1: bx - (bx - ax) * edge,
+      y1: by - (by - ay) * edge,
+      // Nunca chega a zero: um lado apagado abriria um buraco na marca, e a
+      // celula deixaria de ser lida.
+      heat: 0.45 + flicker * 0.55,
+    });
+  }
+  return out;
+};
+
 export type EliteMarkDraw = {
   /** Pe da criatura na tela (a mesma ancora da sombra de contato). */
   sx: number;
@@ -254,32 +334,37 @@ export const drawEliteGround = (ctx: CanvasRenderingContext2D, mark: EliteMarkDr
   ctx.fill();
   ctx.restore();
 
-  // O ANEL PARTIDO. Gira devagar — meia volta a cada dez segundos —, e a falha
-  // entre os arcos e o que impede a leitura de "circulo desenhado".
-  const spin = reducedMotion ? 0 : (nowMs / 10000) * TAU + hash01(seed) * TAU;
-  const step = TAU / ELITE_RING_ARCS;
-  const rx = size * ELITE_RING_RX;
-  const ry = size * ELITE_RING_RY;
+  // O HEXAGONO QUEIMADO. Ver `eliteHex`: seis riscos de brasa com as quinas
+  // abertas, cada um no seu proprio tremular.
   const glow = 0.46 + breath * 0.5;
   ctx.save();
   ctx.lineCap = 'round';
-  // Duas passadas: uma larga e fraca (o derrame da brasa no chao) e o fio
-  // aceso por cima. Sem a larga o anel e uma linha; com ela e luz.
-  for (const pass of [
-    { width: 4 * z, alpha: glow * 0.26, color: EMBER },
-    { width: 1.4 * z, alpha: glow, color: mixHex(EMBER, SPARK, breath * 0.6) },
-  ]) {
-    ctx.lineWidth = pass.width;
-    ctx.strokeStyle = hexAlpha(pass.color, pass.alpha);
-    for (let i = 0; i < ELITE_RING_ARCS; i++) {
-      // Cada arco tem um comprimento proprio, semeado: arcos iguais em volta do
-      // circulo voltam a ser um icone, so que pontilhado.
-      const span = step * ARC_FILL * (0.65 + hash01(seed + i * 977) * 0.7);
-      const from = spin + i * step;
+  for (const edge of eliteHex(size, nowMs, seed, reducedMotion)) {
+    // Duas passadas por lado: uma larga e fraca (o derrame da brasa no chao) e o
+    // fio aceso por cima. Sem a larga o risco e uma linha; com ela e luz.
+    for (const pass of [
+      { width: 4 * z, alpha: glow * edge.heat * 0.26, color: EMBER },
+      { width: 1.4 * z, alpha: glow * edge.heat, color: mixHex(EMBER, SPARK, breath * 0.6) },
+    ]) {
+      ctx.lineWidth = pass.width;
+      ctx.strokeStyle = hexAlpha(pass.color, pass.alpha);
       ctx.beginPath();
-      ctx.ellipse(sx, sy, rx, ry, 0, from, from + span);
+      ctx.moveTo(sx + edge.x0, sy + edge.y0);
+      ctx.lineTo(sx + edge.x1, sy + edge.y1);
       ctx.stroke();
     }
+  }
+  // AS SEIS QUINAS: o ponto de brasa onde dois riscos quase se encontram. E o
+  // que faz o olho fechar o hexagono sem que ele esteja desenhado fechado.
+  const corner = Math.max(1, Math.round(z * 0.9));
+  ctx.fillStyle = hexAlpha(mixHex(EMBER, SPARK, 0.3 + breath * 0.5), 0.5 + breath * 0.4);
+  for (const [cx, cy] of eliteHexCorners(size)) {
+    ctx.fillRect(
+      Math.round(sx + cx - corner / 2),
+      Math.round(sy + cy - corner / 2),
+      corner,
+      corner,
+    );
   }
   ctx.restore();
 
@@ -321,4 +406,57 @@ export const eliteRim = (nowMs: number, seed: number, reducedMotion: boolean): T
     color: mixHex(EMBER, SPARK, 0.15 + breath * 0.45),
     alpha: 0.42 + breath * 0.34,
   };
+};
+
+/**
+ * A MOLDURA DA BARRA DE VIDA do elite: quatro cantoneiras de brasa.
+ *
+ * Cantoneiras, e nao uma moldura fechada, por dois motivos. A barra tem cinco
+ * pixels de altura no zoom do jogo: um retangulo em volta dela dobraria a
+ * espessura da coisa toda e viraria o elemento mais pesado da tela por cima de
+ * um bicho. E uma moldura fechada em volta de uma barra ja fechada e ruido —
+ * duas bordas contando a mesma borda. As quatro quinas bastam para o olho ler
+ * "esta barra e diferente", que e todo o pedido.
+ *
+ * Sao os mesmos seis pontos de brasa das quinas do hexagono no chao, com quatro
+ * em vez de seis: a marca do chao e a da barra ficam sendo a mesma familia.
+ *
+ * Tudo em pixel inteiro: meia unidade aqui sai borrada e uma cantoneira borrada
+ * a cinco pixels de altura vira sujeira.
+ */
+export const drawEliteBarFrame = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  topY: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  seed: number,
+  reducedMotion: boolean,
+): void => {
+  const breath = eliteBreath(nowMs, seed, reducedMotion);
+  const thick = Math.max(1, Math.round(z * 0.5));
+  const gap = thick;
+  const x = Math.round(sx - size) - gap;
+  const y = Math.round(topY) - gap;
+  const w = Math.round(size * 2) + gap * 2;
+  const h = Math.round(2.4 * z) + gap * 2;
+  // O braco horizontal e curto e nao ha moldura fechada: as quatro quinas
+  // marcadas bastam, e o olho fecha o resto. Uma caixa inteira em volta de uma
+  // barra que ja tem borda propria seria a mesma borda desenhada duas vezes.
+  const arm = Math.max(3, Math.round(w * 0.14));
+  const stub = Math.max(thick, Math.round(h * 0.42));
+  ctx.save();
+  ctx.fillStyle = hexAlpha(mixHex(EMBER, SPARK, 0.25 + breath * 0.4), 0.45 + breath * 0.35);
+  for (const left of [true, false]) {
+    for (const top of [true, false]) {
+      const cx = left ? x : x + w - arm;
+      const cy = top ? y : y + h - thick;
+      // O braco deitado e a haste em pe saem da MESMA quina: e o "L" que faz a
+      // marca ler como cantoneira de placa, e nao como dois riscos soltos.
+      ctx.fillRect(cx, cy, arm, thick);
+      ctx.fillRect(left ? x : x + w - thick, top ? y : y + h - stub, thick, stub);
+    }
+  }
+  ctx.restore();
 };

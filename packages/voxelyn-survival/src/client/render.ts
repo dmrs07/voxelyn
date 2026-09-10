@@ -194,6 +194,7 @@ import { bossModuleNameKey, bossModulePresentation } from './boss-module-present
 import { DIAMANDIS_LINES, diamandisLineFor } from './audio/boss-voice-lines';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import {
+  drawEliteBarFrame,
   drawEliteFront,
   drawEliteGround,
   eliteRim,
@@ -4084,12 +4085,25 @@ export class SurvivalRenderer {
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
     };
-    const drawHealthBar = (sx: number, topY: number, size: number, hpFrac: number): void => {
+    const drawHealthBar = (
+      sx: number,
+      topY: number,
+      size: number,
+      hpFrac: number,
+      /**
+       * A marca do elite, quando o dono da barra e um. A moldura sai DEPOIS do
+       * preenchimento para as cantoneiras ficarem por cima da vida, e nao
+       * debaixo dela — uma cantoneira sumindo conforme o bicho apanha seria uma
+       * segunda leitura de dano competindo com a barra.
+       */
+      elite: EliteMarkDraw | null = null,
+    ): void => {
       if (hpFrac >= 1) return;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(sx - size, topY, size * 2, 2.4 * z);
       ctx.fillStyle = hpFrac > 0.4 ? PAL.fungusLight : PAL.blood;
       ctx.fillRect(sx - size, topY, size * 2 * hpFrac, 2.4 * z);
+      if (elite) drawEliteBarFrame(ctx, sx, topY, size, z, nowMs, elite.seed, elite.reducedMotion);
     };
 
     // Atlases na grade fina (ATLAS_SCALE): no zoom tipico de 2x o sprite e
@@ -5373,7 +5387,7 @@ export class SurvivalRenderer {
             !usesMonumentalBar(state, enemy) &&
             (!leviathanHead || leviathanTargetable(enemy, state.tick))
           ) {
-            drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+            drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp, eliteMark);
           }
         },
       });

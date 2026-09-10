@@ -7,21 +7,28 @@
 //    mais opaca da respiracao, e a brasa a mais fraca.
 // 2. TUDO CABE NO RASTRO DO PE. A marca promete a celula que a criatura ocupa;
 //    uma brasa fora do anel mentiria sobre onde o corpo esta.
-// 3. O CALOR SOBE. Toda brasa so anda para cima dentro de uma vida, e a vida
+// 3. O HEXAGONO E QUEIMADO, NAO DESENHADO: fica parado (girar seria runa de
+//    magia), cabe no rastro do pe, tem as quinas ABERTAS e nenhum lado apaga de
+//    vez — um lado apagado abriria um buraco e a celula deixaria de ser lida.
+// 4. O CALOR SOBE. Toda brasa so anda para cima dentro de uma vida, e a vida
 //    recomeca do chao — uma unica vez por ciclo.
-// 4. NINGUEM RESPIRA EM UNISSONO. Duas criaturas com IDs diferentes estao em
+// 5. NINGUEM RESPIRA EM UNISSONO. Duas criaturas com IDs diferentes estao em
 //    fases diferentes; a mesma criatura no mesmo instante desenha sempre a
 //    mesma marca (duas maquinas de uma sala de co-op veem o mesmo bicho).
-// 5. MOVIMENTO REDUZIDO PARA A MARCA, e nao a apaga: continua havendo elite na
+// 6. MOVIMENTO REDUZIDO PARA A MARCA, e nao a apaga: continua havendo elite na
 //    tela, so nao ha pulso.
 import { describe, expect, it } from 'vitest';
 import {
   ELITE_EMBERS,
+  ELITE_HEX_SIDES,
   ELITE_RING_RX,
+  ELITE_RING_RY,
   ELITE_TINT_CHAR,
   ELITE_TINT_EMBER,
   eliteBreath,
   eliteEmbers,
+  eliteHex,
+  eliteHexCorners,
   eliteRim,
   eliteTint,
 } from './elite-mark';
@@ -92,6 +99,58 @@ describe('o contorno aceso', () => {
     expect(forte.alpha).toBeLessThan(1);
     // Mais aceso e tambem mais claro: e a mesma brasa subindo, nao duas cores.
     expect(luma(forte.color)).toBeGreaterThan(luma(fraco.color));
+  });
+});
+
+describe('o hexagono queimado', () => {
+  it('tem seis lados e cabe no rastro do pe', () => {
+    const edges = eliteHex(SIZE, 900, 4, false);
+    expect(edges).toHaveLength(ELITE_HEX_SIDES);
+    for (const e of edges) {
+      for (const [x, y] of [
+        [e.x0, e.y0],
+        [e.x1, e.y1],
+      ]) {
+        // Dentro da elipse do rastro, com folga de arredondamento.
+        const r = (x / (SIZE * ELITE_RING_RX)) ** 2 + (y / (SIZE * ELITE_RING_RY)) ** 2;
+        expect(r).toBeLessThanOrEqual(1.001);
+      }
+    }
+  });
+
+  it('as quinas ficam ABERTAS: nenhum lado encosta na quina', () => {
+    const corners = eliteHexCorners(SIZE);
+    expect(corners).toHaveLength(ELITE_HEX_SIDES);
+    for (const e of eliteHex(SIZE, 900, 4, false)) {
+      const perto = corners.some(
+        ([cx, cy]) =>
+          Math.hypot(cx - e.x0, cy - e.y0) < 0.5 || Math.hypot(cx - e.x1, cy - e.y1) < 0.5,
+      );
+      expect(perto).toBe(false);
+    }
+  });
+
+  it('nao gira: so o calor muda com o tempo', () => {
+    const a = eliteHex(SIZE, 0, 4, false);
+    const b = eliteHex(SIZE, 1234, 4, false);
+    a.forEach((e, i) => {
+      expect([e.x0, e.y0, e.x1, e.y1]).toEqual([b[i].x0, b[i].y0, b[i].x1, b[i].y1]);
+    });
+    expect(a.map((e) => e.heat)).not.toEqual(b.map((e) => e.heat));
+  });
+
+  it('nenhum lado apaga de vez, e nem todos acendem juntos', () => {
+    const heats: number[][] = [];
+    for (let t = 0; t < 3000; t += 60) heats.push(eliteHex(SIZE, t, 4, false).map((e) => e.heat));
+    for (const linha of heats) for (const h of linha) expect(h).toBeGreaterThan(0.4);
+    for (const linha of heats) for (const h of linha) expect(h).toBeLessThanOrEqual(1.0001);
+    // Em algum instante ha lados claramente em fases diferentes.
+    const espalhamento = heats.map((l) => Math.max(...l) - Math.min(...l));
+    expect(Math.max(...espalhamento)).toBeGreaterThan(0.3);
+  });
+
+  it('com movimento reduzido o calor congela', () => {
+    expect(eliteHex(SIZE, 0, 4, true)).toEqual(eliteHex(SIZE, 9999, 4, true));
   });
 });
 
