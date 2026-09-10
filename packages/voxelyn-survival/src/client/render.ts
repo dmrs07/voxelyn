@@ -1,6 +1,12 @@
-import { drawAbilityGlyph } from './ability-icons';
+import {
+  AbilityMorphTracker,
+  drawAbilityActiveRing,
+  drawAbilityGlyph,
+  drawAbilityMorph,
+} from './ability-icons';
 import { drawArcChain, ARC_FLASH_MS } from './arc-chain';
 import {
+  SLIPSTREAM_TICKS,
   SOLID_SUTURE_ANCHOR,
   SOLID_SUTURE_CRACKED,
   SOLID_STITCHED_ROCK,
@@ -1999,6 +2005,8 @@ export class SurvivalRenderer {
    */
   private readonly plungedThisTick = new Set<number>();
   private readonly touchIcons = new TouchIconBank();
+  /** O re-eco do botao de habilidade no toque. */
+  private readonly abilityMorph = new AbilityMorphTracker();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
   private readonly modulePulseUntil = new Map<ModuleId, number>();
@@ -9245,17 +9253,40 @@ export class SurvivalRenderer {
         ctx.stroke();
 
         const iconColor = b.pressed ? PAL.loot : 'rgba(232,241,255,0.9)';
-        const drewIcon =
-          b.id === 'ability'
-            ? drawAbilityGlyph(
+        let drewIcon: boolean;
+        if (b.id === 'ability') {
+          const ability = state.playerExtra.ability;
+          const color = abilityPresentation(ability).color;
+          // O RE-ECO: a troca no poco contada em ~0,7 s em vez de um corte.
+          const morph = this.abilityMorph.observe(state, ability, nowMs);
+          drewIcon = morph
+            ? drawAbilityMorph(
                 ctx,
-                state.playerExtra.ability,
+                morph.from,
+                morph.to,
+                morph.t,
                 b.cx,
                 b.cy,
                 b.r * 1.2,
-                abilityPresentation(state.playerExtra.ability).color,
+                abilityPresentation(morph.from).color,
+                color,
               )
-            : this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
+            : drawAbilityGlyph(ctx, ability, b.cx, b.cy, b.r * 1.2, color);
+          // A Disparada correndo: o anel esvazia com o relogio.
+          if (state.playerExtra.sprintUntil > state.tick) {
+            drawAbilityActiveRing(
+              ctx,
+              b.cx,
+              b.cy,
+              b.r + 3,
+              color,
+              (state.playerExtra.sprintUntil - state.tick) / SLIPSTREAM_TICKS,
+              nowMs,
+            );
+          }
+        } else {
+          drewIcon = this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
+        }
         if (!drewIcon) {
           ctx.fillStyle = iconColor;
           ctx.beginPath();

@@ -12,7 +12,6 @@ import {
   FLAMETHROWER_EMISSION_DAMAGE,
   FLAMETHROWER_EMIT_INTERVAL_TICKS,
   FLAMETHROWER_GUARD_TICKS,
-  DODGE_SPEED,
   type EchoUnlock,
   type SurvivalState,
   type AbilityId,
@@ -148,8 +147,8 @@ export const abilityDetails = (
         tuning.playerDamageScale,
     ),
     guard: number(FLAMETHROWER_GUARD_TICKS / TICK_HZ),
-    dash: number((shape.slipstream.ticks * DODGE_SPEED) / TICK_HZ),
-    dashTime: number(shape.slipstream.ticks / TICK_HZ),
+    sprintBoost: Math.round((shape.slipstream.speed - 1) * 100),
+    sprintTime: number(shape.slipstream.ticks / TICK_HZ),
     stun: number(shape.seismic.stun / TICK_HZ),
   };
   return {

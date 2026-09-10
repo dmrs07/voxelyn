@@ -899,11 +899,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'ability.seismic.origin': 'The Vein recorded your impacts and dispersals.',
   'ability.seismic.effect':
     'Deals {damage} damage, pushes and stuns for {stun} s within {radius} m. Walls block the wave.',
-  'ability.slipstream.label': 'SLIPSTREAM',
-  'ability.slipstream.hint': 'Cross an attack line by aiming at your exit.',
+  'ability.slipstream.label': 'SPRINT',
+  'ability.slipstream.hint':
+    'Direction follows the move stick: run for the exit or the target. Deep water will not hold you.',
   'ability.slipstream.origin': 'The Vein recorded your dodges.',
   'ability.slipstream.effect':
-    'Dash up to {dash} m toward your aim, with {dashTime} s of invulnerability while moving. Stops at walls.',
+    '+{sprintBoost}% movement speed for {sprintTime} s. Runs over deep water and ignores pool and sheet drag. No damage protection.',
   'ability.vent.label': 'EMERGENCY VENT',
   'ability.vent.hint': 'Cool the weapon and clear space to fire again.',
   'ability.vent.origin': 'The Vein recorded your purge-cell use.',

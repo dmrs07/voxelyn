@@ -935,14 +935,15 @@ export const PT_BR = {
   'ability.seismic.effect':
     'Causa {damage} de dano, empurra e atordoa por {stun} s em {radius} m. Paredes bloqueiam a onda.',
 
-  'ability.slipstream.label': 'PASSO DE FUGA',
+  'ability.slipstream.label': 'DISPARADA',
 
-  'ability.slipstream.hint': 'Atravesse uma linha de ataque mirando a sua saída.',
+  'ability.slipstream.hint':
+    'A direção é a do direcional: corra para a saída ou para o alvo. Água funda não segura você.',
 
   'ability.slipstream.origin': 'O Veio registrou suas esquivas.',
 
   'ability.slipstream.effect':
-    'Arrancada de até {dash} m na direção da mira, com {dashTime} s de invulnerabilidade em movimento. Para em paredes.',
+    '+{sprintBoost}% de velocidade por {sprintTime} s. Atravessa água profunda e ignora o freio de poças e lâminas. Não protege de dano.',
 
   'ability.vent.label': 'RESPIRO DE EMERGÊNCIA',
 

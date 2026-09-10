@@ -1385,6 +1385,13 @@ export type PlayerExtra = {
   channelingUntil: number;
   /** Ground-fire protection during Thermal Breath and its exit window. */
   thermalGuardUntil: number;
+  /**
+   * Ate quando a DISPARADA corre: +70% de passo na direcao do direcional,
+   * travessia de agua profunda, freio de liquido ignorado. Zero fora dela.
+   * Entra no hash — duas simulacoes que discordam do relogio divergem no
+   * primeiro passo. Viaja no viewer para o HUD online acender o botao.
+   */
+  sprintUntil: number;
   dodgeUntil: number;
   iframesUntil: number;
   /**

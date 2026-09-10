@@ -471,6 +471,7 @@ export class GameRoom {
       abilityCooldownUntil: e.abilityCooldownUntil,
       channelingUntil: e.channelingUntil,
       thermalGuardUntil: e.thermalGuardUntil,
+      sprintUntil: e.sprintUntil,
       ability: e.ability,
       freeze: e.freeze,
       frostbitten: e.frostbitten,

@@ -183,6 +183,8 @@ export type ViewerState = {
    */
   channelingUntil: number;
   thermalGuardUntil: number;
+  /** Ate quando a Disparada corre; 0 fora dela. O HUD acende o botao com ele. */
+  sprintUntil: number;
   /**
    * A habilidade EQUIPADA. Os timers acima nao bastam: a duracao do radial e a
    * projecao do canal saem do cooldown DESTA habilidade, e o espelho local do
