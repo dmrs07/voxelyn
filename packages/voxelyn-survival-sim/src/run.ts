@@ -9,6 +9,7 @@ import {
   CONDUCTIVE_STUN_TICKS,
   FIRE_FUEL_TICKS,
   FLAMETHROWER_CHANNEL_TICKS,
+  FLAMETHROWER_GUARD_TICKS,
   FLAMETHROWER_EMISSION_DAMAGE,
   FLAMETHROWER_EMIT_INTERVAL_TICKS,
   FLAMETHROWER_LOS_STEP,
@@ -103,6 +104,8 @@ import { emptyBossRuntime } from './bosses.js';
 import { clearFreeze, frostbiteBreaks, meltFreezeByHeat, stepFreezeDecay } from './frost.js';
 import {
   ABILITY_SHAPE,
+  canChooseEcho,
+  echoUnlock,
   STARTING_ABILITY,
   abilityDefinition,
   emptyResonance,
@@ -302,6 +305,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   overheatedUntil: 0,
   nextShotAt: 0,
   channelingUntil: 0,
+  thermalGuardUntil: 0,
   dodgeUntil: 0,
   iframesUntil: 0,
   cocoonUntil: 0,
@@ -344,6 +348,7 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.overheatedUntil = 0;
   extra.nextShotAt = 0;
   extra.channelingUntil = 0;
+  extra.thermalGuardUntil = 0;
   extra.dodgeUntil = 0;
   extra.iframesUntil = 0;
   extra.cocoonUntil = 0;
@@ -823,6 +828,8 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
       continue;
     const surf = state.surface[cellIndexAt(state, ent.x, ent.y)];
     if (surf === SURF_FIRE) {
+      if (ent.kind === 'player' && state.playerExtras[ent.slot ?? 0].thermalGuardUntil > state.tick)
+        continue;
       damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events, { kind: 'fire' }, true);
     } else if (surf === SURF_GAS && ent.kind === 'player') {
       // Gas sulfuroso e toxico; criaturas do Veio sao imunes ao proprio ambiente.
@@ -1035,6 +1042,58 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
       // e isso que faz o sopro seguir o stick durante a habilidade em vez de
       // congelar a mira do instante do cast.
       extra.channelingUntil = state.tick + FLAMETHROWER_CHANNEL_TICKS;
+      extra.thermalGuardUntil = extra.channelingUntil + FLAMETHROWER_GUARD_TICKS;
+      return;
+    }
+
+    case 'seismic': {
+      const { radius, damage, stun } = ABILITY_SHAPE.seismic;
+      events.push({ t: 'pulse', x: player.x, y: player.y, radius, ability: 'seismic' });
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const ox = enemy.x - player.x,
+          oy = enemy.y - player.y;
+        const distance = Math.hypot(ox, oy);
+        if (distance > radius || !flameCanReach(state, player.x, player.y, enemy.x, enemy.y))
+          continue;
+        damageEntity(state, enemy, playerDamage(tuning, damage), events);
+        stunEntity(state, enemy, stun);
+        if (distance > 0.001) {
+          enemy.vx += (ox / distance) * 12;
+          enemy.vy += (oy / distance) * 12;
+        }
+      }
+      return;
+    }
+    case 'slipstream': {
+      // Reuses the swept movement/collision and dodge pose; never teleports through walls.
+      extra.dodgeDir = { x: dx, y: dy };
+      extra.dodgeUntil = state.tick + ABILITY_SHAPE.slipstream.ticks + 1;
+      extra.iframesUntil = Math.max(extra.iframesUntil, extra.dodgeUntil);
+      extra.dodgeCooldownUntil = Math.max(extra.dodgeCooldownUntil, extra.dodgeUntil);
+      events.push({ t: 'dodge', x: player.x, y: player.y });
+      return;
+    }
+    case 'vent': {
+      const { radius } = ABILITY_SHAPE.vent;
+      extra.heat = 0;
+      extra.overheatedUntil = state.tick;
+      const w = state.config.width,
+        r = Math.ceil(radius);
+      for (let y = Math.floor(player.y) - r; y <= Math.floor(player.y) + r; y++) {
+        for (let x = Math.floor(player.x) - r; x <= Math.floor(player.x) + r; x++) {
+          if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+          if (
+            Math.hypot(x + 0.5 - player.x, y + 0.5 - player.y) > radius ||
+            !flameCanReach(state, player.x, player.y, x + 0.5, y + 0.5)
+          )
+            continue;
+          const i = y * w + x;
+          if ([SURF_FIRE, SURF_GAS, SURF_SPORES].includes(state.surface[i]))
+            setSurface(state, i, SURF_NONE, 0);
+        }
+      }
+      events.push({ t: 'pulse', x: player.x, y: player.y, radius, ability: 'vent' });
       return;
     }
 
@@ -1123,6 +1182,7 @@ const settleBreathChannel = (state: SurvivalState, slot: number, events: Semanti
     events.push({ t: 'action_end', entity: state.players[slot].id });
   }
   extra.channelingUntil = 0;
+  extra.thermalGuardUntil = state.tick + FLAMETHROWER_GUARD_TICKS;
   extra.abilityCooldownUntil =
     state.tick +
     Math.round(
@@ -1237,9 +1297,7 @@ const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEve
     reach,
   });
 
-  // Dano e chao sao resolvidos pela MESMA varredura de celulas: o cone acende
-  // o que atravessa, e o fogo que fica e o que continua matando depois. Sem
-  // isso o lanca-chamas seria um tiro largo com nome bonito.
+  // The jet damages creatures; only combustible material sustains ground fire.
   const w = state.config.width;
   const h = state.config.height;
   const r = Math.ceil(range);
@@ -1268,16 +1326,20 @@ const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEve
       // longo em vez do flash curto, e nem o evento de ignicao nem a
       // descoberta aconteciam. Uma habilidade nova que ensina outra fisica
       // para o mesmo material e pior do que uma habilidade que falta.
-      const ignited = igniteCell(state, i, events);
-      if (!ignited) {
-        // Chao nu nao tem o que "pegar" fogo: ali a chama do sopro fica por
-        // conta propria. Qualquer superficie com materia pertence a
-        // `igniteCell`, inclusive quando ela decide nao acender nada.
-        const bare = state.surface[i];
-        if (bare === SURF_NONE || bare === SURF_SCORCHED || bare === SURF_FIRE) {
-          setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
-        }
-      }
+      // Heat actual combustible matter. Empty/scorched ground has no fuel;
+      // painting long-lived fire there made walking with the breath self-destructive.
+      // Never ignite a cell occupied by a teammate directly under their feet.
+      if (
+        state.players.some(
+          (p, slot) =>
+            p.alive &&
+            state.playerExtras[slot].joined &&
+            Math.floor(p.x) === x &&
+            Math.floor(p.y) === y,
+        )
+      )
+        continue;
+      igniteCell(state, i, events);
       // Credita pelo RESULTADO, e so quando ele MUDOU nesta emissao: o canal
       // repassa as mesmas celulas dezenas de vezes, e creditar chama ja acesa a
       // cada emissao inflaria a ressonancia de fogo por repeticao, nao por
@@ -1299,6 +1361,37 @@ const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEve
     damageEntity(state, enemy, playerDamage(tuning, FLAMETHROWER_EMISSION_DAMAGE), events);
     recordResonance(extra.resonance, 'fire');
   }
+};
+
+/** Acceptance from cards and physical echoes has one mutation path. */
+const takeWellOffer = (
+  state: SurvivalState,
+  slot: number,
+  index: 0 | 1 | null,
+  events: SemanticEvent[],
+): void => {
+  const extra = state.playerExtras[slot];
+  const offer = index === null ? null : state.wellOffers[index];
+  if (index !== null && (!offer || offer.takenBy !== null)) return;
+  if (offer && offer.ability !== extra.ability) {
+    extra.ability = offer.ability;
+    extra.abilityCooldownUntil = state.tick;
+    if (extra.channelingUntil > state.tick)
+      events.push({ t: 'action_end', entity: state.players[slot].id });
+    extra.channelingUntil = 0;
+    // A troca CANCELA o canal, mas nao a janela de saida: quem trocou de Eco
+    // em cima do fungo que acabou de acender ganha os mesmos 1,5 s que uma
+    // interrupcao por stun daria (`settleBreathChannel`). Zerar aqui cobrava
+    // dano de chao no MESMO tick da troca. `min` e nao atribuicao: um canal
+    // vivo encurta para a janela; uma janela ja correndo nao se estende; sem
+    // sopro nenhum o valor continua o que era.
+    extra.thermalGuardUntil = Math.min(
+      extra.thermalGuardUntil,
+      state.tick + FLAMETHROWER_GUARD_TICKS,
+    );
+    events.push({ t: 'ability_taken', slot, ability: offer.ability, x: offer.x, y: offer.y });
+  }
+  for (const other of state.wellOffers) if (other.takenBy === null) other.takenBy = slot;
 };
 
 /**
@@ -1352,7 +1445,8 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   // so um buraco. Quem chegou sem provocar reacao nenhuma recebe uma
   // demonstracao sorteada pela seed (deterministica: mesmo Eco para as duas
   // maquinas da sala e para o replay).
-  if (offers.length === 0 && state.sector === 1) {
+  const fallback = offers.length === 0 && state.sector === 1;
+  if (fallback) {
     offers = [fallbackOffer(state.playerExtras[nearest].ability, state.config.seed, state.sector)];
   }
   if (offers.length === 0) return;
@@ -1363,6 +1457,7 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
     const side = index === 0 ? -1 : 1;
     return {
       ability,
+      unlock: echoUnlock(ability, state.playerExtras[nearest!].resonance, nearest!, fallback),
       x: wellX + side * WELL_OFFER_SPREAD,
       y: wellY + side * WELL_OFFER_SPREAD * 0.5,
       takenBy: null,
@@ -1867,7 +1962,7 @@ const stepPlayer = (
   stepFreezeDecay(state, slot);
 
   // Escolha privada do slot: idempotente e nao pausa movimento/simulacao.
-  if (cmd.choose !== null && extra.pendingModuleChoice) {
+  if (cmd.choiceKind !== 'echo' && cmd.choose !== null && extra.pendingModuleChoice) {
     const pending = extra.pendingModuleChoice;
     const picked = pending.options[cmd.choose];
     const recharged = Boolean(activeModule(extra, picked));
@@ -1891,6 +1986,12 @@ const stepPlayer = (
   if (extra.frostbitten) {
     stepFrostbitten(state, slot, cmd, events);
     return;
+  }
+
+  if (cmd.choiceKind === 'echo' && canChooseEcho(state, slot)) {
+    takeWellOffer(state, slot, cmd.choose, events);
+    // A card click cannot also fire, cast, spend a purge or descend this tick.
+    cmd = { ...cmd, fire: false, ability: false, interact: false, purge: false };
   }
 
   // mira e rumo visual. `extra.aim` e a MIRA (bolts e sopro saem por ela);
@@ -1924,6 +2025,7 @@ const stepPlayer = (
     extra.iframesUntil = state.tick + tuning.dodgeIframeTicks;
     extra.dodgeCooldownUntil = state.tick + tuning.dodgeCooldownTicks;
     events.push({ t: 'dodge', x: player.x, y: player.y });
+    recordResonance(extra.resonance, 'evasion');
   }
 
   // movimento. `vx/vy` guarda deslocamento REAL para a mira preditiva do
@@ -2158,6 +2260,7 @@ const stepPlayer = (
   // docs/audit/2026-08-31-contaminacao-em-aberto.md §1.
   if (cmd.purge && extra.purgeCells > 0) {
     extra.purgeCells--;
+    recordResonance(extra.resonance, 'purge');
     player.hp = Math.min(player.maxHp, player.hp + PURGE_CELL_HEAL);
     const w = state.config.width;
     const px = Math.floor(player.x);
@@ -2203,27 +2306,7 @@ const stepPlayer = (
     for (const offer of state.wellOffers) {
       if (offer.takenBy !== null) continue;
       if (Math.hypot(player.x - offer.x, player.y - offer.y) > WELL_OFFER_REACH) continue;
-      offer.takenBy = slot;
-      extra.ability = offer.ability;
-      // O cooldown zera na troca. Herdar o cooldown da habilidade antiga puniria
-      // justamente quem acabou de usar a que tinha para chegar vivo ate aqui.
-      extra.abilityCooldownUntil = state.tick;
-      // Um canal de sopro em andamento morre junto com a habilidade antiga:
-      // continuar cuspindo chama de uma habilidade que o slot nao tem mais
-      // deixaria o bolt travado por um estado orfao. Descartado DIRETO, sem
-      // `settleBreathChannel`: a troca zera o cooldown por design, e cobrar
-      // para zerar na linha de cima seria contradicao morta. O cliente ainda
-      // recebe o `action_end` — a pose prometida pelo cast morre junto.
-      if (extra.channelingUntil > state.tick) {
-        events.push({ t: 'action_end', entity: player.id });
-      }
-      extra.channelingUntil = 0;
-      // As outras ofertas somem: a escolha e UMA, e um Eco que continua ali
-      // depois de voce escolher convida a voltar e trocar de novo.
-      for (const other of state.wellOffers) {
-        if (other.takenBy === null) other.takenBy = slot;
-      }
-      events.push({ t: 'ability_taken', slot, ability: offer.ability, x: offer.x, y: offer.y });
+      takeWellOffer(state, slot, state.wellOffers.indexOf(offer) as 0 | 1, events);
       return;
     }
 
@@ -3593,6 +3676,10 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.wellOffers.length);
   for (const offer of state.wellOffers) {
     mixString(offer.ability);
+    mixString(offer.unlock.kind);
+    mix(offer.unlock.amount);
+    mix(offer.unlock.required);
+    mix(offer.unlock.slot);
     mix(Math.round(offer.x * 1000));
     mix(Math.round(offer.y * 1000));
     mix(offer.takenBy === null ? -1 : offer.takenBy);
@@ -3620,6 +3707,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(p.facing.x * 1000));
     mix(Math.round(p.facing.y * 1000));
     mix(e.channelingUntil);
+    mix(e.thermalGuardUntil);
     // O casulo e os fios da rede: imunidade e passo sao autoritativos.
     mix(e.cocoonUntil);
     mix(e.webbedUntil);
@@ -3632,6 +3720,8 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(e.resonance.current);
     mix(e.resonance.blast);
     mix(e.resonance.kinetic);
+    mix(e.resonance.evasion);
+    mix(e.resonance.purge);
     // O CANHAO ROTATIVO entra no hash inteiro: rotacao, acumulador e fase.
     //
     // Os tres decidem QUANDO a proxima bala sai. Duas simulacoes que discordem

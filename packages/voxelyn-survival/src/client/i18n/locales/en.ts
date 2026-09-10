@@ -804,7 +804,6 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'toast.purge.used': 'PURGE — SYSTEMS RESTORED +{amount}',
   'toast.scan.complete': 'SCAN COMPLETE — CACHE REVEALED',
   'toast.overheat': 'OVERHEAT!',
-  'toast.well.resonance': 'THE VEIN RESONATES — TWO ECHOES DEMONSTRATE',
   'toast.sector.entered': 'SECTOR {sector} — {biome}',
 
   // Messages emitted by the simulation (they arrive as a key, never as text)
@@ -887,13 +886,58 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // Abilities and resonance
   // ---------------------------------------------------------------------
+  'ability.pulse.effect':
+    'Pushes enemies and disperses fire, gas and spores within {radius} m. Deals no damage.',
+  'ability.flamethrower.effect':
+    'A {duration} s jet reaching {range} m, up to {totalDamage} direct damage per target. Protects from ground fire during the jet + {guard} s. Gas and explosions remain dangerous.',
+  'ability.seeker.effect':
+    'Guided drone with {damage} damage and an explosion on impact. Turns slowly and can miss.',
+  'ability.arc.effect':
+    '{damage} damage per target, up to {targets} enemies. Each hop reaches {range} m. Stuns conductive creatures; no pools needed.',
+  'ability.seismic.label': 'SEISMIC WAVE',
+  'ability.seismic.hint': 'Make space when a swarm blocks your way.',
+  'ability.seismic.origin': 'The Vein recorded your impacts and dispersals.',
+  'ability.seismic.effect':
+    'Deals {damage} damage, pushes and stuns for {stun} s within {radius} m. Walls block the wave.',
+  'ability.slipstream.label': 'SLIPSTREAM',
+  'ability.slipstream.hint': 'Cross an attack line by aiming at your exit.',
+  'ability.slipstream.origin': 'The Vein recorded your dodges.',
+  'ability.slipstream.effect':
+    'Dash up to {dash} m toward your aim, with {dashTime} s of invulnerability while moving. Stops at walls.',
+  'ability.vent.label': 'EMERGENCY VENT',
+  'ability.vent.hint': 'Cool the weapon and clear space to fire again.',
+  'ability.vent.origin': 'The Vein recorded your purge-cell use.',
+  'ability.vent.effect':
+    'Removes heat, unlocks an overheated weapon and disperses fire, gas and spores within {radius} m. No healing or global contamination reduction.',
+  'ability.cooldown': 'Cooldown · {seconds} s',
+  'ability.cooldown.after': 'Cooldown · {seconds} s after the jet',
+  'ability.unlock.fire': '{count} combustion records this sector. Required: {required}.',
+  'ability.unlock.current': '{count} current records this sector. Required: {required}.',
+  'ability.unlock.blast': '{count} detonations caused this sector. Required: {required}.',
+  'ability.unlock.kinetic':
+    '{count} pulse impacts or dispersals this sector. Required: {required}.',
+  'ability.unlock.evasion': '{count} dodges performed this sector. Required: {required}.',
+  'ability.unlock.purge': '{count} purge cells used this sector. Required: {required}.',
+  'ability.unlock.first': 'Guaranteed first-descent demonstration. No previous actions required.',
+  'ability.choice.title': 'ATTUNE AN ECHO',
+  'ability.choice.subtitle':
+    'The well resonates with what you did this sector. Attuning an echo swaps your primary ability; descending without choosing keeps the current one.',
+  'ability.choice.why': 'WHY IT UNLOCKED',
+  'ability.choice.select': '[ {key} ] ATTUNE',
+  'ability.choice.keep': 'Keep {ability}',
+  'ability.choice.current': 'EQUIPPED · {ability}',
+  'ability.choice.shared': 'P{slot} record · shared team choice',
+  'ability.choice.live': 'The world keeps moving. Leave the well to close.',
+  'ability.choice.sector': 'RESONANCE / SECTOR {sector}',
+  'resonance.evasion': 'EVASION',
+  'resonance.purge': 'PURGE',
   'ability.pulse.label': 'KINETIC PULSE',
   'ability.pulse.hint':
     'Shoves and scatters clouds. It is the way out when something is already on you.',
   'ability.pulse.origin': 'Standard prospecting equipment.',
   'ability.flamethrower.label': 'THERMAL BREATH',
   'ability.flamethrower.hint':
-    'The flame STAYS on the ground. Worth it in a corridor, a trap on your way back.',
+    'Sweep a corridor without setting empty ground on fire. Combustible material still burns.',
   'ability.flamethrower.origin': 'The Vein heard you dry and burn what you found.',
   'ability.seeker.label': 'SEEKER DRONE',
   'ability.seeker.hint':

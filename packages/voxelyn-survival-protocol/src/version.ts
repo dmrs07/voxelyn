@@ -247,7 +247,8 @@
 //     aceita `net`. Um cliente de 38 desenharia o Prospector solto enquanto o
 //     servidor recusa os comandos dele. `EnemyArchetype` aceita
 //     `silk_spiderling` (a aranhinha da rocha suturada).
-export const PROTOCOL_VERSION = 39;
+// 40: echo evidence and thermal guard in snapshots; bit 7 tags echo choices in command logs.
+export const PROTOCOL_VERSION = 40;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1056,7 +1057,8 @@ export const PROTOCOL_VERSION = 39;
 //     a seda no topo das faixas (toda seed suturada de antes continua
 //     suturada). Antes: 30/15/12. Muda o bioma de parte das seeds e, com
 //     ele, o terreno: replays de 76 geram outro mapa.
-export const SIMULATION_VERSION = 77;
+// 78: safe thermal breath, three action-unlocked echoes, authoritative card acceptance.
+export const SIMULATION_VERSION = 78;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1263,7 +1265,8 @@ export const SIMULATION_VERSION = 77;
 //     de props (teias, casulo que se mexe, casa de aranha, ninhada, fios do
 //     teto — nove quadros, nas vagas da ultima linha) e o atlas
 //     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
-export const CONTENT_VERSION = 40;
+// 41: seismic, slipstream and vent echoes; expanded per-sector resonance.
+export const CONTENT_VERSION = 41;
 
 export type VersionTriple = {
   protocolVersion: number;

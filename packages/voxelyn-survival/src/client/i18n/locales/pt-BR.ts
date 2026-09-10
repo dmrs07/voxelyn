@@ -834,7 +834,6 @@ export const PT_BR = {
   'toast.purge.used': 'PURGA — SISTEMAS RESTABELECIDOS +{amount}',
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
   'toast.overheat': 'SUPERAQUECIMENTO!',
-  'toast.well.resonance': 'O VEIO RESSOA — DOIS ECOS DEMONSTRAM',
   'toast.sector.entered': 'SETOR {sector} — {biome}',
 
   // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
@@ -915,6 +914,87 @@ export const PT_BR = {
   'module.lifetime.charges': '{count} {proc}',
   'module.lifetime.duration': '{seconds}s',
 
+  'ability.pulse.effect':
+    'Empurra inimigos e dissipa fogo, gás e esporos em {radius} m. Não causa dano.',
+
+  'ability.flamethrower.effect':
+    'Jato de {duration} s, alcance {range} m e até {totalDamage} de dano direto por alvo. Protege do fogo no piso durante o jato + {guard} s. Gás e explosões continuam perigosos.',
+
+  'ability.seeker.effect':
+    'Drone guiado com {damage} de dano e explosão no impacto. Curva lentamente e pode errar.',
+
+  'ability.arc.effect':
+    '{damage} de dano por alvo, até {targets} inimigos. Cada salto alcança {range} m. Atordoa criaturas condutivas; dispensa poças.',
+
+  'ability.seismic.label': 'ONDA SÍSMICA',
+
+  'ability.seismic.hint': 'Abra espaço quando o enxame fechar a passagem.',
+
+  'ability.seismic.origin': 'O Veio registrou seus impactos e dissipações.',
+
+  'ability.seismic.effect':
+    'Causa {damage} de dano, empurra e atordoa por {stun} s em {radius} m. Paredes bloqueiam a onda.',
+
+  'ability.slipstream.label': 'PASSO DE FUGA',
+
+  'ability.slipstream.hint': 'Atravesse uma linha de ataque mirando a sua saída.',
+
+  'ability.slipstream.origin': 'O Veio registrou suas esquivas.',
+
+  'ability.slipstream.effect':
+    'Arrancada de até {dash} m na direção da mira, com {dashTime} s de invulnerabilidade em movimento. Para em paredes.',
+
+  'ability.vent.label': 'RESPIRO DE EMERGÊNCIA',
+
+  'ability.vent.hint': 'Resfrie a arma e limpe espaço para voltar a atirar.',
+
+  'ability.vent.origin': 'O Veio registrou o uso de suas células de purga.',
+
+  'ability.vent.effect':
+    'Zera o calor, libera a arma superaquecida e dissipa fogo, gás e esporos em {radius} m. Não cura nem reduz a contaminação global.',
+
+  'ability.cooldown': 'Recarga · {seconds} s',
+
+  'ability.cooldown.after': 'Recarga · {seconds} s após o jato',
+
+  'ability.unlock.fire': '{count} registros de combustão neste setor. Necessário: {required}.',
+
+  'ability.unlock.current': '{count} registros de corrente neste setor. Necessário: {required}.',
+
+  'ability.unlock.blast': '{count} detonações provocadas neste setor. Necessário: {required}.',
+
+  'ability.unlock.kinetic':
+    '{count} impactos ou dissipações com o pulso neste setor. Necessário: {required}.',
+
+  'ability.unlock.evasion': '{count} esquivas realizadas neste setor. Necessário: {required}.',
+
+  'ability.unlock.purge': '{count} células de purga usadas neste setor. Necessário: {required}.',
+
+  'ability.unlock.first': 'Demonstração garantida da primeira descida. Não exige ações anteriores.',
+
+  'ability.choice.title': 'SINTONIZE UM ECO',
+
+  'ability.choice.subtitle':
+    'O poço ressoa com o que você fez neste setor. Sintonizar um Eco troca a sua habilidade primária; descer sem escolher mantém a atual.',
+
+  'ability.choice.why': 'POR QUE DESBLOQUEOU',
+
+  'ability.choice.select': '[ {key} ] SINTONIZAR',
+
+  'ability.choice.keep': 'Manter {ability}',
+
+  'ability.choice.current': 'EQUIPADO · {ability}',
+
+  'ability.choice.shared': 'Registro de P{slot} · escolha compartilhada pela equipe',
+
+  'ability.choice.live': 'O mundo continua. Afaste-se do poço para fechar.',
+
+  'ability.choice.sector': 'RESSONÂNCIA / SETOR {sector}',
+
+  'resonance.evasion': 'ESQUIVA',
+
+  'resonance.purge': 'PURGA',
+
   // ---------------------------------------------------------------------
   // Habilidades e ressonância
   // ---------------------------------------------------------------------
@@ -923,7 +1003,7 @@ export const PT_BR = {
   'ability.pulse.origin': 'Equipamento padrão de prospecção.',
   'ability.flamethrower.label': 'SOPRO TÉRMICO',
   'ability.flamethrower.hint':
-    'A chama FICA no chão. Vale em corredor, e vira armadilha no seu recuo.',
+    'Varra um corredor sem deixar fogo em piso vazio. Materiais combustíveis ainda queimam.',
   'ability.flamethrower.origin': 'O Veio ouviu você secar e queimar o que encontrou.',
   'ability.seeker.label': 'DRONE RASTREADOR',
   'ability.seeker.hint':
