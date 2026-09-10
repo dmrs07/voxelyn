@@ -479,13 +479,19 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     }
 
     case 'boss_state': {
-      // A polaridade do Magnetarca e duas vozes: o rele invertendo e a
-      // polaridade que entrou — e as duas sao globais, porque a resposta
-      // certa depende de saber qual vale sem olhar para nada.
+      // A polaridade do Magnetarca e duas vozes em dois INSTANTES, e desde o
+      // telegrafo elas deixaram de sair juntas: o rele (`magnetarchFlip`) soa
+      // quando a folga ABRE — e o aviso, o unico som que chega antes do dano —
+      // e a voz da polaridade soa quando ela FECHA e a nova entra em vigor.
+      // Empilhar as duas no mesmo tick, como era, dava ao aviso o timing do
+      // fato consumado. As duas sao globais, porque a resposta certa depende de
+      // saber qual polaridade vale sem olhar para nada.
       if (ev.archetype === 'magnetarch') {
+        if (ev.state === 'invert') {
+          return [{ voice: 'magnetarchFlip', x: ev.x, y: ev.y, scale: 1 }];
+        }
         if (ev.state === 'attract' || ev.state === 'repel') {
           return [
-            { voice: 'magnetarchFlip', x: ev.x, y: ev.y, scale: 1 },
             {
               voice: ev.state === 'attract' ? 'magnetarchAttract' : 'magnetarchRepel',
               x: ev.x,

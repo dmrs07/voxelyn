@@ -514,6 +514,10 @@ export class NetClient {
     // -1 quando o servidor e anterior a boca do Devorador: "nao ha boca
     // aberta", que e exatamente o que uma simulacao sem ela quer dizer.
     state.bossRuntime.mawOpenedAt = world.mawOpenedAt ?? -1;
+    // O PRAZO DA INVERSAO do Magnetarca. -1 num servidor anterior ao telegrafo
+    // e "o campo ainda dorme", que e o que uma simulacao sem folga quer dizer:
+    // o desenho fica sem a folga, e nunca com uma folga inventada.
+    state.bossRuntime.magnetFlipAt = world.magnetFlipAt ?? -1;
     // OS SUMIDOUROS da Fome, do servidor e nao dos eventos: quem reconecta com
     // tres crateras abertas nunca recebeu os pousos que as abriram, e o chao
     // puxa dele do mesmo jeito. Servidor antigo: nenhum.

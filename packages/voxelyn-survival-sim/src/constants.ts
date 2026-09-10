@@ -3190,9 +3190,37 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  * contra-jogo geometrico do campo.
  */
 export const MAGNETARCH_HP = 720;
-export const MAGNETARCH_SPEED = 1.8;
+/**
+ * FIXO, como o Pulmao e o Coracao — e pelo mesmo motivo dos dois: a luta nao e
+ * contra um corpo, e contra a sala.
+ *
+ * O numero era 1,8 e NUNCA foi usado: `magnetarchStep` sai do fluxo comum
+ * antes da perseguicao (ele so vira o rosto), entao a velocidade era um
+ * comentario escrito em forma de constante. Um chefe que anda 1,8 na ficha e
+ * zero no jogo mente para quem le a ficha e para quem tenta ajustar o
+ * encontro; pior, escondia a decisao de desenho que sustenta o resto — a FAIXA
+ * so e legivel porque os dois aneis ficam ONDE nasceram, e um campo que
+ * caminha atras do jogador transformaria a leitura de posicao numa
+ * perseguicao.
+ */
+export const MAGNETARCH_SPEED = 0;
 export const MAGNETARCH_RADIUS = 0.8;
+/** Quanto dura CADA polaridade, telegrafo incluido. */
 export const MAGNETARCH_CYCLE_TICKS = 170;
+/**
+ * O TELEGRAFO DA INVERSAO: o fim de cada ciclo em que o campo se cala.
+ *
+ * A polaridade virava num tick, sem aviso, e o unico sinal era um som. Quem
+ * estava colado no anel de fora quando ela virou levava o esmagamento sem
+ * jamais ver por que — e a regra do encontro ("ha uma faixa, e ela troca de
+ * lado") nao pode ser aprendida se a troca nao tem instante visivel.
+ *
+ * Durante a janela o campo NAO puxa e NAO cobra: e uma folga real, e nao um
+ * enfeite. Um segundo e meio a 20 Hz — o mesmo tamanho do telegrafo da
+ * Supernova do Bispo, e o bastante para atravessar a faixa inteira (6 tiles a
+ * 4,6 tiles/s) partindo de qualquer uma das duas bordas.
+ */
+export const MAGNETARCH_FLIP_WINDUP_TICKS = 30;
 export const MAGNETARCH_FIELD_RANGE = 13;
 export const MAGNETARCH_PULL_STEP = 0.12;
 /** Dentro disto, atraindo, o campo esmaga. */

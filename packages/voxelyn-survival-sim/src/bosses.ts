@@ -92,6 +92,13 @@ export const emptyBossRuntime = (): BossRuntime => ({
   leviathanPools: [],
   frostArmored: -1,
   archcantorSilent: false,
+  // -1 e "o campo do Magnetarca ainda nao acordou". Negativo e nao zero pelo
+  // mesmo motivo dos outros relogios daqui: zero e um tick legitimo, e uma
+  // camara que nascesse com `magnetFlipAt = 0` ja comecaria dentro da janela
+  // de inversao — antes de o jogador ter posto o pe no campo.
+  magnetFlipAt: -1,
+  // -1 e "nenhum aviso saiu ainda". Zero seria um prazo legitimo.
+  magnetWarnedAt: -1,
   // Quatro assentos VAZIOS, e nao quatro ids inventados: nenhuma entidade tem
   // id 0 (`nextEntityId` nasce em `playerCount + 1`), entao zero e um "assento
   // sem dono" que nao pode colidir com ninguem. Um array proprio por encontro

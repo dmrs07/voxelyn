@@ -161,7 +161,9 @@ export type SectorBiome = {
  * - termica: Basalto Fraturado -> Fenda Sulfurosa -> Fornalha Abissal. A
  *   temperatura, os gases e a instabilidade crescem com a descida.
  * - industrial: Basalto -> Ferrifero (Cicatriz) -> Ferrifero profundo. O
- *   veio principal E a cicatriz: o lugar que justificou a operacao.
+ *   veio principal E a cicatriz: o lugar que justificou a operacao. A cicatriz
+ *   nao e continua: o trecho magnetizado do veio (posicoes 3 e 4) e o que a
+ *   operacao teve de contornar, e e la que o Magnetarca continua sendo o dono.
  * - arida: Basalto -> Sumidouros de Silica -> Sumidouros profundos. O chao
  *   deixa de segurar o teto, e o fundo e o dono dele (ver LINEAGES).
  * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
@@ -226,15 +228,37 @@ const LINEAGES: Record<LineageId, LineageTable> = {
   industrial: [
     { stratum: 'basalt', occupation: 'none', title: 'Escavacao Inicial' },
     { stratum: 'ferric', occupation: 'aurix', title: 'Galerias Ferriferas' },
-    { stratum: 'ferric', occupation: 'aurix', title: 'Complexo Aurix' },
-    { stratum: 'ferric', occupation: 'aurix', title: 'Linha de Extracao' },
+    // A ANOMALIA PARTE A OPERACAO EM DUAS, e as duas posicoes sem ocupacao no
+    // meio da linhagem sao ela.
+    //
+    // Enquanto a industrial era Aurix da segunda a sexta posicao, o Ferrifero
+    // era o unico estrato do jogo que NUNCA respondia pelo proprio chefe: a
+    // ocupacao forte substitui o dono do estrato (ver `bossForBiome`), e a
+    // cicatriz cobria todas as posicoes de chefe que a linhagem oferecia. O
+    // Magnetarca so sobrava no que restasse — o setimo setor de G-04 sem
+    // intrusao, ou um Nucleo intermediario que cedesse o posto por repeticao.
+    // Ele aparecia em ZERO por cento das runs de G-00, G-01 e G-02 e em 8,9%
+    // das de G-04: o chefe mais dificil de encontrar do jogo, e por acidente de
+    // tabela — o mesmo defeito que ja tinha aposentado o Guardiao (ver a
+    // linhagem basaltica) e o Devorador (ver a arida).
+    //
+    // A correcao vem da propria lore dele (`AX-UNK-067`: o campo antecede a
+    // mina): onde o veio esta magnetizado, a operacao NAO CONSEGUIU trabalhar.
+    // A terceira e a quarta posicao sao o trecho que a Aurix teve de contornar
+    // — veio nu, sem instalacao em cima — e a linha de extracao so retoma na
+    // quinta, ja do outro lado. As duas ficam juntas de proposito: sao os dois
+    // fundos possiveis das runs curtas (G-00/G-01 acabam no 3, G-02 no 4), e e
+    // isso que devolve o Magnetarca a TODA geracao, na mesma frequencia dos
+    // outros donos de estrato (~6,5% das runs curtas, 11,3% das de G-04).
+    { stratum: 'ferric', occupation: 'none', title: 'Veio Exposto' },
+    { stratum: 'ferric', occupation: 'none', title: 'Desvio da Linha' },
     { stratum: 'ferric', occupation: 'aurix', title: 'Cicatriz Aurix' },
     { stratum: 'ferric', occupation: 'aurix', title: 'Instalacao de Recuperacao' },
-    // O fundo da industrial NAO tem ocupacao, e e a unica posicao da linhagem
-    // sem ela. O poco leva o nome da maquina que o abriu, mas a operacao parou
-    // antes de chegar aqui: o que reina no fim e o VEIO — a formacao que
-    // justificou tudo, e o Magnetarca com ela. Sem esta linha a linhagem
-    // enfrentaria o Diamandis duas vezes na mesma run de G-04.
+    // O fundo da industrial tambem NAO tem ocupacao. O poco leva o nome da
+    // maquina que o abriu, mas a operacao parou antes de chegar aqui: o que
+    // reina no fim e o VEIO — a formacao que justificou tudo, e o Magnetarca
+    // com ela. Sem esta linha a linhagem enfrentaria o Diamandis duas vezes na
+    // mesma run de G-04.
     { stratum: 'ferric', occupation: 'none', title: 'Poco Diamandis' },
   ],
   thermal: [

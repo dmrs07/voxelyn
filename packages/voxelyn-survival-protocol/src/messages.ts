@@ -438,6 +438,23 @@ export type WorldFlags = {
    */
   sinkholes?: Array<{ x: number; y: number; at: number }>;
   /**
+   * O MAGNETARCA: o tick em que a polaridade vira (-1 = o campo ainda dorme).
+   *
+   * Um numero so, pela mesma economia de `mawOpenedAt`: dele saem a fase que
+   * vale agora (com o `mood` do corpo, que ja viaja), quanto falta para a
+   * inversao e se o campo esta na folga silenciosa em que ele nao cobra. Um
+   * booleano de "invertendo" diria menos e ainda poderia discordar do prazo.
+   *
+   * Viaja pelo motivo de sempre: quem RECONECTA no meio do encontro nunca
+   * recebeu o `boss_state` que abriu a janela, e desenharia o anel na cor
+   * errada — prometendo esmagamento onde o servidor ja cobra pelo arco.
+   *
+   * Ausente em servidores anteriores ao telegrafo: o cliente trata como -1, que
+   * e "o campo ainda nao acordou" — a leitura correta para uma simulacao em que
+   * a inversao nao tinha instante.
+   */
+  magnetFlipAt?: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

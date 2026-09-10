@@ -1118,7 +1118,9 @@ Notas de desenho que valem registrar:
 - **O Magnetarca não tem posição segura, tem uma faixa.** Atraindo, perto machuca;
   repelindo, longe machuca. O deslocamento usa o passo-a-passo do eletroímã do Coveiro
   — colisão respeitada, sem teleporte — porque a quina no caminho continua sendo o
-  contra-jogo geométrico do campo.
+  contra-jogo geométrico do campo. A faixa é **desenhada** e a inversão é
+  **telegrafada** desde a `SIMULATION_VERSION` 81 (ver §_O campo do Magnetarca,
+  legível_); e ele é **FIXO**, como o Pulmão e o Coração.
 - **Os Espectros da Rainha saem do gelo, não dela.** São extensões do estrato, não
   filhotes, e nascem com vida parcial.
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
@@ -1424,6 +1426,88 @@ sorteando micélio, Aurix e rocha suturada do setor 2 em diante, então ela term
 chefes de ocupação e o de estrato disputam a mesma câmara.
 
 Custo: uma linhagem a mais remapeia **toda seed** (o sorteio é `% LINEAGE_ORDER.length`).
+
+### O Magnetarca — a anomalia que parte a linhagem industrial (`SIMULATION_VERSION` 81)
+
+O mesmo defeito da árida e da basáltica, pela terceira vez e mais escondido que as
+duas: **o Magnetarca era o dono do Estrato Ferrífero, e o Ferrífero era um estrato
+inteiramente coberto pela Cicatriz Aurix.** Ocupação forte substitui o chefe do estrato
+— é a primeira linha da regra —, então todas as posições de chefe que a linhagem
+oferecia pertenciam ao Diamandis. O que sobrava para o Magnetarca era sobra mesmo: o
+sétimo setor de G-04 quando o sorteio de intrusão o deixasse limpo, ou um Núcleo
+intermediário que cedesse o posto por repetição.
+
+Medido sobre a seleção pura, 3.000 seeds por geração:
+
+| Geração     | Antes  | Depois |
+| ----------- | ------ | ------ |
+| G-00 / G-01 | **0%** | 6,5%   |
+| G-02        | **0%** | 6,4%   |
+| G-03        | 14,0%  | 9,0%   |
+| G-04        | 8,9%   | 11,3%  |
+
+Zero por cento em três das cinco gerações — inclusive a de fábrica, que é a que a
+maioria das runs usa. Ele não era "raro", era **inalcançável**, e a tabela dizia o
+contrário. Os outros donos de estrato ficam todos em ~6,5% nas runs curtas e ~11,5% em
+G-04; o Magnetarca agora está exatamente ali.
+
+A correção não é um número de sorteio, é a lore dele. `AX-UNK-067` registra que **o
+campo antecede a mina** — a operação foi construída sobre um cabo que ela não instalou.
+Onde o veio está magnetizado, a Aurix **não conseguiu trabalhar**: as posições 3 e 4 da
+linhagem industrial deixaram de ser Cicatriz Aurix e passaram a ser veio ferrífero
+**sem ocupação** — o trecho que a linha de extração teve de contornar, e que ela só
+retoma na quinta, já do outro lado. As duas ficam juntas porque são os dois fundos
+possíveis das runs curtas (G-00/G-01 acabam no 3, G-02 no 4).
+
+O que mais mudou junto: o **Diamandis** aparecia em 32% das runs de G-02 e passa a 21%
+— ele era, de longe, o chefe mais visto do jogo, e boa parte disso vinha de ele ocupar
+sozinho um estrato inteiro. As intrusões Aurix continuam trazendo ele em qualquer
+linhagem; o que acabou foi o monopólio.
+
+Custo: o terreno das seeds industriais muda nos setores 3 e 4 (a ocupação que saiu
+levava as estruturas dela junto). A impressão digital da geração acompanha, e replays
+de 80 nessas seeds não batem.
+
+### O campo do Magnetarca, legível (`SIMULATION_VERSION` 81, `PROTOCOL_VERSION` 42)
+
+O segundo relato sobre ele foi mais curto que o primeiro: _"não faço ideia de como
+funciona a luta dele"_. Estava certo, e dá para ler a causa no código antigo.
+
+O encontro inteiro era um campo invisível. O corpo não anda (`MAGNETARCH_SPEED` era
+1,8 e **nunca foi usado** — `magnetarchStep` sai do fluxo comum antes da perseguição),
+não telegrafa e não tem golpe com forma: o que existia era um deslocamento contínuo do
+Prospector e um dano a cada segundo. A polaridade vinha do **relógio global da run**
+(`floor(tick / ciclo) % 2`), então a fase em que o jogador entrava na câmara era
+sorteada pelo tempo de jogo — às vezes meio segundo antes de uma inversão que ele não
+tinha como prever — e a troca acontecia **entre dois quadros**, sem aviso. A regra do
+encontro está escrita há muito tempo ("há uma faixa, e ela troca de lado"), e nada na
+tela a dizia.
+
+Quatro mudanças, e as quatro servem à mesma frase:
+
+- **O relógio é do encontro.** `bossRuntime.magnetFlipAt` é autoritativo e hasheado. O
+  campo **dorme** até alguém entrar nele, acorda sempre em **atração** com um ciclo
+  inteiro pela frente e se apresenta com `boss_awake` — o encontro passa a ter começo.
+- **A inversão tem instante.** Os últimos 30 ticks (1,5 s) de cada ciclo são uma
+  **folga silenciosa**: o campo não puxa e não cobra, e emite `boss_state: 'invert'`.
+  A folga é real, e não um enfeite — ela é do tamanho de atravessar a faixa inteira (6
+  tiles a 4,6 tiles/s) partindo de qualquer uma das duas bordas.
+- **O campo aparece no chão** (`drawMagnetField`, `magnet-filings.ts`). A **faixa**
+  preenchida entre os dois anéis (a única coisa constante da luta, e por isso a única
+  preenchida); a **borda que cobra agora** quente e grossa, a outra apagada; a
+  **limalha** atravessando o campo no sentido da polaridade — é ela que diz para que
+  lado o campo empurra sem uma palavra de HUD, e é ela que congela na folga; e a
+  **borda do campo**, fina, para "fora do campo" ser um lugar. Nada disso é
+  transmitido: sai de `magnetField`, a mesma função que a simulação usa para cobrar, e
+  por isso o anel desenhado não pode discordar do anel que machuca.
+- **O som deixou de chegar tarde.** `magnetarchFlip` (o relé) e a voz da polaridade
+  saíam no mesmo tick: quando o relé soava, a polaridade nova já estava cobrando. Agora
+  o relé é o **primeiro** tick da folga e a voz da polaridade é o fim dela.
+
+E `MAGNETARCH_SPEED` foi a zero. Ele já não andava; agora a ficha diz isso — e a
+imobilidade é o que sustenta o resto, porque a faixa só é legível como **lugar** com os
+dois anéis onde nasceram. Ele é o terceiro chefe fixo, com o Pulmão e o Coração, e pelo
+mesmo motivo dos dois: a luta não é contra um corpo, é contra a sala.
 
 ### O objetivo não encosta mais na moldura
 

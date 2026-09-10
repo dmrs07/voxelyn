@@ -30,8 +30,15 @@ import {
   setSurface,
 } from '../src/cells';
 import { generateWorld } from '../src/worldgen';
-import { biomeProfile } from '../src/strata';
-import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
+import { biomeProfile, sectorBiome } from '../src/strata';
+import { runDepthForGeneration } from '../src/progression';
+import { magnetField, magnetStanding } from '../src/magnet';
+import {
+  BOSS_OF_STRATUM,
+  IMPLEMENTED_BOSS,
+  bossArchetypeForBiome,
+  bossForSector,
+} from '../src/bosses';
 import {
   BOSS_PHASE_DELUGE,
   BOSS_PHASE_OVERHEAT,
@@ -79,6 +86,9 @@ import {
   ARCHCANTOR_CRYSTAL_BUDGET,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
+  MAGNETARCH_FIELD_RANGE,
+  MAGNETARCH_FIELD_TICK_INTERVAL,
+  MAGNETARCH_FLIP_WINDUP_TICKS,
   MAGNETARCH_TETHER_RANGE,
   SOLID_CRYSTAL,
   SOLID_NONE,
@@ -212,6 +222,53 @@ describe('a tabela de chefes esta completa', () => {
     for (const stratum of Object.keys(BOSS_OF_STRATUM) as (keyof typeof BOSS_OF_STRATUM)[]) {
       const id = BOSS_OF_STRATUM[stratum];
       expect(IMPLEMENTED_BOSS[id], `${stratum} -> ${id}`).toBeDefined();
+    }
+  });
+
+  /**
+   * O DONO DO FERRIFERO PRECISA PODER APARECER.
+   *
+   * "Um chefe que nao spawna nao esta implementado" ja aposentou o Guardiao
+   * (a linhagem basaltica) e o Devorador (a arida). O Magnetarca era o terceiro
+   * caso e o mais escondido: a tabela dizia que ele era o dono do Ferrifero, e
+   * o Ferrifero era um estrato inteiramente coberto pela Cicatriz Aurix — que,
+   * sendo ocupacao forte, entrega a camara ao Diamandis. Ele nao aparecia em
+   * NENHUMA run de G-00, G-01 ou G-02.
+   *
+   * Este teste varre a selecao PURA (nao gera mundo nenhum) e cobra duas
+   * coisas: ele existe em toda geracao, e a frequencia dele fica na mesma casa
+   * dos outros donos de estrato daquela geracao. A segunda metade e o ponto —
+   * "aparece uma vez em mil" tambem passaria por um teste de presenca.
+   */
+  it('o Magnetarca e alcancavel em TODA geracao, na frequencia dos outros donos de estrato', () => {
+    const SEEDS = 3000;
+    for (const generation of ['G-00', 'G-02', 'G-03', 'G-04'] as const) {
+      const depth = runDepthForGeneration(generation);
+      const tally = new Map<string, number>();
+      for (let seed = 0; seed < SEEDS; seed++) {
+        const owners = new Set<string>();
+        for (let sector = 1; sector <= depth.sectorCount; sector++) {
+          const def = bossForSector(
+            (s) => sectorBiome(seed, s),
+            sector,
+            depth.sectorCount,
+            depth.coreSectors,
+          );
+          if (def) owners.add(def.boss);
+        }
+        for (const boss of owners) tally.set(boss, (tally.get(boss) ?? 0) + 1);
+      }
+      const magnetarch = tally.get('magnetarch') ?? 0;
+      expect(magnetarch, `${generation}: o Ferrifero nao tem dono alcancavel`).toBeGreaterThan(0);
+      // O Guardiao e a referencia justa: dono de estrato tambem, e o basalto
+      // tambem so e final numa linhagem. Metade da frequencia dele e a margem —
+      // as intrusoes nao caem igual em todo estrato, e o teste mede ordem de
+      // grandeza, nao paridade decimal.
+      const guardian = tally.get('guardian') ?? 0;
+      expect(
+        magnetarch * 2,
+        `${generation}: magnetarca ${magnetarch} contra guardiao ${guardian} em ${SEEDS} seeds`,
+      ).toBeGreaterThanOrEqual(guardian);
     }
   });
 
@@ -1563,7 +1620,44 @@ describe('Rainha da Geada — a couraça e o estrato', () => {
 });
 
 describe('Magnetarca — a faixa troca de lado', () => {
-  it('a polaridade alterna sozinha, pelo relogio', () => {
+  /**
+   * Anda a simulacao ate a polaridade pedida estar valendo E fora da folga.
+   *
+   * Substitui o `Math.floor(tick / CICLO) % 2` que estes testes usavam: aquele
+   * relogio era o GLOBAL, e desde o telegrafo o ciclo e do encontro. Um teste
+   * que continuasse consultando o relogio do mundo estaria medindo a fase certa
+   * por coincidencia — que e exatamente o defeito que o rework corrigiu.
+   */
+  const settleInto = (
+    state: SurvivalState,
+    boss: { mood?: number },
+    polarity: 'attract' | 'repel',
+  ): boolean =>
+    advanceUntil(state, () => {
+      const field = magnetField(state.tick, state.bossRuntime.magnetFlipAt, boss.mood ?? -1);
+      return field.live && field.polarity === polarity;
+    });
+
+  it('o campo DORME ate alguem entrar nele, e acorda em atracao', () => {
+    // Longe do alcance: o encontro nem comecou, e o relogio nao pode estar
+    // correndo. Enquanto ele era global, ja estava.
+    const { state, boss } = duel(650, 'magnetarch', MAGNETARCH_FIELD_RANGE + 4);
+    for (let t = 0; t < 40; t++) stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.magnetFlipAt, 'o campo acordou sem ninguem nele').toBe(-1);
+
+    state.player.x = boss.x - (MAGNETARCH_FIELD_RANGE - 2);
+    const events = advanceCollecting(state, 2);
+    expect(state.bossRuntime.magnetFlipAt, 'entrou no campo e ele continuou dormindo').toBe(
+      state.tick + MAGNETARCH_CYCLE_TICKS - 1,
+    );
+    expect(boss.mood, 'o encontro nao comecou em atracao').toBe(MAGNET_ATTRACT);
+    expect(
+      events.some((ev) => ev.t === 'boss_awake' && ev.archetype === 'magnetarch'),
+      'o campo acordou sem se apresentar',
+    ).toBe(true);
+  });
+
+  it('a polaridade alterna sozinha, pelo relogio DO ENCONTRO', () => {
     const { state, boss } = duel(651, 'magnetarch', 6);
     const seen = new Set<number>();
     for (let t = 0; t < MAGNETARCH_CYCLE_TICKS * 3; t++) {
@@ -1575,14 +1669,81 @@ describe('Magnetarca — a faixa troca de lado', () => {
     expect(seen.has(MAGNET_REPEL)).toBe(true);
   });
 
+  it('a INVERSAO se anuncia, e durante ela o campo nao puxa nem cobra', () => {
+    const { state } = duel(655, 'magnetarch', 6);
+    // Ate a folga do primeiro ciclo abrir.
+    expect(
+      advanceUntil(
+        state,
+        () =>
+          state.bossRuntime.magnetFlipAt > 0 &&
+          state.bossRuntime.magnetFlipAt - state.tick <= MAGNETARCH_FLIP_WINDUP_TICKS,
+      ),
+      'a folga nunca abriu',
+    ).toBe(true);
+
+    // O aviso sai UMA vez, no tick em que a janela abre — e nao a cada tick
+    // dela: o estado continuo de quem reconecta sai de `magnetFlipAt`.
+    const events = advanceCollecting(state, MAGNETARCH_FLIP_WINDUP_TICKS - 1);
+    const warnings = events.filter(
+      (ev) => ev.t === 'boss_state' && ev.archetype === 'magnetarch' && ev.state === 'invert',
+    );
+    expect(warnings.length, 'o aviso de inversao repetiu ou nao saiu').toBeLessThanOrEqual(1);
+
+    // A FOLGA E REAL: nem deslocamento nem dano enquanto ela dura.
+    const { state: quiet, boss: quietBoss } = duel(656, 'magnetarch', 2);
+    expect(
+      advanceUntil(
+        quiet,
+        () =>
+          quiet.bossRuntime.magnetFlipAt > 0 &&
+          quiet.bossRuntime.magnetFlipAt - quiet.tick <= MAGNETARCH_FLIP_WINDUP_TICKS,
+      ),
+      'a folga nunca abriu',
+    ).toBe(true);
+    // Colado no corpo, dentro do anel de esmagamento: fora da folga isto cobra
+    // todo segundo.
+    quiet.player.x = quietBoss.x - (MAGNETARCH_CRUSH_RANGE - 1);
+    quiet.player.y = quietBoss.y;
+    const hp = quiet.player.hp;
+    const where = quiet.player.x;
+    for (let t = 0; t < MAGNETARCH_FLIP_WINDUP_TICKS - 2; t++) stepRun(quiet, [emptyCommand()]);
+    expect(quiet.player.hp, 'a folga cobrou dano').toBe(hp);
+    expect(Math.abs(quiet.player.x - where), 'a folga puxou o jogador').toBeLessThan(0.01);
+  });
+
+  it('o aviso sobrevive ao atordoamento — no Ferrifero a parede conduz', () => {
+    // O laco de inimigos pula o corpo inteiro enquanto ele esta atordoado, e
+    // atordoar e a resposta natural do estrato (a parede e fiacao). Um aviso
+    // preso a um tick exato seria engolido justamente por quem joga o bioma
+    // como ele pede.
+    const { state, boss } = duel(659, 'magnetarch', 6);
+    expect(
+      advanceUntil(
+        state,
+        () =>
+          state.bossRuntime.magnetFlipAt > 0 &&
+          state.bossRuntime.magnetFlipAt - state.tick <= MAGNETARCH_FLIP_WINDUP_TICKS + 1,
+      ),
+      'a folga nunca chegou',
+    ).toBe(true);
+    // A janela ainda nao abriu: o prazo decresce de um em um, entao o primeiro
+    // tick em que a condicao acima vale e o de VESPERA. E dali que o
+    // atordoamento cobre a abertura inteira.
+    expect(state.bossRuntime.magnetFlipAt - state.tick).toBe(MAGNETARCH_FLIP_WINDUP_TICKS + 1);
+    boss.stunnedUntil = state.tick + MAGNETARCH_FLIP_WINDUP_TICKS - 4;
+    const events = advanceCollecting(state, MAGNETARCH_FLIP_WINDUP_TICKS);
+    expect(
+      events.filter(
+        (ev) => ev.t === 'boss_state' && ev.archetype === 'magnetarch' && ev.state === 'invert',
+      ).length,
+      'o atordoamento engoliu o aviso (ou o repetiu)',
+    ).toBe(1);
+  });
+
   it('atraindo ele PUXA; repelindo, empurra', () => {
     const { state, boss } = duel(652, 'magnetarch', 8);
-    boss.mood = MAGNET_ATTRACT;
-    // Congela a fase para medir uma coisa de cada vez: o ciclo sai do relogio,
-    // entao o teste anda a simulacao ate a janela que quer.
-    expect(
-      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0),
-    ).toBe(true);
+    expect(settleInto(state, boss, 'attract'), 'nunca entrou em atracao').toBe(true);
     const startPull = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1590,9 +1751,7 @@ describe('Magnetarca — a faixa troca de lado', () => {
     }
     expect(Math.abs(state.player.x - boss.x), 'atraindo, nao puxou').toBeLessThan(startPull);
 
-    expect(
-      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1),
-    ).toBe(true);
+    expect(settleInto(state, boss, 'repel'), 'nunca entrou em repulsao').toBe(true);
     const startPush = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1603,26 +1762,82 @@ describe('Magnetarca — a faixa troca de lado', () => {
 
   it('perto machuca numa polaridade, longe machuca na outra', () => {
     const near = duel(653, 'magnetarch', 2);
-    near.boss.mood = MAGNET_ATTRACT;
-    expect(
-      advanceUntil(
-        near.state,
-        () => Math.floor(near.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0,
-      ),
-    ).toBe(true);
+    expect(settleInto(near.state, near.boss, 'attract'), 'nunca entrou em atracao').toBe(true);
     near.state.player.x = near.boss.x - MAGNETARCH_CRUSH_RANGE + 1;
     const nearHp = near.state.player.hp;
     for (let t = 0; t < 40; t++) stepRun(near.state, [emptyCommand()]);
     expect(near.state.player.hp, 'atraindo, a proximidade nao cobrou').toBeLessThan(nearHp);
 
     const far = duel(654, 'magnetarch', 2);
-    expect(
-      advanceUntil(far.state, () => Math.floor(far.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1),
-    ).toBe(true);
+    expect(settleInto(far.state, far.boss, 'repel'), 'nunca entrou em repulsao').toBe(true);
     far.state.player.x = far.boss.x - MAGNETARCH_TETHER_RANGE - 1;
     const farHp = far.state.player.hp;
     for (let t = 0; t < 40; t++) stepRun(far.state, [emptyCommand()]);
     expect(far.state.player.hp, 'repelindo, a distancia nao cobrou').toBeLessThan(farHp);
+  });
+
+  it('o campo cobra dos DOIS Prospectores, e nao so do mais proximo', () => {
+    // O campo valia so para o alvo que o laco de inimigos escolhe (o mais
+    // proximo), e numa sala de dois isso deixava o segundo fora do encontro:
+    // sem puxao, sem cobranca, atirando de onde quisesse. Um campo e uma regra
+    // sobre distancia, e regra sobre distancia nao tem alvo.
+    const state = createRun({ seed: 658, playerCount: 2 });
+    const w = state.config.width;
+    const px = Math.floor(state.players[0].x);
+    const py = Math.floor(state.players[0].y);
+    for (let y = py - 18; y <= py + 18; y++) {
+      for (let x = px - 18; x <= px + 18; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        state.solid[y * w + x] = SOLID_NONE;
+        state.surface[y * w + x] = SURF_NONE;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+    state.enemies = [];
+    const boss = spawnEnemy(state, 'magnetarch', px, py, false);
+    state.bossRuntime.awake = true;
+    // Os dois COLADOS no corpo, em lados opostos: atraindo, o anel de
+    // esmagamento cobra dos dois.
+    const place = (): void => {
+      state.players[0].x = boss.x - (MAGNETARCH_CRUSH_RANGE - 1);
+      state.players[0].y = boss.y;
+      state.players[1].x = boss.x + (MAGNETARCH_CRUSH_RANGE - 1);
+      state.players[1].y = boss.y;
+    };
+    place();
+    const before = state.players.map((p) => p.hp);
+    for (let t = 0; t < MAGNETARCH_FIELD_TICK_INTERVAL * 2; t++) {
+      place();
+      stepRun(state, [emptyCommand(), emptyCommand()]);
+    }
+    expect(state.players[0].hp, 'o slot 0 nao foi cobrado').toBeLessThan(before[0]);
+    expect(state.players[1].hp, 'o parceiro ficou fora do encontro').toBeLessThan(before[1]);
+  });
+
+  it('a FAIXA e a mesma nas duas polaridades — e as duas pontas leem a mesma', () => {
+    // O contrato entre a simulacao e o desenho: `magnetStanding` responde
+    // 'band' exatamente onde `magnetarchStep` nao cobra. Se um dos dois mudar
+    // sozinho, o anel desenhado passa a mentir sobre onde o dano mora.
+    expect(magnetStanding(MAGNETARCH_CRUSH_RANGE - 0.5)).toBe('crush');
+    expect(magnetStanding(MAGNETARCH_CRUSH_RANGE + 0.5)).toBe('band');
+    expect(magnetStanding(MAGNETARCH_TETHER_RANGE - 0.5)).toBe('band');
+    expect(magnetStanding(MAGNETARCH_TETHER_RANGE + 0.5)).toBe('tether');
+    expect(magnetStanding(MAGNETARCH_FIELD_RANGE + 0.5)).toBe('outside');
+
+    const band = duel(657, 'magnetarch', 6);
+    band.state.player.x = band.boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
+    band.state.player.y = band.boss.y;
+    const hp = band.state.player.hp;
+    // Um ciclo inteiro parado na faixa, atravessando uma inversao: as duas
+    // polaridades passam, e nenhuma cobra. (O deslocamento do campo tira o
+    // jogador do lugar, entao ele e recolocado a cada tick — o que se mede aqui
+    // e a cobranca, nao a capacidade de resistir ao puxao.)
+    for (let t = 0; t < MAGNETARCH_CYCLE_TICKS * 2; t++) {
+      band.state.player.x = band.boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
+      band.state.player.y = band.boss.y;
+      stepRun(band.state, [emptyCommand()]);
+    }
+    expect(band.state.player.hp, 'a faixa cobrou').toBe(hp);
   });
 });
 

@@ -248,7 +248,13 @@ describe('impressao digital da geracao', () => {
     // todo setor sem ocupacao (antes 30/15/12), com a seda no topo das faixas.
     // O bioma de (seed, setor) muda para parte das seeds da amostra, e com ele
     // o terreno inteiro delas — e continua o mesmo em qualquer geracao.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2945120737);
+    // 2103462241 (era 2945120737), na SIMULATION_VERSION 81: a ANOMALIA no meio
+    // da linhagem industrial. As posicoes 3 e 4 deixam de ser Cicatriz Aurix e
+    // passam a ser veio ferrifero SEM ocupacao — o trecho magnetizado que a
+    // operacao teve de contornar. O bioma de (seed, setor) muda so para as
+    // seeds industriais, e nelas so nesses dois setores; o terreno deles muda
+    // inteiro com a ocupacao que saiu. Continua identico em qualquer geracao.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2103462241);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

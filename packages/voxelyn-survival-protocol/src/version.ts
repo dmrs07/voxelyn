@@ -250,7 +250,14 @@
 // 40: echo evidence and thermal guard in snapshots; bit 7 tags echo choices in command logs.
 // 41: o viewer ganha `sprintUntil` (a Disparada). Um cliente de 40 nao acenderia
 //     o botao nem saberia por que o parceiro atravessou a agua funda.
-export const PROTOCOL_VERSION = 41;
+// 42: `WorldFlags` ganha `magnetFlipAt` — o tick em que a polaridade do
+//     MAGNETARCA vira (-1 = o campo ainda dorme). Dele saem, no cliente, a fase
+//     que vale, a folga silenciosa da inversao e qual das duas bordas cobra
+//     agora. Um cliente de 41 nunca receberia o prazo e desenharia o campo sem
+//     a folga — prometendo esmagamento no tick em que o servidor ja cobra pelo
+//     arco de retorno. `BossMoment` aceita `invert`, o instante em que a folga
+//     abre: um cliente antigo receberia um estado que ele nao conhece.
+export const PROTOCOL_VERSION = 42;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1079,7 +1086,26 @@ export const PROTOCOL_VERSION = 41;
 //     habilidades desbloqueadas (antes: as duas de maior contagem, sempre as
 //     mesmas com tudo desbloqueado). Replays de 79 que usaram o Passo ou
 //     chegaram ao poco com tres ou mais Ecos nao batem.
-export const SIMULATION_VERSION = 80;
+// 81: O MAGNETARCA — onde ele mora e como a luta dele se le.
+//
+//     ONDE: as posicoes 3 e 4 da linhagem industrial deixam de ser Cicatriz
+//     Aurix e passam a ser veio ferrifero SEM ocupacao. O Ferrifero era o unico
+//     estrato que nunca respondia pelo proprio chefe — a ocupacao forte
+//     substitui o dono do estrato, e a cicatriz cobria todas as posicoes de
+//     chefe que a linhagem oferecia —, entao o Magnetarca aparecia em ZERO por
+//     cento das runs de G-00, G-01 e G-02 e em 8,9% das de G-04. Agora ele
+//     aparece em toda geracao, na mesma frequencia dos outros donos de estrato.
+//     O terreno das seeds industriais muda nesses dois setores (a impressao
+//     digital da geracao acompanha), e replays de 80 nessas seeds nao batem.
+//
+//     COMO: a polaridade sai do relogio GLOBAL (`floor(tick / ciclo) % 2`) e
+//     passa a ter relogio proprio, hasheado (`bossRuntime.magnetFlipAt`). O
+//     campo dorme ate alguem entrar nele, acorda sempre em atracao com um ciclo
+//     inteiro pela frente e emite `boss_awake`; o fim de cada ciclo tem uma
+//     folga de 30 ticks em que ele nao puxa nem cobra — o telegrafo da
+//     inversao. `MAGNETARCH_SPEED` vai a zero: ele ja nao andava, e agora a
+//     ficha diz isso.
+export const SIMULATION_VERSION = 81;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

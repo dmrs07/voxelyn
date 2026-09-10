@@ -3993,6 +3993,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.choirPattern);
   mix(state.bossRuntime.choirRotateAt);
   mix(state.bossRuntime.choirRecruitAt);
+  // A POLARIDADE DO MAGNETARCA em um numero. `magnetFlipAt` decide, a cada
+  // tick, para que lado o campo empurra, se ele esta na folga silenciosa e qual
+  // das duas bordas cobra — ou seja, decide dano e POSICAO do jogador. Duas
+  // simulacoes que discordassem dele divergiriam em vida e em coordenada no
+  // primeiro ciclo. O `mood` do corpo entra pelo laco de inimigos, como
+  // qualquer outro; o que falta e o prazo.
+  mix(state.bossRuntime.magnetFlipAt);
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
   // ja e hasheado por conta propria. Duas simulacoes discordando de

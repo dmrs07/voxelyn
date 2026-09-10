@@ -105,7 +105,13 @@ import {
   insideAnyBubble,
   leviathanPosture,
   leviathanTargetable,
+  MAGNET_BAND_INNER,
+  MAGNET_BAND_OUTER,
+  MAGNETARCH_FIELD_RANGE,
+  MAGNETARCH_FLIP_WINDUP_TICKS,
+  magnetField,
 } from '@voxelyn/survival-sim';
+import { MAGNET_FILINGS, magnetFiling } from './magnet-filings';
 import {
   LEVIATHAN_HEAD_MASS_RADIUS,
   LEVIATHAN_MASS_RADIUS,
@@ -2689,6 +2695,30 @@ export class SurvivalRenderer {
           });
           break;
         case 'boss_state': {
+          // O MAGNETARCA NOMEIA A REGRA. O campo dele nao tem corpo e nao tem
+          // golpe: sem uma frase, o jogador so descobre a polaridade pelo dano
+          // que ela cobra — e cobrar antes de dizer e como o encontro chegou
+          // ate aqui ilegivel. Tres estados, tres frases, e a do aviso vem
+          // ANTES (a folga da inversao), que e a unica que da para agir em cima.
+          if (ev.archetype === 'magnetarch') {
+            const magnetKey =
+              ev.state === 'invert'
+                ? 'toast.magnetarch.invert'
+                : ev.state === 'attract'
+                  ? 'toast.magnetarch.attract'
+                  : ev.state === 'repel'
+                    ? 'toast.magnetarch.repel'
+                    : null;
+            if (magnetKey) {
+              this.messages.push({
+                text: t(magnetKey),
+                until: nowMs + 2200,
+                tone: ev.state === 'invert' ? 'warn' : undefined,
+              });
+              this.addFlash(ev.x, ev.y, 2.4, 0.5, nowMs, 260);
+            }
+            break;
+          }
           // A CERZIDEIRA subindo, descendo e entrando em frenesi: um clarao
           // no ponto do fio e um solavanco; o frenesi e vermelho, como os olhos.
           if (ev.archetype === 'seamstress') {
@@ -3752,6 +3782,34 @@ export class SurvivalRenderer {
         ctx.ellipse(msx, msy, rx * progress, ry * progress, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      }
+    }
+
+    // O CAMPO DO MAGNETARCA. No CHAO, pelo mesmo motivo do vortice logo abaixo:
+    // o jogador precisa ver os proprios pes dentro (ou fora) da faixa, e um
+    // efeito por cima da cena resolveria a leitura errada — a de assistir, e
+    // nao a de estar em pe em algum lugar.
+    //
+    // Nada aqui e transmitido. O unico numero que viaja e o tick da inversao
+    // (`bossRuntime.magnetFlipAt`); a fase, a folga e a borda que cobra saem
+    // dele pela MESMA funcao que a simulacao usa para cobrar (`magnetField`).
+    // O anel nao pode prometer um raio diferente do raio que machuca.
+    {
+      const magnetarch = state.enemies.find((e) => e.alive && e.archetype === 'magnetarch');
+      const field = magnetarch
+        ? magnetField(state.tick, state.bossRuntime.magnetFlipAt, magnetarch.mood ?? 0)
+        : null;
+      if (magnetarch && field?.live) {
+        this.drawMagnetField(
+          ctx,
+          toScreen,
+          z,
+          magnetarch.x,
+          magnetarch.y,
+          field,
+          nowMs / 1000,
+          this.quality.maxFx / PRESETS.high.maxFx,
+        );
       }
     }
 
@@ -7245,6 +7303,162 @@ export class SurvivalRenderer {
    * dois saem do estado autoritativo pelas MESMAS funcoes que a simulacao usa
    * para puxar.
    */
+  /**
+   * O CAMPO DO MAGNETARCA no chao: a faixa, as duas bordas e a limalha.
+   *
+   * Este desenho E o encontro. Antes dele o Magnetarca era um corpo parado que
+   * arrastava o Prospector e cobrava dano sem que nada na tela dissesse por
+   * que — a regra ("ha uma faixa, e ela troca de lado") existia so na
+   * simulacao e nos documentos. Sao quatro leituras, e a ordem delas e a ordem
+   * de importancia:
+   *
+   * 1. A FAIXA, preenchida: o corredor entre os dois aneis, o unico lugar que
+   *    nenhuma polaridade cobra. E a unica coisa constante da luta, entao e a
+   *    unica preenchida — o olho aprende "e ali" uma vez e nao reaprende.
+   * 2. A BORDA QUE COBRA AGORA, quente e grossa: o anel de esmagamento
+   *    atraindo, o do arco de retorno repelindo. A outra fica apagada, porque
+   *    ela nao esta cobrando nada neste ciclo.
+   * 3. A LIMALHA, atravessando o campo no sentido da polaridade. E o que diz
+   *    para que lado o campo empurra sem uma palavra de HUD — e, na folga, e o
+   *    que diz que ele parou.
+   * 4. A BORDA DO CAMPO, fina: onde o campo acaba. Sem ela, "fora do campo"
+   *    nao e um lugar.
+   *
+   * Na FOLGA DA INVERSAO o desenho inteiro esfria e a borda que VAI cobrar
+   * pulsa com a carga (0..1). E o telegrafo: o instante da troca deixa de
+   * acontecer entre dois quadros e passa a ser um segundo e meio em que da para
+   * atravessar a faixa e escolher lado.
+   */
+  private drawMagnetField(
+    ctx: CanvasRenderingContext2D,
+    toScreen: (x: number, y: number) => [number, number],
+    z: number,
+    cx: number,
+    cy: number,
+    field: ReturnType<typeof magnetField>,
+    seconds: number,
+    fxScale: number,
+  ): void {
+    const [mx, my] = toScreen(cx, cy);
+    // O MESMO fator de projecao do vortice da boca, e pela mesma razao: um
+    // circulo de raio R vira, nesta isometrica, uma elipse de semi-eixos
+    // `R * TILE/2 * raiz(2)`. Sem a raiz o anel sai a 71% do raio que ele
+    // anuncia — e este anel e literalmente a fronteira do dano.
+    const ISO = Math.SQRT2;
+    const ringX = (r: number): number => r * TILE_W * 0.5 * ISO * z;
+    const ringY = (r: number): number => r * TILE_H * 0.5 * ISO * z;
+    const inverting = field.polarity === 'inverting';
+    // Quem cobra AGORA, e quem vai cobrar quando a folga fechar.
+    const armed = inverting
+      ? field.next === 'attract'
+        ? MAGNET_BAND_INNER
+        : MAGNET_BAND_OUTER
+      : field.edge;
+    // O sentido da limalha e o da polaridade que esta VALENDO. Na folga nao ha
+    // nenhuma valendo, e o que se congela e a que estava saindo — ou seja, a
+    // oposta da que entra: por isso `next === 'attract'` significa que a
+    // limalha parou indo para FORA.
+    const outward = inverting ? field.next === 'attract' : field.polarity === 'repel';
+    // A pulsacao da carga: um ciclo e meio dentro da folga, terminando aceso.
+    // Ela e a unica coisa que se move durante a folga, alem do tremor da
+    // limalha — o campo esta calado, e o desenho tem de soar calado tambem.
+    const charge = inverting ? 0.35 + 0.65 * Math.abs(Math.sin(field.charge * Math.PI * 1.5)) : 1;
+
+    ctx.save();
+
+    // 1. A FAIXA. Um anel preenchido por regra de recorte par-impar: o disco de
+    //    fora menos o de dentro. Verde-frio e discreto — ela nao e um alvo, e
+    //    um chao seguro, e um chao seguro que gritasse competiria com a borda
+    //    que esta cobrando.
+    ctx.beginPath();
+    ctx.ellipse(mx, my, ringX(MAGNET_BAND_OUTER), ringY(MAGNET_BAND_OUTER), 0, 0, Math.PI * 2);
+    ctx.ellipse(mx, my, ringX(MAGNET_BAND_INNER), ringY(MAGNET_BAND_INNER), 0, 0, Math.PI * 2);
+    ctx.fillStyle = inverting ? 'rgba(126,200,168,0.16)' : 'rgba(126,200,168,0.1)';
+    ctx.fill('evenodd');
+
+    // 2. AS DUAS BORDAS. A que cobra e quente e grossa; a outra e um traco
+    //    apagado — ela continua sendo geometria util (o outro lado da faixa),
+    //    mas nao esta prometendo dano nenhum neste ciclo.
+    for (const edge of [MAGNET_BAND_INNER, MAGNET_BAND_OUTER]) {
+      const hot = edge === armed;
+      ctx.strokeStyle = hot
+        ? `rgba(224,86,58,${(inverting ? 0.3 : 0.62) * charge})`
+        : 'rgba(146,158,170,0.22)';
+      ctx.lineWidth = Math.max(1, z * (hot ? 0.85 : 0.45));
+      ctx.beginPath();
+      ctx.ellipse(mx, my, ringX(edge), ringY(edge), 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 2b. O RELOGIO DO CICLO, por cima da borda que cobra: um arco claro que
+    //     fecha a volta conforme o ciclo corre. E a mesma divisao de trabalho
+    //     da marca de estalactite do Coracao — o anel diz ONDE, o arco diz
+    //     QUANDO —, e aqui ela vale ainda mais: sem o arco, "vai inverter" so
+    //     chega no ultimo segundo e meio, e a decisao de atravessar a faixa e
+    //     de antes disso. Some na folga: la o que restou de tempo ja e a
+    //     pulsacao da carga, e dois relogios diriam a mesma coisa duas vezes.
+    if (!inverting) {
+      const swept = field.progress;
+      ctx.strokeStyle = 'rgba(255,214,170,0.5)';
+      ctx.lineWidth = Math.max(1, z * 0.9);
+      ctx.beginPath();
+      ctx.ellipse(
+        mx,
+        my,
+        ringX(armed),
+        ringY(armed),
+        0,
+        -Math.PI / 2,
+        -Math.PI / 2 + swept * Math.PI * 2,
+      );
+      ctx.stroke();
+    }
+
+    // 3. A LIMALHA. Desenhada ponto a ponto no espaco do MUNDO e projetada nas
+    //    duas pontas, como a crista do sumidouro: assim ela achata junto com o
+    //    chao em vez de flutuar sobre ele.
+    //
+    //    Na folga ela CONGELA (o tempo fica parado no instante em que a janela
+    //    abriu) e apaga. Congelar em vez de inverter na hora e o que evita o
+    //    salto: quando a polaridade nova entra, a limalha ja esta invisivel e
+    //    volta a acender no sentido novo.
+    const flow = inverting
+      ? seconds - (field.charge * MAGNETARCH_FLIP_WINDUP_TICKS) / TICK_HZ
+      : seconds;
+    const filings = Math.max(24, Math.round(MAGNET_FILINGS * fxScale));
+    ctx.lineWidth = Math.max(1, z * 0.5);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < filings; i++) {
+      const f = magnetFiling(i, filings, flow, outward, MAGNET_BAND_INNER, MAGNETARCH_FIELD_RANGE);
+      const [tx, ty] = toScreen(cx + f.x, cy + f.y);
+      const [hx, hy] = toScreen(cx + f.hx, cy + f.hy);
+      ctx.strokeStyle = `rgba(198,206,216,${f.alpha * (inverting ? 0.1 : 0.34)})`;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+    }
+
+    // 4. ONDE O CAMPO ACABA. Fina e fria: nao ha dano nessa linha, ha o fim da
+    //    influencia — e ela e o que faz "fora do campo" ser um lugar, e nao a
+    //    ausencia de desenho.
+    ctx.strokeStyle = 'rgba(146,158,170,0.16)';
+    ctx.lineWidth = Math.max(1, z * 0.4);
+    ctx.beginPath();
+    ctx.ellipse(
+      mx,
+      my,
+      ringX(MAGNETARCH_FIELD_RANGE),
+      ringY(MAGNETARCH_FIELD_RANGE),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   private drawSandVortex(
     ctx: CanvasRenderingContext2D,
     toScreen: (x: number, y: number) => [number, number],

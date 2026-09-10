@@ -142,6 +142,18 @@ export {
 // refaz a mesma conta da simulacao, a partir do unico tick que viaja
 // (`bossRuntime.mawOpenedAt`), e chega no mesmo alcance e na mesma forca.
 export { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
+// O CAMPO DO MAGNETARCA, pela mesma economia: do prazo que viaja
+// (`bossRuntime.magnetFlipAt`) mais o humor do corpo saem a polaridade, a folga
+// da inversao e a borda que cobra — nas duas pontas, pela mesma funcao.
+export {
+  MAGNET_BAND_INNER,
+  MAGNET_BAND_OUTER,
+  magnetField,
+  magnetStanding,
+  type MagnetField,
+  type MagnetPolarity,
+  type MagnetStanding,
+} from './magnet.js';
 export { hasLineOfSight } from './pathing.js';
 export {
   FREEZE_THAW_RELEASE_AT,

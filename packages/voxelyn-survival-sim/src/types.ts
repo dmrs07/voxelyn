@@ -964,6 +964,39 @@ export type BossRuntime = {
   frostArmored: number;
   archcantorSilent: boolean;
   /**
+   * O tick em que a polaridade do MAGNETARCA vira, ou -1 enquanto o campo
+   * dorme.
+   *
+   * Autoritativo e HASHEADO, e nao derivado do relogio global como era antes
+   * (`floor(tick / CICLO) % 2`). Tres coisas dependem disso:
+   *
+   * - O encontro comeca SEMPRE em atracao e com um ciclo inteiro pela frente.
+   *   Com o relogio global, quem entrava na camara herdava um pedaco de fase
+   *   sorteado pelo tempo de jogo — as vezes meio segundo antes de uma
+   *   inversao que ele nao tinha como prever.
+   * - O TELEGRAFO precisa de um prazo: `magnetFlipAt - tick` e o que diz se o
+   *   campo esta na janela silenciosa (`MAGNETARCH_FLIP_WINDUP_TICKS`), e e o
+   *   mesmo numero dos dois lados — a simulacao cobra por ele e o cliente
+   *   desenha por ele.
+   * - Quem reconecta no meio do encontro recebe o prazo pronto em `WorldFlags`
+   *   e desenha a inversao no instante certo, em vez de comecar a contar do
+   *   zero e mentir por um ciclo.
+   */
+  magnetFlipAt: number;
+  /**
+   * O prazo (`magnetFlipAt`) cujo aviso de inversao JA saiu, ou -1.
+   *
+   * Memoria de apresentacao, como `drillLockedAt`: fora do hash e fora do wire.
+   * Existe porque o aviso nao pode depender de um tick exato ser processado. O
+   * laco de inimigos pula o corpo inteiro enquanto ele esta atordoado
+   * (`stunnedUntil`), e no Ferrifero atordoar e rotina — a parede conduz, e a
+   * descarga e uma das respostas naturais do estrato. Uma comparacao com o tick
+   * da folga perderia o aviso justamente nas runs em que o jogador mais usa a
+   * ferramenta do bioma; comparar com o PRAZO faz o aviso sair no primeiro tick
+   * util depois do atordoamento, uma vez por ciclo.
+   */
+  magnetWarnedAt: number;
+  /**
    * O CORO CARDINAL: a entidade que ocupa cada assento da formacao, ou 0.
    *
    * Quatro ids e nao quatro coordenadas. A posicao de um guarda e DERIVADA —
@@ -1098,9 +1131,14 @@ export type BossMoment =
   // Rainha da Geada: os Espectros saindo do gelo; o tiro absorvido pela couraça.
   | 'wraiths'
   | 'armor_hit'
-  // Magnetarca: a polaridade que acabou de valer.
+  // Magnetarca: a polaridade que acabou de valer, e a INVERSAO comecando —
+  // a janela em que o campo se cala antes de trocar de lado. `invert` sai uma
+  // vez por ciclo, no primeiro tick da folga, e e o unico aviso que o encontro
+  // da: sem ele a troca acontece entre dois quadros e o jogador so descobre a
+  // regra pelo dano.
   | 'attract'
   | 'repel'
+  | 'invert'
   // Cerzideira: a subida pelo fio vertical, a descida e o frenesi.
   | 'ascend'
   | 'descend'
