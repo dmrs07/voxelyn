@@ -10,6 +10,20 @@ export type RunConfig = {
   height?: number;
   playerCount?: number;
   /**
+   * Quantos assentos ja tem DONO no instante da criacao. Ausente = todos.
+   *
+   * Existe porque uma sala de co-op nasce com dois assentos ANTES de qualquer
+   * cliente reivindicar um: `GameRoom` chama `createRun({ playerCount: 2 })` e
+   * so depois zera os `joined`. Entre uma coisa e outra o setor inteiro ja foi
+   * povoado, e a escala de encontro (coop.ts) leria dois jogadores num setor
+   * que talvez nunca tenha mais de um — quem entra primeiro e joga esperando o
+   * parceiro pagaria a conta de dois.
+   *
+   * O padrao continua sendo "todos entraram", que e o caminho local e solo: o
+   * jogo de uma pessoa nunca precisa dizer isto.
+   */
+  claimedSlots?: number;
+  /**
    * Setor em que a run COMECA. Padrao 1.
    *
    * Existe porque a run deixou de ser um mapa e virou varios encadeados, e sem
@@ -2358,7 +2372,15 @@ export type SurvivalState = {
   sutures: Suture[];
   /** One salvage payment per sector, including return trips and reconnects. */
   sutureRewardsMask: number;
-  config: Required<RunConfig>;
+  /**
+   * A configuracao CONGELADA da run. `claimedSlots` fica de fora: ele descreve
+   * o instante da criacao (quantos assentos ja tinham dono quando o setor foi
+   * povoado) e nao um fato da run — guardado aqui, envelheceria em silencio e
+   * o primeiro leitor a confundi-lo com "quantos jogadores existem" acertaria
+   * por acidente ate o parceiro entrar. Quem esta em jogo AGORA se pergunta a
+   * `playerExtras[].joined` (ver `partySize` em coop.ts).
+   */
+  config: Omit<Required<RunConfig>, 'claimedSlots'>;
   rng: RNG;
   tick: number;
   phase: RunPhase;

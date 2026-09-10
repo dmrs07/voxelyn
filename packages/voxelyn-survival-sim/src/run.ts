@@ -45,6 +45,7 @@ import {
   MINIGUN_PROJECTILE_SPEED,
   MINIGUN_PROJECTILE_TTL_SECONDS,
   MAX_PLAYERS,
+  MAX_ENEMIES,
   MAX_PROJECTILES,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
   PLAYER_RADIUS,
@@ -154,6 +155,7 @@ import {
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import { ascend, descend, populateSector, sectorSeed } from './sectors.js';
+import { coopPackCapped, isCoop } from './coop.js';
 import {
   clearCoreTaken,
   coreUnlocked,
@@ -414,9 +416,15 @@ export const createRun = (config: RunConfig): SurvivalState => {
   ];
   const players: Entity[] = [];
   const playerExtras: PlayerExtra[] = [];
+  // Os assentos com dono ANTES da povoacao. Ver `RunConfig.claimedSlots`: e o
+  // que impede o setor de abertura de uma sala vazia de nascer com a escala de
+  // dois jogadores que talvez nunca cheguem.
+  const claimed = Math.max(0, Math.min(playerCount, config.claimedSlots ?? playerCount));
   for (let s = 0; s < playerCount; s++) {
     players.push(makePlayer(s, world.entry.x + offsets[s].x, world.entry.y + offsets[s].y, tuning));
-    playerExtras.push(makeExtra(tuning));
+    const extra = makeExtra(tuning);
+    extra.joined = s < claimed;
+    playerExtras.push(extra);
   }
 
   const state: SurvivalState = {
@@ -2410,6 +2418,11 @@ const stepPlayer = (
           y: site.terminal.y,
           completesAtTick: site.scanEndsAt,
         });
+        // O ALARME do terminal: seis casas em volta, e mais quatro que so o
+        // co-op alcanca. Sem as extras, uma leva de tier 3 com dois jogadores
+        // (cinco corpos virando sete) esgotaria o anel e os ultimos nasceriam
+        // sobre os primeiros — o solo continua consumindo apenas o prefixo de
+        // seis, na ordem de sempre.
         const offsets = [
           [-3, 0],
           [3, 0],
@@ -2417,10 +2430,19 @@ const stepPlayer = (
           [0, 3],
           [-2, -2],
           [2, 2],
+          [2, -2],
+          [-2, 2],
+          [-4, 0],
+          [4, 0],
         ] as const;
+        const alarm = coopPackCapped(state, 2 + site.tier, MAX_ENEMIES - state.enemies.length);
+        // O anel do solo tem SEIS casas, e a rotacao por `site.id` gira dentro
+        // delas: alargar o modulo para dez mudaria a casa de onde cada bicho de
+        // uma run solo sempre saiu.
+        const ring = isCoop(state) ? offsets.length : 6;
         let spawned = 0;
-        for (let i = 0; i < offsets.length && spawned < 2 + site.tier; i++) {
-          const [dx, dy] = offsets[(i + site.id) % offsets.length];
+        for (let i = 0; i < ring && spawned < alarm; i++) {
+          const [dx, dy] = offsets[(i + site.id) % ring];
           const x = site.terminal.x + dx;
           const y = site.terminal.y + dy;
           if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1)
@@ -3243,8 +3265,13 @@ const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void =
  * sem que ninguem percebesse.
  */
 const spawnContaminationWave = (state: SurvivalState, count: number): void => {
-  let spawned = 0;
-  for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
+  // A leva cresce com o time (ver coop.ts), e o numero de TENTATIVAS cresce
+  // junto: o teto de 80 foi dimensionado para levas de dois a quatro num anel
+  // estreito, e uma leva maior sob o mesmo teto simplesmente nasceria pela
+  // metade — a escala existiria no papel e nao no setor.
+  const target = coopPackCapped(state, count, MAX_ENEMIES - state.enemies.length);
+  const attempts = 80 + 20 * (target - count);
+  for (let attempt = 0, spawned = 0; attempt < attempts && spawned < target; attempt++) {
     const x = state.rng.nextInt(state.config.width);
     const y = state.rng.nextInt(state.config.height);
     const i = y * state.config.width + x;

@@ -392,6 +392,7 @@ import { insideAnyBubble, isPoolCore, leviathanTargetable } from './leviathan.js
 import { applyFreezeDose } from './frost.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
+import { coopEnemyHp, coopPack, coopPackCapped } from './coop.js';
 import { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
 import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
@@ -1354,6 +1355,13 @@ export const spawnEnemy = (
   elite: boolean,
 ): Entity => {
   const def = ARCHETYPES[archetype];
+  // A VIDA passa pelo tamanho do time, e este e o unico ponto do jogo que a
+  // escreve: toda boca do bestiario nasce aqui — povoacao de setor, onda de
+  // contaminacao, alarme de terminal, ninhada de chefe, invocacao no meio da
+  // luta. Escalar aqui e o que torna impossivel um caminho de spawn novo
+  // nascer com vida de solo dentro de uma sala de dois.
+  const baseHp = elite ? Math.floor(def.hp * 2.2) : def.hp;
+  const hp = coopEnemyHp(state, archetype, baseHp);
   const enemy: Entity = {
     id: state.nextEntityId++,
     kind: 'enemy',
@@ -1362,8 +1370,8 @@ export const spawnEnemy = (
     y: y + 0.5,
     vx: 0,
     vy: 0,
-    hp: elite ? Math.floor(def.hp * 2.2) : def.hp,
-    maxHp: elite ? Math.floor(def.hp * 2.2) : def.hp,
+    hp,
+    maxHp: hp,
     radius: def.radius,
     alive: true,
     elite,
@@ -7203,8 +7211,13 @@ const furnaceHeartBrood = (state: SurvivalState, enemy: Entity): void => {
   // aprendida, e acumular pressao e exatamente o ponto da escada.
   const teaching = !furnaceOverheated(state);
   if (teaching && alive > 0) return;
-  const quota = teaching ? 1 : FURNACE_HEART_BROOD_PER_WAVE;
-  const cap = teaching ? 1 : FURNACE_HEART_BROOD_CAP;
+  // A leva de ENSINO continua sendo uma so, com ou sem parceiro: ela existe
+  // para o time ver UMA escoria nascer e entender de onde elas vem, e duas ao
+  // mesmo tempo ensinam menos que uma. Depois do colapso e que a cobranca
+  // escala — quota e teto, porque com dois canos um teto de tres some antes de
+  // a escada termica subir um degrau.
+  const quota = teaching ? 1 : coopPack(state, FURNACE_HEART_BROOD_PER_WAVE);
+  const cap = teaching ? 1 : coopPack(state, FURNACE_HEART_BROOD_CAP);
   const w = state.config.width;
   const h = state.config.height;
   let placed = 0;
@@ -7319,8 +7332,12 @@ const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticE
   }
   // Os Espectros saem do gelo, em volta dela.
   let risen = 0;
-  for (let k = 0; k < FROST_QUEEN_WRAITHS; k++) {
-    const angle = (k / FROST_QUEEN_WRAITHS) * Math.PI * 2;
+  // O leque de espectros e recalculado a partir do TOTAL: com tres, eles saem
+  // a 120 graus um do outro e nao dois colados mais um perdido. E por isso que
+  // o angulo divide pelo numero da leva, e nao pela constante.
+  const wraiths = coopPack(state, FROST_QUEEN_WRAITHS);
+  for (let k = 0; k < wraiths; k++) {
+    const angle = (k / wraiths) * Math.PI * 2;
     const wx = Math.floor(enemy.x + Math.cos(angle) * 3);
     const wy = Math.floor(enemy.y + Math.sin(angle) * 3);
     if (wx < 1 || wy < 1 || wx >= w - 1 || wy >= state.config.height - 1) continue;
@@ -7622,10 +7639,14 @@ const diamandisCallSalvageCrew = (state: SurvivalState, enemy: Entity): void => 
   // O rumo inicial gira com o modulo: a segunda equipe nao repete a rota da
   // primeira, e a terceira nao repete a segunda.
   const turn = state.bossRuntime.modulesExposed;
+  // A equipe e o TETO dela crescem com o time; o anel de oito casas comporta a
+  // equipe maior sem duas pas na mesma celula.
+  const crew = coopPack(state, DIAMANDIS_SALVAGE_CREW);
+  const crewCap = coopPack(state, DIAMANDIS_SALVAGE_CREW_CAP);
   let placed = 0;
   for (let k = 0; k < DIAMANDIS_CREW_RING.length; k++) {
-    if (placed >= DIAMANDIS_SALVAGE_CREW) return;
-    if (alive + placed >= DIAMANDIS_SALVAGE_CREW_CAP) return;
+    if (placed >= crew) return;
+    if (alive + placed >= crewCap) return;
     if (state.enemies.length >= MAX_ENEMIES) return;
     const [ux, uy] = DIAMANDIS_CREW_RING[(k + turn) % DIAMANDIS_CREW_RING.length];
     const x = Math.floor(enemy.x + ux * r);
@@ -8896,13 +8917,28 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     });
     // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
     // resolvia os quatro com um recuo so.
+    //
+    // O anel tem OITO casas e o solo usa quatro. As diagonais existem para a
+    // leva de co-op: `coopPack` pede seis, e seis num anel de quatro nascem
+    // dois a dois na mesma celula — um sprite com duas hitboxes, que e o
+    // defeito que a reserva de celula de `populateMiners` ja tinha custado uma
+    // vez. Com o solo consumindo so o prefixo, o cerco de um jogador continua
+    // sendo exatamente o mesmo quadrado de sempre.
     const around = [
       [-2, 0],
       [2, 0],
       [0, -2],
       [0, 2],
+      [-2, -2],
+      [2, 2],
+      [2, -2],
+      [-2, 2],
     ];
-    for (let k = 0; k < GUARDIAN_SUMMON_COUNT; k++) {
+    const summons = Math.min(
+      coopPackCapped(state, GUARDIAN_SUMMON_COUNT, MAX_ENEMIES - state.enemies.length),
+      around.length,
+    );
+    for (let k = 0; k < summons; k++) {
       const [dx, dy] = around[k % around.length];
       spawnEnemy(state, 'stalker', Math.floor(guardian.x) + dx, Math.floor(guardian.y) + dy, false);
     }

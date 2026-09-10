@@ -116,9 +116,13 @@ export class GameRoom {
      */
     depth: RunDepthConfig = DEFAULT_RUN_DEPTH,
   ) {
-    this.state = createRun({ seed, playerCount: maxPlayers, depth });
-    // nenhum avatar entra na sim ate que um cliente reivindique o slot
-    for (const e of this.state.playerExtras) e.joined = false;
+    // `claimedSlots: 0` — nenhum avatar entra na sim ate que um cliente
+    // reivindique o slot, e a SIMULACAO precisa saber disso ANTES de povoar o
+    // setor: a escala de encontro (coop.ts) le os slots em jogo, e zerar os
+    // `joined` depois de `createRun` chegaria tarde demais — o setor de
+    // abertura de toda sala vazia nasceria com a densidade e a vida de dois
+    // jogadores que talvez nunca cheguem.
+    this.state = createRun({ seed, playerCount: maxPlayers, depth, claimedSlots: 0 });
     this.tracker = new ChunkTracker(this.state.config.width, this.state.config.height);
     this.tracker.seed(this.state);
     for (const enemy of this.state.enemies) if (enemy.alive) this.prevAliveEnemies.add(enemy.id);

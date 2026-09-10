@@ -49,6 +49,19 @@ export {
 } from './strata.js';
 export { ascend, descend, populateSector, sectorSeed } from './sectors.js';
 export {
+  COOP_BOSS_HP_PER_EXTRA,
+  COOP_DENSITY_PER_EXTRA,
+  COOP_HP_PER_EXTRA,
+  COOP_PACK_PER_EXTRA,
+  coopDensity,
+  coopElites,
+  coopEnemyHp,
+  coopPack,
+  coopScale,
+  isCoop,
+  partySize,
+} from './coop.js';
+export {
   clearCoreTaken,
   coreUnlocked,
   coresAvailable,

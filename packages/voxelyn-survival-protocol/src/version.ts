@@ -1058,7 +1058,18 @@ export const PROTOCOL_VERSION = 40;
 //     suturada). Antes: 30/15/12. Muda o bioma de parte das seeds e, com
 //     ele, o terreno: replays de 76 geram outro mapa.
 // 78: safe thermal breath, three action-unlocked echoes, authoritative card acceptance.
-export const SIMULATION_VERSION = 78;
+// 79: O ENCONTRO COBRA PELO TIME. Com dois Prospectores em jogo, o setor
+//     nasce com mais corpos (1,45x), o bestiario com mais vida (1,55x), o
+//     chefe com mais ainda (1,75x), um elite por jogador, e toda leva
+//     fechada — onda de contaminacao, alarme de terminal, bando da
+//     assinatura, invocacao e ninhada de chefe — cresce meio a mais por
+//     jogador extra (ver coop.ts). Dano, loot e o mapa do worldgen ficam
+//     iguais: a mesma seed gera o MESMO terreno com um ou dois jogadores. As
+//     levas escaladas respeitam `MAX_ENEMIES`, e em co-op a reserva de celula
+//     e uma so (nada nasce empilhado por causa da escala). O caminho solo e
+//     byte-identico ao da 78 — nenhuma tirada de `rng` mudou de ordem —, mas
+//     todo hash de co-op da 78 deixa de bater.
+export const SIMULATION_VERSION = 79;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
