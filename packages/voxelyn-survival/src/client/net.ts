@@ -233,7 +233,17 @@ export class NetClient {
     acc.ability = acc.ability || cmd.ability;
     acc.interact = acc.interact || cmd.interact;
     acc.purge = acc.purge || cmd.purge;
-    if (cmd.choose !== null) acc.choose = cmd.choose;
+    // A escolha de Eco e uma borda com TRES valores — card 1, card 2 e MANTER
+    // (`choose: null`) — e o tipo viaja junto. Acumular so o indice fazia o
+    // card chegar ao servidor como escolha de MODULO, e o "manter" nunca
+    // chegava: o painel ja tinha se fechado como se a escolha tivesse ido.
+    if (cmd.choiceKind === 'echo') {
+      acc.choose = cmd.choose;
+      acc.choiceKind = 'echo';
+    } else if (cmd.choose !== null) {
+      acc.choose = cmd.choose;
+      delete acc.choiceKind;
+    }
   }
 
   /** Envia a intencao corrente (com throttle ~25 Hz para respeitar o rate limit). */
@@ -256,6 +266,7 @@ export class NetClient {
     this.command.interact = false;
     this.command.purge = false;
     this.command.choose = null;
+    delete this.command.choiceKind;
   }
 
   /** Quantos jogadores o servidor esta reportando neste instante. */
@@ -546,6 +557,7 @@ export class NetClient {
     // funcionando, e o pior que acontece e o co-op nao mostrar Eco nenhum.
     state.wellOffers = (world.wellOffers ?? []).map((offer) => ({
       ability: offer.ability,
+      unlock: { ...offer.unlock },
       x: offer.x,
       y: offer.y,
       takenBy: offer.takenBy,
@@ -854,6 +866,7 @@ export class NetClient {
       ex.dodgeCooldownUntil = this.viewer.dodgeCooldownUntil;
       ex.abilityCooldownUntil = this.viewer.abilityCooldownUntil;
       ex.channelingUntil = this.viewer.channelingUntil;
+      ex.thermalGuardUntil = this.viewer.thermalGuardUntil;
       // A habilidade equipada viaja junto: os timers sozinhos nao bastam — a
       // duracao do radial e a projecao do canal saem do cooldown DELA, e o
       // espelho local nascia com `pulse` e nunca sabia da troca no poco.

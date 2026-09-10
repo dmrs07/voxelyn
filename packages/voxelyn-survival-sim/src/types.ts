@@ -1330,11 +1330,26 @@ export const BELLOWS_EXHALING = 1;
  * distinguir ESTILOS, e um registro fino demais devolveria sempre a habilidade do
  * ultimo acidente em vez da do habito.
  */
-export type ResonanceKind = 'fire' | 'current' | 'blast' | 'kinetic';
+export type ResonanceKind = 'fire' | 'current' | 'blast' | 'kinetic' | 'evasion' | 'purge';
 
 export type ResonanceTally = Record<ResonanceKind, number>;
 
-export type AbilityId = 'pulse' | 'flamethrower' | 'seeker' | 'arc';
+export type AbilityId =
+  | 'pulse'
+  | 'flamethrower'
+  | 'seeker'
+  | 'arc'
+  | 'seismic'
+  | 'slipstream'
+  | 'vent';
+
+/** Evidence frozen with the offer; never inferred from a later tally. */
+export type EchoUnlock = {
+  kind: ResonanceKind | 'first_descent';
+  amount: number;
+  required: number;
+  slot: number;
+};
 
 /**
  * Um Eco demonstrando uma habilidade ao lado do poco.
@@ -1344,6 +1359,7 @@ export type AbilityId = 'pulse' | 'flamethrower' | 'seeker' | 'arc';
  */
 export type WellOffer = {
   ability: AbilityId;
+  unlock: EchoUnlock;
   x: number;
   y: number;
   /** Slot que levou esta habilidade, ou null. A oferta some quando alguem pega. */
@@ -1367,6 +1383,8 @@ export type PlayerExtra = {
    * de um canal ativo divergem no primeiro tiro travado.
    */
   channelingUntil: number;
+  /** Ground-fire protection during Thermal Breath and its exit window. */
+  thermalGuardUntil: number;
   dodgeUntil: number;
   iframesUntil: number;
   /**
@@ -1911,7 +1929,7 @@ export type SemanticEvent =
    * o cliente desenha uma frente que promete ate onde o efeito chega. Um raio
    * constante copiado no cliente viraria mentira no primeiro ajuste de balanco.
    */
-  | { t: 'pulse'; x: number; y: number; radius: number }
+  | { t: 'pulse'; x: number; y: number; radius: number; ability?: AbilityId }
   /**
    * UMA emissao do sopro do lanca-chamas. `dx`/`dy` sao a direcao, `arc` a
    * meia-abertura. `seq` numera a emissao dentro do canal — sal deterministico
@@ -2303,6 +2321,8 @@ export type PlayerCommand = {
   interact: boolean;
   purge: boolean;
   choose: 0 | 1 | null;
+  /** Omitted for module choices. With choose=null, keeps the equipped echo. */
+  choiceKind?: 'echo';
 };
 
 export type SutureRecipe = {

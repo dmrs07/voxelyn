@@ -512,6 +512,53 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(room.state.playerExtras[0].purgeCells).toBe(before - 1);
   });
 
+  it('a escolha de Eco sobrevive ao throttle, inclusive o MANTER', () => {
+    // Dois clientes, duas escolhas: um sintoniza o card 1, o outro mantem.
+    // As duas caem DENTRO da janela nao transmitida, como a purga acima.
+    const run = (pick: 0 | null): { ability: string; offered: string; kept: string } => {
+      const loop = new Loop();
+      const a = loop.connect('A');
+      a.connect();
+      loop.advance(3);
+      const room = loop.server.roomForClient('A')!;
+      const state = room.state;
+      const extra = state.playerExtras[0];
+      extra.resonance.fire = 12;
+      extra.resonance.current = 3;
+      state.players[0].x = state.corePos.x + 0.5;
+      state.players[0].y = state.corePos.y + 0.5;
+      state.enemies = [];
+      loop.tick();
+      expect(state.wellOffers.length).toBeGreaterThan(0);
+      const offered = state.wellOffers[0].ability;
+      const kept = extra.ability;
+
+      const idle = (): PlayerCommand => {
+        const c = emptyCommand();
+        c.aim = { x: 1, y: 0 };
+        return c;
+      };
+      const T = 10_000;
+      a.setCommand(idle());
+      a.pump(T);
+      const choice = idle();
+      choice.choose = pick;
+      choice.choiceKind = 'echo';
+      a.setCommand(choice);
+      a.pump(T + 10); // dentro da janela: nao transmite
+      a.setCommand(idle());
+      a.pump(T + 100); // transmite o acumulado
+      loop.tick();
+      loop.tick();
+      expect(state.wellOffers.every((offer) => offer.takenBy === 0)).toBe(true);
+      return { ability: extra.ability, offered, kept };
+    };
+    const picked = run(0);
+    expect(picked.ability).toBe(picked.offered);
+    const held = run(null);
+    expect(held.ability).toBe(held.kept);
+  });
+
   it('resetSession descarta token e estado: o proximo hello entra em sala nova', () => {
     const loop = new Loop();
     const a = loop.connect('A');

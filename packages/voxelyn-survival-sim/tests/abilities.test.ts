@@ -75,7 +75,7 @@ describe('habilidades', () => {
     }
   });
 
-  it('o lanca-chamas acende o cone a frente e nao o que esta atras', () => {
+  it('o lanca-chamas fere a frente sem incendiar piso vazio', () => {
     const state = createRun({ seed: 2 });
     clearArena(state);
     state.playerExtra.ability = 'flamethrower';
@@ -96,7 +96,7 @@ describe('habilidades', () => {
     const w = state.config.width;
     const front = Math.floor(state.player.y) * w + Math.floor(state.player.x + 2);
     const back = Math.floor(state.player.y) * w + Math.floor(state.player.x - 2);
-    expect(state.surface[front]).toBe(SURF_FIRE);
+    expect(state.surface[front]).toBe(SURF_NONE);
     expect(state.surface[back]).toBe(SURF_NONE);
   });
 
@@ -123,16 +123,21 @@ describe('habilidades', () => {
     // Gas queima com o flash curto do proprio material.
     expect(state.surface[gas]).toBe(SURF_FIRE);
     expect(state.surfaceTimer[gas]).toBeLessThanOrEqual(GAS_FLASH_TICKS);
-    // Chao nu continua recebendo a chama do sopro, que e o que a habilidade faz.
-    expect(state.surface[bare]).toBe(SURF_FIRE);
-    expect(state.surfaceTimer[bare]).toBeGreaterThan(GAS_FLASH_TICKS);
+    // Empty ground is no longer an artificial fuel source.
+    expect(state.surface[bare]).toBe(SURF_NONE);
   });
 
   it('o lanca-chamas nao atravessa alem do alcance', () => {
     const state = createRun({ seed: 3 });
     clearArena(state);
     state.playerExtra.ability = 'flamethrower';
-    const far = spawnEnemy(state, 'stalker', state.player.x + FLAMETHROWER_RANGE + 2, state.player.y, false);
+    const far = spawnEnemy(
+      state,
+      'stalker',
+      state.player.x + FLAMETHROWER_RANGE + 2,
+      state.player.y,
+      false,
+    );
     far.x = state.player.x + FLAMETHROWER_RANGE + 2;
     far.y = state.player.y;
     const hp = far.hp;
@@ -148,7 +153,13 @@ describe('habilidades', () => {
     near.x = state.player.x + 1.5;
     near.y = state.player.y;
     // Dentro do alcance a partir do PRIMEIRO alvo, mas nao do jogador.
-    const chained = spawnEnemy(state, 'stalker', state.player.x + 1.5 + ARC_CHAIN_RANGE - 1, state.player.y, false);
+    const chained = spawnEnemy(
+      state,
+      'stalker',
+      state.player.x + 1.5 + ARC_CHAIN_RANGE - 1,
+      state.player.y,
+      false,
+    );
     chained.x = state.player.x + 1.5 + ARC_CHAIN_RANGE - 1;
     chained.y = state.player.y;
     const isolated = spawnEnemy(state, 'stalker', state.player.x, state.player.y + 40, false);

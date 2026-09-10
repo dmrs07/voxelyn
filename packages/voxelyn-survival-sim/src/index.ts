@@ -190,6 +190,9 @@ export {
 } from './materials.js';
 
 export {
+  canChooseEcho,
+  wellInCombat,
+  echoUnlock,
   ABILITY_DEFINITIONS,
   ABILITY_SHAPE,
   STARTING_ABILITY,

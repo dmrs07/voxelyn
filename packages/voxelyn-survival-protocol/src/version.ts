@@ -247,7 +247,8 @@
 //     aceita `net`. Um cliente de 38 desenharia o Prospector solto enquanto o
 //     servidor recusa os comandos dele. `EnemyArchetype` aceita
 //     `silk_spiderling` (a aranhinha da rocha suturada).
-export const PROTOCOL_VERSION = 39;
+// 40: echo evidence and thermal guard in snapshots; bit 7 tags echo choices in command logs.
+export const PROTOCOL_VERSION = 40;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1056,7 +1057,8 @@ export const PROTOCOL_VERSION = 39;
 //     a seda no topo das faixas (toda seed suturada de antes continua
 //     suturada). Antes: 30/15/12. Muda o bioma de parte das seeds e, com
 //     ele, o terreno: replays de 76 geram outro mapa.
-// 78: O ENCONTRO COBRA PELO TIME. Com dois Prospectores em jogo, o setor
+// 78: safe thermal breath, three action-unlocked echoes, authoritative card acceptance.
+// 79: O ENCONTRO COBRA PELO TIME. Com dois Prospectores em jogo, o setor
 //     nasce com mais corpos (1,45x), o bestiario com mais vida (1,55x), o
 //     chefe com mais ainda (1,75x), um elite por jogador, e toda leva
 //     fechada — onda de contaminacao, alarme de terminal, bando da
@@ -1065,9 +1067,9 @@ export const PROTOCOL_VERSION = 39;
 //     iguais: a mesma seed gera o MESMO terreno com um ou dois jogadores. As
 //     levas escaladas respeitam `MAX_ENEMIES`, e em co-op a reserva de celula
 //     e uma so (nada nasce empilhado por causa da escala). O caminho solo e
-//     byte-identico ao da 77 — nenhuma tirada de `rng` mudou de ordem —, mas
-//     todo hash de co-op da 77 deixa de bater.
-export const SIMULATION_VERSION = 78;
+//     byte-identico ao da 78 — nenhuma tirada de `rng` mudou de ordem —, mas
+//     todo hash de co-op da 78 deixa de bater.
+export const SIMULATION_VERSION = 79;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1274,7 +1276,8 @@ export const SIMULATION_VERSION = 78;
 //     de props (teias, casulo que se mexe, casa de aranha, ninhada, fios do
 //     teto — nove quadros, nas vagas da ultima linha) e o atlas
 //     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
-export const CONTENT_VERSION = 40;
+// 41: seismic, slipstream and vent echoes; expanded per-sector resonance.
+export const CONTENT_VERSION = 41;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -1789,6 +1789,17 @@ export const FLAMETHROWER_EMISSION_DAMAGE = 1.2;
  * celula para uma parede de um tile nunca ser saltada entre duas amostras.
  */
 export const FLAMETHROWER_LOS_STEP = 0.25;
+/** Safe exit from combustible ground after a channel ends or is interrupted. */
+export const FLAMETHROWER_GUARD_TICKS = 30; // 1.5 s, ground fire only
+
+export const SEISMIC_COOLDOWN_TICKS = 180;
+export const SEISMIC_RADIUS = 3.8;
+export const SEISMIC_DAMAGE = 18;
+export const SEISMIC_STUN_TICKS = 16;
+export const SLIPSTREAM_COOLDOWN_TICKS = 160;
+export const SLIPSTREAM_TICKS = 10;
+export const VENT_COOLDOWN_TICKS = 220;
+export const VENT_RADIUS = 3.5;
 
 /**
  * Drone rastreador: UM quadricoptero kamikaze, com dano alto e curva lenta.
@@ -1822,6 +1833,21 @@ export const ARC_MAX_TARGETS = 4;
  */
 export const WELL_OFFER_REVEAL = 7.5;
 export const WELL_OFFER_REACH = 1.4;
+/** Shared card selection is accepted only within the well's immediate area. */
+export const WELL_CHOICE_REACH = 4.2;
+/**
+ * Raio, a partir do JOGADOR, em que um inimigo hostil vivo conta como "em
+ * combate" para o poco. Em combate o painel de sintonia nao abre e a escolha e
+ * recusada: a tela e um menu, e um menu no meio de uma luta e onde o jogador
+ * morre lendo. Ele espera o ultimo bicho cair ou sair de perto.
+ *
+ * Dez tiles e mais que o alcance de cuspe do Cuspidor e menos que meio
+ * setor: o que esta a essa distancia vai chegar antes de o jogador terminar
+ * de ler dois cards. Mede so INIMIGOS, e nao dano recente ou chao pegando
+ * fogo, porque e a unica leitura que o espelho do co-op tambem tem — o
+ * cliente online decide se mostra o painel com o mesmo predicado do servidor.
+ */
+export const WELL_COMBAT_RADIUS = 10;
 /** Quao longe do poco os dois Ecos ficam, um de cada lado. */
 export const WELL_OFFER_SPREAD = 2.4;
 export const ABILITY_KNOCKBACK = 3.2;

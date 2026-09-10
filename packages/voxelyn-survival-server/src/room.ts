@@ -470,6 +470,7 @@ export class GameRoom {
       dodgeCooldownUntil: e.dodgeCooldownUntil,
       abilityCooldownUntil: e.abilityCooldownUntil,
       channelingUntil: e.channelingUntil,
+      thermalGuardUntil: e.thermalGuardUntil,
       ability: e.ability,
       freeze: e.freeze,
       frostbitten: e.frostbitten,
@@ -550,6 +551,7 @@ export class GameRoom {
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.
       wellOffers: this.state.wellOffers.map((offer) => ({
         ability: offer.ability,
+        unlock: { ...offer.unlock },
         x: round3(offer.x),
         y: round3(offer.y),
         takenBy: offer.takenBy,
