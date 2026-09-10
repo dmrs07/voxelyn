@@ -32,7 +32,8 @@ describe('Echoes 2.0 selection UI', () => {
     expect(cards[0].textContent).toContain('8 s após o jato');
     expect(cards[1].textContent).toContain('3 registros de corrente');
     expect(cards[1].textContent).toContain('até 4 inimigos');
-    expect(panel!.element.textContent).toContain('ECHOES 2.0');
+    expect(panel!.element.textContent).toContain('SINTONIZE UM ECO');
+    expect(panel!.element.textContent).toContain('troca a sua habilidade primária');
   });
   it('keyboard chooses once and disappears only after a deliberate choice', () => {
     const state = setup();

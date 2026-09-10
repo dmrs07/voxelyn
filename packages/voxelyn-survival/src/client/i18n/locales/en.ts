@@ -920,8 +920,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'ability.unlock.evasion': '{count} dodges performed this sector. Required: {required}.',
   'ability.unlock.purge': '{count} purge cells used this sector. Required: {required}.',
   'ability.unlock.first': 'Guaranteed first-descent demonstration. No previous actions required.',
-  'ability.choice.title': 'ECHOES 2.0',
-  'ability.choice.subtitle': 'Choose an echo to replace your ability.',
+  'ability.choice.title': 'ATTUNE AN ECHO',
+  'ability.choice.subtitle':
+    'The well resonates with what you did this sector. Attuning an echo swaps your primary ability; descending without choosing keeps the current one.',
   'ability.choice.why': 'WHY IT UNLOCKED',
   'ability.choice.select': '[ {key} ] ATTUNE',
   'ability.choice.keep': 'Keep {ability}',

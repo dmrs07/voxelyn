@@ -973,9 +973,10 @@ export const PT_BR = {
 
   'ability.unlock.first': 'Demonstração garantida da primeira descida. Não exige ações anteriores.',
 
-  'ability.choice.title': 'ECHOES 2.0',
+  'ability.choice.title': 'SINTONIZE UM ECO',
 
-  'ability.choice.subtitle': 'Escolha uma habilidade que nasceu desta descida.',
+  'ability.choice.subtitle':
+    'O poço ressoa com o que você fez neste setor. Sintonizar um Eco troca a sua habilidade primária; descer sem escolher mantém a atual.',
 
   'ability.choice.why': 'POR QUE DESBLOQUEOU',
 
