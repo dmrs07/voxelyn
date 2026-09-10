@@ -21,12 +21,16 @@
 // compositor pedir uma emenda de loop justa.
 //
 // Uso:
-//   node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis] [--out <caminho>] [--trim-silence] [--copy]
+//   node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis|diamandis-vinheta] [--out <caminho>] [--trim-silence] [--copy]
 //
 // --slot escolhe o destino no pipeline: 'run' (padrao) e a trilha da descida
 // (public/audio/voxelyn-survival-theme.flac, COMPOSED_TRIM); 'menu' e a
 // trilha de abertura do terminal (voxelyn-survival-menu.flac, MENU_TRIM);
-// 'diamandis' e a trilha do encontro (voxelyn-survival-diamandis, BOSS_TRIM).
+// 'diamandis' e o LEITO em loop do encontro (voxelyn-survival-diamandis,
+// BOSS_TRIM); 'diamandis-vinheta' e a vinheta de abertura do encontro
+// (voxelyn-survival-diamandis-vinheta, BOSS_VINHETA_TRIM) — toca UMA VEZ
+// quando ele acorda, antes do leito entrar; os dois sao arquivos distintos de
+// proposito, para o leito poder repetir sem repetir a vinheta junto.
 //
 // --copy grava a entrada COMO ESTA (extensao preservada) em vez de FLAC. E o
 // caminho certo quando o master so existe em formato lossy: reempacotar mp3
@@ -86,8 +90,9 @@ const dB = (linear) => 20 * Math.log10(linear);
 const argv = process.argv.slice(2);
 const slotFlag = argv.indexOf('--slot');
 const slot = slotFlag >= 0 ? argv[slotFlag + 1] : 'run';
-if (slot !== 'run' && slot !== 'menu' && slot !== 'diamandis') {
-  die(`--slot invalido: ${slot} (use run, menu ou diamandis)`);
+const VALID_SLOTS = ['run', 'menu', 'diamandis', 'diamandis-vinheta'];
+if (!VALID_SLOTS.includes(slot)) {
+  die(`--slot invalido: ${slot} (use ${VALID_SLOTS.join(', ')})`);
 }
 // Valores de flags nao sao "o arquivo sem --": exclui-los da busca pela
 // entrada — por INDICE, nao por valor (indexOf ausente daria -1 e o +1
@@ -100,13 +105,17 @@ for (const flag of ['--slot', '--out']) {
 const input = argv.find((a, i) => !a.startsWith('--') && !flagValueIdx.has(i));
 if (!input)
   die(
-    'uso: node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis] [--out <caminho>] [--trim-silence] [--copy]',
+    'uso: node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu|diamandis|diamandis-vinheta] [--out <caminho>] [--trim-silence] [--copy]',
   );
 if (!existsSync(input)) die(`entrada nao existe: ${input}`);
 const SLOTS = {
   run: { file: 'voxelyn-survival-theme.flac', trimConst: 'COMPOSED_TRIM' },
   menu: { file: 'voxelyn-survival-menu.flac', trimConst: 'MENU_TRIM' },
   diamandis: { file: 'voxelyn-survival-diamandis.flac', trimConst: 'BOSS_TRIM' },
+  'diamandis-vinheta': {
+    file: 'voxelyn-survival-diamandis-vinheta.flac',
+    trimConst: 'BOSS_VINHETA_TRIM',
+  },
 };
 const copyAsIs = argv.includes('--copy');
 const outFlag = argv.indexOf('--out');

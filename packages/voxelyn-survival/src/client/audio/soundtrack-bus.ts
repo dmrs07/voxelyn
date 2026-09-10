@@ -63,11 +63,23 @@ export class SoundtrackBus {
      * uma constante — duas instancias, um contrato.
      */
     private readonly baseGain: (musicVolume: number) => number = composedBaseGain,
+    /**
+     * Loop continuo (trilhas de atmosfera) ou passagem unica (uma vinheta que
+     * anuncia o encontro e nao deve repetir a cada volta do leito)? So muda o
+     * `loop` da fonte — o resto do ciclo de vida (wake/silence/duck) e
+     * identico, porque o contrato de mixagem (SFX > musica) vale para as duas.
+     */
+    private readonly loop: boolean = true,
   ) {}
 
   /** O arquivo decodificou e a trilha pode soar? */
   get ready(): boolean {
     return this.buffer !== null;
+  }
+
+  /** Duracao do buffer decodificado, em segundos; 0 antes de `load` resolver. */
+  get durationSec(): number {
+    return this.buffer?.duration ?? 0;
   }
 
   /** Cria os nos persistentes em ganho zero. Idempotente. */
@@ -174,12 +186,29 @@ export class SoundtrackBus {
     this.started = false;
   }
 
-  /** Cria a fonte em loop se ha buffer e ainda nao ha fonte viva. */
+  /**
+   * Libera a fonte ja tocada para uma passagem unica poder soar de novo (a
+   * proxima run, o proximo encontro). Sem efeito num bus em loop: a fonte
+   * dele e para durar a sessao inteira, nunca para ser recriada.
+   */
+  resetOneShot(): void {
+    if (this.loop || !this.source) return;
+    try {
+      this.source.stop();
+      this.source.disconnect();
+    } catch {
+      // ja tocou ate o fim; nada a fazer
+    }
+    this.source = null;
+    this.silenced = true;
+  }
+
+  /** Cria a fonte (em loop ou passagem unica) se ha buffer e nenhuma viva. */
   private attachSource(): void {
     if (this.source || !this.buffer || !this.duckGain) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this.buffer;
-    src.loop = true;
+    src.loop = this.loop;
     // Sem trim de loopStart/loopEnd: o asset ja chega com as bordas tratadas
     // pelo prepare-soundtrack.mjs; o loop cobre o buffer inteiro.
     src.connect(this.duckGain);
