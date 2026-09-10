@@ -1379,7 +1379,16 @@ const takeWellOffer = (
     if (extra.channelingUntil > state.tick)
       events.push({ t: 'action_end', entity: state.players[slot].id });
     extra.channelingUntil = 0;
-    extra.thermalGuardUntil = 0;
+    // A troca CANCELA o canal, mas nao a janela de saida: quem trocou de Eco
+    // em cima do fungo que acabou de acender ganha os mesmos 1,5 s que uma
+    // interrupcao por stun daria (`settleBreathChannel`). Zerar aqui cobrava
+    // dano de chao no MESMO tick da troca. `min` e nao atribuicao: um canal
+    // vivo encurta para a janela; uma janela ja correndo nao se estende; sem
+    // sopro nenhum o valor continua o que era.
+    extra.thermalGuardUntil = Math.min(
+      extra.thermalGuardUntil,
+      state.tick + FLAMETHROWER_GUARD_TICKS,
+    );
     events.push({ t: 'ability_taken', slot, ability: offer.ability, x: offer.x, y: offer.y });
   }
   for (const other of state.wellOffers) if (other.takenBy === null) other.takenBy = slot;

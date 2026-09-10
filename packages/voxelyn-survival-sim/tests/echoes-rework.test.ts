@@ -107,6 +107,19 @@ describe('Thermal Breath safety', () => {
 });
 
 describe('Echo unlocks and selection', () => {
+  it('swapping away from a live breath keeps the exit window instead of a bare tick on fire', () => {
+    const s = arena('flamethrower');
+    reveal(s);
+    cast(s);
+    expect(s.playerExtra.channelingUntil).toBeGreaterThan(s.tick);
+    expect(s.wellOffers[0].ability).not.toBe('flamethrower');
+    stepRun(s, [{ ...emptyCommand(), choiceKind: 'echo', choose: 0 }]);
+    expect(s.playerExtra.ability).toBe(s.wellOffers[0].ability);
+    expect(s.playerExtra.channelingUntil).toBe(0);
+    // A mesma janela que um stun daria: nunca zero, nunca o canal inteiro.
+    expect(s.playerExtra.thermalGuardUntil).toBe(s.tick + FLAMETHROWER_GUARD_TICKS);
+  });
+
   it('requires each new action threshold and excludes the equipped ability', () => {
     for (const id of ['seismic', 'slipstream', 'vent'] as const) {
       const d = abilityDefinition(id),
