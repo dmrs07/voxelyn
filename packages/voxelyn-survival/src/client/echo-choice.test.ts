@@ -35,6 +35,23 @@ describe('Echoes 2.0 selection UI', () => {
     expect(panel!.element.textContent).toContain('SINTONIZE UM ECO');
     expect(panel!.element.textContent).toContain('troca a sua habilidade primária');
   });
+  it('landscape touch keeps the panel in the lane between joystick and action buttons', () => {
+    const state = setup();
+    panel!.update(state, true);
+    const style = panel!.element.style;
+    const left = parseFloat(style.getPropertyValue('--echo-lane-left'));
+    const right = parseFloat(style.getPropertyValue('--echo-lane-right'));
+    // happy-dom: 1024x768, paisagem. Esquerda limpa o joystick; direita limpa
+    // o aglomerado de tres botoes, que e mais largo que o joystick.
+    expect(left).toBeGreaterThan(100);
+    expect(right).toBeGreaterThan(left);
+    expect(window.innerWidth - left - right).toBeGreaterThan(250);
+    expect(panel!.element.dataset.lane).toBe('wide');
+    // Mouse: o CSS decide sozinho, sem variaveis penduradas.
+    panel!.update(state, false);
+    expect(style.getPropertyValue('--echo-lane-left')).toBe('');
+    expect(panel!.element.dataset.lane).toBeUndefined();
+  });
   it('keyboard chooses once and disappears only after a deliberate choice', () => {
     const state = setup();
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2', key: '2', bubbles: true }));
