@@ -230,6 +230,7 @@ export const frameDeltaMs = (lastMs: number, nowMs: number): number => {
 
 export class VoxelParticles {
   private items: Particle[] = [];
+  private readonly lastSprintBucket = new Map<number, number>();
   /**
    * Ultimo bucket de tempo em que cada celula emitiu gas. Limitado ao numero de
    * celulas do mundo, entao nao cresce sem teto.
@@ -973,6 +974,45 @@ export class VoxelParticles {
    * maquina passando, nao ar cortado. `speed` e a fracao da velocidade
    * (0..1): a corrida devagar levanta pouco; o pico levanta muito.
    */
+  /**
+   * POEIRA DA DISPARADA: um pequeno sopro de pedra atras dos pes de quem
+   * corre, a cada tres ticks. E o rastro no chao; as linhas de velocidade no
+   * tronco sao de `sprint-trail.ts`. Semeado pelo tick e pelo id, entao as
+   * duas maquinas do co-op poem os graos no mesmo lugar.
+   */
+  emitSprintDust(
+    id: number,
+    x: number,
+    y: number,
+    facingX: number,
+    facingY: number,
+    tick: number,
+    scale: number,
+  ): void {
+    const bucket = Math.floor(tick / 3);
+    if (this.lastSprintBucket.get(id) === bucket) return;
+    this.lastSprintBucket.set(id, bucket);
+    const len = Math.hypot(facingX, facingY) || 1;
+    const bx = -facingX / len;
+    const by = -facingY / len;
+    const rnd = seeded(eventSeed(x, y, id ^ (bucket * 131)));
+    const count = Math.max(1, Math.round(2 * scale));
+    for (let i = 0; i < count; i++) {
+      this.push({
+        x: x + bx * 0.3 + (rnd() - 0.5) * 0.3,
+        y: y + by * 0.3 + (rnd() - 0.5) * 0.3,
+        z: 0.05 + rnd() * 0.1,
+        vx: bx * 0.9 + (rnd() - 0.5) * 0.5,
+        vy: by * 0.9 + (rnd() - 0.5) * 0.5,
+        vz: 0.5 + rnd() * 0.6,
+        life: 260 + rnd() * 160,
+        maxLife: 420,
+        kind: 'stone',
+        visualSeed: id + i,
+      });
+    }
+  }
+
   emitDrillDust(
     x: number,
     y: number,

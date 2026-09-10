@@ -710,6 +710,8 @@ export class NetClient {
           state.playerExtras[slot].frostbitten = snap.frostbitten ?? false;
           state.playerExtras[slot].cocoonUntil = snap.cocoonUntil ?? 0;
           state.playerExtras[slot].webbedUntil = snap.webbedUntil ?? 0;
+          // A Disparada do parceiro: o rastro dele sai do estado, como o frio.
+          state.playerExtras[slot].sprintUntil = snap.sprintUntil ?? 0;
           pl.action = snap.action
             ? {
                 kind: snap.action.kind,

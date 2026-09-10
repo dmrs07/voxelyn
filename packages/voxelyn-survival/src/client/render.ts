@@ -5,6 +5,7 @@ import {
   drawAbilityMorph,
 } from './ability-icons';
 import { drawArcChain, ARC_FLASH_MS } from './arc-chain';
+import { drawSprintTrail } from './sprint-trail';
 import {
   SLIPSTREAM_TICKS,
   SOLID_SUTURE_ANCHOR,
@@ -5469,6 +5470,36 @@ export class SurvivalRenderer {
               ex.cocoonUntil > state.tick,
             );
           },
+        });
+      }
+      // A DISPARADA: linhas de velocidade atras do tronco e poeira nos pes,
+      // para QUALQUER Prospector correndo — o local e o parceiro leem o mesmo
+      // estado (`sprintUntil` viaja na entidade). Atras do corpo na fila.
+      if (ex.sprintUntil > state.tick) {
+        this.particles.emitSprintDust(
+          pl.id,
+          pl.x,
+          pl.y,
+          pl.facing.x,
+          pl.facing.y,
+          state.tick,
+          this.quality.maxFx / PRESETS.high.maxFx,
+        );
+        items.push({
+          depth: pl.x + pl.y - 0.01,
+          draw: () =>
+            drawSprintTrail(
+              ctx,
+              pl.x,
+              pl.y,
+              pl.facing.x,
+              pl.facing.y,
+              toScreen,
+              TILE_H * 0.55 * z,
+              Math.max(1, 1.3 * z),
+              abilityPresentation('slipstream').color,
+              nowMs,
+            ),
         });
       }
       items.push({
