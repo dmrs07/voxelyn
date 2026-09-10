@@ -147,6 +147,24 @@ export const coopEnemyHp = (
 export const coopPack = (state: SurvivalState, base: number): number =>
   Math.max(base, Math.round(base * coopScale(state, COOP_PACK_PER_EXTRA)));
 
+/**
+ * A mesma leva, recortada pelo que ainda cabe no orcamento do setor.
+ *
+ * `MAX_ENEMIES` e teto de SETOR e nao de corpos vivos: `state.enemies` guarda os
+ * cadaveres tambem e so e zerado na descida. Todo outro spawn do jogo ja para
+ * quando ele enche (`if (state.enemies.length >= MAX_ENEMIES) return`); as levas
+ * daqui nao paravam, e a densidade de co-op transformou isso num estouro real —
+ * seed 2, setor 3: 46 corpos na povoacao, 52 depois de um alarme de tier 3, 55
+ * depois da primeira onda.
+ *
+ * O SOLO passa reto, com a leva de sempre. Nao e descuido: com 26 corpos num
+ * setor de 48 ele praticamente nao encosta no teto, a versao anterior nunca
+ * checou nada aqui, e recusar um corpo que ela spawnava mudaria o setor de quem
+ * joga sozinho — a garantia que esta escala inteira existe para nao quebrar.
+ */
+export const coopPackCapped = (state: SurvivalState, base: number, capacity: number): number =>
+  isCoop(state) ? Math.max(0, Math.min(coopPack(state, base), capacity)) : base;
+
 /** Quantos corpos a povoacao do setor coloca, dado o orcamento solo. */
 export const coopDensity = (state: SurvivalState, base: number): number =>
   Math.max(base, Math.round(base * coopScale(state, COOP_DENSITY_PER_EXTRA)));

@@ -112,11 +112,13 @@ describe('escala de co-op: o encontro cobra pelo time', () => {
 
   it('os corpos extras nascem em chao livre, sem empilhar e longe da entrada', () => {
     // Comparativo com o solo de proposito, e nao um zero absoluto: a povoacao
-    // de um jogador ja empilha Costureiros quando o bioma sorteia mais deles
-    // que suturas soltas, e dois pontos do worldgen em cem nascem apertados
-    // demais para um corpo de raio 0,5. Nenhum dos dois e desta escala — o que
-    // ela nao pode fazer e PIORAR a conta ao encher o setor.
-    for (const seed of [1, 9, 42, 55, 777]) {
+    // de um jogador ja empilha Costureiros quando a Cerzideira os junta na
+    // mesma sutura, e dois pontos do worldgen em cem nascem apertados demais
+    // para um corpo de raio 0,5. Nenhum dos dois e desta escala — o que ela nao
+    // pode fazer e PIORAR a conta ao encher o setor, e foi exatamente o que ela
+    // fazia em doze dos 420 setores medidos (bando da assinatura sobre um
+    // Espreitador comum, Costureiro extra sobre o Costureiro realocado).
+    for (const seed of [1, 9, 21, 42, 55, 106, 127, 777]) {
       for (const sector of [1, 2, 3]) {
         const solo = createRun({ seed, playerCount: 1, sector });
         const duo = createRun({ seed, playerCount: 2, sector });
@@ -128,6 +130,32 @@ describe('escala de co-op: o encontro cobra pelo time', () => {
         }
       }
     }
+  });
+
+  it('a leva maior respeita o teto do setor em vez de estoura-lo', () => {
+    // Seed 2, setor 3: a povoacao da dupla entrega 46 corpos, e antes desta
+    // guarda o alarme de tier 3 levava o setor a 52 e a primeira onda a 55,
+    // num teto de 48. A regra e "a leva nunca empurra o setor para alem do teto
+    // — nem para alem de onde ele ja estava".
+    const state = createRun({ seed: 2, playerCount: 2, sector: 3 });
+    const cap = (before: number): number => Math.max(before, MAX_ENEMIES);
+
+    const site = state.salvageSites.find((s) => s.tier === 3) ?? state.salvageSites[0];
+    state.players[0].x = site.terminal.x + 0.5;
+    state.players[0].y = site.terminal.y + 0.5;
+    const interact = emptyCommand();
+    interact.interact = true;
+    const beforeAlarm = state.enemies.length;
+    expect(beforeAlarm).toBeGreaterThan(MAX_ENEMIES - 10); // o setor JA nasce apertado
+    stepRun(state, [interact, emptyCommand()]);
+    expect(site.terminalState).toBe('scanning');
+    expect(state.enemies.length).toBeLessThanOrEqual(cap(beforeAlarm));
+
+    state.contamination = 0.4;
+    const beforeWave = state.enemies.length;
+    stepRun(state, [emptyCommand(), emptyCommand()]);
+    expect(state.contaminationWaves).toBe(1); // a onda DISPAROU, so nao coube
+    expect(state.enemies.length).toBeLessThanOrEqual(cap(beforeWave));
   });
 
   it('toda vaga DERIVADA cabe: o corpo extra nunca nasce dentro da pedra', () => {
@@ -169,6 +197,24 @@ describe('escala de co-op: o encontro cobra pelo time', () => {
     const solo = alarm(1);
     const duo = alarm(2);
     expect(duo).toBeGreaterThan(solo);
+  });
+
+  it('a sala de co-op VAZIA povoa o setor de abertura para um, nao para dois', () => {
+    // O caso do servidor: `GameRoom` cria a run com os dois assentos antes de
+    // qualquer cliente reivindicar um. Sem `claimedSlots`, o setor de abertura
+    // de toda sala nascia com a densidade e a vida de dois jogadores que talvez
+    // nunca chegassem — e quem entrasse primeiro pagaria essa conta sozinho.
+    const room = createRun({ seed: 42, playerCount: 2, claimedSlots: 0 });
+    const solo = createRun({ seed: 42, playerCount: 1 });
+    expect(partySize(room)).toBe(1);
+    expect(room.enemies.length).toBe(solo.enemies.length);
+    expect(room.enemies.map((e) => e.maxHp)).toEqual(solo.enemies.map((e) => e.maxHp));
+
+    // E quando os dois entram, a proxima leva ja cobra por dois — o setor ja
+    // povoado nao muda debaixo de ninguem, mas o que vier depois muda.
+    for (const extra of room.playerExtras) extra.joined = true;
+    expect(partySize(room)).toBe(2);
+    expect(contaminationWave(room)).toBe(coopPack(room, 2));
   });
 
   it('a sala de um assento ocupado joga a run de um, inclusive nas levas', () => {

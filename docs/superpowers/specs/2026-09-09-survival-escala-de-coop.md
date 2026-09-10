@@ -69,15 +69,40 @@ o que elas são.
 ## 4. Quem é "o time"
 
 `partySize()` lê `joined` — os slots **efetivamente em jogo** —, nunca
-`config.playerCount`. A diferença importa nos dois sentidos: uma sala de co-op é
-criada com dois assentos **antes** de qualquer cliente reivindicar um deles, e
-quem entra primeiro e joga esperando o parceiro não pode receber a conta de
-dois; quem entra no meio da descida não pode continuar pagando a conta de um.
+`config.playerCount`. A diferença importa nos dois sentidos: quem entra primeiro
+e joga esperando o parceiro não pode receber a conta de dois; quem entra no meio
+da descida não pode continuar pagando a conta de um.
+
+Isso impõe uma **ordem** ao servidor. `GameRoom` cria a run com todos os assentos
+da sala e só depois decide quem entrou — e o setor de abertura já foi povoado
+nesse intervalo. Por isso `RunConfig.claimedSlots` existe: a sala passa `0`, a
+população do primeiro setor lê um time de um, e a sala que ficar a run inteira
+com um jogador só nunca paga a conta de dois. O campo descreve o instante da
+criação e por isso **não** entra em `state.config`, que é a configuração
+congelada da run — guardá-lo lá o deixaria envelhecer em silêncio.
 
 Como toda escala é aplicada **no instante do spawn**, o setor já povoado não muda
 debaixo do jogador: a mudança vale para a próxima onda, o próximo alarme, o
 próximo setor. É função pura do estado, como tudo em `depth.ts` — o servidor
 autoritativo e qualquer re-simulação chegam ao mesmo número no mesmo tick.
+
+## 4.1 O teto do setor
+
+`MAX_ENEMIES` é teto de **setor**, não de corpos vivos: `state.enemies` guarda os
+cadáveres também e só é zerado na descida. Todo outro spawn do jogo já para
+quando ele enche; as levas escaladas não paravam, e a densidade de dupla
+transformou isso num estouro real — seed 2, setor 3: 46 corpos na população, 52
+depois de um alarme de tier 3, 55 depois da primeira onda. `coopPackCapped`
+recorta a leva pelo que ainda cabe.
+
+O solo passa reto por essa guarda, com a leva de sempre: com 26 corpos num setor
+de 48 ele praticamente não encosta no teto, a versão anterior nunca checou nada
+ali, e recusar um corpo que ela spawnava mudaria o setor de quem joga sozinho.
+
+Um encontro pode ainda assim passar do teto — a **formação de abertura do
+Arquicantor** é garantida por desenho e nasce sem consultar orçamento nenhum.
+Isso é anterior a esta escala e continua valendo; o que a escala garante é que
+nenhuma leva **dela** empurra o setor para além do teto.
 
 ## 5. Garantias
 
@@ -87,11 +112,17 @@ autoritativo e qualquer re-simulação chegam ao mesmo número no mesmo tick.
   de contaminação só cresce junto com a leva. Verificado por hash autoritativo
   contra a `SIMULATION_VERSION` 77 em 400 ticks roteirizados de seis seeds e na
   população de 120 setores (40 seeds x 3 setores).
-- **Nada nasce empilhado por causa da escala.** Toda vaga derivada reserva a
-  própria célula, e o Costureiro extra desvia quando o rodízio de suturas dá a
-  volta. Medido nos mesmos 120 setores: a dupla não empilha mais que o solo.
-- **`MAX_ENEMIES` continua sendo teto duro**, compartilhado com mineradores,
-  ninhadas e ondas.
+- **Nada nasce empilhado por causa da escala.** Em co-op a reserva de células é
+  **uma só**: vaga derivada, casa do bando da assinatura e pouso do Costureiro
+  realocado pela Cerzideira disputam o mesmo chão e nenhum deles escolhe uma
+  célula que já tem dono. Medido em 420 setores (140 seeds x 3): **nenhum** setor
+  de dupla empilha mais corpos que o mesmo setor no solo. O empilhamento que
+  sobra é o do solo — mais velho que esta escala, e corrigi-lo moveria corpos de
+  quem joga sozinho.
+- **`MAX_ENEMIES` continua sendo teto**, compartilhado com mineradores, ninhadas
+  e ondas — ver §4.1.
 - **Hashes de co-op da 77 deixam de bater** — daí o bump de `SIMULATION_VERSION`.
 
-Testes: `packages/voxelyn-survival-sim/tests/escala-coop.test.ts`.
+Testes: `packages/voxelyn-survival-sim/tests/escala-coop.test.ts` e
+`packages/voxelyn-survival-server/tests/escala-de-encontro-na-sala.test.ts` (a
+ordem entre criar a sala e povoar o setor).

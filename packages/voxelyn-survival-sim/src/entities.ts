@@ -392,7 +392,7 @@ import { insideAnyBubble, isPoolCore, leviathanTargetable } from './leviathan.js
 import { applyFreezeDose } from './frost.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
-import { coopEnemyHp, coopPack } from './coop.js';
+import { coopEnemyHp, coopPack, coopPackCapped } from './coop.js';
 import { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
 import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
@@ -8934,7 +8934,10 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       [2, -2],
       [-2, 2],
     ];
-    const summons = Math.min(coopPack(state, GUARDIAN_SUMMON_COUNT), around.length);
+    const summons = Math.min(
+      coopPackCapped(state, GUARDIAN_SUMMON_COUNT, MAX_ENEMIES - state.enemies.length),
+      around.length,
+    );
     for (let k = 0; k < summons; k++) {
       const [dx, dy] = around[k % around.length];
       spawnEnemy(state, 'stalker', Math.floor(guardian.x) + dx, Math.floor(guardian.y) + dy, false);

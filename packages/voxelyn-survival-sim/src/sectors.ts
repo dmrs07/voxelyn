@@ -53,7 +53,7 @@ import {
   circleBlocked,
   spawnEnemy,
 } from './entities.js';
-import { coopDensity, coopElites, coopPack } from './coop.js';
+import { coopDensity, coopElites, coopPack, isCoop } from './coop.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
 import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { isIceSurface } from './constants.js';
@@ -343,9 +343,8 @@ export const populateSector = (
   // lampreia em chao seco nao e um encontro, e um peixe fora d'agua.
   const signature = SIGNATURE_OF_STRATUM[state.stratum] as EnemyArchetype | undefined;
   const signatureIndices = new Set<number>();
-  // Celulas de elemento ja entregues a um membro do bando. Local, como o
-  // `taken` de populateMiners: vale durante a povoacao e nao existe depois.
-  const signatureHomes = new Set<number>();
+  // Celulas de elemento ja entregues a um membro do bando (ver `takenCells`,
+  // logo abaixo: em co-op as duas reservas sao a mesma).
   if (signature) {
     // O bando cresce com o time pelo mesmo motivo que a leva de contaminacao
     // cresce: ele e o encontro AUTORAL do estrato, e um lago que dois jogadores
@@ -359,11 +358,18 @@ export const populateSector = (
     }
   }
 
-  // Celulas ja prometidas a alguem. Comeca com os proprios pontos do worldgen
-  // (uma vaga derivada nao pode cair sobre uma vaga original ainda por
-  // preencher) e vale so durante a povoacao, como o `taken` de populateMiners.
+  // Celulas ja prometidas a alguem: cada corpo entra nela ao nascer, e ela vale
+  // so durante a povoacao, como o `taken` de populateMiners.
+  //
+  // EM CO-OP ELA E A MESMA DO BANDO DA ASSINATURA. A casa da Lampreia sai de uma
+  // varredura que so conhecia as casas dos OUTROS membros do bando, entao o
+  // bando maior encontrava lago ja ocupado por um Espreitador comum e nascia
+  // por cima dele (seed 106, setor 3: lampreia sobre stalker). Com uma reserva
+  // so, a varredura enxerga o setor inteiro. O solo mantem os dois conjuntos
+  // separados: unifica-los la moveria corpos de quem joga sozinho, e o
+  // empilhamento que sobra no solo e mais velho que esta escala.
   const takenCells = new Set<number>();
-  for (const spawn of spawns) takenCells.add(spawn.y * state.config.width + spawn.x);
+  const signatureHomes = isCoop(state) ? takenCells : new Set<number>();
 
   let workerHome = 0;
   for (let i = 0; i < budget; i++) {

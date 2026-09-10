@@ -1062,9 +1062,11 @@ export const PROTOCOL_VERSION = 39;
 //     fechada — onda de contaminacao, alarme de terminal, bando da
 //     assinatura, invocacao e ninhada de chefe — cresce meio a mais por
 //     jogador extra (ver coop.ts). Dano, loot e o mapa do worldgen ficam
-//     iguais: a mesma seed gera o MESMO terreno com um ou dois jogadores. O
-//     caminho solo e byte-identico ao da 77 — nenhuma tirada de `rng` mudou
-//     de ordem —, mas todo hash de co-op da 77 deixa de bater.
+//     iguais: a mesma seed gera o MESMO terreno com um ou dois jogadores. As
+//     levas escaladas respeitam `MAX_ENEMIES`, e em co-op a reserva de celula
+//     e uma so (nada nasce empilhado por causa da escala). O caminho solo e
+//     byte-identico ao da 77 — nenhuma tirada de `rng` mudou de ordem —, mas
+//     todo hash de co-op da 77 deixa de bater.
 export const SIMULATION_VERSION = 78;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.

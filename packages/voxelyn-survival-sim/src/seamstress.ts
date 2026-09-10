@@ -1,7 +1,7 @@
 import { SOLID_NONE, SOLID_STITCHED_ROCK, TICK_HZ, MAX_ENEMIES } from './constants.js';
 import { markDirty } from './cells.js';
 import { bodyBlocked, damageEntity, spawnEnemy, startAction } from './entities.js';
-import { coopPack } from './coop.js';
+import { coopPack, isCoop } from './coop.js';
 import { approach, suturePoint } from './sutures.js';
 import { maintainWebRepair, webRepairFirst } from './web-repair.js';
 import { registerWebJunctions, WEB_ANCHOR_HP } from './web-supports.js';
@@ -234,8 +234,22 @@ export const silkLanding = (
   body: Entity,
   at: Vec2,
   reach = 3,
+  /**
+   * Celulas ja prometidas nesta mesma passada, quando quem chama precisa de
+   * pousos DISTINTOS. `null` (o padrao) mantem o comportamento historico: a
+   * varredura devolve sempre a celula valida mais proxima do alvo, e dois
+   * corpos com o mesmo alvo pousam um sobre o outro.
+   */
+  taken: Set<number> | null = null,
 ): Vec2 | null => {
-  if (silkCanLand(state, body, at.x, at.y)) return { x: at.x, y: at.y };
+  const reserve = (p: Vec2): Vec2 => {
+    taken?.add(Math.floor(p.y) * state.config.width + Math.floor(p.x));
+    return p;
+  };
+  const free = (x: number, y: number): boolean =>
+    taken === null || !taken.has(Math.floor(y) * state.config.width + Math.floor(x));
+  if (free(at.x, at.y) && silkCanLand(state, body, at.x, at.y))
+    return reserve({ x: at.x, y: at.y });
   let best: Vec2 | null = null,
     score = Infinity;
   const w = state.config.width;
@@ -250,13 +264,18 @@ export const silkLanding = (
       x++
     ) {
       const d = Math.hypot(x + 0.5 - at.x, y + 0.5 - at.y);
-      if (d <= reach && d < score && silkCanLand(state, body, x + 0.5, y + 0.5)) {
+      if (
+        d <= reach &&
+        d < score &&
+        free(x + 0.5, y + 0.5) &&
+        silkCanLand(state, body, x + 0.5, y + 0.5)
+      ) {
         best = { x: x + 0.5, y: y + 0.5 };
         score = d;
       }
     }
   }
-  return best;
+  return best === null ? null : reserve(best);
 };
 
 export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
@@ -288,6 +307,14 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
         markDirty(state, i % state.config.width, Math.floor(i / state.config.width));
       }
   }
+  // CADA Costureiro da camara e mandado para a MESMA sutura, e a varredura
+  // devolve sempre a celula valida mais proxima dela: sem reserva, o segundo
+  // pousa em cima do primeiro. Em co-op cada pouso e reservado, porque a densidade maior
+  // manda mais Costureiros para a mesma camara e o empilhamento cresceria com o
+  // time (seed 21, setor 3: dois corpos empilhados no solo, tres na dupla). O
+  // solo fica como estava — o defeito e mais velho que esta escala, e corrigi-lo
+  // la moveria corpos de quem joga sozinho.
+  const landings = isCoop(state) ? new Set<number>() : null;
   for (const worker of state.enemies) {
     if (
       worker.archetype !== 'stitcher' ||
@@ -296,7 +323,9 @@ export const initSeamstress = (state: SurvivalState, queen: Entity): void => {
     )
       continue;
     const site = state.sutures.find((s) => !s.encounter);
-    const at = site ? silkLanding(state, worker, suturePoint(state, site.cells[0]), 3) : null;
+    const at = site
+      ? silkLanding(state, worker, suturePoint(state, site.cells[0]), 3, landings)
+      : null;
     if (at) {
       worker.x = at.x;
       worker.y = at.y;
