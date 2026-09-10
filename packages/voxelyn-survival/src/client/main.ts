@@ -11,8 +11,14 @@ import type {
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { DesktopControlBar } from './desktop-controls';
 import { inductionSeen, markInductionSeen, renderInduction } from './induction';
-import { createTrainingRun, markTrainingDone } from './training-setup';
-import { TrainingDirector, type TrainingCue } from './training-director';
+import {
+  TRAINING_START,
+  createTrainingRun,
+  markTrainingDone,
+  placeAtTrainingObjective,
+  stampTrainingSector,
+} from './training-setup';
+import { TrainingDirector, type TrainingCheckpoint, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { EngagementMemory, applyCombatAssist } from './combat-assist';
 import { SurvivalRenderer } from './render';
@@ -42,6 +48,7 @@ import {
 } from './settings';
 import { audio } from './audio';
 import {
+  applyDiscoveries,
   applyRunOnce,
   loadRecords,
   runSummaryIdentity,
@@ -381,6 +388,9 @@ const backToMenu = (): void => {
  * - destructive (vermelho 2px): perda irreversivel, e SO ela.
  */
 type BannerTone = 'warning' | 'info' | 'success' | 'offline' | 'error' | 'destructive';
+
+/** O banner esta na tela agora? Ver `TrainingDirector.standingBanner`. */
+const bannerVisible = (): boolean => !banner.classList.contains('hidden');
 
 const setBanner = (text: string | null, tone: BannerTone = 'warning'): void => {
   if (!text) {
@@ -1529,6 +1539,13 @@ const showTrainingOutcome = (certified: boolean): void => {
     'btn-training-descend',
     certified ? 'training.complete.descend' : 'training.incomplete.retry',
   );
+  // A leitura complementar so aparece no formulario HOMOLOGADO: quem vai
+  // repetir o exercicio tem uma tarefa a fazer, e um paragrafo sobre o arquivo
+  // no meio dela e a companhia falando quando ninguem perguntou.
+  const archiveNote = document.getElementById('training-complete-archive');
+  const archiveButton = document.getElementById('btn-training-archive');
+  if (archiveNote) archiveNote.hidden = !certified;
+  if (archiveButton) archiveButton.hidden = !certified;
 
   runInProgress = false;
   activeRunKind = 'none';
@@ -1536,6 +1553,7 @@ const showTrainingOutcome = (certified: boolean): void => {
   paused = false;
   pauseMenu.disarmHistory();
   input.clearPendingUiInput();
+  echoChoice.hide();
   mountOptions(optionsSlot);
   trainingCompleteOverlay.classList.remove('hidden');
 };
@@ -1565,7 +1583,7 @@ const prepareTraining = (): PreparedRun => {
   renderer.messages.length = 0;
   renderer.setDeathEchoes(emptyDeathEchoFrame());
 
-  let state: SurvivalState = createTrainingRun();
+  let state: SurvivalState = createTrainingRun(TRAINING_START);
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -1577,6 +1595,8 @@ const prepareTraining = (): PreparedRun => {
   playout.capture(state);
   const assistMemory = new EngagementMemory();
   let frameNow = lastTime;
+  /** A carta de modulo escolhida neste quadro, a caminho do proximo tick. */
+  let queuedChoice: 0 | 1 | null = null;
   const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
     renderer.ingestEvents(events, frameNow);
     audio.ingest(events, frameNow, state);
@@ -1591,6 +1611,9 @@ const prepareTraining = (): PreparedRun => {
     playout.capture(state);
     assistMemory.clear();
     input.consumeAimTap();
+    input.clearPendingChoiceInput();
+    echoChoice.hide();
+    queuedChoice = null;
   };
 
   /** Os cues do diretor viram efeito AQUI — ele nao conhece banner nem toast. */
@@ -1608,6 +1631,46 @@ const prepareTraining = (): PreparedRun => {
     }
   };
 
+  const toast = (key: MessageKey, nowMs: number): void => {
+    renderer.messages.push({ text: t(key), until: nowMs + 3600 });
+  };
+
+  /**
+   * Reconstroi o exercicio no checkpoint pedido, e recomeca o laco nele.
+   *
+   * O `state` do laco e reatribuido: e a mesma troca que a versao anterior
+   * fazia na tela de fim, so que agora sem tela de fim no meio. Tudo o que
+   * atravessaria a descontinuidade — playout, fila de eventos, memoria da
+   * assistencia, toasts, painel de Ecos — e drenado por `rearm`.
+   */
+  const restartAt = (checkpoint: TrainingCheckpoint): void => {
+    state = createTrainingRun(checkpoint);
+    liveRun = state;
+    rearm();
+    audio.reset();
+    resetRunTracking();
+    renderer.messages.length = 0;
+    gate.reset();
+    accumulator = 0;
+  };
+
+  /**
+   * A troca de setor, carimbada.
+   *
+   * `descend` e `ascend` REGERAM o mundo a partir do worldgen: o percurso do
+   * exercicio nao sobrevive a nenhuma das duas. O carimbo tem de ser reaplicado
+   * no mesmo instante em que a simulacao terminou a transicao e antes de
+   * qualquer coisa ler o mundo novo — este e o unico ponto do laco em que isso
+   * e verdade, e e por isso que ele mora entre `stepRun` e `playout.capture`.
+   *
+   * Na SUBIDA ha um segundo acerto: `ascend` emerge o Prospector no poco que o
+   * worldgen inventou, que o carimbo acabou de transformar em rocha.
+   */
+  const stampSectorChange = (ascending: boolean): void => {
+    const course = stampTrainingSector(state);
+    if (ascending) placeAtTrainingObjective(state, course);
+  };
+
   /**
    * O desenho do treinamento contorna `renderState` de proposito: ela pede o
    * pool de carcacas na rede, e o exercicio nao pode gerar trafego. A carga do
@@ -1617,6 +1680,10 @@ const prepareTraining = (): PreparedRun => {
   const draw = (view: SurvivalState, nowMs: number): void => {
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, nowMs);
+    // O painel de Ecos e DOM, como no solo: sem esta linha o poco do exercicio
+    // ofereceria dois props no chao e nenhuma carta — e a licao do Eco seria a
+    // unica do curriculo sem interface.
+    echoChoice.update(view, input.state.usingTouch, pauseMenu.isOpen);
   };
 
   const frame = (now: number): void => {
@@ -1649,7 +1716,17 @@ const prepareTraining = (): PreparedRun => {
       // desenhando para escutar R/T.
       if (state.phase === 'extracted' || state.phase === 'extracted_with_core') {
         const certified = state.phase === 'extracted_with_core';
-        if (certified) markTrainingDone();
+        if (certified) {
+          markTrainingDone();
+          // A UNICA coisa que o exercicio deixa gravada. Ver `applyDiscoveries`:
+          // o que ele aprendeu quebrando rocha fragil e o que faz o "ABRIR OS
+          // ARQUIVOS" do formulario levar a uma pagina com conteudo.
+          const merged = applyDiscoveries(records, state.stats.discoveries);
+          if (merged !== records) {
+            records = merged;
+            saveRecords(records);
+          }
+        }
         setBanner(null);
         audio.update(state, now);
         // O ultimo quadro fica congelado atras do formulario.
@@ -1659,38 +1736,51 @@ const prepareTraining = (): PreparedRun => {
         return;
       }
 
-      // Morreu: a mesma tela de fim de sempre — a leitura do resultado tambem
-      // e curriculo. Reiniciar e instantaneo (nao ha ticket a esperar).
-      const { drain, armed } = gate.frame(now, true);
-      if (drain) input.clearPendingUiInput();
+      // Morreu: e o exercicio NAO tem tela de fim.
+      //
+      // Uma operacao de treinamento que devolve o novato ao menu por causa de
+      // um espreitador cobra dele exatamente o tempo que ela existe para
+      // economizar. O chassi e material de consumo — a circular diz isso no §1,
+      // e aqui a companhia simplesmente manda outro: o trecho e reconstruido, o
+      // diretor rebobina para o inicio dele, e a instrucao seguinte ja e a
+      // mesma que estava na tela. O que se perde e o progresso DENTRO do
+      // trecho, nunca o exercicio.
+      eventQueue.flush(Number.POSITIVE_INFINITY);
       audio.update(state, now);
       draw(state, now);
-      const endRegions = renderer.renderEnd(state, vw, vh, now, { input: input.state });
-      const action = endScreenAction(endRegions, armed);
-      if (action === 'restart') {
-        state = createTrainingRun();
-        liveRun = state;
-        rearm();
-        audio.reset();
-        resetRunTracking();
-        renderer.messages.length = 0;
-        director.reset();
-        gate.reset();
-      } else if (action === 'terminal') {
-        audio.ui();
-        abandonRun();
-      }
-      accumulator = 0;
+      const checkpoint = director.rewind();
+      restartAt(checkpoint);
+      setBanner(null);
+      toast(checkpoint.withCore ? 'training.restart.return' : 'training.restart.sector', now);
       requestAnimationFrame(frame);
       return;
     }
 
     while (accumulator >= TICK_MS) {
       const raw = input.snapshot(playerScreen());
+      if (queuedChoice !== null) {
+        raw.choose = queuedChoice;
+        queuedChoice = null;
+      }
       // A assistencia roda como no solo; o que NAO existe e o recorder — nada
       // aqui sera re-simulado por ninguem.
       applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
+      // O Eco OBSERVA o comando; nao o consome. Mesma composicao do solo: a
+      // carta escolhida zera fogo/habilidade/interacao do tick, para uma
+      // escolha nunca virar tambem um tiro ou uma descida.
+      const echoCommand = echoChoice.consume();
+      if (echoCommand)
+        Object.assign(raw, echoCommand, {
+          fire: false,
+          ability: false,
+          interact: false,
+          purge: false,
+        });
+      const sectorBefore = state.sector;
       const result = stepRun(state, [raw]);
+      // A troca de setor e carimbada AQUI, entre o tick e a captura: o mundo
+      // que o playout guardar e o que o jogador vai ver.
+      if (state.sector !== sectorBefore) stampSectorChange(state.sector < sectorBefore);
       playout.capture(state);
       eventQueue.push(state.tick, result.events);
       accumulator -= TICK_MS;
@@ -1702,7 +1792,17 @@ const prepareTraining = (): PreparedRun => {
     // Depois do flush, uma vez por quadro: o diretor le os fatos e devolve o
     // que a tela deve mudar.
     applyCues(director.frame(state, input.state.usingTouch), now);
-    if (gate.frame(now, false).drain) input.clearPendingUiInput();
+    // E a instrucao volta se alguem a tiver apagado. O banner e compartilhado
+    // com os avisos do cliente: o de qualidade adaptativa aparece por 1,8 s e
+    // entao chama `setBanner(null)`, levando a licao junto — e o diretor, que
+    // so reemite quando a mensagem muda, nao tinha como saber.
+    if (!bannerVisible() && director.standingBanner) {
+      setBanner(t(director.standingBanner), 'info');
+    }
+    // A escolha de modulo vem da VISTA pela mesma razao do solo: lida do
+    // presente, ela existiria um quadro antes do evento que a anuncia.
+    const pendingChoice = view.playerExtra.pendingModuleChoice;
+    if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     audio.update(view, now);
     draw(view, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
@@ -1714,6 +1814,13 @@ const prepareTraining = (): PreparedRun => {
       window.innerHeight,
       safeInsets.bottom,
     );
+    if (pendingChoice && renderer.isChoiceRevealReady(now)) {
+      const regions = renderer.renderChoice(view, vw, vh, input.state, now);
+      const choice = input.consumeChoiceTap(regions);
+      if (choice !== null) queuedChoice = choice;
+    } else if (pendingChoice) {
+      input.clearPendingChoiceInput();
+    }
     requestAnimationFrame(frame);
   };
 
@@ -2138,6 +2245,7 @@ const teardownTraining = (): void => {
   paused = false;
   pauseMenu.disarmHistory();
   input.clearPendingUiInput();
+  echoChoice.hide();
   setBanner(null);
   audio.reset();
   trainingCompleteOverlay.classList.add('hidden');
@@ -2160,6 +2268,17 @@ document.getElementById('btn-training-descend')?.addEventListener('click', () =>
   teardownTraining();
   if (trainingOutcome === 'certified') startSolo();
   else startTraining();
+});
+// A ultima licao do exercicio, e a unica que acontece FORA do Veio: os
+// documentos moram no terminal. O formulario nao explica onde clicar — ele
+// abre a porta, que e a unica forma de instrucao que este jogo ja provou que
+// funciona. Reaproveita o handler do menu, como o trilho `data-ax-nav`.
+document.getElementById('btn-training-archive')?.addEventListener('click', () => {
+  audio.ui();
+  teardownTraining();
+  audio.setScreen('menu');
+  menu.classList.remove('hidden');
+  (document.getElementById('btn-records') as HTMLButtonElement | null)?.click();
 });
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um

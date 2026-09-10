@@ -347,6 +347,27 @@ export const DISCOVERIES: readonly Discovery[] = [
   },
 ];
 
+/**
+ * Acende as descobertas de uma descida que NAO vai ser registrada.
+ *
+ * O unico chamador e a operacao de treinamento, e a excecao e deliberada. O
+ * exercicio nao rende — sem carga, sem abates no bestiario, sem nota, sem
+ * historico —, e nada disso muda aqui: uma descoberta nao e premio, e a
+ * confirmacao de uma frase que o mundo ja mostrou ("o codex so confirma o que
+ * o mundo ja mostrou", acima). Quem quebrou rocha fragil no treinamento
+ * aprendeu que nem toda parede e parede, e o formulario de homologacao termina
+ * mandando ler o arquivo: sem esta linha ele mandaria o novato para uma pagina
+ * onde nao ha nada desbloqueado, que e a pior forma possivel de apresentar os
+ * Arquivos.
+ *
+ * Devolve o registro novo, ou o MESMO objeto quando nao ha bit novo — quem
+ * chama usa isso para nao gravar a toa.
+ */
+export const applyDiscoveries = (records: Records, discoveries: number): Records => {
+  if ((discoveries & ~records.discoveries) === 0) return records;
+  return { ...records, discoveries: records.discoveries | discoveries };
+};
+
 export const hasDiscovery = (records: Records, bit: number): boolean =>
   (records.discoveries & bit) !== 0;
 
