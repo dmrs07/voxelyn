@@ -275,7 +275,7 @@ const denyCarpet = (state, boss) => {
 };
 
 const play = (seed, archetype, hp) => {
-  const gap = BAND[archetype] ?? DEFAULT_BAND;
+  const gap = forcedBand !== null ? Number(forcedBand) : (BAND[archetype] ?? DEFAULT_BAND);
   const { state, boss } = duel(seed, archetype, gap, hp);
   const limit = LIMIT_SECONDS * TICK_HZ;
   let ticks = 0;
@@ -345,6 +345,16 @@ const arg = (name, fallback) => {
   return hit ? hit.split('=')[1] : fallback;
 };
 const seeds = Number(arg('seeds', 8));
+/**
+ * A FAIXA forcada, em tiles — para perguntar quanto vale DISTANCIA.
+ *
+ * O alcance do parafuso e hoje 18,2 tiles (BOLT_SPEED x 1,4 s de ttl), e a
+ * medicao padrao acontece a seis. Forcar a faixa e como se pergunta o que um
+ * corte de alcance tira de cada encontro: nao o teto de dano, que quase nao
+ * muda, mas o DANO TOMADO — quem so podia ser enfrentado de longe passa a
+ * cobrar de perto.
+ */
+const forcedBand = arg('band', null);
 const only = arg('boss', null);
 const sweep = arg('sweep', null);
 const list = only ? only.split(',') : BOSSES;
