@@ -812,11 +812,17 @@ export const GUARDIAN_STRAIN_INTERVAL_TICKS = 40;
  * ESTRAGO que ele deixa, nunca no raio de colisao.
  */
 /**
- * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta agora tem quatro
- * atos e nao tres: as tres ferramentas mais o corpo que sobra quando elas
- * acabam. 880 fechava antes de o quarto ato existir.
+ * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta tem quatro atos e nao
+ * tres: as tres ferramentas mais o corpo que sobra quando elas acabam. 880
+ * fechava antes de o quarto ato existir.
+ *
+ * 48 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts). Eram 1400, que davam 41 s
+ * — dos numeros antigos, o que estava mais perto de certo, porque quatro atos
+ * ja eram quatro atos. A subida e pequena e serve a posicao dele na lista: ele
+ * e o dono das ocupacoes Aurix, aparece fundo e tem de pesar mais que o chefe
+ * de estrato que ele substitui.
  */
-export const DIAMANDIS_HP = 1400;
+export const DIAMANDIS_HP = 1700;
 export const DIAMANDIS_SPEED = 1.5;
 export const DIAMANDIS_RADIUS = 0.9;
 
@@ -1108,20 +1114,23 @@ export const DIAMANDIS_SALVAGE_CREW_CAP = 4;
  * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
  */
 /**
- * Era 760. Com 760 o encontro cabia em DUAS janelas: 7,5 s de boca a 56 de
- * DPS do bolt basico (14 a cada 5 ticks) sao 420 por janela, e a segunda ja
- * fechava a conta com folga. Uma luta de duas janelas nao tem onde pendurar
- * uma virada — a fase 2 (ver DEVOURER_HUNGER_HP_FRACTION) chegaria no meio da
- * segunda janela e acabaria antes de ensinar alguma coisa.
+ * 58 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts). Eram 1500, que davam 86 s.
  *
- * 1500 poe a metade em 750, que e uma janela e meia de dano limpo: a Fome
- * abre no fim do segundo ciclo e a luta ainda pede mais dois inteiros dela.
- * Fica entre o Coracao (900) e o Diamandis (1400), que sao os dois chefes com
- * escada de fim de luta, e abaixo do Leviata (4000), que compensa a couraça
- * de submerso com massa. `hp`/`maxHp` viajam no snapshot e no hash: um replay
- * anterior nao bate.
+ * Ele continua no alto da faixa — e um chefe de JANELAS, e as janelas sao
+ * curtas: fora da boca aberta ele esta enterrado, e vida aqui compra muito
+ * menos luta que em qualquer chefe exposto. O que 86 s acrescentavam sobre 58
+ * nao era fase nova; era o mesmo ciclo de mergulho, bote e boca mais duas vezes.
+ *
+ * 1000 preservam a estrutura que a vida antiga defendia. A conta de la, que
+ * continua valendo: 7,5 s de boca ao dps do parafuso basico sao ~420 de dano
+ * por janela, e o encontro nao pode caber em duas. Com 1000, a metade fica em
+ * 500 — a Fome (ver DEVOURER_HUNGER_HP_FRACTION) abre com mais de uma janela
+ * inteira ja gasta e a luta ainda pede outras duas. Com os 760 originais ela
+ * chegava no meio da segunda e acabava antes de ensinar alguma coisa.
+ *
+ * `hp`/`maxHp` viajam no snapshot e no hash: um replay anterior nao bate.
  */
-export const DEVOURER_HP = 1500;
+export const DEVOURER_HP = 1000;
 /** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
 export const DEVOURER_BURROW_SPEED = 4.6;
 /**
@@ -2042,7 +2051,27 @@ export const CONTAMINATION_SURGE_COUNT = 3;
  * "de que chao eu o tiro", e usa fungo, fogo e propagacao que ja existem, sem
  * mecanica nova nenhuma.
  */
-export const BISHOP_HP = 260;
+/**
+ * 30 s de faixa (ver BOSS_TTK_SECONDS), medidos DEPOIS de resolvido o tapete.
+ *
+ * A vida dele e a unica da lista que nao responde sozinha pela duracao: sobre
+ * micelio vivo ele cura 64/s e nenhum numero aqui muda isso (ver
+ * BISHOP_REGEN_PER_TICK). O alvo e do encontro que a resposta certa produz —
+ * chao aceso debaixo dele, cura e couraça desligadas —, e e esse que 1180
+ * entrega.
+ *
+ * Eram 260: cinco segundos para quem resolvia o quebra-cabeca territorial, e
+ * uma eternidade para quem nao resolvia. A distancia entre as duas respostas
+ * continua enorme, que e o desenho; o que muda e que o lado certo dela agora e
+ * uma luta, e nao a execucao de um chefe ja vencido. Ele fica no piso da faixa
+ * junto com o Guardiao — e um pouco abaixo dele em vida, como sempre esteve.
+ *
+ * A cura NAO acompanhou a vida de proposito: 64/s continuam suplantando o
+ * disparo basico sustentado, que e a promessa inteira do encontro. O que a vida
+ * maior muda e o preco de UM deslize — com 260, meio segundo de tapete devolvia
+ * um oitavo da luta.
+ */
+export const BISHOP_HP = 1180;
 /**
  * Cura por tick sobre fungo. A 20 Hz sao 64 de vida por segundo.
  *
@@ -2221,7 +2250,20 @@ export const HORSE_SPAWN_CHANCE = 0.34;
 export const HORSE_TURN_RATE = 0.12;
 
 export const ENEMY_MIN_SPAWN_DIST = 12;
-export const GUARDIAN_HP = 420;
+/**
+ * O PISO da faixa de duracao (ver BOSS_TTK_SECONDS em bosses.ts): 30 s.
+ *
+ * Eram 420, e 420 nao davam encontro: o parafuso basico sustentado cobra ~39/s,
+ * entao o primeiro chefe que quase toda run encontra caia em 9 s — menos que um
+ * ciclo de investida e recuo dele. A fase de furia (abaixo de metade da vida)
+ * existia no codigo e quase nunca na partida.
+ *
+ * 1200 e o piso porque a luta dele e a mais simples do jogo, de proposito: ele
+ * nao tem janela para abrir nem blindagem para derrubar, e um chefe sem leitura
+ * nao pode ocupar o lugar do mais longo. Trinta segundos e o tempo de a furia
+ * chegar e ser respondida, e nada alem disso.
+ */
+export const GUARDIAN_HP = 1200;
 
 // Co-op: estado abatido, revive e extracao coletiva.
 export const MAX_PLAYERS = 2;
@@ -2355,7 +2397,15 @@ export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: numb
  * recurso do setor. O jogador decide quanto da catedral apagar para sobreviver
  * a ela.
  */
-export const ARCHCANTOR_HP = 620;
+/**
+ * 38 s de faixa (ver BOSS_TTK_SECONDS). Eram 620, que davam 20 s.
+ *
+ * A luta dele tem duas metades — apagar a rede de cristal e desmontar o coro —
+ * e com 20 s a segunda era opcional: dava para derrubar o corpo com a Catedral
+ * ainda cantando. Trinta e oito segundos e o tempo de a formacao girar, ser
+ * quebrada e ser RECRUTADA de novo, que e quando o coro deixa de ser cenario.
+ */
+export const ARCHCANTOR_HP = 1450;
 /**
  * Ate onde o canto alcanca cristal. Era 9, e nove era a mesma falha que a
  * varredura do Coracao tinha com 8.
@@ -2612,21 +2662,26 @@ export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
  * nada aqui e inferido do humor compartilhado com o Devorador.
  */
 /**
- * A VIDA e o que faz o encontro durar o ciclo que ele conta.
+ * O TETO da faixa de duracao (ver BOSS_TTK_SECONDS em bosses.ts): 60 s.
  *
- * Medido sem cliente, com o Prospector parado a sete tiles atirando o
- * parafuso basico (14 de dano a cada 5 ticks) sempre que ele e alvo: com 800
- * ele morria em 19 s e cruzava o limiar do Diluvio aos 13 — antes do primeiro
- * mergulho. A primeira fase inteira (ancorar, sondar, mergulhar, reaparecer)
- * nunca aparecia, e a segunda durava seis segundos. Com 4000, na mesma
- * medida (tiro perfeito, sem errar um parafuso, o atirador sempre a seis
- * tiles), o Diluvio sai aos 61 s depois de quatro mergulhos e ele morre aos
- * 105 s; um jogador de verdade erra, desvia e recua, e o encontro com a arma
- * basica fica em dois ou tres minutos — com missil, Minigun e modulos, bem
- * menos. E o chefe do ultimo estrato, e passa boa parte do tempo fora de
- * alcance: a vida alta e o preco de ter janelas de dano de verdade.
+ * Ele senta no teto porque merece o teto — fecha o ultimo estrato, tem duas
+ * fases inteiras e passa boa parte do encontro fora de alcance —, mas o teto e
+ * o teto. Medido em `tools/boss-ttk.mjs` (agente imortal, mira perfeita,
+ * parafuso basico, sete tiles), 4000 davam 125 s: o dobro do chefe seguinte da
+ * lista e treze vezes o Guardiao. O que 125 s acrescentavam sobre 60 nao era
+ * fase nova, era o mesmo ciclo de ancorar, sondar e mergulhar mais tres vezes.
+ *
+ * 2000 entregam ~59 s com a estrutura intacta: o Diluvio continua caindo no
+ * mesmo ponto da vida (DELUGE_HP_FRACTION le fracao, e as duas pontas desceram
+ * juntas), a primeira fase continua com mergulhos suficientes para o ciclo ser
+ * lido, e a segunda continua sendo a metade que persegue.
+ *
+ * O historico, porque explica por que o numero ja foi tao alto: com 800 ele
+ * morria em 19 s e cruzava o limiar do Diluvio aos 13 — antes do primeiro
+ * mergulho —, e a correcao da epoca foi multiplicar a vida por cinco sem uma
+ * faixa contra a qual conferir o resultado.
  */
-export const LEVIATHAN_HP = 4000;
+export const LEVIATHAN_HP = 2000;
 /** Velocidade de PERSEGUICAO, na segunda fase. Ele nada; nao ha chao seco. */
 export const LEVIATHAN_SWIM_SPEED = 5;
 /**
@@ -2916,7 +2971,15 @@ export const DIVER_BOSS_AGGRO_RANGE = 16;
  * ele e machuca de verdade — e transforma parte da arena em fogo. Ele e o unico
  * chefe do jogo cuja janela de dano o JOGADOR abre, e ela custa terreno.
  */
-export const LUNG_MATRIX_HP = 700;
+/**
+ * 35 s de faixa (ver BOSS_TTK_SECONDS): um pouco acima do piso, porque a janela
+ * de dano dele e a unica do jogo que o JOGADOR abre.
+ *
+ * Eram 700, que davam 16 s. Com 16 s a respiracao completa — inspirar, expelir,
+ * incendiar a coluna — cabia duas vezes na luta inteira, e a segunda ja era a
+ * ultima: o ciclo que e a identidade do encontro nao chegava a ser um ciclo.
+ */
+export const LUNG_MATRIX_HP = 1380;
 export const LUNG_MATRIX_RADIUS = 0.9;
 export const LUNG_MATRIX_CYCLE_TICKS = 130;
 export const LUNG_MATRIX_BREATH_INTERVAL_TICKS = 10;
@@ -2947,7 +3010,17 @@ export const LUNG_MATRIX_HOLD_TICKS = 12;
  * So fica vulneravel no resfriamento, e essa e a leitura inteira: o jogador nao
  * escolhe quando bater, escolhe onde estar quando puder.
  */
-export const FURNACE_HEART_HP = 900;
+/**
+ * 52 s de faixa (ver BOSS_TTK_SECONDS): perto do teto, porque metade do
+ * encontro ele e intocavel por desenho.
+ *
+ * Ele so aceita dano no RESFRIAMENTO, entao a vida aqui compra menos tempo de
+ * luta que em qualquer chefe aberto — 950 sao ~52 s de encontro e pouco mais de
+ * vinte de janela. Subiu pouco (eram 900) porque o numero ja estava quase certo:
+ * o que faltava a ele nao era massa, era o resto da lista ter parado de cair em
+ * dez segundos.
+ */
+export const FURNACE_HEART_HP = 950;
 export const FURNACE_HEART_RADIUS = 1;
 export const FURNACE_HEART_CYCLE_TICKS = 150;
 export const FURNACE_HEART_HOT_ARMOR = 0.2;
@@ -3144,7 +3217,21 @@ export const FURNACE_HEART_CYCLONE_CAP = 3;
  * Os Espectros nao sao invocados como matilha: sao EXTENSOES dela, e por isso
  * saem do gelo em volta e nao dela.
  */
-export const FROST_QUEEN_HP = 640;
+/**
+ * 45 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts). Eram 640, que davam 24 s.
+ *
+ * Ela sobe pouco em numero absoluto e muito em tempo, e a razao e a couraça: o
+ * dano dela nao e linear na vida. Enquanto ha gelo em volta entra 22% do golpe
+ * (FROST_QUEEN_ICE_ARMOR), e como ela RECONGELA a placa a cada 14 s, cada
+ * pedaco de vida a mais compra mais de um pedaco de tempo. Medido, a subida de
+ * 640 para 950 vale de 24 s para 45 s; 1100 ja passariam de 60 s.
+ *
+ * A dispersao entre camaras e a maior da lista pelo mesmo motivo — quanto gelo
+ * sobrou perto dela quando o encontro comeca muda a conta —, e e por isso que
+ * ela fica no meio da faixa e nao perto do teto: o que a empurraria para os 60 s
+ * medidos e sorte de terreno, nao desenho.
+ */
+export const FROST_QUEEN_HP = 950;
 export const FROST_QUEEN_SPEED = 2.4;
 export const FROST_QUEEN_RADIUS = 0.7;
 export const FROST_QUEEN_ICE_ARMOR = 0.22;
@@ -3190,49 +3277,49 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  * contra-jogo geometrico do campo.
  */
 /**
- * A VARREDURA QUE FIXOU OS DOIS NUMEROS ABAIXO ESTA VENCIDA.
+ * O QUE A VARREDURA DO CICLO DO FERRO AINDA RESPONDE, E O QUE NAO RESPONDE MAIS.
  *
- * `MAGNETARCH_HP` e `MAGNETARCH_CYCLE_TICKS` foram escolhidos medindo o
- * encontro na camara que a geracao dava na epoca — a natural, que nascia onde o
- * mapa levasse e costumava ser um canto. Da SIMULATION_VERSION 86 em diante o
- * Magnetarca tem CAMARA CENTRAL com cobertura na faixa (`bossArena` e
- * `BAND_COVER` em worldgen.ts).
+ * Ela mediu o encontro na camara que a geracao dava na epoca — a natural, que
+ * nascia onde o mapa levasse e costumava ser um canto. Da SIMULATION_VERSION 86
+ * em diante o Magnetarca tem CAMARA CENTRAL com cobertura na faixa (`bossArena`
+ * e `BAND_COVER` em worldgen.ts), e da 87 em diante a vida saiu dela para
+ * responder a faixa de duracao da lista inteira (ver BOSS_TTK_SECONDS).
  *
  * A sala nova nao ficou mais facil que a antiga — com os pilares de volta, o
  * mesmo bot mortal nas mesmas 24 seeds termina com 57 de vida em media contra os
- * 56 de la —, e isso e um argumento a favor de deixar os dois numeros em paz.
+ * 56 de la.
  * (A versao intermediaria, o disco vazio de raio 11 da 85, media 88: foi ela que
  * mostrou que faixa sem cobertura nao e "ampla", e sim vazia.)
  *
- * O que NAO vale mais e usar as tabelas abaixo como PROVA de que 1.200 e 120 sao
- * as escolhas certas: elas continuam sendo o registro do que foi medido e por
- * que, mas a sala mudou embaixo delas. Re-tunar e uma decisao separada.
+ * O que continua valendo das tabelas abaixo e a RELACAO que elas medem: o que
+ * custa subir a vida sem mexer no estoque de ferro. O que nao vale mais e
+ * le-las como prova de que 1.200 e a escolha certa — a sala mudou embaixo
+ * delas, e depois a pergunta mudou.
  */
 /**
- * A vida, MEDIDA e nao escolhida.
+ * 42 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts). Eram 1200, que davam 30 s.
  *
- * Com 720 o chefe morria aos 19,8 s — meio segundo ANTES de a primeira massa
- * fraturada chegar nele. O contra-jogo caracteristico da luta nao cabia na luta.
+ * Ele sobe MENOS que a media da lista, e de proposito: 1200 ja tinham saido de
+ * uma medicao, e o que faltava ao encontro nao era massa. O que muda com 1620 e
+ * que o ciclo do ferro fecha inteiro mais de uma vez — com 1200 a luta acabava
+ * pouco depois do segundo recolhimento.
  *
- * A varredura abaixo foi REFEITA depois de tres correcoes que mudaram os
- * numeros (a sabotagem passou a valer durante o telegrafo, o estilhaco deixou
- * de amplificar a si mesmo e a morte deixou de ser desfeita pelo passo das
- * massas). Medida na polaridade de 6 s, com bot imortal e mira perfeita:
+ * O FERRO ACOMPANHOU. A varredura que fixou 1200 registrava o custo de subir a
+ * vida sozinha, e vale ler de novo porque continua verdadeira:
  *
  *   vida  ignorando  sabotando  1o estilhaco  sem material no fim
  *    900    19,8 s     14,7 s    aos 14,2 s (4% de vida)      0,5 s
- *   1050    22,3 s     18,5 s    aos 14,2 s (18%)             4,3 s
  *   1200    26,6 s     21,2 s    aos 14,2 s (28%)             7,0 s
  *   1400    30,1 s     26,3 s    aos 14,2 s (38%)            12,1 s
  *
- * 1200 e o ponto de equilibrio entre as tres colunas que importam: saber a luta
- * vale 20% do tempo dela; o pagamento chega com 28% de vida pela frente (ou
- * seja, como janela e nao como golpe de misericordia); e o trecho final sem
- * material fica em 7 s — uma conclusao, e nao um vazio. Em 1400 esse trecho
- * dobra para doze segundos, que e onde "acabou o ferro" vira problema de
- * verdade.
+ * A ultima coluna e a que cobra: vida maior com o mesmo estoque de massas
+ * alonga o trecho FINAL sem ferro, e esse trecho e o unico pedaco da luta sem
+ * decisao nenhuma. Por isso `MAGNETARCH_SHARDS` foi de tres para quatro no
+ * mesmo movimento — a quarta massa devolve ao fim da luta o material que a vida
+ * nova consumiria, e mantem o ferro respondendo por perto de um quarto do dano
+ * total, que era a proporcao que a varredura aprovou.
  */
-export const MAGNETARCH_HP = 1200;
+export const MAGNETARCH_HP = 1620;
 /**
  * FIXO, como o Pulmao e o Coracao — e pelo mesmo motivo dos dois: a luta nao e
  * contra um corpo, e contra a sala.
@@ -3279,6 +3366,12 @@ export const MAGNETARCH_RADIUS = 0.8;
  * De quebra, seis segundos respondem ao outro defeito do encontro — "voce
  * resolve a distancia e repete o movimento": a faixa troca de lado 42% mais
  * vezes que antes.
+ *
+ * As FRACOES DE VIDA da tabela sao de quando a vida era 1.200 e as massas eram
+ * tres. Com 1.620 e quatro (SIMULATION_VERSION 87) o pagamento continua caindo
+ * na mesma hora do relogio — quem o marca e a polaridade, nao a vida —, mas cai
+ * com mais luta pela frente. A escolha da polaridade nao depende disso: ela e
+ * sobre QUANDO o ciclo fecha, e o ciclo nao mudou.
  */
 export const MAGNETARCH_CYCLE_TICKS = 120;
 /**
@@ -3332,14 +3425,21 @@ export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;
 /**
  * Quantas massas o campo controla de uma vez.
  *
- * Tres, e grandes. A alternativa (muitas pequenas) transformaria a arena numa
- * chuva de riscos e apagaria a decisao: com tres, cada uma e um objeto que se
+ * Quatro, e grandes. A alternativa (muitas pequenas) transformaria a arena numa
+ * chuva de riscos e apagaria a decisao: com quatro, cada uma e um objeto que se
  * reconhece de longe, com integridade propria e uma rota anunciada que da para
  * ler antes de sair. Elas nao repovoam — a que se despedaca acabou. Uma luta
  * curta com material infinito seria farm; com material finito, ela e uma
  * conta: quantas voce consegue preparar antes que ele caia.
+ *
+ * Eram tres, e a quarta entrou junto com a vida nova (ver MAGNETARCH_HP): o
+ * estoque e o que impede o fim da luta de virar um trecho sem decisao, e ele
+ * tem de crescer com a luta ou deixa de proteger o que protegia. Quatro
+ * continua sendo um numero que se conta de relance — e o piso continua sendo o
+ * chao: `claimMagnetShards` entrega o que a camara permitir, nunca um numero
+ * prometido.
  */
-export const MAGNETARCH_SHARDS = 3;
+export const MAGNETARCH_SHARDS = 4;
 /**
  * A integridade de uma massa cravada. Tres tiros do disparo basico (14 cada),
  * de proposito.

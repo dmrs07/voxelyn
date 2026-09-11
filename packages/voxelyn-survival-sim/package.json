@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run",
-    "bot:magnetarch": "node tools/magnetarch-bot.mjs"
+    "bot:magnetarch": "node tools/magnetarch-bot.mjs",
+    "bench:ttk": "node tools/boss-ttk.mjs"
   },
   "dependencies": {
     "@voxelyn/core": "workspace:*"

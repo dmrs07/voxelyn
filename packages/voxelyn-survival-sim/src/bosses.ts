@@ -162,6 +162,58 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
   ferric: 'magnetarch',
 };
 
+/**
+ * A FAIXA DE DURACAO de cada encontro, em segundos, e a unica escala em que
+ * onze chefes se comparam.
+ *
+ * O NUMERO E UM TETO, nao uma previsao: e o que `tools/boss-ttk.mjs` mede com
+ * um agente imortal, de mira perfeita, armado so com o parafuso basico e sem
+ * outra decisao alem de manter a distancia de tiro. Ninguem joga assim — e por
+ * isso ele serve: tudo o que um jogador de verdade acrescenta (erro de mira,
+ * esquiva, recuo, morte) so pode fazer o encontro DURAR MAIS. O teto e o piso
+ * do encontro.
+ *
+ * A FAIXA E DE 30 A 60 SEGUNDOS, e ela existe porque a lista media nao tinha
+ * faixa nenhuma: o Guardiao caia em 9 s e o Leviata pedia 125 s, um intervalo
+ * de treze vezes entre o chefe mais curto e o mais longo do mesmo jogo. Os dois
+ * extremos eram o mesmo defeito visto de dois lados — um encontro que acaba
+ * antes de mostrar a segunda fase e um que mostra a mesma fase seis vezes.
+ *
+ * ABAIXO DE 30 s o contra-jogo nao chega a ser exercido. Um chefe de dez
+ * segundos e resolvido pelo dano que o jogador ja trazia: ele nao tem tempo de
+ * cobrar a fase que o distingue, e duas runs seguidas contra ele sao a mesma
+ * run. ACIMA DE 60 s o encontro passa a se repetir em vez de progredir — o
+ * ciclo que era leitura vira espera, e o custo de errar deixa de ser
+ * proporcional ao tempo ja investido.
+ *
+ * A ORDEM DENTRO DA FAIXA e a da descida, e nao a do capricho: quem guarda o
+ * estrato mais fundo, ou pede mais do jogador para abrir janela, senta perto do
+ * teto de 60 s; quem ensina, senta no piso de 30 s. O Guardiao e o primeiro
+ * chefe que quase toda run encontra e o unico cuja luta nao pede leitura
+ * nenhuma — ele e o 30. O Leviata fecha o ultimo estrato, passa metade do
+ * encontro fora de alcance e tem duas fases inteiras — ele e o 60.
+ *
+ * O QUE ESTA TABELA NAO E: ela nao entra na simulacao. Nenhum passo a le, e o
+ * que cobra o alvo e a VIDA de cada chefe (`*_HP` em constants.ts), escolhida
+ * medindo. Ela esta aqui — e nao num documento — porque foi a falta de um alvo
+ * escrito que deixou a lista abrir treze vezes: quem for mexer numa vida
+ * amanha precisa ver, no mesmo repositorio, contra o que aquele numero foi
+ * escolhido.
+ */
+export const BOSS_TTK_SECONDS: Record<BossId, number> = {
+  guardian: 30,
+  bishop: 30,
+  lung_matrix: 35,
+  archcantor: 38,
+  magnetarch: 42,
+  frost_queen: 45,
+  diamandis: 48,
+  furnace_heart: 52,
+  seamstress: 55,
+  white_devourer: 58,
+  sheet_leviathan: 60,
+};
+
 export type BossBiome = {
   stratum: StratumId;
   occupation: OccupationId;

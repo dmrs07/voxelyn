@@ -116,9 +116,12 @@ const count = (state: SurvivalState, kind: number, cx: number, cy: number, r: nu
 };
 
 describe('A Fome — a virada', () => {
-  it('a vida subiu para caber uma virada: metade e mais que uma janela de bolt', () => {
+  it('a vida cabe uma virada: metade e mais que uma janela de bolt', () => {
     const { worm } = arena(1);
-    expect(DEVOURER_HP).toBe(1500);
+    // O NUMERO nao esta mais escrito aqui. Ele e um alvo de DURACAO (ver
+    // BOSS_TTK_SECONDS) e muda quando a faixa muda; o que este teste protege e
+    // a relacao que nenhum rebalanceamento pode quebrar — a Fome tem de abrir
+    // com mais de uma janela de dano pela frente.
     expect(worm.maxHp).toBe(DEVOURER_HP);
     // 7,5 s de bolt basico (14 a cada 5 ticks) sao 420: a metade tem de pedir
     // mais que uma janela, senao a Fome chega e vai embora na mesma abertura.

@@ -65,6 +65,7 @@ import {
   FURNACE_HEART_CYCLE_TICKS,
   FURNACE_HEART_HOT_ARMOR,
   FURNACE_HEART_HP,
+  GUARDIAN_HP,
   FURNACE_HEART_RADIUS,
   FURNACE_HEART_WAVE_ARC,
   FURNACE_HEART_WAVE_TURN,
@@ -499,9 +500,15 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     aggroRange: 0,
   },
   seamstress: {
-    // 900, e nao 780: a segunda fase e blindada pela teia (WEB_ARMOR), e a
-    // luta tem de durar o bastante para a teia ser lida, cortada e refeita.
-    hp: 900,
+    // 730: 55 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts), e ela e um dos
+    // dois chefes da lista cuja vida DESCEU.
+    //
+    // Eram 900, e a razao de la continua valendo — a segunda fase e blindada
+    // pela teia (WEB_ARMOR), e a luta tem de durar o bastante para a teia ser
+    // lida, cortada e refeita. O que mudou e que a blindagem faz a vida render
+    // muito mais tempo que nos chefes abertos: 900 davam 68 s medidos, e os
+    // dez segundos a mais eram a mesma teia refeita outra vez.
+    hp: 730,
     speed: 4,
     radius: 0.72,
     contactDamage: 20,
@@ -538,17 +545,21 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
   guardian: {
-    hp: 420,
+    // A vida vem de `GUARDIAN_HP`, e nao de um 420 escrito aqui. O literal era
+    // a unica vida de chefe fora de constants.ts: a constante existia, ninguem
+    // a lia, e um rebalanceamento que a mudasse nao mudava nada no jogo.
+    hp: GUARDIAN_HP,
     speed: 2.1,
     radius: 0.68,
     contactDamage: 24,
     contactCooldown: 14,
     aggroRange: 7,
   },
-  // Vida MENOR que a do guardiao de proposito. A dificuldade do bispo nao mora
-  // na barra: em cima do fungo ele se cura mais rapido do que se leva dano, e
-  // fora dele cai depressa. Somar vida grande a cura seria cobrar as duas coisas
-  // pelo mesmo problema e transformar a luta em espera.
+  // Vida MENOR que a do guardiao de proposito, e continua menor depois de as
+  // duas subirem. A dificuldade do bispo nao mora na barra: em cima do fungo ele
+  // se cura mais rapido do que se leva dano, e fora dele cai depressa. Somar
+  // vida grande a cura seria cobrar as duas coisas pelo mesmo problema e
+  // transformar a luta em espera.
   bishop: {
     hp: BISHOP_HP,
     speed: 2.6,

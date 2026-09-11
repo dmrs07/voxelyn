@@ -1973,6 +1973,125 @@ carrega o sotaque do estrato e é funcional.
 número é um teto e não um desejo: tentei 4 primeiro, para o anel de raio 3 também caber
 sempre, e a maioria das tentativas passou a ser recusada — a geração inteira desabou.
 
+## A faixa de 30 a 60 segundos (`SIMULATION_VERSION` 87)
+
+Onze chefes, e nenhuma escala em que eles se comparassem. O Guardião caía em **9,1 s**
+e o Leviatã pedia **125,3 s**: treze vezes de diferença entre o encontro mais curto e o
+mais longo do mesmo jogo, e cada vida tinha sido escolhida por uma medição própria,
+contra a luta dela, sem nada do lado de fora para conferir o resultado.
+
+Os dois extremos são o **mesmo defeito visto de dois lados**. Abaixo de 30 s o
+contra-jogo não chega a ser exercido — o chefe é resolvido pelo dano que o jogador já
+trazia, a fase que o distingue não tem tempo de cobrar nada, e duas runs seguidas
+contra ele são a mesma run. Acima de 60 s o encontro passa a se repetir em vez de
+progredir: o ciclo que era leitura vira espera, e o custo de errar deixa de ser
+proporcional ao tempo já investido.
+
+### O instrumento, antes dos números
+
+`packages/voxelyn-survival-sim/tools/boss-ttk.mjs` mede o **teto** de cada encontro: um
+agente imortal, de mira perfeita (com antecipação de tempo de voo), armado **só com o
+parafuso básico** e sem nenhuma decisão além de manter a distância de tiro. A cena é a
+mesma dos testes de estrato — clareira limpa no meio do mapa, chefe a seis tiles,
+`bossRuntime.awake` ligado, fauna fora.
+
+Ninguém joga assim, e é exatamente por isso que ele serve: tudo o que um jogador de
+verdade acrescenta — erro de mira, esquiva, recuo, morte — só pode fazer o encontro
+**durar mais**. O teto é o piso do encontro, e é o único número comparável entre onze
+contra-jogos diferentes. A arma é o parafuso básico e mais nada porque é o único
+equipamento que toda run tem: comparar com míssil e Minigun seria comparar builds.
+
+Três concessões ficam registradas, porque são elas que tornam o número discutível:
+
+- **O agente não morre, e a run não termina.** Uma queda em água profunda encerra a run
+  inteira, e `stepRun` numa run encerrada não avança o tick — sem restaurar a fase, um
+  afogamento apareceria como "chefe eterno", que é o diagnóstico oposto.
+- **Ele não pisa no buraco.** A única leitura de terreno que faz é sair da coluna
+  marcada da Sondagem e não entrar em água profunda. É o que o telégrafo pede.
+- **O tapete do Bispo entra resolvido.** Sobre micélio vivo ele cura 64/s — mais que o
+  disparo básico sustentado, por decisão de desenho (`BISHOP_REGEN_PER_TICK`), e nenhum
+  valor de vida muda isso. O chão aquece por fora, no mesmo tick em que o micélio
+  aparece sob o corpo: é o efeito exato da resposta certa, e o número que sai é o do
+  encontro **depois** de resolvido o quebra-cabeça territorial — a única pergunta de
+  duração que o Bispo aceita.
+
+### O que mudou
+
+A ordem dentro da faixa é a da descida, e não a do capricho: quem guarda o estrato mais
+fundo, ou pede mais do jogador para abrir janela, senta perto do teto; quem ensina,
+senta no piso. O alvo de cada um vive em `BOSS_TTK_SECONDS` (`bosses.ts`) — **no
+repositório, e não só aqui**, porque foi a falta de um alvo escrito que deixou a lista
+abrir treze vezes.
+
+| Chefe               | Vida (antes → depois) | TTK antes | Alvo | TTK depois |
+| ------------------- | --------------------- | --------- | ---- | ---------- |
+| Guardião            | 420 → **1200**        | 9,1 s     | 30 s | 31,0 s     |
+| Bispo               | 260 → **1180**        | 5,2 s     | 30 s | 30,4 s     |
+| Pulmão-Matriz       | 700 → **1380**        | 16,1 s    | 35 s | 35,2 s     |
+| Arquicantor         | 620 → **1450**        | 19,9 s    | 38 s | 39,5 s     |
+| Magnetarca          | 1200 → **1620**       | 30,0 s    | 42 s | 41,8 s     |
+| Rainha da Geada     | 640 → **950**         | 24,1 s    | 45 s | 45,1 s     |
+| Diamandis           | 1400 → **1700**       | 40,5 s    | 48 s | 48,5 s     |
+| Coração da Fornalha | 900 → **950**         | 45,0 s    | 52 s | 52,0 s     |
+| Cerzideira          | 900 → **730**         | 67,8 s    | 55 s | 56,8 s     |
+| Devorador Branco    | 1500 → **1000**       | 85,7 s    | 58 s | 57,3 s     |
+| Leviatã do Lençol   | 4000 → **2000**       | 125,3 s   | 60 s | 59,2 s     |
+
+Duas vidas **desceram**, e as duas pelo mesmo motivo: blindagem faz a vida render muito
+mais tempo que em chefe aberto. A Cerzideira tem a teia (`WEB_ARMOR`) e o Devorador
+passa a maior parte do encontro enterrado — o que os dez segundos a mais compravam não
+era fase nova, era a mesma teia refeita outra vez e o mesmo ciclo de bote mais duas.
+
+O Leviatã perdeu metade da vida e não perdeu nada da estrutura: o Dilúvio continua
+caindo no mesmo ponto (`DELUGE_HP_FRACTION` lê fração, e as duas pontas desceram
+juntas), a primeira fase continua com mergulhos suficientes para o ciclo ser lido, e a
+segunda continua sendo a metade que persegue. Os 4000 de antes vinham de uma correção
+legítima — com 800 ele cruzava o limiar do Dilúvio **antes do primeiro mergulho** — que
+multiplicou a vida por cinco sem uma faixa contra a qual conferir o resultado.
+
+### O ferro acompanhou o Magnetarca
+
+Subir a vida sozinha tem um custo registrado na própria varredura que fixou 1.200: a
+coluna **"sem material no fim"**. Vida maior com o mesmo estoque de massas alonga o
+trecho final sem ferro, e esse trecho é o único pedaço da luta sem decisão nenhuma —
+em 1.400 ele já dobrava para 12,1 s.
+
+Por isso `MAGNETARCH_SHARDS` foi de três para **quatro** no mesmo movimento. A quarta
+massa devolve ao fim da luta o material que a vida nova consumiria e mantém o ferro
+respondendo por perto de um quarto do dano total, que era a proporção que a varredura
+aprovou. O piso continua sendo o chão: `claimMagnetShards` entrega o que a câmara
+permitir, nunca um número prometido.
+
+O **bot mortal** (o outro instrumento, o que erra a mira e morre) diz que o encontro
+continua de pé com os dois números novos — oito câmaras reais de G-04, três estratégias
+sobre as mesmas seeds:
+
+| Estratégia          | Desfechos  | Tempo  | Vida restante | Fraturadas | Cauda sem massa |
+| ------------------- | ---------- | ------ | ------------- | ---------- | --------------- |
+| Ignorando o ferro   | 8 vitórias | 56,1 s | 100/100       | 0,4        | 0,0 s           |
+| Uma massa por ciclo | 8 vitórias | 45,7 s | 92/100        | 3,1        | 0,0 s           |
+| Todas               | 8 vitórias | 46,5 s | 92/100        | 3,5        | 3,2 s           |
+
+Nenhuma não vitória. Saber a luta continua valendo ~19% do tempo dela, e a cauda sem
+material ficou onde estava (3,2 s na estratégia que gasta tudo, contra os 3,1 s medidos
+na câmara central com três massas e 1.200 de vida) — que era exatamente o que a quarta
+massa tinha de proteger.
+
+### O que a medição deixou em aberto
+
+- **A Rainha tem a maior dispersão da lista**, e é do terreno: enquanto há gelo em volta
+  entra 22% do golpe, e ela recongela a placa a cada 14 s. A mediana fica em 45 s, mas a
+  pior câmara da amostra chegou a 79 s — e é a câmara em que o gelo nunca sai, ou seja,
+  a partida em que o jogador não derreteu nada. É por isso que ela fica no meio da faixa
+  e não perto do teto: o que a empurraria para os 60 s medidos seria sorte de terreno, e
+  não desenho.
+- **`GUARDIAN_HP` não era lido por ninguém.** A ficha do arquétipo trazia um `420`
+  escrito à mão — a única vida de chefe fora de `constants.ts` —, então a constante
+  existia e mudá-la não mudava nada no jogo. Agora a ficha lê a constante.
+- **Nada disto é playtest.** São cenários simulados com um agente que segue regras
+  fixas. O que a faixa garante é que os onze encontros passaram a ser comparáveis entre
+  si; se 30 e 60 são os dois números certos, quem responde é gente jogando.
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔
