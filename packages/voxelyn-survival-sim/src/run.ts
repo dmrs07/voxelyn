@@ -3,9 +3,21 @@ import { hitMagnetShards } from './magnet-shards.js';
 import { RNG } from '@voxelyn/core';
 import {
   BLEEDOUT_TICKS,
+  BLUNDERBUSS_COOLDOWN_TICKS,
+  BLUNDERBUSS_DAMAGE,
+  BLUNDERBUSS_HEAT_PER_SHOT,
+  BLUNDERBUSS_PELLETS,
+  BLUNDERBUSS_SPEED,
+  BLUNDERBUSS_SPREAD,
+  BLUNDERBUSS_TTL_TICKS,
   BOLT_COOLDOWN_TICKS,
   BOLT_DAMAGE,
   BOLT_TTL_TICKS,
+  PROSPECT_LANCE_COOLDOWN_TICKS,
+  PROSPECT_LANCE_DAMAGE,
+  PROSPECT_LANCE_HEAT_PER_SHOT,
+  PROSPECT_LANCE_SPEED,
+  PROSPECT_LANCE_TTL_TICKS,
   BOLT_SPEED,
   BRUISER_ROCK_STUN_TICKS,
   CONDUCTIVE_STUN_TICKS,
@@ -2181,19 +2193,43 @@ const stepPlayer = (
   // o sopro: a tentativa barrada nao arma modulo, nao gera calor e nao toca em
   // `nextShotAt` — nada e consumido, e nada fica enfileirado para depois. O
   // bloqueio morre junto com o canal, inclusive quando ele e cancelado.
+  // QUAL ARMA ESTA COM O GATILHO. A Minigun tem passo proprio acima; as duas
+  // de tier 2 (Lanca e Bacamarte) trocam os numeros DESTE disparo — cadencia,
+  // calor, dano, velocidade, alcance e quantos projeteis saem — em vez de
+  // abrirem um caminho paralelo. Um `if arma else bolt` por arma nova foi
+  // exatamente o defeito que o disco de retorno ja teve: ele engolia em
+  // silencio todos os outros modulos equipados.
+  const trigger = activeWeaponModule(extra, state.tick);
+  const lance = trigger === 'prospect_lance';
+  const blunderbuss = trigger === 'blunderbuss';
+  const shotCooldown = lance
+    ? PROSPECT_LANCE_COOLDOWN_TICKS
+    : blunderbuss
+      ? BLUNDERBUSS_COOLDOWN_TICKS
+      : BOLT_COOLDOWN_TICKS;
+  const shotHeat = lance
+    ? PROSPECT_LANCE_HEAT_PER_SHOT
+    : blunderbuss
+      ? BLUNDERBUSS_HEAT_PER_SHOT
+      : HEAT_PER_SHOT;
+  // O Bacamarte poe CINCO projeteis no mundo de uma vez: a folga tem de caber a
+  // rajada inteira, ou o teto cortaria o leque no meio e o tiro sairia torto
+  // sem nada avisar.
+  const shotProjectiles = blunderbuss ? BLUNDERBUSS_PELLETS : 1;
+
   if (
     cmd.fire &&
     !channeling &&
     !minigunHoldsTrigger &&
     state.tick >= extra.nextShotAt &&
     state.tick >= extra.overheatedUntil &&
-    state.projectiles.length < MAX_PROJECTILES
+    state.projectiles.length + shotProjectiles <= MAX_PROJECTILES
   ) {
-    extra.nextShotAt = state.tick + BOLT_COOLDOWN_TICKS;
-    extra.heat += HEAT_PER_SHOT;
+    extra.nextShotAt = state.tick + shotCooldown;
+    extra.heat += shotHeat;
     // O tiro de verdade tambem derrete o gelo residual de quem ja se soltou:
     // e o mesmo calor novo, so que agora saindo pelo cano.
-    meltFreezeByHeat(extra, HEAT_PER_SHOT);
+    meltFreezeByHeat(extra, shotHeat);
 
     // O disparo apenas ARMA os modulos ativos; nenhuma carga e debitada aqui.
     // Cobrar no gatilho punia o tiro que errava tudo — e, pior, obrigava o
@@ -2201,18 +2237,72 @@ const stepPlayer = (
     // fazia ele engolir em silencio todos os outros modulos equipados. Aqui ele
     // e so mais uma flag: decide o VEICULO, e o resto viaja junto.
     const modules: NonNullable<SurvivalState['projectiles'][number]['modules']> = {};
-    if (moduleHasCapacity(extra, 'piercing', state.tick)) modules.piercing = true;
-    if (moduleHasCapacity(extra, 'explosive', state.tick)) {
-      modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
+    // O BACAMARTE nao arma modificador nenhum, e a regra e de VOLUME e nao de
+    // etiqueta (ver a matriz em `modules.ts`): cinco graos por tiro fariam do
+    // `explosive` cinco explosoes no colo do proprio Prospector. A Lanca arma
+    // tudo — ela dispara 1,11 vez por segundo, menos que o parafuso comum.
+    if (!blunderbuss) {
+      if (moduleHasCapacity(extra, 'piercing', state.tick)) modules.piercing = true;
+      if (moduleHasCapacity(extra, 'explosive', state.tick)) {
+        modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
+      }
+      if (moduleHasCapacity(extra, 'ricochet', state.tick)) {
+        modules.ricochet = { remainingBounces: RICOCHET_BOUNCES };
+      }
+      if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
+      if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
     }
-    if (moduleHasCapacity(extra, 'ricochet', state.tick)) {
-      modules.ricochet = { remainingBounces: RICOCHET_BOUNCES };
-    }
-    if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
-    if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
     const armed = Object.keys(modules).length > 0 ? modules : undefined;
 
-    if (moduleHasCapacity(extra, 'return_disc', state.tick)) {
+    if (blunderbuss) {
+      // O LEQUE, em rumos FIXOS e simetricos: os graos partem juntos e ABREM.
+      // Encostado os cinco cabem num corpo de chefe; a cinco tiles o chumbo
+      // morre no ar. Nao ha regra de queda de dano em lugar nenhum — o alcance
+      // se resolve pela geometria, como se resolve para quem atira de verdade.
+      const half = (BLUNDERBUSS_PELLETS - 1) / 2;
+      for (let pellet = 0; pellet < BLUNDERBUSS_PELLETS; pellet++) {
+        const angle = ((pellet - half) / half) * BLUNDERBUSS_SPREAD;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const dx = extra.aim.x * cos - extra.aim.y * sin;
+        const dy = extra.aim.x * sin + extra.aim.y * cos;
+        state.projectiles.push({
+          kind: 'pellet',
+          id: state.nextEntityId++,
+          owner: player.id,
+          x: player.x + dx * 0.4,
+          y: player.y + dy * 0.4,
+          vx: dx * BLUNDERBUSS_SPEED * tuning.projectileSpeedScale,
+          vy: dy * BLUNDERBUSS_SPEED * tuning.projectileSpeedScale,
+          damage: playerDamage(tuning, BLUNDERBUSS_DAMAGE),
+          distanceTravelled: 0,
+          hostile: false,
+          leavesBiofluid: false,
+          ttl: BLUNDERBUSS_TTL_TICKS,
+        });
+      }
+      // UMA carga por DISPARO, e nao uma por grao: a regua do modulo conta
+      // tiros (ver `MODULE_DEFINITIONS`), e cobrar por grao faria sessenta
+      // cargas durarem doze tiros.
+      consumeModuleCharge(extra, 'blunderbuss', slot, events);
+    } else if (lance) {
+      state.projectiles.push({
+        kind: 'lance',
+        id: state.nextEntityId++,
+        owner: player.id,
+        x: player.x + extra.aim.x * 0.4,
+        y: player.y + extra.aim.y * 0.4,
+        vx: extra.aim.x * PROSPECT_LANCE_SPEED * tuning.projectileSpeedScale,
+        vy: extra.aim.y * PROSPECT_LANCE_SPEED * tuning.projectileSpeedScale,
+        damage: playerDamage(tuning, PROSPECT_LANCE_DAMAGE),
+        modules: armed,
+        distanceTravelled: 0,
+        hostile: false,
+        leavesBiofluid: false,
+        ttl: PROSPECT_LANCE_TTL_TICKS,
+      });
+      consumeModuleCharge(extra, 'prospect_lance', slot, events);
+    } else if (moduleHasCapacity(extra, 'return_disc', state.tick)) {
       state.projectiles.push({
         kind: 'return_disc',
         id: state.nextEntityId++,
@@ -2972,7 +3062,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             // contato. Parede que QUEBROU ja tem `break` (entulho + som), e os
             // outros veiculos ficam de fora: explosive detonou antes, o disco
             // reverte, e cuspe/pedra hostis nao sao plasma de bolt.
-            if (proj.kind === 'bolt' && !proj.hostile && !broke) {
+            //
+            // A LANCA entra porque e o mesmo plasma num cano mais longo, e um
+            // tiro que custa um segundo de cadencia nao pode terminar em
+            // silencio contra a rocha. O GRAO do Bacamarte fica de fora pelo
+            // motivo oposto — cinco bursts por disparo viram a mancha que a
+            // flechette ja evita.
+            if ((proj.kind === 'bolt' || proj.kind === 'lance') && !proj.hostile && !broke) {
               const impact = solidImpactPoint(prevX, prevY, proj.x, proj.y, cx, cy);
               events.push({
                 t: 'bolt_impact',

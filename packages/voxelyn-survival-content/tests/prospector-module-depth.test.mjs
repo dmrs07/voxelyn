@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { layerDepthDispute } from '../tools/voxel.mjs';
-import { ALL_MODULE_IDS, moduleLayerId } from '../tools/player-layers.mjs';
-import { MODULE_ATTACHMENTS, minigunGun } from '../tools/prospector-modules.mjs';
-import { gunAnchor, prospectorParts } from '../tools/prospector.mjs';
+import { ALL_MODULE_IDS, moduleBoxes, moduleLayerId } from '../tools/player-layers.mjs';
+import { minigunGun } from '../tools/prospector-modules.mjs';
+import { prospectorParts } from '../tools/prospector.mjs';
 import { MODULE_LAYER_SPRITE_IDS, PLAYER_GUN_BEHIND_DIRS } from '../src/manifest';
 
 const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
-const POSES = [
-  ...[0, 0, 1, 0].map((bob) => ({ bob })),
-  ...[0, 2, 1, 0].map((kick) => ({ kick })),
-];
+const POSES = [...[0, 0, 1, 0].map((bob) => ({ bob })), ...[0, 2, 1, 0].map((kick) => ({ kick }))];
 
+/**
+ * As caixas de um modulo, pelo MESMO despacho que o gerador usa.
+ *
+ * Este helper ja foi uma copia do `moduleBoxes` — `id === 'minigun' ? ... :
+ * MODULE_ATTACHMENTS[id](...)` — e a copia quebrou no dia em que a Lanca e o
+ * Bacamarte entraram: eles nao estao em `MODULE_ATTACHMENTS` (sao armas, nao
+ * acoplados), e o teste morreu com "not a function" em vez de medir alguma
+ * coisa. Um teste de profundidade que desenha o modulo diferente do gerador nao
+ * esta conferindo o gerador.
+ */
 const boxesFor = (id, pose, frame) =>
-  id === 'minigun'
-    ? minigunGun({ ...pose, fan: frame })
-    : MODULE_ATTACHMENTS[id](gunAnchor(pose));
+  moduleBoxes(id, pose.kick !== undefined ? 'attack' : 'idle', frame);
 
 /**
  * A ordem em que o cliente desenha corpo e MODULO, medida nos voxels.
@@ -31,7 +36,11 @@ describe('profundidade entre corpo e modulos acoplados', () => {
       let disputed = 0;
       let inFront = 0;
       POSES.forEach((pose, frame) => {
-        const d = layerDepthDispute(boxesFor(id, pose, frame % 4), prospectorParts(pose).upper, index);
+        const d = layerDepthDispute(
+          boxesFor(id, pose, frame % 4),
+          prospectorParts(pose).upper,
+          index,
+        );
         disputed += d.disputed;
         inFront += d.aInFront;
       });
@@ -102,7 +111,9 @@ describe('a Minigun no lugar do Cravador', () => {
       (box, i) => box.mat !== minigunGun({ flash: true })[i].mat,
     )[0];
     const gun = prospectorParts({ flash: false }).gun;
-    const gunMuzzle = gun.filter((box, i) => box.mat !== prospectorParts({ flash: true }).gun[i].mat)[0];
+    const gunMuzzle = gun.filter(
+      (box, i) => box.mat !== prospectorParts({ flash: true }).gun[i].mat,
+    )[0];
     expect(mgMuzzle.z).toBe(gunMuzzle.z + 0.5);
   });
 

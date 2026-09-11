@@ -55,6 +55,8 @@
     "layer-module-return-disc",
     "layer-module-ricochet",
     "layer-module-siphon",
-    "layer-module-minigun"
+    "layer-module-minigun",
+    "layer-module-prospect-lance",
+    "layer-module-blunderbuss"
   ]
 }

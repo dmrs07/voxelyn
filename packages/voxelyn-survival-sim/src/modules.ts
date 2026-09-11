@@ -105,6 +105,39 @@ export const MODULE_DEFINITIONS: Record<ModuleId, ModuleDefinition> = {
     tier: 3,
     tags: ['projectile', 'weapon', 'safe'],
   },
+  /**
+   * AS DUAS ARMAS DE TIER 2, e por que elas nao sao tier 3 como a Minigun.
+   *
+   * A Minigun e tier 3 porque e um UPLIFT: mais dano por segundo do que o
+   * parafuso em toda situacao, limitada so por municao. Estas duas sao
+   * SIDEGRADES — cada uma e pior que o parafuso comum em metade do jogo. A
+   * Lanca nao tem janela de burst e erra tudo no corpo a corpo; o Bacamarte
+   * nao existe a oito tiles. Trocar de arma aqui e escolher um problema, e
+   * escolher problema e o que tier 2 sempre fez.
+   *
+   * AS CARGAS CONTAM TIROS e nao procs, como na Minigun e pelo mesmo motivo:
+   * aqui o gatilho E o efeito, nao existe "Lanca que nao procou". Mas a regua
+   * das balas nao serve — 300 balas da Minigun sao 18,7 s de gatilho porque ela
+   * cospe 16 por segundo. Convertido para TEMPO DE GATILHO, que e a unidade em
+   * que os tres se comparam: 70 tiros de Lanca a 1,11/s sao 63 s, e 60 do
+   * Bacamarte a 0,91/s sao 66 s. A mesma ordem de grandeza dos tier 3 do resto
+   * da lista, e a mesma promessa: atravessa um setor e morre dentro do
+   * seguinte.
+   */
+  prospect_lance: {
+    id: 'prospect_lance',
+    lifetime: 'charges',
+    defaultCharges: 70,
+    tier: 2,
+    tags: ['projectile', 'weapon', 'safe'],
+  },
+  blunderbuss: {
+    id: 'blunderbuss',
+    lifetime: 'charges',
+    defaultCharges: 60,
+    tier: 2,
+    tags: ['projectile', 'weapon', 'safe'],
+  },
 };
 
 export const moduleDefinition = (id: ModuleId): ModuleDefinition => MODULE_DEFINITIONS[id];
@@ -135,6 +168,21 @@ export const moduleHasCapacity = (extra: PlayerExtra, id: ModuleId, tick: number
  * uma combinacao forte, e uma combinacao que nao tem orcamento — nem de
  * balanceamento, nem de particula, nem de projetil vivo.
  *
+ * A REGRA E SOBRE VOLUME, E NAO SOBRE A ETIQUETA `weapon`. Isso ficou visivel
+ * quando a Lanca e o Bacamarte entraram: os tres tem a etiqueta, e so dois
+ * precisam da recusa.
+ *
+ *   - a LANCA dispara 1,11 vez por segundo — MENOS que o parafuso comum, que
+ *     ja aceita tudo a 4/s. Um modulo nela e estritamente mais seguro do que
+ *     no tiro que o jogo entrega de graca, entao ela ACEITA os modificadores;
+ *   - o BACAMARTE dispara 0,91 vez por segundo, mas cada disparo sao CINCO
+ *     graos. `explosive` viraria cinco explosoes por tiro no colo do proprio
+ *     Prospector, que e a versao curta do problema da Minigun. Ele RECUSA;
+ *   - a MINIGUN recusa por 16 tiros por segundo, como sempre.
+ *
+ * Escrever a regra como "arma nao aceita modulo" teria sido mais curto e teria
+ * mentido: o que nao cabe e multiplicar o proc, nao trocar o gatilho.
+ *
  * A regra, entao, e conservadora e explicita:
  *
  *   | equipado com Minigun ativa | efeito na bala da Minigun          |
@@ -160,15 +208,35 @@ export const isWeaponModule = (id: ModuleId): boolean =>
 /**
  * O modulo-arma que esta com o gatilho AGORA, ou `undefined` para o tiro comum.
  *
- * Devolve o primeiro em ordem de id porque `activeModules` e mantido ordenado
- * — e um criterio arbitrario, mas TOTAL: hoje so existe uma arma, e no dia em
- * que existirem duas o desempate ja e deterministico em vez de depender da
- * ordem em que o jogador as pegou.
+ * O CRITERIO E O TIER, do maior para o menor, e ele deixou de ser academico no
+ * dia em que a Lanca e o Bacamarte entraram. Antes esta funcao devolvia o
+ * primeiro em ordem de id — "arbitrario, mas TOTAL", o que era verdade
+ * enquanto existia uma arma so. Com tres, a ordem alfabetica passaria o gatilho
+ * ao `blunderbuss` por cima de uma `minigun` carregada, e alguem perderia
+ * duzentas balas sem entender por que.
+ *
+ * Tier resolve isso do jeito que o encontro ja prometia: a Minigun (tier 3)
+ * SEGURA o gatilho ate a bala 300 sair, que e exatamente o que o disco de
+ * retorno ja fazia ("NAO dispara enquanto ha Minigun"). Quem pega uma arma de
+ * tier 2 com a Minigun viva nao perde nada — as cargas ficam intactas e ela
+ * assume sozinha quando a rajada acabar.
+ *
+ * O QUE ISTO NAO RESOLVE, e fica dito: entre as DUAS armas de tier 2 o
+ * desempate volta a ser o id (`blunderbuss` antes de `prospect_lance`), entao
+ * quem carrega as duas atira sempre com o Bacamarte. E total e deterministico,
+ * mas nao e intencao do jogador — o criterio certo seria "a ultima que voce
+ * pegou", e ele pede um `acquiredAtTick` na vida util por cargas, que hoje nao
+ * existe e viaja no wire. Fica para quando alguem reclamar de verdade.
  */
-export const activeWeaponModule = (extra: PlayerExtra, tick: number): ModuleId | undefined =>
-  extra.activeModules.find(
+export const activeWeaponModule = (extra: PlayerExtra, tick: number): ModuleId | undefined => {
+  const armed = extra.activeModules.filter(
     (module) => isWeaponModule(module.id) && moduleHasCapacity(extra, module.id, tick),
-  )?.id;
+  );
+  if (armed.length === 0) return undefined;
+  // `activeModules` ja vem ordenado por id, entao um sort ESTAVEL por tier
+  // preserva o desempate alfabetico sem precisar repeti-lo aqui.
+  return [...armed].sort((a, b) => moduleDefinition(b.id).tier - moduleDefinition(a.id).tier)[0].id;
+};
 
 const createModule = (id: ModuleId, tick: number): ActiveModule => {
   const def = moduleDefinition(id);
@@ -184,7 +252,11 @@ const createModule = (id: ModuleId, tick: number): ActiveModule => {
 };
 
 /** Grants a module or refreshes the existing instance to its configured maximum. */
-export const grantOrRechargeModule = (extra: PlayerExtra, id: ModuleId, tick: number): ActiveModule => {
+export const grantOrRechargeModule = (
+  extra: PlayerExtra,
+  id: ModuleId,
+  tick: number,
+): ActiveModule => {
   const existing = activeModule(extra, id);
   const fresh = createModule(id, tick);
   if (!existing) {
@@ -223,7 +295,7 @@ export const consumeModuleCharge = (
    * desta funcao que decide alguma coisa (a ejecao visual, o retorno do tiro
    * comum), e ele continua saindo exatamente uma vez.
    */
-  quiet = false
+  quiet = false,
 ): boolean => {
   const index = extra.activeModules.findIndex((module) => module.id === id);
   if (index < 0) return false;
@@ -250,7 +322,7 @@ export const expireTimedModules = (
   extra: PlayerExtra,
   tick: number,
   slot: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   for (let i = extra.activeModules.length - 1; i >= 0; i--) {
     const module = extra.activeModules[i];
@@ -288,7 +360,7 @@ export const rollModuleChoice = (
   siteId: number,
   tier: 1 | 2 | 3,
   extra: PlayerExtra,
-  tick: number
+  tick: number,
 ): PendingModuleChoice['options'] => {
   const rng = new RNG((seed ^ Math.imul(siteId + 1, 0x9e3779b9)) >>> 0 || 1);
   const base = tierPool(tier);
@@ -297,14 +369,18 @@ export const rollModuleChoice = (
   const preferred = rotated.filter((id) => !isFull(extra, id, tick));
   const candidates = preferred.length >= 2 ? preferred : rotated;
 
-  const safe = candidates.find((id) => !MODULE_DEFINITIONS[id].tags.includes('volatile')) ?? candidates[0];
-  const companion = candidates.find((id) => {
-    if (id === safe) return false;
-    if (MODULE_DEFINITIONS[safe].tags.includes('volatile')) {
-      return !MODULE_DEFINITIONS[id].tags.includes('volatile');
-    }
-    return true;
-  }) ?? rotated.find((id) => id !== safe) ?? safe;
+  const safe =
+    candidates.find((id) => !MODULE_DEFINITIONS[id].tags.includes('volatile')) ?? candidates[0];
+  const companion =
+    candidates.find((id) => {
+      if (id === safe) return false;
+      if (MODULE_DEFINITIONS[safe].tags.includes('volatile')) {
+        return !MODULE_DEFINITIONS[id].tags.includes('volatile');
+      }
+      return true;
+    }) ??
+    rotated.find((id) => id !== safe) ??
+    safe;
 
   return [safe, companion];
 };
@@ -332,7 +408,7 @@ export const liveProjectileModules = <
 >(
   modules: T | undefined,
   extra: PlayerExtra | undefined,
-  tick: number
+  tick: number,
 ): T | undefined => {
   if (!modules) return undefined;
   // Sem o dono a vista (projetil hostil, ou parceiro cujas cargas so o servidor
@@ -342,7 +418,9 @@ export const liveProjectileModules = <
   // serpente verde): a marca caduca cobra a mesma honestidade das outras —
   // sem carga, o dreno nao proca, e a serpente estaria prometendo cura.
   const ids = ['piercing', 'ricochet', 'explosive', 'siphon'] as const;
-  const stale = ids.filter((id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick));
+  const stale = ids.filter(
+    (id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick),
+  );
   if (stale.length === 0) return modules;
   const live = { ...modules };
   for (const id of stale) delete live[id];

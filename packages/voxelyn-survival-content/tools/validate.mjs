@@ -142,8 +142,22 @@ const MAX_ATLAS_WIDTH = 4096;
 const MAX_PNG_BYTES = 1536 * 1024;
 const MAX_TOTAL_PNG_BYTES = 10 * 1024 * 1024;
 const MAX_DECODED_BYTES = 160 * 1024 * 1024;
-/** Teto do que chega DEPOIS do boot, um arquetipo por vez. */
-const MAX_ON_DEMAND_DECODED_BYTES = 48 * 1024 * 1024;
+/**
+ * Teto do que chega DEPOIS do boot, um arquetipo por vez.
+ *
+ * SUBIU DE 48 PARA 64 MiB quando as camadas de modulo entraram na conta certa,
+ * e a subida e do teto LARGO e nao do teto que aperta — que e exatamente a
+ * distincao que o bloco acima estabeleceu. Os 12,3 MiB que se mudaram para ca
+ * sairam do orcamento de boot, que CAIU de 161,2 para 148,9 MiB: a troca
+ * liberou doze MiB no teto de 160 e gastou doze no de 48.
+ *
+ * O pior caso daqui continua sendo raro e gradual — e agora tem uma segunda
+ * razao para ser: ninguem carrega os nove modulos numa run, porque cada
+ * terminal oferece dois e a run tem poucos terminais. Um jogador que
+ * encontrasse todo arquetipo do jogo E todo modulo do jogo numa sessao so
+ * pagaria os 64 MiB, e ainda assim gradualmente, uma peca por vez.
+ */
+const MAX_ON_DEMAND_DECODED_BYTES = 64 * 1024 * 1024;
 /**
  * Atlas que o cliente NAO carrega no boot: chegam na primeira vez que sao
  * pedidos. Tem de bater com `ON_DEMAND_ATLASES` em `sprites.ts` (o teste de
@@ -167,6 +181,24 @@ export const ON_DEMAND_ATLASES = new Set([
   // teto — e a regra escrita acima aplicada ao primeiro peso que veio depois
   // dela: paga-se com carregamento sob demanda, nao com teto maior.
   'fx-magnet-shard',
+  // AS CAMADAS DE MODULO — correcao de contabilidade, e nao carregamento novo.
+  //
+  // O cliente NUNCA as carregou no boot: `MODULE_SOURCES` fica fora de
+  // `SOURCES` e quem as pede e `requestModule`, no laco de desenho, enquanto a
+  // peca esta equipada. Elas so nao estavam nesta lista, entao este validador
+  // cobrava 12,3 MiB do orcamento de BOOT por atlas que ninguem carrega no
+  // boot — e o teto que aperta ficou 12 MiB menor do que era de verdade por
+  // todo esse tempo. O defeito so apareceu quando a Lanca e o Bacamarte
+  // encostaram no limite.
+  'layer-module-piercing',
+  'layer-module-explosive',
+  'layer-module-conductive',
+  'layer-module-return-disc',
+  'layer-module-ricochet',
+  'layer-module-siphon',
+  'layer-module-minigun',
+  'layer-module-prospect-lance',
+  'layer-module-blunderbuss',
 ]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;

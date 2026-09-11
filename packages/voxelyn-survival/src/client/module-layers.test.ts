@@ -72,11 +72,17 @@ describe('o que a arma mostra', () => {
   });
 
   it('a regra vale para TODO modulo com a tag weapon, e nao so para o literal', () => {
-    // O dia em que existir uma segunda arma, este teste falha aqui em vez de
-    // no jogo. `weaponComposition` compara com 'minigun' porque hoje ela e a
-    // unica; se deixar de ser, a comparacao precisa virar `isWeaponModule`.
+    // Este teste ja falhou uma vez, e fez o trabalho dele: `weaponComposition`
+    // comparava com o literal 'minigun', e no dia em que a Lanca e o Bacamarte
+    // entraram ele quebrou aqui em vez de no jogo. Agora a comparacao e por
+    // etiqueta, e o que se cobra e que TODA arma substitua o Cravador.
     const weapons = ALL_MODULES.filter(isWeaponModule);
-    expect(weapons).toEqual(['minigun']);
+    expect(weapons.length).toBeGreaterThan(1);
+    for (const weapon of weapons) {
+      const c = weaponComposition(['piercing', weapon, 'explosive']);
+      expect(c.weapon, `${weapon} devia substituir o Cravador`).toBe(weapon);
+      expect(c.attachments, `${weapon} devia esconder os acoplados`).toEqual([]);
+    }
   });
 });
 
@@ -108,7 +114,9 @@ describe('quando o canhao esta montado', () => {
     // dez ticks para parar. Trocar de arma no meio disso e trocar exatamente
     // quando o jogador esta olhando.
     expect(mountedModules([], { spin: 0.4, barrelPhase: 0.9 })).toEqual(['minigun']);
-    expect(weaponComposition(mountedModules([], { spin: 0.4, barrelPhase: 0.9 })).weapon).toBe('minigun');
+    expect(weaponComposition(mountedModules([], { spin: 0.4, barrelPhase: 0.9 })).weapon).toBe(
+      'minigun',
+    );
   });
 
   it('nao duplica quando a lista e a rotacao concordam', () => {
@@ -123,7 +131,9 @@ describe('quando o canhao esta montado', () => {
 
   it('o limiar nao e zero — a integracao local deixa residuo', () => {
     expect(mountedModules([], { spin: MINIGUN_MOUNTED_SPIN, barrelPhase: 0 })).toEqual([]);
-    expect(mountedModules([], { spin: MINIGUN_MOUNTED_SPIN * 2, barrelPhase: 0 })).toEqual(['minigun']);
+    expect(mountedModules([], { spin: MINIGUN_MOUNTED_SPIN * 2, barrelPhase: 0 })).toEqual([
+      'minigun',
+    ]);
   });
 });
 

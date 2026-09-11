@@ -264,7 +264,13 @@
 //     `BossMoment` aceita `crack` e `shatter`. Um cliente de 42 nao desenharia
 //     nem as massas nem as rotas marcadas no chao — e as rotas SAO o telegrafo:
 //     sem elas o ferro atravessa a arena sem sinal.
-export const PROTOCOL_VERSION = 43;
+// 44: dois `ProjectileKind` novos no wire — `lance` e `pellet` — e dois
+//     `ModuleId` novos em `activeModules`. E quebra nos dois sentidos: um
+//     cliente antigo contra servidor novo recebe um `kind` que nao conhece e
+//     cai no desenho padrao (um parafuso comum no lugar de uma lanca, cinco
+//     deles no lugar do chumbo), e a HUD dele nao tem rotulo para um modulo
+//     cujo id ela nunca viu.
+export const PROTOCOL_VERSION = 44;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1286,7 +1292,43 @@ export const PROTOCOL_VERSION = 43;
 //     medianas saem iguais as da 87.
 //
 //     O ttl viaja no hash dos projeteis: replays de 87 nao batem.
-export const SIMULATION_VERSION = 88;
+// 89: AS DUAS ARMAS DE TIER 2 — a Lanca de Prospeccao e o Bacamarte.
+//
+//     Os dois OCUPAM o gatilho em vez de modifica-lo, como a Minigun, e andam
+//     em direcoes opostas a ela e entre si: a Lanca e um tiro por vez, mais
+//     forte e tres tiles alem do parafuso; o Bacamarte sao cinco graos num
+//     leque que morre a cinco tiles.
+//
+//     A LANCA E O ALCANCE DE ONTEM, COMPRADO. A base caiu para 13 na 88 porque
+//     18 deixavam quatro chefes neutralizaveis por posicao, e devolver 18 num
+//     modulo reabriria o que o corte fechou. Dezesseis dao vantagem que se
+//     sente sem devolver a opcao de ignorar a posicao do chefe.
+//
+//     O CALOR E QUE PAGA A CADENCIA. `HEAT_DECAY_PER_TICK` devolve 23/s; uma
+//     arma lenta com o calor do parafuso (9) nunca esquentaria, e a "cadencia
+//     reduzida" se pagaria sozinha em uptime. 19 e 22 por tiro poem o teto
+//     termico logo acima da cadencia de cada uma.
+//
+//     A MATRIZ DE COMPATIBILIDADE passou a ser sobre VOLUME e nao sobre a
+//     etiqueta `weapon`, e isso so ficou visivel com tres armas na bancada: a
+//     Lanca ACEITA modificadores (1,11 tiro/s e menos que os 4/s do parafuso,
+//     que ja aceita tudo), o Bacamarte RECUSA (cinco graos por tiro sao a
+//     versao curta do problema da Minigun) e a Minigun recusa por 16/s.
+//
+//     E `activeWeaponModule` passa a escolher por TIER e nao por ordem de id.
+//     Com uma arma so o criterio era inocente; com tres, a ordem alfabetica
+//     entregaria o gatilho ao Bacamarte por cima de uma Minigun carregada.
+//
+//     Medido (bot imortal, 6 tiles salvo onde dito): a Lanca encurta tudo
+//     (Guardiao 38,8 -> 35,1 s; Rainha 45,1 -> 31,6; Devorador 83,0 -> 66,6) e
+//     protege (dano tomado da Rainha 482 -> 140). O Bacamarte a DOIS tiles
+//     bate mais forte que o parafuso na mesma distancia (Guardiao 30,9 s a 47
+//     de dps contra 36,9 s a 39,3) e cobra a posicao: 2307 de dano tomado
+//     contra os 1248 a seis tiles.
+//
+//     Os alvos de `BOSS_TTK_SECONDS` NAO se mexem: eles sao medidos sem modulo
+//     nenhum, porque o parafuso e o unico equipamento que toda run tem.
+export const SIMULATION_VERSION = 89;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

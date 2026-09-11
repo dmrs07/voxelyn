@@ -206,7 +206,14 @@ export const ATTACHMENT_IDS = Object.keys(MODULE_ATTACHMENTS);
  */
 export const MINIGUN_FAN_FRAMES = 4;
 
-export const minigunGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, fan = 0, flash = false } = {}) => {
+export const minigunGun = ({
+  bob = 0,
+  kick = 0,
+  lean = 0,
+  crouch = 0,
+  fan = 0,
+  flash = false,
+} = {}) => {
   const a = gunAnchor({ bob, kick, lean, crouch });
 
   // O VOLUME PROJETA PARA A FRENTE, e nao para tras. A primeira versao punha a
@@ -271,5 +278,100 @@ export const minigunGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, fan = 0, f
     // clarao pelo ATLAS, e uma arma que nao acendesse deixaria a luz do disparo
     // sem fonte no corpo.
     box(a.x + 0.5, a.y - 5.5, a.z + 0.5, 1, 1, 1, flash ? 'loot' : 'rockDeep'),
+  ];
+};
+
+/**
+ * A LANCA DE PROSPECCAO — o cano longo.
+ *
+ * Ela substitui o Cravador como a Minigun substitui, e a leitura tem de ser
+ * OPOSTA a dela em todos os eixos: onde a Minigun e massa, tambor e ventoinha,
+ * a Lanca e COMPRIMENTO e mais nada. A silhueta e o argumento inteiro — a
+ * 4px por voxel ninguem le calibre, mas todo mundo le que aquele bot tem uma
+ * coisa comprida apontada para a frente.
+ *
+ * Osso palido pelo mesmo motivo da Minigun: o chassi e escuro, e uma arma
+ * `rockDeep` some dentro dele. A cinta escura no meio existe para o cano nao
+ * virar um traco branco unico de sete voxels — ela parte o comprimento em duas
+ * leituras e devolve a escala.
+ */
+export const prospectLanceGun = ({
+  bob = 0,
+  kick = 0,
+  lean = 0,
+  crouch = 0,
+  flash = false,
+} = {}) => {
+  const a = gunAnchor({ bob, kick, lean, crouch });
+  return [
+    // RECEPTOR: curto e baixo, porque tudo o que ela tem de dizer esta na
+    // frente. Mais volume aqui roubaria contraste do cano.
+    box(a.x, a.y - 2.5, a.z, 2, 2, 1.5, 'rust'),
+    box(a.x, a.y - 2.5, a.z + 1.5, 2, 2, 0.5, 'rockDeep'),
+
+    // O CANO, em dois trechos com a cinta entre eles. Sete voxels a frente do
+    // receptor — quase o dobro do Cravador, que e a unica coisa que o jogador
+    // precisa perceber a distancia.
+    box(a.x + 0.5, a.y - 4, a.z + 0.5, 1, 2, 1, 'bone'),
+    box(a.x + 0.25, a.y - 4.5, a.z + 0.5, 1.5, 1, 1, 'rockDeep'),
+    box(a.x + 0.5, a.y - 5.25, a.z + 0.5, 1, 1.5, 1, 'bone'),
+
+    // O TRILHO DE MIRA, acima do receptor: o unico volume que sobe, e o que
+    // distingue a Lanca do Perfurante (que tambem alonga a arma, mas por
+    // baixo, no eixo do cano, e sem nada em cima).
+    box(a.x + 0.5, a.y - 3, a.z + 2, 1, 2.5, 0.5, 'rockDeep'),
+    box(a.x + 0.5, a.y - 4, a.z + 2.5, 1, 0.5, 0.5, 'electric'),
+
+    // BIPE dobrado sob a boca: peso de arma apoiada, e o contraponto de baixo
+    // que impede o conjunto de ler como uma antena.
+    box(a.x + 0.5, a.y - 5.25, a.z - 0.5, 1, 0.5, 1, 'rust'),
+
+    // BOCA, acesa no mesmo quadro em que o Cravador acenderia.
+    box(a.x + 0.5, a.y - 5.5, a.z + 0.5, 1, 1, 1, flash ? 'loot' : 'rockDeep'),
+  ];
+};
+
+/**
+ * O BACAMARTE — o cano curto e ABERTO.
+ *
+ * O oposto exato da Lanca, e de proposito: ela e comprimento sem massa, ele e
+ * massa sem comprimento. A boca em funil e a peca inteira — e o unico volume
+ * do arsenal que fica MAIS LARGO na ponta, e e por isso que ele se reconhece de
+ * relance mesmo sem o jogador saber o nome.
+ *
+ * O funil e `rust` e nao `bone`: chumbo e polvora sao ferragem suja, e o osso
+ * palido ja e a linguagem do Cravador e da Lanca. Duas armas brancas e uma
+ * escura separam melhor do que tres brancas de comprimentos diferentes.
+ */
+export const blunderbussGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, flash = false } = {}) => {
+  const a = gunAnchor({ bob, kick, lean, crouch });
+  return [
+    // CULATRA: curta e GROSSA. Ela ocupa quase todo o comprimento da arma, que
+    // e o que sobra quando o cano nao existe.
+    box(a.x, a.y - 3, a.z, 2, 2.5, 2, 'rust'),
+    box(a.x, a.y - 3, a.z + 2, 2, 2.5, 0.5, 'rockDeep'),
+
+    // O FUNIL, em dois degraus que ABREM — e abrem em ALTURA, nao em largura.
+    //
+    // A primeira versao alargava para os lados, que e o que um bacamarte faz, e
+    // isso estourou o quadro: `fitReference` enquadra o corpo e TODOS os modulos
+    // juntos, entao a peca mais larga do arsenal define o recorte de todas as
+    // camadas do bot. Nao havia folga lateral — o Ricochete ja ocupa a borda
+    // direita — e havia folga vertical de sobra. Abrindo em z, o trompete se le
+    // igual nesta isometria e nao empurra ninguem.
+    box(a.x, a.y - 4.5, a.z + 0.25, 2, 1.5, 2.5, 'rust'),
+    box(a.x, a.y - 5.5, a.z + 0.25, 2, 1, 3.2, 'rust'),
+
+    // O ARO da boca, escuro, fechando o funil. Sem ele a ponta mais aberta da
+    // arma e tambem a mais clara, e o volume inteiro le como um bloco chapado.
+    box(a.x, a.y - 5.5, a.z + 0.25, 2, 0.5, 3.2, 'rockDeep'),
+
+    // CARTUCHEIRA sob a culatra: a massa que diz que a munição dele e grossa,
+    // e o contrapeso que impede a arma de parecer so uma boca flutuando.
+    box(a.x + 0.25, a.y - 2.5, a.z - 1, 1.5, 1.5, 1, 'loot'),
+
+    // BOCA acesa no centro do funil, mais larga que a dos outros dois canos —
+    // o clarao de um bacamarte e a coisa mais larga que o bot produz.
+    box(a.x, a.y - 5.75, a.z + 0.5, 2, 0.5, 1.2, flash ? 'loot' : 'rockDeep'),
   ];
 };

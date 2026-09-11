@@ -56,6 +56,7 @@ import {
   IMPLEMENTED_BOSS,
   createRun,
   emptyCommand,
+  grantOrRechargeModule,
   spawnEnemy,
   stepRun,
 } from '../dist/src/index.js';
@@ -186,6 +187,11 @@ const duel = (seed, archetype, gap, hp) => {
   if (hp) {
     boss.hp = hp;
     boss.maxHp = hp;
+  }
+  if (weapon) {
+    // Cargas cheias e nunca reabastecidas: se a arma acabar no meio, o resto da
+    // luta sai no parafuso e o numero vira uma media de duas armas.
+    grantOrRechargeModule(state.playerExtras[0], weapon, state.tick);
   }
   state.bossRuntime.awake = true;
   return { state, boss };
@@ -355,6 +361,16 @@ const seeds = Number(arg('seeds', 8));
  * cobrar de perto.
  */
 const forcedBand = arg('band', null);
+/**
+ * A ARMA equipada na medicao, ou o parafuso basico.
+ *
+ * O alvo de `BOSS_TTK_SECONDS` e medido SEM modulo nenhum, e continua sendo:
+ * o parafuso e o unico equipamento que toda run tem, e por isso o unico
+ * denominador em que onze chefes se comparam. Esta flag responde outra
+ * pergunta — quanto uma arma de tier 2 encurta o teto —, e a resposta dela
+ * nunca vira alvo.
+ */
+const weapon = arg('weapon', null);
 const only = arg('boss', null);
 const sweep = arg('sweep', null);
 const list = only ? only.split(',') : BOSSES;

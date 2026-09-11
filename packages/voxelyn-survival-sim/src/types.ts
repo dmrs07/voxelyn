@@ -179,7 +179,19 @@ export type ModuleId =
    * TROCA o tiro. Ver `modules.ts` para a matriz de compatibilidade e
    * `constants.ts`, secao "MINIGUN", para os numeros.
    */
-  | 'minigun';
+  | 'minigun'
+  /**
+   * LANCA DE PROSPECCAO: o parafuso longo. Como a Minigun, OCUPA o gatilho em
+   * vez de modifica-lo — mas na direcao oposta dela: um tiro por vez, mais
+   * lento que o comum, mais forte e com alcance de 16 tiles contra os 13 da
+   * base. Ver `constants.ts`, secao "LANCA DE PROSPECCAO".
+   */
+  | 'prospect_lance'
+  /**
+   * BACAMARTE: a carga de chumbo. Cinco graos num leque curto — muito dano
+   * encostado, nada a oito tiles. Ver `constants.ts`, secao "BACAMARTE".
+   */
+  | 'blunderbuss';
 /**
  * `weapon` marca o modulo que OCUPA o disparo principal em vez de modifica-lo.
  *
@@ -1645,6 +1657,23 @@ export type ProjectileKind =
    * balas" num calibre que quase nao ocupa pixel.
    */
   | 'flechette'
+  /**
+   * LANCA: o parafuso longo da Lanca de Prospeccao.
+   *
+   * Tipo proprio pelo mesmo motivo da flechette — o cliente decide FORMA pelo
+   * `kind`, e um bolt comum voando a 26 tiles/s leria como um bolt com pressa.
+   * A lanca e um risco fino e comprido, que e o que anuncia de longe que aquele
+   * tiro custou um segundo de cadencia.
+   */
+  | 'lance'
+  /**
+   * GRAO: um dos cinco chumbos do Bacamarte.
+   *
+   * Cinco por disparo, vida util curtissima (cinco tiles) e corpo minusculo. Um
+   * bolt em escala reduzida desenharia cinco estilhacos com rastro de energia a
+   * cada tiro — a mesma mancha que a flechette evita, so que em rajada.
+   */
+  | 'pellet'
   /**
    * A REDE DE SEDA da Cerzideira (abaixo de 20% de vida): um disco de teia
    * arremessado num dos oito rumos autorados. Nao fere: ENCAPSULA quem

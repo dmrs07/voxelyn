@@ -126,6 +126,8 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   ricochet: 'Ricochete',
   return_disc: 'Disco de Retorno',
   minigun: 'Minigun',
+  prospect_lance: 'Lança de Prospecção',
+  blunderbuss: 'Bacamarte',
 };
 const MODULE_ORDER: readonly ModuleId[] = [
   'piercing',
@@ -135,6 +137,8 @@ const MODULE_ORDER: readonly ModuleId[] = [
   'ricochet',
   'return_disc',
   'minigun',
+  'prospect_lance',
+  'blunderbuss',
 ];
 
 const setupEl = document.getElementById('setup') as HTMLDivElement;

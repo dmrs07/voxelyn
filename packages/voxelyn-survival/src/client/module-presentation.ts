@@ -81,6 +81,24 @@ const MODULES: Record<ModuleId, ModuleStatic> = {
     proc: 'module.minigun.proc',
     risk: 'safe',
   },
+  /**
+   * As duas armas de tier 2 sao `safe` pelo mesmo criterio da Minigun: `risk`
+   * aqui responde UMA pergunta — o modulo pode matar o proprio Prospector? — e
+   * nenhuma das duas pode. O Bacamarte cobra POSICAO, que e outra coisa: quem
+   * paga por ela e a barra de vida, e a barra de vida ja esta na tela.
+   */
+  prospect_lance: {
+    label: 'module.prospect_lance.label',
+    description: 'module.prospect_lance.description',
+    proc: 'module.prospect_lance.proc',
+    risk: 'safe',
+  },
+  blunderbuss: {
+    label: 'module.blunderbuss.label',
+    description: 'module.blunderbuss.description',
+    proc: 'module.blunderbuss.proc',
+    risk: 'safe',
+  },
 };
 
 /**

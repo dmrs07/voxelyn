@@ -1789,6 +1789,81 @@ export const BOLT_COOLDOWN_TICKS = 5;
  * E o alcance de ontem nao sumiu — virou um modulo. Ver PROSPECT_LANCE_RANGE.
  */
 export const BOLT_RANGE = 13;
+
+/**
+ * ---------------------------------------------------------------------------
+ * LANCA DE PROSPECCAO — o alcance de ontem, agora comprado.
+ * ---------------------------------------------------------------------------
+ *
+ * O terceiro modulo que OCUPA o gatilho em vez de modifica-lo (ver a matriz em
+ * `modules.ts`), e o primeiro que anda na direcao oposta da Minigun: um tiro de
+ * cada vez, mais lento que o comum, mais forte, e enxergando mais longe.
+ *
+ * OS 16 TILES SAO O DESENHO INTEIRO. A base caiu para 13 porque 18 deixavam
+ * quatro chefes neutralizaveis por posicao (ver BOLT_RANGE), e devolver 18 num
+ * modulo reabriria exatamente o que o corte fechou. Dezesseis dao uma vantagem
+ * que se sente — tres tiles sao a diferenca entre trocar tiro com um Corcel e
+ * abate-lo antes da investida — sem devolver a opcao de ignorar a posicao do
+ * chefe: o alcance de ameaca do Bispo, da Rainha e do Magnetarca fica perto de
+ * 9, e nem 13 nem 16 mudam quem esta dentro dele.
+ *
+ * O CALOR E QUE PAGA A CADENCIA, e sem ele o modulo seria um upgrade puro.
+ * `HEAT_DECAY_PER_TICK` devolve 23/s; o parafuso comum gasta 36/s e por isso
+ * satura em 2,56 tiros/s (dos 4 que a cadencia permitiria). Uma arma lenta com
+ * o calor do parafuso NUNCA esquentaria, e a "cadencia reduzida" se pagaria
+ * sozinha em uptime. Os 19 por tiro poem o teto termico em 1,21 tiros/s, logo
+ * acima da cadencia de 1,11 — a arma e limitada pelo proprio ritmo, e nao ganha
+ * disparo de graca.
+ *
+ * A conta que sobra: 42,2 de dano sustentado por segundo contra os 35,8 do
+ * parafuso (+18%), e NENHUMA janela de burst. O parafuso comum cospe 56/s por
+ * uns quatro segundos antes de saturar; a Lanca nunca passa dos 42,2. Quem a
+ * escolhe troca o pico pela regularidade e pelos tres tiles.
+ */
+export const PROSPECT_LANCE_RANGE = 16;
+export const PROSPECT_LANCE_SPEED = 26;
+export const PROSPECT_LANCE_TTL_TICKS = Math.ceil(
+  (PROSPECT_LANCE_RANGE / PROSPECT_LANCE_SPEED) * TICK_HZ,
+);
+export const PROSPECT_LANCE_DAMAGE = 38;
+export const PROSPECT_LANCE_COOLDOWN_TICKS = 18;
+export const PROSPECT_LANCE_HEAT_PER_SHOT = 19;
+
+/**
+ * ---------------------------------------------------------------------------
+ * BACAMARTE — a carga de chumbo.
+ * ---------------------------------------------------------------------------
+ *
+ * Cinco graos num leque de rumos FIXOS. Fixos e nao sorteados de proposito: a
+ * simulacao e deterministica e o padrao de um bacamarte e coisa que se aprende
+ * — um leque que muda a cada tiro seria um erro de mira disfarcado de arma, e
+ * ainda consumiria a RNG da run para desenhar chumbo.
+ *
+ * O ARCO SAI DA GEOMETRIA, e nao de uma conta de cone. Os graos partem juntos e
+ * ABREM: encostado, os cinco cabem num corpo de chefe e cobram 50; a tres
+ * tiles, dois ou tres acertam; a cinco, o chumbo morre no ar. Nao ha regra de
+ * queda de dano em lugar nenhum — o alcance se resolve sozinho, do mesmo jeito
+ * que se resolve para quem atira de verdade.
+ *
+ * O PRECO ESTA MEDIDO, e e a razao de ele nao ser um upgrade: os 50 exigem
+ * estar a dois tiles de coisas que cobram caro. O `tools/boss-ttk.mjs` mede o
+ * Guardiao em 1538 de dano tomado por encontro a SEIS tiles, e a Fornalha em
+ * 1161. A dois, o bacamarte nao e uma arma melhor: e uma aposta.
+ *
+ * Calor 22 poe o teto termico em 1,05 tiros/s contra a cadencia de 0,91 — a
+ * mesma regra da Lanca, pelo mesmo motivo (ver PROSPECT_LANCE_HEAT_PER_SHOT).
+ * Sustentado encostado: 45,5/s. A oito tiles: zero.
+ */
+export const BLUNDERBUSS_PELLETS = 5;
+export const BLUNDERBUSS_DAMAGE = 10;
+/** Meia-abertura do leque, em radianos: ~48 graus de ponta a ponta. */
+export const BLUNDERBUSS_SPREAD = 0.42;
+export const BLUNDERBUSS_RANGE = 5;
+export const BLUNDERBUSS_SPEED = 15;
+export const BLUNDERBUSS_TTL_TICKS = Math.ceil((BLUNDERBUSS_RANGE / BLUNDERBUSS_SPEED) * TICK_HZ);
+export const BLUNDERBUSS_COOLDOWN_TICKS = 22;
+export const BLUNDERBUSS_HEAT_PER_SHOT = 22;
+
 /**
  * A vida util do projetil, DERIVADA do alcance. Um tick a mais por seguranca de
  * arredondamento seria alcance a mais; `floor` deixaria o ultimo meio tile
