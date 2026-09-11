@@ -41,13 +41,11 @@ import {
   SHARD_LODGED,
   SHARD_WINDUP,
   TICK_HZ,
-  bossForSector,
-  createRun,
+  createMagnetarchBench,
   emptyCommand,
   hasLineOfSight,
   magnetField,
-  runDepthForGeneration,
-  sectorBiome,
+  magnetarchBenchSeed,
   stepRun,
 } from '../dist/src/index.js';
 
@@ -147,54 +145,19 @@ const pickShard = (state, me, strategy, seen, preparedThisCycle) => {
 
 // --- uma partida -----------------------------------------------------------
 
-const play = (seed, strategy, { fauna, trace = false }) => {
+const play = (seed, strategy, { fauna, trace = false, record = false }) => {
   const shotsAt = { chefe: 0, massa: 0 };
-  const depth = runDepthForGeneration('G-04');
-  const state = createRun({ seed, sector: 7, depth });
-  const boss = state.enemies.find((e) => e.archetype === 'magnetarch');
-  if (!boss) return null;
-  if (!fauna) state.enemies = state.enemies.filter((e) => e === boss);
+  // O CENARIO VEM DE `createMagnetarchBench`, na simulacao, e nao daqui: o rig
+  // de captura monta o MESMO estado no navegador para reproduzir o log de
+  // comandos com o renderer de verdade. Duas construcoes separadas
+  // dessincronizariam no primeiro tick, e o video mostraria uma partida que
+  // ninguem mediu.
+  const bench = createMagnetarchBench(seed, { fauna });
+  if (!bench) return null;
+  const { state, boss } = bench;
+  /** O log de comandos, quando pedido: e ele que o rig de captura reproduz. */
+  const log = record ? [] : null;
 
-  // ONDE ELE COMECA, e por que isto e uma decisao e nao um detalhe.
-  //
-  // A primeira versao largava o bot na borda do campo (13 tiles). Em camara de
-  // verdade isso quase sempre cai FORA do salao, no sistema de cavernas em volta
-  // — e este bot nao tem busca de rota. Resultado: dezesseis partidas com o
-  // corpo encostado em rocha a onze tiles, tomando 14/s do arco de retorno em
-  // cada repulsao, sem nunca ver a faixa. O numero que sairia dali seria sobre o
-  // meu harness, nao sobre o encontro.
-  //
-  // Ele comeca DENTRO da faixa, com LINHA DE VISAO para o chefe: a travessia ate
-  // a camara nao e o que se esta medindo, e um agente sem rota nao pode
-  // responder por ela. E uma limitacao declarada, nao um resultado.
-  const spawn = (() => {
-    const w = state.config.width;
-    const mid = (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
-    for (const ring of [mid, mid + 1.5, mid - 1.5, MAGNETARCH_CRUSH_RANGE + 1]) {
-      for (let k = 0; k < 48; k++) {
-        const a = (k / 48) * Math.PI * 2;
-        const x = boss.x + Math.cos(a) * ring;
-        const y = boss.y + Math.sin(a) * ring;
-        const cx = Math.floor(x);
-        const cy = Math.floor(y);
-        if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
-        if (state.solid[cy * w + cx] !== 0) continue;
-        if (!hasLineOfSight(state, x, y, boss.x, boss.y)) continue;
-        return { x, y };
-      }
-    }
-    return null;
-  })();
-  if (!spawn) return null;
-  state.player.x = spawn.x;
-  state.player.y = spawn.y;
-
-  // A MESMA SEQUENCIA DE ERRO DE MIRA nas tres estrategias: o PRNG e semeado so
-  // pela seed. A versao anterior somava `strategy.length`, o que dava a `none`
-  // um stream diferente de `one`/`all` (que por acidente compartilhavam o
-  // mesmo) — comparar estrategias com sortes diferentes mistura a decisao com o
-  // dado. As sequencias divergem depois da primeira escolha diferente, o que e
-  // inevitavel; o que se pode garantir e a mesma largada.
   const rnd = mulberry32(seed * 7919);
   const memory = [];
   const damageBy = new Map();
@@ -293,6 +256,15 @@ const play = (seed, strategy, { fauna, trace = false }) => {
     };
     cmd.fire = state.playerExtras[0].heat < HEAT_CEILING;
 
+    if (log)
+      log.push([
+        Number(cmd.move.x.toFixed(4)),
+        Number(cmd.move.y.toFixed(4)),
+        Number(cmd.aim.x.toFixed(4)),
+        Number(cmd.aim.y.toFixed(4)),
+        cmd.fire ? 1 : 0,
+        cmd.dodge ? 1 : 0,
+      ]);
     const res = stepRun(state, [cmd]);
     ticks++;
     if (trace) {
@@ -379,34 +351,27 @@ const play = (seed, strategy, { fauna, trace = false }) => {
     blockedTicks,
     flatTicks,
     damageBy,
+    openness: bench.openness,
+    log,
   };
 };
 
 // --- seeds: camaras de verdade, abertas e apertadas ------------------------
 
-/** Quanto chao aberto existe a ate 10 tiles do chefe — a "largura" da camara. */
-const openness = (state, boss) => {
-  let open = 0;
-  const w = state.config.width;
-  for (let y = Math.floor(boss.y) - 10; y <= Math.floor(boss.y) + 10; y++)
-    for (let x = Math.floor(boss.x) - 10; x <= Math.floor(boss.x) + 10; x++) {
-      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
-      if (Math.hypot(x - boss.x, y - boss.y) > 10) continue;
-      if (state.solid[y * w + x] === 0) open++;
-    }
-  return open;
-};
-
+/**
+ * As seeds do benchmark, metade em camara apertada e metade em aberta.
+ *
+ * A "largura" da camara sai de `createMagnetarchBench` — a mesma conta que o rig
+ * de captura ve —, e o corte e por extremos: as mais fechadas contra as mais
+ * abertas entre as que entregam o chefe.
+ */
 const findSeeds = (count) => {
-  const depth = runDepthForGeneration('G-04');
   const found = [];
   for (let seed = 1; seed < 4000 && found.length < count * 3; seed++) {
-    const def = bossForSector((s) => sectorBiome(seed, s), 7, depth.sectorCount, depth.coreSectors);
-    if (def?.archetype !== 'magnetarch') continue;
-    const state = createRun({ seed, sector: 7, depth });
-    const boss = state.enemies.find((e) => e.archetype === 'magnetarch');
-    if (!boss) continue;
-    found.push({ seed, open: openness(state, boss) });
+    if (!magnetarchBenchSeed(seed)) continue;
+    const bench = createMagnetarchBench(seed);
+    if (!bench) continue;
+    found.push({ seed, open: bench.openness });
   }
   found.sort((a, b) => a.open - b.open);
   const tight = found.slice(0, Math.ceil(count / 2));
@@ -448,6 +413,67 @@ console.log(
 console.log(
   `atraso de reacao ${REACTION_TICKS} ticks (${(REACTION_TICKS / TICK_HZ) * 1000} ms) · erro de mira sigma ${AIM_SIGMA} rad · teto de calor ${HEAT_CEILING}`,
 );
+
+// --- modo CAPTURA: escolhe as tres partidas e grava os logs ----------------
+//
+// As tres cenas que interessam, e as tres saem do MESMO benchmark, com a mesma
+// vida, a mesma arena e os mesmos parametros — nenhuma e montada:
+//
+//   1. uma vitoria REPRESENTATIVA mirando so no chefe (a de tempo mediano);
+//   2. uma vitoria SABOTANDO, escolhida pela cauda mais longa — e ela o que se
+//      quer olhar: o trecho depois de o ferro acabar;
+//   3. a PIOR partida do lote. Se houver morte ou timeout, e ela; como hoje nao
+//      ha nenhuma, e a de menor vida restante — a que mais perto chegou.
+if (argv.includes('--captures')) {
+  const mkdirSync = (await import('node:fs')).mkdirSync;
+  const writeFileSync = (await import('node:fs')).writeFileSync;
+  const out = (argv.find((a) => a.startsWith('--out=')) ?? '--out=captures').split('=')[1];
+  mkdirSync(out, { recursive: true });
+  const all = [];
+  for (const strategy of ['none', 'one']) {
+    for (const entry of seeds) {
+      const r = play(entry.seed, strategy, { fauna, record: true });
+      if (r) all.push({ ...entry, r });
+    }
+  }
+  const wins = (st) => all.filter((x) => x.r.strategy === st && x.r.outcome === 'vitoria');
+  const byTicks = [...wins('none')].sort((a, b) => a.r.ticks - b.r.ticks);
+  const median = byTicks[Math.floor(byTicks.length / 2)];
+  const tail = [...wins('one')].sort((a, b) => b.r.flatTicks - a.r.flatTicks)[0];
+  const bad = all.filter((x) => x.r.outcome !== 'vitoria');
+  const worst = bad.length
+    ? bad.sort((a, b) => a.r.hpLeft - b.r.hpLeft)[0]
+    : [...all].sort((a, b) => a.r.hpLeft - b.r.hpLeft)[0];
+  const picks = [
+    { name: '1-vitoria-no-chefe', pick: median },
+    { name: '2-vitoria-sabotando', pick: tail },
+    { name: `3-pior-caso-${worst.r.outcome}`, pick: worst },
+  ];
+  for (const { name, pick } of picks) {
+    const { r } = pick;
+    writeFileSync(
+      `${out}/${name}.json`,
+      JSON.stringify({
+        seed: r.seed,
+        strategy: r.strategy,
+        fauna,
+        outcome: r.outcome,
+        ticks: r.ticks,
+        hpLeft: Math.round(r.hpLeft),
+        cracked: r.cracked,
+        shattered: r.shattered,
+        flatTicks: r.flatTicks,
+        chamber: pick.kind,
+        commands: r.log,
+      }),
+    );
+    console.log(
+      `  ${name}: seed ${r.seed} (${pick.kind}) ${r.strategy} — ${r.outcome} em ${s(r.ticks)}s,` +
+        ` vida ${Math.round(r.hpLeft)}/100, fraturadas ${r.cracked}, cauda ${s(r.flatTicks)}s`,
+    );
+  }
+  process.exit(0);
+}
 
 const rows = [];
 for (const strategy of ['none', 'one', 'all']) {

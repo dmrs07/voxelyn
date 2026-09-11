@@ -1662,6 +1662,41 @@ aprende. Vinte e quatro vitórias em vinte e quatro, com 9 a 24 de 100 de dano, 
 São cenários simulados, para achar situações impraticáveis e comparar estratégias entre
 si; não estabelecem piso nenhum.
 
+#### As capturas: o encontro rodando, não cenas montadas
+
+Três vídeos saem do **mesmo** benchmark — mesma vida, mesma arena, mesmos parâmetros —,
+reproduzidos no renderer de verdade:
+
+```
+pnpm --filter @voxelyn/survival-sim build
+node packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs --runs=24 --captures --out=/tmp/caps
+pnpm --filter @voxelyn/survival build
+node packages/voxelyn-survival/scripts/capture-magnetarch-bench.mjs /tmp/caps /tmp/videos
+```
+
+O que garante que o vídeo mostre a partida que foi medida é `createMagnetarchBench`, na
+simulação: o bot (em Node) e o rig (`bench.html`, no navegador) montam o estado inicial
+pela **mesma função**, e a simulação é determinística — mesmo estado mais mesma sequência
+de comandos dá a mesma partida. O rig não decide nada: ele reproduz o log de comandos que
+o bot gravou, com `stepRun` a 20 Hz, `LocalPlayout` e `SurvivalRenderer`. A ficha da
+partida (seed, câmara, estratégia, desfecho, cauda) fica na tela — um vídeo de benchmark
+sem ela é um vídeo bonito que não prova nada.
+
+As três escolhidas pelo próprio lote:
+
+| Cena                                     | Seed | Câmara   | Desfecho          | Vida       | Cauda      |
+| ---------------------------------------- | ---- | -------- | ----------------- | ---------- | ---------- |
+| Vitória mirando no chefe (tempo mediano) | 1063 | aberta   | vitória em 36,5 s | 48/100     | 0,0 s      |
+| Vitória sabotando (cauda mais longa)     | 216  | apertada | vitória em 39,9 s | 82/100     | **34,8 s** |
+| Pior caso do lote                        | 399  | apertada | vitória em 49,5 s | **30/100** | 0,0 s      |
+
+Não houve morte nem timeout em nenhuma das 24 partidas, então a terceira cena é a que
+chegou mais perto — e ela é uma partida **ignorando** o ferro, terminando com 30 de vida.
+
+A segunda captura é a que mais informa: 34,8 s de campo sem nenhuma massa contra os 6,9 s
+de média. Em câmara apertada o material acaba cedo, e o resto da luta é o campo puro.
+Essa é a variação que a média escondia.
+
 #### O que a medição diz sobre a segunda fase
 
 Com três massas finitas, o protótipo entrega **um** pagamento grande e não um laço: o

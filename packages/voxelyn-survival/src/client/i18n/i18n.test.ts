@@ -149,7 +149,18 @@ describe('nenhum texto de jogador fora do catálogo', () => {
   // ver. Passa pelo mesmo motor de render (por isso mora em `src/client`, e não
   // num diretório de ferramentas separado), mas o texto da tela de setup nunca
   // aparece no jogo publicado.
-  const IGNORADOS = new Set(['i18n', 'sprite-viewer.ts', 'arena-main.ts', 'arena-catalog.ts']);
+  //
+  // O rig de captura do benchmark (`bench.html`) entra pela mesma porta, e com
+  // uma razão a mais: o texto dele é a FICHA DA PARTIDA (seed, câmara, desfecho,
+  // cauda) escrita por cima do vídeo. Traduzi-la seria traduzir um número de
+  // laboratório — e sem ela o vídeo não prova de que partida se trata.
+  const IGNORADOS = new Set([
+    'i18n',
+    'sprite-viewer.ts',
+    'arena-main.ts',
+    'arena-catalog.ts',
+    'bench-main.ts',
+  ]);
 
   const arquivos = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
