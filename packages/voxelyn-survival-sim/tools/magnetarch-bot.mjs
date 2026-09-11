@@ -37,6 +37,7 @@ import {
   MAGNETARCH_FIELD_RANGE,
   MAGNETARCH_SHARD_HP,
   MAGNETARCH_SHARD_RADIUS,
+  MAGNETARCH_SHARD_RETURN_DAMAGE,
   MAGNETARCH_TETHER_RANGE,
   MAGNET_ATTRACT,
   SHARD_FLIGHT,
@@ -122,18 +123,30 @@ const perceive = (state, boss) => ({
  *
  * `one` para de preparar depois da primeira de cada recolhimento; `all` insiste
  * enquanto houver ferro inteiro no chao. `none` nunca olha para elas.
+ *
+ * LINHA DE VISAO E OBRIGATORIA, e a falta dela era um defeito com consequencia
+ * grande: a versao anterior escolhia so pela integridade, entao o bot podia
+ * insistir numa massa atras de uma coluna e gastar a janela inteira atirando em
+ * rocha. A linha de visao garantida no nascimento e para o CHEFE, nao para as
+ * massas — e um agente teimando num alvo bloqueado faz a sabotagem parecer uma
+ * armadilha quando o problema e a escolha dele.
  */
-const pickShard = (strategy, seen, preparedThisCycle) => {
+const pickShard = (state, me, strategy, seen, preparedThisCycle) => {
   if (strategy === 'none') return null;
   if (strategy === 'one' && preparedThisCycle > 0) return null;
-  const targets = seen.shards.filter(
+  const candidates = seen.shards.filter(
     (s) => (s.state === SHARD_LODGED || s.state === SHARD_WINDUP) && s.cracked === 0,
   );
-  if (targets.length === 0) return null;
+  const visible = candidates.filter((s) => hasLineOfSight(state, me.x, me.y, s.x, s.y));
+  if (visible.length === 0) {
+    // Nenhuma alcancavel: ele ABANDONA a ideia e volta para o chefe neste tick,
+    // em vez de guardar um alvo que nao pode acertar.
+    return { blocked: candidates.length > 0, shard: null };
+  }
   // A mais adiantada: a que ja levou tiro. Terminar uma vale mais que comecar
   // tres, e isso e uma decisao de jogador e nao de simulacao.
-  targets.sort((a, b) => a.hp - b.hp);
-  return targets[0];
+  visible.sort((a, b) => a.hp - b.hp);
+  return { blocked: false, shard: visible[0] };
 };
 
 // --- uma partida -----------------------------------------------------------
@@ -180,21 +193,33 @@ const play = (seed, strategy, { fauna, trace = false }) => {
   state.player.x = spawn.x;
   state.player.y = spawn.y;
 
-  const rnd = mulberry32(seed * 7919 + strategy.length * 104729);
+  // A MESMA SEQUENCIA DE ERRO DE MIRA nas tres estrategias: o PRNG e semeado so
+  // pela seed. A versao anterior somava `strategy.length`, o que dava a `none`
+  // um stream diferente de `one`/`all` (que por acidente compartilhavam o
+  // mesmo) — comparar estrategias com sortes diferentes mistura a decisao com o
+  // dado. As sequencias divergem depois da primeira escolha diferente, o que e
+  // inevitavel; o que se pode garantir e a mesma largada.
+  const rnd = mulberry32(seed * 7919);
   const memory = [];
   const damageBy = new Map();
   let ticks = 0;
   let cracked = 0;
   let shattered = 0;
   let exposedTicks = 0;
-  let exposedFiring = 0;
+  let exposedPlayerDamage = 0;
+  let normalTicks = 0;
+  let normalPlayerDamage = 0;
+  let returnDamage = 0;
+  let blockedTicks = 0;
   let flatTicks = 0;
+  let bossHpBefore = boss.hp;
   let lastHp = state.player.hp;
   let preparedThisCycle = 0;
   let lastMood = boss.mood;
   let firstShatterAt = -1;
 
-  while (boss.alive && state.player.alive && ticks < 120 * TICK_HZ) {
+  const LIMIT = 120 * TICK_HZ;
+  while (boss.alive && state.player.alive && ticks < LIMIT) {
     memory.push(perceive(state, boss));
     const seen = memory[Math.max(0, memory.length - 1 - REACTION_TICKS)];
     const me = state.player;
@@ -257,7 +282,9 @@ const play = (seed, strategy, { fauna, trace = false }) => {
     cmd.move = mlen > 0 ? { x: move.x / mlen, y: move.y / mlen } : { x: 0, y: 0 };
 
     // --- em que atirar -----------------------------------------------------
-    const target = pickShard(strategy, seen, preparedThisCycle) ?? seen.boss;
+    const pick = pickShard(state, me, strategy, seen, preparedThisCycle);
+    if (pick?.blocked) blockedTicks++;
+    const target = pick?.shard ?? seen.boss;
     const ax = target.x - me.x;
     const ay = target.y - me.y;
     const alen = Math.hypot(ax, ay) || 1;
@@ -285,6 +312,7 @@ const play = (seed, strategy, { fauna, trace = false }) => {
       }
     }
 
+    let shattersThisTick = 0;
     for (const ev of res.events) {
       if (ev.t !== 'boss_state' || ev.archetype !== 'magnetarch') continue;
       if (ev.state === 'crack') {
@@ -293,6 +321,7 @@ const play = (seed, strategy, { fauna, trace = false }) => {
       }
       if (ev.state === 'shatter') {
         shattered++;
+        shattersThisTick++;
         if (firstShatterAt < 0) firstShatterAt = ticks;
       }
     }
@@ -304,11 +333,25 @@ const play = (seed, strategy, { fauna, trace = false }) => {
     }
     lastHp = state.player.hp;
 
+    // DANO EFETIVO NO CHEFE, separado por autor. O retorno e exato (96 por massa
+    // e fora do multiplicador), entao o que sobra da queda de vida no tick e o
+    // que o JOGADOR cobrou. "Gatilho pressionado" nao dizia nada: nao confirmava
+    // disparo, nem alvo, nem dano — e a pergunta e se a janela virou vantagem.
+    const bossDrop = bossHpBefore - boss.hp;
+    const fromReturns = shattersThisTick * MAGNETARCH_SHARD_RETURN_DAMAGE;
+    const fromPlayer = Math.max(0, bossDrop - fromReturns);
+    returnDamage += Math.min(fromReturns, bossDrop);
+    bossHpBefore = boss.hp;
+
     const exposed = state.tick < state.bossRuntime.magnetExposedUntil;
     if (exposed) {
       exposedTicks++;
-      if (cmd.fire) exposedFiring++;
-    } else if (state.bossRuntime.magnetShards.length === 0 && boss.alive) {
+      exposedPlayerDamage += fromPlayer;
+    } else {
+      normalTicks++;
+      normalPlayerDamage += fromPlayer;
+    }
+    if (!exposed && state.bossRuntime.magnetShards.length === 0 && boss.alive) {
       // CAMPO NORMAL SEM MASSAS: o trecho que pode voltar a ser repetitivo. A
       // janela do descompasso fica FORA desta conta de proposito — ela e
       // recompensa conquistada, e somar as duas escondia exatamente a diferenca
@@ -318,16 +361,26 @@ const play = (seed, strategy, { fauna, trace = false }) => {
   }
 
   if (trace) console.log(`   tiros: chefe=${shotsAt.chefe} massa=${shotsAt.massa}`);
+  // TRES DESFECHOS, e nao um booleano. "Nao vitoria" juntava morte com estouro
+  // de tempo, que sao diagnosticos opostos: um diz que a luta cobra caro, o
+  // outro que ela nao termina. O trace chegava a imprimir MORTE para os dois.
+  const outcome = !boss.alive ? 'vitoria' : !state.player.alive ? 'morte' : 'timeout';
   return {
     seed,
     strategy,
-    won: !boss.alive,
+    outcome,
     ticks,
+    hpLeft: Math.max(0, state.player.hp),
+    bossHpLeft: Math.max(0, boss.hp),
     cracked,
     shattered,
     firstShatterAt,
     exposedTicks,
-    exposedFiring,
+    exposedPlayerDamage,
+    normalTicks,
+    normalPlayerDamage,
+    returnDamage,
+    blockedTicks,
     flatTicks,
     damageBy,
   };
@@ -385,7 +438,7 @@ if (traceSeed) {
     console.log(`\n--- seed ${seed}, estrategia ${strategy} ---`);
     const r = play(seed, strategy, { fauna, trace: true });
     console.log(
-      `   => ${r.won ? 'VITORIA' : 'MORTE'} em ${s(r.ticks)}s, fraturadas=${r.cracked} estilhacadas=${r.shattered}`,
+      `   => ${r.outcome.toUpperCase()} em ${s(r.ticks)}s, vida ${r.hpLeft.toFixed(0)}/100, chefe com ${r.bossHpLeft.toFixed(0)}, fraturadas=${r.cracked} estilhacadas=${r.shattered}`,
     );
   }
   process.exit(0);
@@ -401,44 +454,89 @@ console.log(
   `atraso de reacao ${REACTION_TICKS} ticks (${(REACTION_TICKS / TICK_HZ) * 1000} ms) · erro de mira sigma ${AIM_SIGMA} rad · teto de calor ${HEAT_CEILING}`,
 );
 
+const rows = [];
 for (const strategy of ['none', 'one', 'all']) {
-  const label = { none: 'IGNORAR   ', one: 'UMA/CICLO ', all: 'TODAS     ' }[strategy];
+  const label = { none: 'IGNORAR  ', one: 'UMA/CICLO', all: 'TODAS    ' }[strategy];
   const runs = seeds
     .map((entry) => ({ ...entry, r: play(entry.seed, strategy, { fauna }) }))
     .filter((x) => x.r);
-  const wins = runs.filter((x) => x.r.won);
+  rows.push({ strategy, label, runs });
+  const by = (o) => runs.filter((x) => x.r.outcome === o);
   const causes = new Map();
   let cracked = 0;
   let shattered = 0;
-  let exposed = 0;
-  let exposedFiring = 0;
+  let exposedTicks = 0;
+  let exposedDmg = 0;
+  let normalTicks = 0;
+  let normalDmg = 0;
+  let returnDmg = 0;
+  let blocked = 0;
   let flat = 0;
+  let hpLeft = 0;
   for (const { r } of runs) {
     cracked += r.cracked;
     shattered += r.shattered;
-    exposed += r.exposedTicks;
-    exposedFiring += r.exposedFiring;
+    exposedTicks += r.exposedTicks;
+    exposedDmg += r.exposedPlayerDamage;
+    normalTicks += r.normalTicks;
+    normalDmg += r.normalPlayerDamage;
+    returnDmg += r.returnDamage;
+    blocked += r.blockedTicks;
     flat += r.flatTicks;
+    hpLeft += r.hpLeft;
     for (const [k, v] of r.damageBy) causes.set(k, (causes.get(k) ?? 0) + v);
   }
+  const wins = by('vitoria');
   const all = runs.reduce((a, x) => a + x.r.ticks, 0) / Math.max(1, runs.length);
   const won = wins.reduce((a, x) => a + x.r.ticks, 0) / Math.max(1, wins.length);
+  // O NUMERO QUE RESPONDE A PERGUNTA: o dano por segundo que o JOGADOR cobra
+  // dentro da janela, contra o que ele cobra fora dela.
+  //
+  // E ele PODE passar de 1,6x sem ser erro de conta. O multiplicador atua no
+  // dano por acerto; a janela tambem cala o campo, e um campo calado nao obriga
+  // a andar — o agente fica parado mirando e ACERTA mais. O 1,6x e o piso do que
+  // a janela vale quando usada, nao o teto.
+  const dpsIn = exposedTicks > 0 ? (exposedDmg / exposedTicks) * TICK_HZ : 0;
+  const dpsOut = normalTicks > 0 ? (normalDmg / normalTicks) * TICK_HZ : 0;
   const byKind = (kind) => {
     const sub = runs.filter((x) => x.kind === kind);
-    return `${sub.filter((x) => x.r.won).length}/${sub.length}`;
+    return `${sub.filter((x) => x.r.outcome === 'vitoria').length}/${sub.length}`;
   };
   console.log(
-    `\n${label} vitorias ${wins.length}/${runs.length} (aberta ${byKind('aberta')} · apertada ${byKind('apertada')})\n` +
-      `           tempo medio ${s(all)}s (todas) · ${wins.length ? `${s(won)}s (so vitorias)` : '—'}\n` +
-      `           massas fraturadas ${(cracked / runs.length).toFixed(1)}/partida · estilhacadas ${(shattered / runs.length).toFixed(1)}\n` +
-      `           nucleo exposto ${s(exposed / runs.length)}s/partida, atirando em ${pct(exposedFiring, exposed)} dele\n` +
-      `           campo normal SEM massas ${s(flat / runs.length)}s/partida\n` +
-      `           dano tomado: ${
+    `\n${label} vitoria ${wins.length} · morte ${by('morte').length} · timeout ${by('timeout').length}` +
+      `   (aberta ${byKind('aberta')} · apertada ${byKind('apertada')})\n` +
+      `          tempo ${s(all)}s (todas) · ${wins.length ? `${s(won)}s (vitorias)` : '—'}` +
+      `   vida restante media ${(hpLeft / runs.length).toFixed(0)}/100\n` +
+      `          massas fraturadas ${(cracked / runs.length).toFixed(1)}/partida · estilhacadas ${(shattered / runs.length).toFixed(1)}` +
+      `   dano do retorno ${(returnDmg / runs.length).toFixed(0)}/partida\n` +
+      `          janela: ${s(exposedTicks / runs.length)}s/partida · dano do JOGADOR nela ${(exposedDmg / runs.length).toFixed(0)}` +
+      `   dps na janela ${dpsIn.toFixed(1)} vs fora ${dpsOut.toFixed(1)} (${dpsOut > 0 ? (dpsIn / dpsOut).toFixed(2) : '—'}x; 1,60x e o multiplicador)\n` +
+      `          campo normal SEM massas ${s(flat / runs.length)}s/partida` +
+      `   ticks com alvo BLOQUEADO ${(blocked / runs.length).toFixed(0)}\n` +
+      `          dano tomado: ${
         [...causes]
           .sort((a, b) => b[1] - a[1])
           .map(([k, v]) => `${k} ${Math.round(v / runs.length)}`)
           .join(' · ') || 'nenhum'
       }`,
   );
+}
+
+// AS NAO VITORIAS, uma por uma. Elas tem de ser identificaveis antes de
+// qualquer afirmacao sobre letalidade: "15/16" nao diz se a que faltou foi uma
+// morte ou uma luta que nao terminou.
+const bad = rows.flatMap(({ label, runs }) =>
+  runs.filter((x) => x.r.outcome !== 'vitoria').map((x) => ({ label, ...x })),
+);
+if (bad.length === 0) console.log('\nNenhuma nao vitoria.');
+else {
+  console.log('\nNAO VITORIAS:');
+  for (const b of bad) {
+    console.log(
+      `  ${b.label} seed ${b.seed} (${b.kind}) — ${b.r.outcome.toUpperCase()} em ${s(b.r.ticks)}s` +
+        `, vida ${b.r.hpLeft.toFixed(0)}/100, chefe com ${b.r.bossHpLeft.toFixed(0)}` +
+        `, fraturadas ${b.r.cracked}, estilhacadas ${b.r.shattered}`,
+    );
+  }
 }
 console.log('');

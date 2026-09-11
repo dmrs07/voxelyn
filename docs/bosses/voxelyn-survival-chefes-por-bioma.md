@@ -1613,51 +1613,54 @@ repete o movimento"_: a faixa troca de lado **42% mais vezes** que antes.
 #### O bot mortal: o que muda quando o agente erra
 
 O bot anterior era imortal e de mira perfeita — media o **teto** do encontro. Este morre,
-erra a mira (σ 0,08 rad) e reage com **250 ms** de atraso, lendo só o que a tela mostra.
-Dezesseis câmaras reais (G-04 setor 7), oito abertas e oito apertadas, três estratégias
-sobre as mesmas seeds, tudo pelos comandos normais
-(`packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs`).
+erra a mira (σ 0,08 rad) e reage com **250 ms** de atraso, lendo só o que a tela mostra e
+agindo só por `PlayerCommand`. Vinte e quatro câmaras reais (G-04 setor 7), doze abertas
+e doze apertadas, três estratégias sobre as mesmas seeds e com a **mesma sequência de
+erro de mira** (`packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs`).
 
-| Estratégia        | Vitórias | Tempo médio | Massas fraturadas | Núcleo exposto  | Campo sem massas | Dano tomado (de 100) |
-| ----------------- | -------- | ----------- | ----------------- | --------------- | ---------------- | -------------------- |
-| **Ignorar**       | 16/16    | **40,2 s**  | 0,8               | 2,2 s (usa 32%) | 1,8 s            | 17                   |
-| **Uma por ciclo** | 15/16    | 48,7 s      | 1,8               | 4,8 s (usa 41%) | **11,9 s**       | 7                    |
-| **Todas**         | 15/16    | 49,8 s      | 1,8               | 4,5 s (usa 43%) | **14,3 s**       | 7                    |
+| Estratégia        | Desfechos   | Tempo      | Vida restante | Fraturadas | Janela | dps na janela | Cauda sem massa | Dano tomado |
+| ----------------- | ----------- | ---------- | ------------- | ---------- | ------ | ------------- | --------------- | ----------- |
+| **Ignorar**       | 24 vitórias | 38,7 s     | 77/100        | 0,8        | 2,2 s  | 1,78×         | 1,7 s           | 24          |
+| **Uma por ciclo** | 24 vitórias | **35,2 s** | **91/100**    | 1,5        | 4,2 s  | **2,34×**     | 6,9 s           | 9           |
+| **Todas**         | 24 vitórias | 35,9 s     | 91/100        | 1,5        | 4,0 s  | 2,34×         | 8,3 s           | 9           |
 
-Com a fauna do setor ligada os números praticamente não mudam (15/16, 14/16, 14/16; o
-dano sobe de 17 para 22 no pior caso).
+> **A primeira rodada deste bot foi retratada.** Ela dizia que sabotar era _dominado_
+> (+8,5 s), e isso era defeito do harness: o bot escolhia massa só pela integridade, sem
+> **linha de visão**, e insistia em ferro atrás de rocha — 218 a 249 ticks por partida
+> (11 a 12 s) atirando em pedra. Com a escolha corrigida, a conclusão inverte. Duas
+> outras medições também eram falsas: "aproveita 41% da janela" contava **gatilho
+> pressionado** (sem confirmar disparo, alvo ou dano), e "15/16 vitórias" juntava morte
+> com estouro de tempo num mesmo "não vitória" — o trace chegava a imprimir MORTE para
+> os dois casos.
 
-Três leituras, e as três contrariam a varredura de mira perfeita:
+O que os números sustentam agora:
 
-- **O encontro não mata.** Dezesseis vitórias em dezesseis ignorando a mecânica, com 17
-  de 100 de dano — e a maior parte disso é o campo mordendo uma vez quando o puxão
-  arrasta para dentro do anel. O ferro quase nunca conecta (menos de uma pancada por
-  partida): o telégrafo funciona bem demais para um agente que só precisa sair de uma
-  linha parada. **Nenhuma estratégia é arriscada porque a luta não oferece risco.**
-- **Sabotar é DOMINADO.** Custa 8,5 s a mais. A varredura perfeita dizia o contrário
-  (21,2 s contra 26,6 s) porque lá as três massas racham em dez ticks; aqui o agente
-  fratura 1,8 de 3, e os tiros gastos mirando ferro valem menos que os mesmos tiros no
-  chefe. A mecânica, como está afinada, é uma **armadilha para quem não tem mira
-  perfeita**.
-- **A cauda explode.** 11,9 a 14,3 s de campo normal sem nenhuma massa, contra 1,8 s de
-  quem ignora — porque consumir o material cedo é justamente o que abre o vazio. Os
-  7,0 s medidos com mira perfeita eram otimistas.
+- **Preparar uma massa acessível compensa, e é medível.** O caminho sabotado é ao mesmo
+  tempo **mais rápido** (35,2 s contra 38,7 s) e **mais seguro** (91 de vida contra 77).
+  Não há troca entre velocidade e segurança: ganha nas duas.
+- **A janela vale mais que o próprio multiplicador.** O jogador cobra **2,34×** o dps
+  dele dentro do descompasso, contra um multiplicador de 1,6×. A diferença é o campo
+  calado: sem puxão, ele para de andar e acerta mais. O 1,6× é o piso do que a janela
+  vale quando usada.
+- **Uma por ciclo ≥ todas.** As duas fraturam 1,5 massa por partida — o agente não
+  consegue mais que isso de qualquer jeito — e a ambição só alonga a cauda (8,3 s contra
+  6,9 s). A ambição não aumentou o risco; aumentou o tempo morto.
+- **Ignorar já recebe parte da recompensa por acidente:** 0,8 massa fraturada e 72 de
+  dano de retorno por partida, sem nenhuma intenção. Parte da distância pequena entre as
+  estratégias vem daí.
 
-O que isso sugere sobre o próximo passo: **o problema não é a sabotagem ser cara, é
-ignorar não custar nada.** Hoje a massa recolhida inteira volta para o corpo e não
-acontece nada — o jogador que nunca atira no ferro paga zero por isso. Enquanto essa
-linha existir, qualquer barateamento da fratura só aproxima as duas estratégias sem
-tornar nenhuma interessante. A forma clássica seria a massa reincorporada **valer
-alguma coisa para ele** (couraça, alcance, um pedaço de vida), transformando o
-recolhimento numa ameaça que se nega — e aí sabotar deixa de ser um investimento
-opcional e passa a ser a resposta.
+O que **continua** em aberto, e é o único ponto que ainda argumenta pelos aglomerados: a
+**cauda** de 6,9 a 8,3 s de campo normal sem nenhuma massa, contra 1,7 s de quem ignora.
+Menor do que a primeira rodada dizia (11,9 a 14,3 s), e ainda o maior trecho sem decisão
+do encontro.
 
 **Limites deste bot, que valem mais que os números:** ele segue regras fixas, começa
 dentro da faixa com linha de visão (não tem busca de rota, e medir a travessia até a
 câmara seria medir o harness), não usa módulos nem esquiva ofensiva, não faz kite e não
-aprende. Os resultados são **cenários simulados** — servem para encontrar situações
-impraticáveis e comparar estratégias entre si, e não estabelecem piso nenhum para
-jogadores humanos.
+aprende. Vinte e quatro vitórias em vinte e quatro, com 9 a 24 de 100 de dano, dizem que
+**este agente** lê os avisos — não que os avisos sejam generosos para gente de verdade.
+São cenários simulados, para achar situações impraticáveis e comparar estratégias entre
+si; não estabelecem piso nenhum.
 
 #### O que a medição diz sobre a segunda fase
 
@@ -1669,7 +1672,8 @@ encontro segue por mais **7,0 s sem nenhum material em campo**.
 Sete segundos de conclusão é defensável — consumir as três massas e terminar acertando
 o núcleo exposto é um fecho, não um vazio. O que decide se a **recomposição da limalha**
 resolve um problema real é essa última coluna, e ela é o número a vigiar: em 1.400 de
-vida ela já vai a 12,1 s, e aí "acabou o ferro" passa a ser metade da luta.
+vida ela já vai a 12,1 s, e aí "acabou o ferro" passa a ser metade da luta. O bot mortal
+mede 6,9 a 8,3 s nessa coluna (ver acima), na mesma ordem de grandeza.
 
 Se o playtest mostrar que o trecho final cansa, a recomposição entra **ao terminar o
 primeiro descompasso** e repondo **uma massa por vez** — o jogador vê a consequência da
