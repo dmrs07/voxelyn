@@ -437,7 +437,10 @@ const buildSurfaces = () => {
     // 9: a AGUA PROFUNDA NATIVA DO AQUIFERO (`aquifer-deep-water`), o mesmo
     // id de superficie desenhado por (superficie, estrato): o nucleo das
     // bacias, sem lasca de gelo. No fim da lista.
-    version: 9,
+    // 10: o tapete fungico (e o aquecido) ganha COGUMELOS pequenos em duas
+    // das tres variantes, sorteados por posicao — sem eles o tapete lia como
+    // grama. Nenhum tipo novo; so o desenho de dois que ja existiam.
+    version: 10,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
