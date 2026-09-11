@@ -63,6 +63,33 @@ export const RAMPS = {
    */
   rust: ['bone', 'brass', 'rockShadow'],
   bone: ['bone', 'brass', 'rockShadow'],
+  /**
+   * MINERIO DE FERRO BRUTO — o material das massas do Magnetarca.
+   *
+   * Existe porque `rust` (acima) e LATAO ACABADO, e a diferenca esta no TOPO.
+   * Em isometria a face de cima e a de maior area, e `rust` topa em osso: uma
+   * pedra feita com ela sai bege por inteiro e le como arenito, que foi
+   * exatamente o que a primeira massa do Magnetarca fez — num chao de rocha ela
+   * virava entulho de cenario.
+   *
+   * A diferenca esta na FACE MAIS ESCURA. `rust` cai em `rockShadow`, que e
+   * AZUL: o lado direito de cada volume esfria de matiz, e num corpo inteiro
+   * feito dela metade da area sai na mesma familia do chao. O Estrato Ferrifero
+   * e cinza-azulado da parede ao piso, e a massa e a unica coisa da camara que o
+   * jogador precisa acertar — ela nao pode compartilhar familia com o cenario
+   * em nenhuma das tres faces.
+   *
+   * Aqui a rampa fica inteira na familia quente: osso em cima, latao a esquerda,
+   * ferrugem a direita. A escada de sombra e realce (`SHADOW_OF`/`LIGHT_OF`)
+   * estende as pontas para carvao e para giz conforme a geometria, entao o
+   * volume tem profundidade sem nenhum degrau frio.
+   *
+   * Uma versao intermediaria desceu a rampa toda uma casa (latao/ferrugem/carvao)
+   * para a massa nao ficar bege. Medida no jogo, ela virou um bloco quase preto
+   * numa camara escura: em isometria o TOPO e a face de maior area, e escurece-lo
+   * apaga o objeto. O que separa a massa do chao e a familia, nao o valor baixo.
+   */
+  ferrite: ['bone', 'brass', 'rust'],
   fungus: ['fungusLight', 'moss', 'fungusDark'],
   fungusDeep: ['fungus', 'fungusDark', 'dark'],
   biolum: ['biolum', 'fungusLight', 'fungus'],

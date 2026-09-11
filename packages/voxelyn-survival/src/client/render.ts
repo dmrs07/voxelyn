@@ -151,6 +151,7 @@ import {
   type EntityAnimState,
   PropBank,
   SILK_COCOON_ATLAS,
+  MAGNET_SHARD_ATLAS,
 } from './sprites';
 import {
   MAW_CLOUDS,
@@ -3828,6 +3829,12 @@ export class SurvivalRenderer {
       const field = magnetarch
         ? magnetField(state.tick, state.bossRuntime.magnetFlipAt, magnetarch.mood ?? 0)
         : null;
+      // O atlas das massas chega SOB DEMANDA, com o grupo do Magnetarca. O
+      // pedido sai assim que o corpo dele entra na cena, e nao quando a
+      // primeira massa e arremessada: o download tem de caber no tempo em que o
+      // jogador atravessa a camara, ou a primeira massa — a mais importante,
+      // porque e nela que ele aprende — sairia no recuo chapado.
+      if (magnetarch) this.sprites.requestPart(MAGNET_SHARD_ATLAS);
       if (magnetarch && field?.live) {
         this.drawMagnetField(
           ctx,
@@ -3840,18 +3847,12 @@ export class SurvivalRenderer {
           this.quality.maxFx / PRESETS.high.maxFx,
         );
       }
-      // AS MASSAS do ciclo do ferro. Depois do campo e antes de qualquer corpo:
+      // AS ROTAS do ciclo do ferro. Depois do campo e antes de qualquer corpo:
       // a rota marcada e chao, e o jogador precisa ver os proprios pes dentro
-      // ou fora dela.
+      // ou fora dela. Os CORPOS das massas vao na fila de profundidade, mais
+      // abaixo — eles tem altura, e aqui sairiam por baixo das paredes.
       if (state.bossRuntime.magnetShards.length > 0) {
-        this.drawMagnetShards(
-          ctx,
-          toScreen,
-          z,
-          state.bossRuntime.magnetShards,
-          state.tick,
-          nowMs / 1000,
-        );
+        this.drawMagnetShardMarks(ctx, toScreen, z, state.bossRuntime.magnetShards, state.tick);
       }
     }
 
@@ -4236,6 +4237,21 @@ export class SurvivalRenderer {
         draw: () => this.drawWellOffer(offer, osx, osy, z, spriteZoom, nowMs, reachable),
       });
     }
+
+    // AS MASSAS DE FERRO do Magnetarca. Na fila como qualquer corpo: elas tem
+    // altura e ficam no chao da camara, e uma massa desenhada por cima da
+    // parede que a esconde — ou por baixo dela — deixa de ser um alvo que o
+    // jogador consegue localizar. Ver `drawMagnetShardBody`.
+    state.bossRuntime.magnetShards.forEach((shard, index) => {
+      if (shard.state === SHARD_HELD) return;
+      const [ssx, ssy] = toScreen(shard.x, shard.y);
+      if (ssx < -80 || ssx > vw + 80 || ssy < -100 || ssy > vh + 80) return;
+      items.push({
+        depth: shard.x + shard.y,
+        draw: () =>
+          this.drawMagnetShardBody(ctx, ssx, ssy, z, spriteZoom, shard, index, nowMs / 1000),
+      });
+    });
 
     // O prompt das JUNCOES de leyline: aparece so com o jogador perto (a
     // proximidade convida, o ato e o botao — a mesma regra da caixa-preta),
@@ -7526,32 +7542,28 @@ export class SurvivalRenderer {
   }
 
   /**
-   * AS MASSAS DE FERRO no chao: a rota marcada, o corpo e a rachadura.
+   * AS MARCAS DE CHAO das massas de ferro: a rota e o rastro.
    *
-   * Tres estados, tres leituras, e a ordem delas e a ordem em que o jogador
-   * precisa decidir:
+   * Duas leituras, e a ordem delas e a ordem em que o jogador precisa decidir:
    *
    * 1. A ROTA MARCADA (telegrafo): uma faixa no chao da massa ate o destino,
    *    que ENCHE conforme o prazo corre. Ela congela onde nasceu — sair da
    *    linha e a resposta inteira, e isso so vale porque a linha nao persegue.
-   * 2. O CORPO: um bloco de minerio. Integro, ele e um alvo (a barra de
-   *    integridade aparece assim que ele leva o primeiro tiro — antes disso
-   *    seria ruido sobre um objeto que ninguem tocou). FRATURADO, ele racha e
-   *    solta limalha: e o unico sinal de que os tres tiros bastaram, e a
-   *    decisao seguinte (parar ou gastar mais) e tomada em cima dele.
-   * 3. Em VOO ele ganha rastro, porque ai o que importa e de onde ele vem.
+   * 2. Em VOO a massa ganha RASTRO, porque ai o que importa e de onde ela vem.
    *
-   * A massa REINCORPORADA (`SHARD_HELD`) nao e desenhada no chao de proposito:
-   * ela esta dentro do corpo, nao e alvo, e desenha-la ali prometeria um tiro
+   * O CORPO nao esta aqui: ele tem altura e vai na fila de profundidade, em
+   * `drawMagnetShardBody`. Aqui fica so o que e pintura no piso.
+   *
+   * A massa REINCORPORADA (`SHARD_HELD`) nao e desenhada de proposito: ela esta
+   * dentro do corpo do chefe, nao e alvo, e desenha-la ali prometeria um tiro
    * que nao vai acontecer.
    */
-  private drawMagnetShards(
+  private drawMagnetShardMarks(
     ctx: CanvasRenderingContext2D,
     toScreen: (x: number, y: number) => [number, number],
     z: number,
     shards: readonly MagnetShard[],
     tick: number,
-    seconds: number,
   ): void {
     for (const shard of shards) {
       if (shard.state === SHARD_HELD) continue;
@@ -7600,59 +7612,107 @@ export class SurvivalRenderer {
         }
         ctx.restore();
       }
+    }
+  }
 
-      // 3. O CORPO. Um bloco irregular e escuro, de minerio: seis lados fixos
-      //    pelo indice, para ele nao pulsar de forma a cada quadro.
-      const r = z * MAGNETARCH_SHARD_RADIUS * 5.2;
+  /**
+   * O CORPO de uma massa, do atlas `fx-magnet-shard`.
+   *
+   * NA FILA DE PROFUNDIDADE, e nao entre as marcas de chao: a massa tem altura
+   * e ocupa lugar no mundo. Desenhada com as marcas, ela saía por BAIXO das
+   * paredes — uma massa cravada ao pe de um paredao aparecia cortada na base, e
+   * do outro lado da camara ninguem reconhecia o alvo. E a mesma razao pela
+   * qual os Ecos do Poco entram nesta fila: um corpo desenhado por cima da
+   * parede que o esconde deixa de parecer que esta LA.
+   *
+   * O TAMANHO E O CONTRATO, e e por ele que este desenho deixou de ser um
+   * poligono a mao. A simulacao acerta a massa — e atropela com ela — num raio
+   * de 0,7 tile (`MAGNETARCH_SHARD_RADIUS`), e o bloco que estava aqui saia a
+   * 23% disso: o jogador mirava num cascalho e o tiro passava por cima de uma
+   * coisa que ele nao conseguia ver. O contra-jogo inteiro do encontro e
+   * atirar nela.
+   */
+  private drawMagnetShardBody(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    shard: MagnetShard,
+    index: number,
+    seconds: number,
+  ): void {
+    // `radiusPx` e a MESMA projecao do vortice da boca do Devorador, pela mesma
+    // razao: um circulo de raio R no mundo vira, nesta isometrica, uma elipse
+    // de semi-eixo `R * TILE_W/2 * raiz(2)`. Sem a raiz o corpo sai a 71% do
+    // raio que ele anuncia.
+    const radiusPx = MAGNETARCH_SHARD_RADIUS * TILE_W * 0.5 * Math.SQRT2 * z;
+    drawGroundShadow(ctx, sx, sy, radiusPx * 0.9);
+
+    // O ESTADO ESCOLHE A ANIMACAO, e nao uma tinta por cima: `special` e a
+    // massa FRATURADA — ela ABRE, a fenda acende em branco quente e solta
+    // limalha. E o unico sinal de que os tres tiros bastaram, e a decisao
+    // seguinte (parar de atirar, ou gastar a janela toda) e tomada em cima
+    // dele.
+    //
+    // O relogio ganha um deslocamento por massa: tres pedras identicas pulsando
+    // em uniao leem como mecanismo, e o que elas sao e minerio preso num campo.
+    // O deslocamento vem do INDICE e nao de `shard.at` porque `at` reinicia a
+    // cada transicao de estado, e um salto de quadro no instante do arremesso
+    // seria visivel justamente quando o olho esta nela.
+    const anim = shard.cracked ? 'special' : 'idle';
+    if (
+      !this.sprites.drawFx(
+        ctx,
+        MAGNET_SHARD_ATLAS,
+        anim,
+        seconds * 1000 + index * 130,
+        sx,
+        sy,
+        spriteZoom,
+      )
+    ) {
+      // RECUO enquanto o atlas nao chegou (ele vem sob demanda, com o grupo do
+      // Magnetarca). Um bloco chapado NO TAMANHO CERTO: feio e honesto e melhor
+      // que bonito e menor que a propria colisao, que era o defeito.
       ctx.save();
       ctx.translate(sx, sy);
       ctx.beginPath();
       for (let k = 0; k < 6; k++) {
         const a = (k / 6) * Math.PI * 2 + shard.at * 0.37;
-        const rr = r * (0.78 + 0.22 * Math.abs(Math.sin(k * 2.3 + shard.at)));
+        const rr = radiusPx * (0.78 + 0.22 * Math.abs(Math.sin(k * 2.3 + shard.at)));
         const px = Math.cos(a) * rr;
         const py = Math.sin(a) * rr * 0.55;
         if (k === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      ctx.fillStyle = shard.cracked ? 'rgba(78,62,54,0.92)' : 'rgba(58,54,58,0.94)';
+      ctx.fillStyle = shard.cracked ? 'rgba(120,84,58,0.94)' : 'rgba(88,72,58,0.94)';
       ctx.fill();
-      ctx.strokeStyle = shard.cracked ? 'rgba(224,86,58,0.75)' : 'rgba(146,158,170,0.5)';
+      ctx.strokeStyle = shard.cracked ? 'rgba(255,196,120,0.85)' : 'rgba(146,158,170,0.5)';
       ctx.lineWidth = Math.max(1, z * 0.5);
       ctx.stroke();
-
-      if (shard.cracked) {
-        // A RACHADURA, e a limalha escapando por ela. E o estado que decide a
-        // luta: sem um sinal proprio, tres tiros bem gastos ficariam
-        // indistinguiveis de dois.
-        ctx.strokeStyle = 'rgba(255,196,120,0.85)';
-        ctx.lineWidth = Math.max(1, z * 0.45);
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.6, -r * 0.12);
-        ctx.lineTo(-r * 0.1, r * 0.16);
-        ctx.lineTo(r * 0.25, -r * 0.2);
-        ctx.lineTo(r * 0.66, r * 0.1);
-        ctx.stroke();
-        for (let k = 0; k < 5; k++) {
-          const drift = ((seconds * 0.9 + k * 0.21) % 1) ** 1.4;
-          ctx.fillStyle = `rgba(255,196,120,${0.5 * (1 - drift)})`;
-          ctx.beginPath();
-          ctx.arc((k - 2) * r * 0.3, -drift * r * 1.5, Math.max(0.6, z * 0.35), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (shard.hp < MAGNETARCH_SHARD_HP) {
-        // A INTEGRIDADE so aparece depois do primeiro tiro. Antes disso ela
-        // seria uma barra sobre um objeto que ninguem tocou — ruido no chao de
-        // uma luta que ja pede leitura de duas bordas e de tres corredores.
-        const frac = Math.max(0, shard.hp / MAGNETARCH_SHARD_HP);
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(-r * 0.8, -r * 1.15, r * 1.6, Math.max(1.5, z * 0.9));
-        ctx.fillStyle = 'rgba(255,196,120,0.9)';
-        ctx.fillRect(-r * 0.8, -r * 1.15, r * 1.6 * frac, Math.max(1.5, z * 0.9));
-      }
       ctx.restore();
     }
+
+    // A INTEGRIDADE so aparece depois do primeiro tiro E antes da fratura.
+    // Antes do primeiro tiro ela seria uma barra sobre um objeto que ninguem
+    // tocou; depois da fratura o proprio corpo ja diz tudo, e uma barra cheia ao
+    // lado de uma massa rachada seria a segunda leitura discordando da primeira
+    // — num chao que ja pede duas bordas e tres corredores.
+    if (shard.cracked || shard.hp >= MAGNETARCH_SHARD_HP) return;
+    const frac = Math.max(0, shard.hp / MAGNETARCH_SHARD_HP);
+    const barW = radiusPx * 1.5;
+    const barH = Math.max(1.5, z * 0.9);
+    // Acima do corpo, e nao sobre ele: o sprite tem altura, e uma barra no meio
+    // da pedra some dentro dela.
+    const barY = sy - radiusPx * 0.8 - MAGNETARCH_SHARD_RADIUS * TILE_H * 2 * z;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(sx - barW / 2, barY, barW, barH);
+    ctx.fillStyle = 'rgba(255,196,120,0.9)';
+    ctx.fillRect(sx - barW / 2, barY, barW * frac, barH);
+    ctx.restore();
   }
 
   private drawSandVortex(

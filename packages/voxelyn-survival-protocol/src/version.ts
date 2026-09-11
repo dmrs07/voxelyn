@@ -1373,7 +1373,16 @@ export const SIMULATION_VERSION = 84;
 //     teto — nove quadros, nas vagas da ultima linha) e o atlas
 //     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
 // 41: seismic, slipstream and vent echoes; expanded per-sector resonance.
-export const CONTENT_VERSION = 41;
+// 42: o atlas `fx-magnet-shard` — a massa de ferro do Magnetarca, sob demanda
+//     com o grupo dele. O ciclo do ferro desenhava as massas a mao no cliente,
+//     e a mao saia a 23% do raio que a simulacao acerta e atropela (0,7 tile):
+//     o jogador mirava num cascalho e o tiro passava por cima da unica coisa
+//     que o contra-jogo do encontro pede que ele acerte. O sprite e autorado
+//     NAQUELE raio, em dois estados — inteira (faiscas frias do campo) e
+//     fraturada (o corpo aberto, a fenda em branco quente e a limalha
+//     escapando). Um cliente com a precache antiga continuaria sem o atlas e
+//     cairia no recuo chapado; o bump invalida a precache.
+export const CONTENT_VERSION = 42;
 
 export type VersionTriple = {
   protocolVersion: number;

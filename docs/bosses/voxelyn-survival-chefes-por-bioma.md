@@ -1748,6 +1748,83 @@ encontro muda de mão —, e onde ele cai depende da polaridade escolhida (28% e
 em 5 s, 12% em 8,5 s). Fixar uma porcentagem antes de escolher a polaridade seria fixar
 o efeito antes da causa.
 
+#### As massas em atlas (`CONTENT_VERSION` 42, `fx-magnet-shard`)
+
+O playtest da seed 216 parou antes de começar, e o relato foi curto: **os ferros não
+aparecem**. Ele estava certo, e o defeito era meu.
+
+As massas eram desenhadas à mão no cliente — um hexágono de cor chapada — e o corpo saía
+de `z * MAGNETARCH_SHARD_RADIUS * 5.2`. Nesta isometria um raio de R tiles projeta em
+`R * TILE_W/2 * raiz(2)`, ou seja **22,6 px por tile**: uma massa de raio 0,7 mede 15,8 px
+de semi-eixo, e `0,7 * 5,2 = 3,6`. O desenho estava a **23% do tamanho real**.
+
+Isso não é um erro de acabamento. `MAGNETARCH_SHARD_RADIUS` é o raio em que o tiro
+acerta a massa e em que ela atropela o jogador: a coisa que o contra-jogo inteiro do
+encontro pede que se acerte estava sendo desenhada como um cascalho no meio de um corpo
+de colisão quatro vezes maior. O jogador mirava no que via e o tiro passava por cima.
+
+O conserto tem duas metades, e a segunda é a que o autor do jogo pediu:
+
+1. **O tamanho passou a sair da projeção**, a mesma conta do vórtice do Devorador, com a
+   raiz que já estava documentada lá — sem ela o corpo sai a 71% do raio que anuncia.
+2. **A aparência foi autorada em atlas**, no pipeline de conteúdo, em vez de desenhada
+   em `canvas`. `fx-magnet-shard`: oito quadros de 84x76, um rumo, dois estados.
+
+O que o atlas resolve além do tamanho é a **matéria**. Chapada e cinza, a massa lia como
+entulho de cenário num chão de rocha cinza-azulada — nada dizia "isto é alvo". O corpo
+agora é minério quente (`ferrite`, rampa nova em `voxel.mjs`: latão no topo, ferrugem e
+carvão nas laterais) salpicado de `rust` claro, sobre uma base de magnetita. A separação
+do chão é de **matiz e de valor** ao mesmo tempo, que é o que faz ela sobreviver à
+distância, à limalha do campo por cima e à escala de cinza.
+
+E os dois estados são **animações distintas**, não uma tinta aplicada por cima:
+
+| Estado    | Anim      | O que diz                                                                       |
+| --------- | --------- | ------------------------------------------------------------------------------- |
+| Íntegra   | `idle`    | três faíscas `electric` (frias) orbitando: o campo do chefe segurando o minério |
+| Fraturada | `special` | o corpo **abre**, a fenda acende em `lamp` (quente) e solta limalha             |
+
+A fenda é geometria e não um risco pintado: o estado sobrevive à silhueta, como a classe
+dos cofres sobrevive à escala de cinza. Quem gastou os três tiros precisa ver, do outro
+lado da câmara, que não precisa gastar o quarto — é a segunda das três perguntas do
+playtest.
+
+O atlas chega **sob demanda**, com o grupo `magnetarch`, e não no boot. Não é preferência:
+o orçamento de memória de vídeo do boot está a menos de 300 KiB do teto, e o comentário
+que fixou esse teto em `validate.mjs` diz o que fazer com o próximo peso — paga-se com
+carregamento sob demanda, nunca com teto maior. Este é o primeiro peso que veio depois
+daquela frase. O pedido sai quando o corpo do chefe entra na cena, e não quando a
+primeira massa é arremessada: o download tem de caber na travessia da câmara, ou a massa
+em que o jogador aprende a mecânica sairia no recuo chapado.
+
+Três formas foram descartadas antes desta, e valem como registro do que **não** lê:
+
+- **Caixas concêntricas empilhadas** — zigurate. Leitura de construção, no objeto que
+  precisa ler como pedra arrancada de um veio.
+- **Elipsóide com ruído no raio, célula a célula** — falha nos dois sentidos conforme a
+  intensidade: fraco vira terraço, forte vira coral. Perto do topo o campo quadrático
+  muda depressa, então a mesma perturbação vale meio degrau no equador e três no alto.
+- **Magnetita salpicada (ou em faixa) sobre corpo claro** — mancha escura em pedra lê
+  como **buraco**, e faixa horizontal lê como andar de prédio. O que dá textura de
+  minério é o contrário: salpico claro sobre corpo escuro.
+
+O que ficou é um **mapa de altura** com três domos, rugosidade dada em degraus (±0,8
+célula) e nenhuma célula solta ou enterrada — por construção não há vão interno, que é
+a falha que só aparece depois de assado.
+
+Duas correções vieram da captura no jogo, e nenhuma das duas aparecia no atlas isolado:
+
+- **A massa saía por baixo das paredes.** Ela era desenhada entre as _marcas de chão_,
+  junto das rotas, e marca de chão é pintura no piso: tudo o que tem volume é desenhado
+  depois. Uma massa cravada ao pé de um paredão aparecia cortada na base — 1/3 do corpo,
+  e do outro lado da câmara ninguém reconhecia o alvo. O corpo passou para a **fila de
+  profundidade**, como os Ecos do Poço, e as rotas e o rastro ficaram onde estavam.
+- **A fratura virou uma bola de luz.** A parede da fenda acendia em `lamp`, cuja rampa
+  topa no branco quente e tem as três cores emissivas: com o halo do cliente por cima, o
+  corpo de pedra sumia dentro do brilho. Em `fire` (brasa/chama) o miolo acende sem
+  apagar o que acendeu — uma fratura tem de continuar sendo uma pedra rachada, ou o
+  estado deixa de ser um estado _dela_.
+
 ### O objetivo não encosta mais na moldura
 
 `bfsFarthest` procura o ponto mais distante da entrada, e o mais distante costuma ser

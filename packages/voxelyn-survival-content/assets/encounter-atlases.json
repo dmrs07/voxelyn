@@ -23,6 +23,12 @@
   "lung_matrix": ["enemy-lung-matrix"],
   "furnace_heart": ["enemy-furnace-heart"],
   "frost_queen": ["enemy-frost-queen"],
-  "magnetarch": ["enemy-magnetarch"],
-  "seamstress": ["enemy-seamstress", "enemy-stitcher", "enemy-seamstress-brood", "enemy-silk-spiderling", "fx-silk-cocoon"]
+  "magnetarch": ["enemy-magnetarch", "fx-magnet-shard"],
+  "seamstress": [
+    "enemy-seamstress",
+    "enemy-stitcher",
+    "enemy-seamstress-brood",
+    "enemy-silk-spiderling",
+    "fx-silk-cocoon"
+  ]
 }
