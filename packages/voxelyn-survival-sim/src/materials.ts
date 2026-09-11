@@ -55,6 +55,7 @@ import {
   igniteCell,
   markDirty,
   setSurface,
+  spreadFungal,
 } from './cells.js';
 import type { EffectOrigin, Projectile, SemanticEvent, SurvivalState } from './types.js';
 import { webSupportAt } from './web-supports.js';
@@ -477,7 +478,7 @@ export const impactSurface = (
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
         const n = ny * w + nx;
         if (state.solid[n] === SOLID_NONE && state.surface[n] === SURF_NONE) {
-          setSurface(state, n, SURF_FUNGAL, 0);
+          spreadFungal(state, n, 0, events);
         }
       }
       return false;
@@ -488,7 +489,7 @@ export const impactSurface = (
       return false;
     }
     if (surface === SURF_SCORCHED) {
-      setSurface(state, i, SURF_FUNGAL, 0);
+      spreadFungal(state, i, 0, events);
       return false;
     }
   }

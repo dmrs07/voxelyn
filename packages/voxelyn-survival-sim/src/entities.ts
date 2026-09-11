@@ -388,6 +388,7 @@ import {
   ripSolid,
   sealIceHole,
   setSurface,
+  spreadFungal,
 } from './cells.js';
 import { insideAnyBubble, isPoolCore, leviathanTargetable } from './leviathan.js';
 import { applyFreezeDose } from './frost.js';
@@ -2583,7 +2584,7 @@ const bishopNovaStride = (state: SurvivalState, enemy: Entity, events: SemanticE
       // transformaria a acao dele em nada. O fungo cresce onde o fogo ja
       // passou, e nao por cima dele.
       if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_FUNGAL) continue;
-      setSurface(state, i, SURF_FUNGAL, BISHOP_NOVA_FUNGAL_TICKS);
+      spreadFungal(state, i, BISHOP_NOVA_FUNGAL_TICKS, events);
     }
   }
 

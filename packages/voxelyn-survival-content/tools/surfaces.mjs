@@ -456,10 +456,12 @@ const gasModel = (variant, frame) => {
  * de frutificacao brotando dele.
  *
  * "Alguns" e literal: a variante 0 continua tapete nu, a 1 leva um cogumelo e
- * a 2 leva um par (um medio e um pequeno). Como o cliente escolhe a variante
- * pela POSICAO da celula, um campo de tapete fica com cerca de dois tercos das
- * celulas com cogumelo, em lugares que nao rimam de uma celula para a vizinha —
- * o padrao de repeticao do atlas some no tamanho de tres celulas.
+ * a 2 leva um trio (um medio e dois pequenos). Como o cliente escolhe a
+ * variante pela POSICAO da celula, um campo de tapete fica com cerca de dois
+ * tercos das celulas com cogumelo, em lugares que nao rimam de uma celula para
+ * a vizinha — o padrao de repeticao do atlas some no tamanho de tres celulas.
+ * O trio existe para a variante cheia se separar da de um cogumelo so: com um
+ * par, de longe, "um" e "dois" liam como a mesma densidade.
  *
  * Sao PEQUENOS de proposito. O cogumelo grande ja existe como objeto de mundo
  * (a Matriz Micelial, em `decor-props.mjs`, com talo de 8 voxels), e e uma
@@ -468,7 +470,7 @@ const gasModel = (variant, frame) => {
  * invadir a celula vizinha, e afastados entre si para os chapeus nao fundirem
  * numa mancha so.
  */
-const MUSHROOM_COUNT_BY_VARIANT = [0, 1, 2];
+const MUSHROOM_COUNT_BY_VARIANT = [0, 1, 3];
 
 /** Posicoes (coluna fina, raio do chapeu, altura do pe) dos cogumelos de uma variante. */
 const mushroomSpots = (variant) => {
@@ -476,7 +478,7 @@ const mushroomSpots = (variant) => {
   const spots = [];
   for (let attempt = 0; spots.length < count && attempt < 64; attempt++) {
     const h = hash3d(attempt, spots.length, 7, variant);
-    // O primeiro cogumelo de um par e o medio; todos os outros sao pequenos.
+    // O primeiro cogumelo de um grupo e o medio; todos os outros sao pequenos.
     const r = spots.length === 0 && count > 1 ? 2 : 1;
     const margin = r + 1;
     const span = FINE_COLS - 2 * margin;

@@ -263,6 +263,29 @@ describe('superficies reagem por classe de projetil', () => {
     expect(around.every((n) => state.surface[n] === SURF_FUNGAL)).toBe(true);
   });
 
+  // O puff de esporos do cliente nasce deste evento: uma celula que VIROU
+  // tapete. Cada vizinha limpa emite um, no centro dela; a celula do impacto,
+  // que ja era fungo, nao emite — reidratar nao e espalhar.
+  it('anuncia cada celula que vira tapete fungico, e so essas', () => {
+    const state = world(20);
+    state.surface[at(state, 30, 30)] = SURF_FUNGAL;
+    state.surface[at(state, 31, 30)] = SURF_FUNGAL;
+    const events: SemanticEvent[] = [];
+    impactSurface(state, 30, 30, 'bio', events);
+    const spread = events.filter((e) => e.t === 'fungal_spread');
+    expect(spread.map((e) => `${e.x},${e.y}`).sort()).toEqual(
+      ['29.5,30.5', '30.5,29.5', '30.5,31.5'].sort(),
+    );
+
+    // A colonia secando que o acido reidrata nao anuncia nada.
+    state.surface[at(state, 40, 40)] = SURF_FUNGAL_HEATED;
+    for (const n of [at(state, 39, 40), at(state, 41, 40), at(state, 40, 39), at(state, 40, 41)])
+      state.surface[n] = SURF_FUNGAL;
+    events.length = 0;
+    impactSurface(state, 40, 40, 'bio', events);
+    expect(events.some((e) => e.t === 'fungal_spread')).toBe(false);
+  });
+
   it('nao consome o projetil quando o material nao reage', () => {
     const state = world(19);
     expect(impactSurface(state, 30, 30, 'kinetic', [])).toBe(false);

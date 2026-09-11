@@ -239,6 +239,28 @@ export const setSurface = (state: SurvivalState, i: number, kind: number, timer:
 };
 
 /**
+ * Torna a celula tapete fungico e AVISA quando isso e uma mudanca de fato.
+ *
+ * Toda fonte de espalhamento passa por aqui (o acido do cuspidor, o anel do
+ * Bispo) para que o evento `fungal_spread` saia de um lugar so, com uma regra
+ * so: ele marca a celula que nao era colonia e passou a ser. Uma colonia que
+ * estava secando e volta a ser tapete nao emite — para o jogador ela nunca
+ * deixou de ser fungo, e um puff ali leria como espalhamento onde nao houve.
+ */
+export const spreadFungal = (
+  state: SurvivalState,
+  i: number,
+  timer: number,
+  events: SemanticEvent[],
+): void => {
+  const before = state.surface[i];
+  setSurface(state, i, SURF_FUNGAL, timer);
+  if (before === SURF_FUNGAL || before === SURF_FUNGAL_HEATED) return;
+  const x = i % W(state);
+  events.push({ t: 'fungal_spread', x: x + 0.5, y: (i - x) / W(state) + 0.5 });
+};
+
+/**
  * Derrete uma celula de gelo em agua condutiva que vai recongelar sozinha.
  *
  * QUALQUER estagio derrete, e nao so a placa inteira: o calor nao pergunta

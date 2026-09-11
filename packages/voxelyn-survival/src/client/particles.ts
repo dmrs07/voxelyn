@@ -517,6 +517,17 @@ export class VoxelParticles {
           // o mesmo sorteio — a brasa da ignicao nasceria colada na da explosao.
           this.burst(ev.x, ev.y, 'ember', n(4), 0.5, 1.6, 420, 31);
           break;
+        case 'fungal_spread':
+          // PUFF: a celula acabou de virar tapete, e o tapete do atlas ja nasce
+          // com cogumelos — sem nada marcando o instante, eles simplesmente
+          // aparecem no proximo diff de chunk, como um erro de sincronizacao.
+          // Uma nuvem pequena de esporos, na cor do tapete, que sobe pouco e
+          // se abre: e o fungo soltando o que o fez brotar ali. Menor e mais
+          // curta que a nuvem ambiente da crosta de esporos, porque e um
+          // acontecimento, nao um estado — o Bispo planta um anel inteiro de
+          // uma vez e cada celula dele emite o seu.
+          this.burst(ev.x, ev.y, 'sporeCloud', n(6), 0.45, 0.9, 620, 37);
+          break;
         case 'heal':
           // SOBE. Todo o resto do sistema cai — brasa, entulho, caco, respingo —
           // porque tudo o mais e materia sendo arrancada de alguma coisa. Aqui e
