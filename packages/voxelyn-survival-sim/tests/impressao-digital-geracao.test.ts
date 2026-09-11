@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SECTOR_COUNT, RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { sectorSeed } from '../src/sectors';
 import { sectorProfile } from '../src/strata';
+import { DEFAULT_RUN_DEPTH } from '../src/progression';
 import { generateWorld, type GeneratedWorld } from '../src/worldgen';
 
 /** FNV-1a de 32 bits, o mesmo espirito do hash autoritativo da run. */
@@ -101,7 +102,7 @@ const worldFor = (seed: number, sector: number): GeneratedWorld =>
     sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
     WORLD_W,
     WORLD_H,
-    sectorProfile(seed, sector),
+    sectorProfile(seed, sector, DEFAULT_RUN_DEPTH),
   );
 
 describe('impressao digital da geracao', () => {
@@ -254,7 +255,15 @@ describe('impressao digital da geracao', () => {
     // operacao teve de contornar. O bioma de (seed, setor) muda so para as
     // seeds industriais, e nelas so nesses dois setores; o terreno deles muda
     // inteiro com a ocupacao que saiu. Continua identico em qualquer geracao.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2103462241);
+    // 3312224378 (era 2103462241), na SIMULATION_VERSION 85: a CAMARA CENTRAL
+    // do Magnetarca. Setor cujo dono e ele passa a ter a arena escavada no
+    // centro EXATO do mapa (disco de raio 11), com o corpo ali e o Nucleo
+    // vizinho — em vez de o Nucleo cair no ponto mais distante da entrada e o
+    // chefe se encostar nele. Muda o terreno inteiro desses setores, e so
+    // deles: o perfil dos outros nao ganha um byte, e a RNG da geracao so e
+    // consumida a mais na camara central (o lado sorteado do Nucleo). Ver
+    // `bossArena` em worldgen.ts.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3312224378);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

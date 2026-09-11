@@ -407,8 +407,22 @@ if (traceSeed) {
 
 const seeds = findSeeds(RUNS);
 
+// A LARGURA MEDIDA da amostra, e nao so o rotulo.
+//
+// O corte `apertada`/`aberta` e por EXTREMOS (ver `findSeeds`), entao ele
+// sempre produz dois grupos — inclusive quando nao ha dois tipos de camara. Foi
+// o que aconteceu quando o Magnetarca ganhou camara central (`bossArena` no
+// worldgen): o chao aberto a dez tiles do corpo passou a variar de 309 a 311
+// celulas, e "apertada 12 · aberta 12" virou uma distincao de duas celulas
+// anunciada como eixo de comparacao. Imprimir a faixa faz o relatorio se
+// desmentir sozinho em vez de deixar quem le concluir errado.
+const spread = seeds.map((sd) => sd.open).sort((a, b) => a - b);
 console.log(
   `\nBOT MORTAL — ${seeds.length} camaras reais (G-04 setor 7), fauna ${fauna ? 'LIGADA' : 'desligada'}`,
+);
+console.log(
+  `largura das camaras (chao aberto a 10 tiles do corpo): ${spread[0]}..${spread[spread.length - 1]}` +
+    `${spread[spread.length - 1] - spread[0] <= 8 ? ' — o eixo apertada/aberta NAO separa nada nesta amostra' : ''}`,
 );
 console.log(
   `atraso de reacao ${REACTION_TICKS} ticks (${(REACTION_TICKS / TICK_HZ) * 1000} ms) · erro de mira sigma ${AIM_SIGMA} rad · teto de calor ${HEAT_CEILING}`,
@@ -542,11 +556,17 @@ for (const strategy of ['none', 'one', 'all']) {
     const sub = runs.filter((x) => x.kind === kind);
     return `${sub.filter((x) => x.r.outcome === 'vitoria').length}/${sub.length}`;
   };
+  // A PIOR PARTIDA do lote, por vida restante. A media nao responde a pergunta
+  // que a letalidade faz — "24 vitorias" e compativel tanto com um lote folgado
+  // quanto com um lote em que uma das partidas terminou em 10 de vida, e as
+  // duas leituras pedem decisoes opostas.
+  const worst = runs.reduce((a, x) => (x.r.hpLeft < a.r.hpLeft ? x : a), runs[0]);
   console.log(
     `\n${label} vitoria ${wins.length} · morte ${by('morte').length} · timeout ${by('timeout').length}` +
       `   (aberta ${byKind('aberta')} · apertada ${byKind('apertada')})\n` +
       `          tempo ${s(all)}s (todas) · ${wins.length ? `${s(won)}s (vitorias)` : '—'}` +
-      `   vida restante media ${(hpLeft / runs.length).toFixed(0)}/100\n` +
+      `   vida restante media ${(hpLeft / runs.length).toFixed(0)}/100` +
+      `   pior ${worst.r.hpLeft.toFixed(0)}/100 (seed ${worst.seed})\n` +
       `          massas fraturadas ${(cracked / runs.length).toFixed(1)}/partida · estilhacadas ${(shattered / runs.length).toFixed(1)}` +
       `   dano do retorno ${(returnDmg / runs.length).toFixed(0)}/partida\n` +
       `          janela: ${s(exposedTicks / runs.length)}s/partida · dano do JOGADOR nela ${(exposedDmg / runs.length).toFixed(0)}` +

@@ -1165,7 +1165,28 @@ export const PROTOCOL_VERSION = 43;
 //     E outra luta: com tres corredores por ciclo o bot mortal termina com 56
 //     de vida ignorando o ferro (era 77) e a pior partida do lote acaba em
 //     10/100. Replays de 83 num setor com Magnetarca nao batem.
-export const SIMULATION_VERSION = 84;
+// 85: a CAMARA CENTRAL do Magnetarca.
+//
+//     O campo dele tem treze tiles de raio e a luta inteira e ler DUAS BORDAS
+//     concentricas e atravessar a faixa entre elas. A camara nascia onde o mapa
+//     levasse — o Nucleo no ponto mais distante da entrada (`bfsFarthest`), que
+//     costuma ser um canto, e o chefe encostado nele. Num canto metade do campo
+//     nasce dentro da parede: o anel que o jogador precisa ler sai cortado, a
+//     faixa vira um corredor em vez de um corredor circular, e o ciclo do ferro
+//     perde o chao elegivel de que as massas precisam.
+//
+//     O perfil de geracao ganha `bossArena`. Com `central`, a arena e escavada
+//     no centro EXATO do mapa (disco de raio 11 = alcance do arco de retorno
+//     mais dois tiles de folga), o corpo fica ali e o Nucleo e que se encosta
+//     nele — a mesma vizinhanca de sempre, com a ancora trocada de lado. E o
+//     unico traco de terreno que sai do CHEFE e nao do estrato, e por isso
+//     `sectorProfile` passou a pedir a profundidade da run: quem e o dono de um
+//     setor depende de quantos setores a descida tem.
+//
+//     Nenhum outro chefe pede isto. O Arquicantor pede MARGEM e recua a rotunda
+//     para dentro; o Magnetarca pede CENTRO, e um canto com margem continua
+//     sendo um canto. Replays de 84 num setor com Magnetarca nao batem.
+export const SIMULATION_VERSION = 85;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

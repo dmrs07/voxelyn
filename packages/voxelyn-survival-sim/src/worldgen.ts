@@ -37,6 +37,7 @@ import {
   SURF_DEEP_WATER,
   LEVIATHAN_POOL_CORE_RADIUS,
   LEVIATHAN_POOL_RIM_RADIUS,
+  MAGNETARCH_TETHER_RANGE,
   WORLD_W,
 } from './constants.js';
 import type { LeylineNode, SutureRecipe, Vec2 } from './types.js';
@@ -144,6 +145,30 @@ export type WorldgenProfile = {
    * - `none`: nenhuma marca; o labirinto do automato puro
    */
   halls: 'none' | 'columns' | 'radial' | 'lungs' | 'canyon' | 'karst' | 'terraced' | 'lakes';
+
+  /**
+   * ONDE a camara do chefe pode nascer.
+   *
+   * - `natural`: onde o mapa levar. O Nucleo cai no ponto mais distante da
+   *   entrada (`bfsFarthest`) e o chefe nasce ao lado dele. E a regra de sempre,
+   *   e ela e boa: o mais distante costuma ser um canto, e um canto e um lugar
+   *   com paredes — cobertura, linha de tiro curta, quina para cortar.
+   *
+   * - `central`: no MEIO do mapa, sempre, com a rocha aberta em volta. A regra
+   *   vale para UM encontro, e por uma razao que e dele e nao do estrato: o
+   *   campo do Magnetarca tem treze tiles de raio e a luta inteira e ler DUAS
+   *   BORDAS concentricas e atravessar a faixa entre elas. Num canto, metade do
+   *   campo nasce dentro da parede: o anel que o jogador precisa ler fica
+   *   cortado, a faixa vira um corredor em vez de um corredor circular, e o
+   *   ciclo do ferro perde o chao elegivel de que as massas precisam (foi a
+   *   mesma escassez que a camara da seed 216 expos).
+   *
+   *   Nenhum outro chefe pede isto. O Arquicantor precisa de espaco e recua a
+   *   rotunda para dentro (`halls: 'radial'`), o que nao e a mesma coisa: ele
+   *   pede MARGEM, o Magnetarca pede CENTRO. Um canto com margem continua sendo
+   *   um canto, e o campo dele continua encostando em duas paredes.
+   */
+  bossArena: 'natural' | 'central';
 };
 
 /** O perfil historico: Galerias de Basalto. `generateWorld` sem perfil e ele. */
@@ -166,6 +191,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   minerCap: 3,
   leylines: 0,
   halls: 'none',
+  bossArena: 'natural',
 };
 
 export type GeneratedWorld = {
@@ -386,6 +412,40 @@ export const deriveLeylineNetwork = (
  * o admitem; o corpo do chefe emparedado nao era.
  */
 const CORE_BORDER_MARGIN = 2;
+
+/**
+ * O raio da escavacao da CAMARA CENTRAL, em tiles.
+ *
+ * Derivado do encontro que a pede (ver `bossArena` em WorldgenProfile): a faixa
+ * segura do Magnetarca termina em `MAGNETARCH_TETHER_RANGE` (9) e o campo
+ * alcanca `MAGNETARCH_FIELD_RANGE` (13). Onze abre a faixa inteira com dois
+ * tiles de folga para sair dela e deixa os dois ultimos na rocha — a camara
+ * continua tendo parede, e a borda do campo continua caindo em algum lugar.
+ *
+ * Importado e nao copiado de proposito: se o alcance do campo mudar, este
+ * numero tem de ser reconferido, e um literal aqui nao avisaria ninguem.
+ */
+const CENTRAL_ARENA_RADIUS = MAGNETARCH_TETHER_RANGE + 2;
+
+/**
+ * Os oito lugares em que o chefe e o Nucleo ficam VIZINHOS, em tiles.
+ *
+ * Uma tabela so, lida dos dois lados da relacao: na camara natural o Nucleo
+ * escolhe o ponto e o chefe se encosta nele por aqui; na central o centro do
+ * mapa escolhe e e o Nucleo que se encosta, pela mesma tabela. Duas listas
+ * poderiam divergir, e a distancia entre objetivo e dono e contrato do jogo
+ * inteiro — nao e algo que a camara central deva renegociar.
+ */
+const BOSS_CORE_OFFSETS = [
+  [3, 0],
+  [-3, 0],
+  [0, 3],
+  [0, -3],
+  [2, 2],
+  [-2, 2],
+  [2, -2],
+  [-2, -2],
+] as const;
 
 const idx = (w: number, x: number, y: number): number => y * w + x;
 
@@ -1016,11 +1076,30 @@ const stampCorePedestal = (
   h: number,
   core: Vec2,
   halls: WorldgenProfile['halls'],
+  /**
+   * Um ponto cujo 3x3 o pedestal NAO pode fechar — o corpo do chefe, quando ele
+   * ja esta escolhido.
+   *
+   * Existe por uma colisao ESTRUTURAL e nao por acaso. O anel do pedestal usa
+   * os mesmos oito vizinhos de `BOSS_CORE_OFFSETS`, e o anel e simetrico: com o
+   * Nucleo em `chefe + (dx,dy)`, a celula `nucleo + (-dx,-dy)` do anel E o
+   * chefe. Sempre, em qualquer um dos oito lados.
+   *
+   * Na camara natural isso nunca aparece porque a ORDEM esconde: o pedestal e
+   * carimbado antes de o chefe existir, e `hasGuardianClearance` depois recusa
+   * exatamente as celulas que o anel fechou. Na camara central o chefe vem
+   * primeiro (ele E o centro do mapa), e sem esta guarda ele nasce emparedado —
+   * foi o que a prova "ninguem nasce DENTRO da moldura" pegou na seed 92.
+   */
+  keepClear?: Vec2,
 ): void => {
   const { solid, surface } = draft;
+  const blocked = (x: number, y: number): boolean =>
+    keepClear !== undefined && Math.abs(x - keepClear.x) <= 1 && Math.abs(y - keepClear.y) <= 1;
   const put = (dx: number, dy: number, mat: number): void => {
     const x = core.x + dx;
     const y = core.y + dy;
+    if (blocked(x, y)) return;
     if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
       draft.setSolid(idx(w, x, y), mat);
     }
@@ -1028,6 +1107,7 @@ const stampCorePedestal = (
   const paint = (dx: number, dy: number, surf: number): void => {
     const x = core.x + dx;
     const y = core.y + dy;
+    if (blocked(x, y)) return;
     if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
       surface[idx(w, x, y)] = surf;
     }
@@ -1530,8 +1610,67 @@ const generateAttempt = (
     if (solid[i] === SOLID_NONE && !open.has(i)) draft.setSolid(i, SOLID_ROCK);
   }
 
-  const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
-  if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
+  // A CAMARA CENTRAL, quando o dono do setor a exige (`bossArena: 'central'` —
+  // hoje, so o Magnetarca; ver WorldgenProfile).
+  //
+  // Ela e escavada ANTES de qualquer escolha de ponto, e no centro EXATO do
+  // mapa: procurar "o chao aberto mais proximo do meio" daria uma camara quase
+  // central, e quase central e a mesma promessa quebrada de novo — o campo tem
+  // treze tiles de raio e encostaria na parede de um lado so, que e pior que
+  // encostar nos dois (o jogador aprende um anel que vale em metade das
+  // direcoes).
+  //
+  // O RAIO da escavacao sai do encontro e nao de um numero redondo: a faixa
+  // segura termina em `MAGNETARCH_TETHER_RANGE` (9) e o campo alcanca 13. Onze
+  // abre a faixa inteira com dois tiles de folga para sair dela, e deixa os
+  // ultimos dois na rocha — a camara continua tendo parede, e o limite do campo
+  // continua sendo um lugar, nao o vazio.
+  const central = profile.bossArena === 'central' ? { x: w >> 1, y: h >> 1 } : null;
+  if (central) {
+    carveBlob(draft, w, h, central.x, central.y, CENTRAL_ARENA_RADIUS);
+    // Escavar pode ter aberto um bolsao: um disco cercado de rocha por todos os
+    // lados e uma camara que ninguem alcanca. Vale so se ele fala com a entrada,
+    // e o que a escavacao abriu sem ligar volta a ser parede pela MESMA regra
+    // que fecha qualquer bolsao acima.
+    const reach = floodOpen(solid, w, h, entry.x, entry.y);
+    if (!reach.has(idx(w, central.x, central.y))) return null;
+    for (let i = 0; i < solid.length; i++) {
+      if (solid[i] === SOLID_NONE && !reach.has(i)) draft.setSolid(i, SOLID_ROCK);
+    }
+  }
+
+  const far = bfsFarthest(solid, w, h, entry);
+  const dist = far.dist;
+  // O NUCLEO. Longe da entrada na camara natural; ao lado do chefe na central.
+  //
+  // A relacao entre os dois e a MESMA das duas maneiras — o objetivo vizinho do
+  // corpo que o guarda, pela tabela `BOSS_CORE_OFFSETS` —, e so a ancora troca
+  // de lado: normalmente o Nucleo escolhe o lugar e o chefe se encosta nele; na
+  // camara central o centro do mapa escolhe, e o Nucleo e que se encosta.
+  //
+  // O LADO e sorteado, e o sorteio e o unico da camara central. Sem ele o
+  // objetivo cairia sempre no mesmo canto do disco: a entrada nasce na quina
+  // superior-esquerda em todo mapa, entao qualquer regra derivada dela da a
+  // mesma resposta em toda seed, e a camara — que ja e sempre o mesmo centro —
+  // passaria a ser tambem sempre a mesma planta. Sortear so aqui mantem o
+  // fluxo da RNG intacto para os mapas que nao pedem camara central.
+  const centralCoreSide = central ? BOSS_CORE_OFFSETS[rng.nextInt(BOSS_CORE_OFFSETS.length)] : null;
+  const corePos =
+    central && centralCoreSide
+      ? { x: central.x + centralCoreSide[0], y: central.y + centralCoreSide[1] }
+      : far.cell;
+  // A CAMINHADA ATE O OBJETIVO tem de existir.
+  //
+  // Na camara natural o objetivo E o ponto mais distante, e o piso cobra que
+  // ele esteja a mais de metade do mapa da entrada. Na central a distancia e
+  // GEOMETRIA e nao sorteio — a entrada nasce na quina superior-esquerda e o
+  // centro esta a meio mapa dela por construcao —, entao o piso cai para o que
+  // a geometria ja garante e passa a cobrar outra coisa: que o caminho EXISTA.
+  // Um piso alto ali recusaria seeds perfeitamente boas so porque a rota ate o
+  // meio e curta, que e justamente o que uma camara central deve ser.
+  const coreDist = dist[idx(w, corePos.x, corePos.y)];
+  if (coreDist < 0) return null;
+  if (coreDist < Math.floor((w + h) * (central ? 0.25 : 0.55))) return null;
   // O objetivo nao pode encostar na MOLDURA do mapa.
   //
   // `bfsFarthest` procura o ponto mais distante da entrada, e o mais distante
@@ -1544,7 +1683,9 @@ const generateAttempt = (
   //
   // Recusar a tentativa e mais barato e mais honesto que remendar depois: a
   // geracao ja tenta outra seed derivada quando um mapa nao serve, e um mundo
-  // com o objetivo emparedado na moldura nao serve.
+  // com o objetivo emparedado na moldura nao serve. Na camara central a prova
+  // passa de graca, e continua rodando: ela e sobre o objetivo, nao sobre como
+  // ele foi escolhido.
   if (
     corePos.x < CORE_BORDER_MARGIN ||
     corePos.y < CORE_BORDER_MARGIN ||
@@ -1554,7 +1695,7 @@ const generateAttempt = (
     return null;
   }
   carveBlob(draft, w, h, corePos.x, corePos.y, 4);
-  stampCorePedestal(draft, w, h, corePos, profile.halls);
+  stampCorePedestal(draft, w, h, corePos, profile.halls, central ?? undefined);
 
   const isOpen = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;
@@ -1572,18 +1713,13 @@ const generateAttempt = (
     }
     return true;
   };
-  const guardianOffsets = [
-    [3, 0],
-    [-3, 0],
-    [0, 3],
-    [0, -3],
-    [2, 2],
-    [-2, 2],
-    [2, -2],
-    [-2, -2],
-  ] as const;
   let guardianSpawn: Vec2 | null = null;
-  if (profile.halls === 'radial') {
+  if (central) {
+    // A CAMARA CENTRAL ja escolheu o ponto, e escavou em volta dele: o corpo
+    // fica no centro do mapa e nao ao lado do Nucleo. A folga do corpo nao
+    // precisa ser procurada — ela e o disco.
+    guardianSpawn = central;
+  } else if (profile.halls === 'radial') {
     // O ponto mais distante costuma cair perto da borda. Para a Catedral isso
     // nao serve: corpo + orbita + resposta precisam de doze tiles de margem.
     // Recuamos a ROTUNDA para dentro e abrimos a camara ali; o Nucleo continua
@@ -1598,7 +1734,7 @@ const generateAttempt = (
     };
     carveBlob(draft, w, h, guardianSpawn.x, guardianSpawn.y, 8);
   } else {
-    for (const [dx, dy] of guardianOffsets) {
+    for (const [dx, dy] of BOSS_CORE_OFFSETS) {
       const x = corePos.x + dx;
       const y = corePos.y + dy;
       if (!hasGuardianClearance(x, y)) continue;

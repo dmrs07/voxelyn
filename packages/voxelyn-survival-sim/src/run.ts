@@ -411,7 +411,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
   // reconstroi o mesmo estrato e a mesma ocupacao sem consumir a RNG da run.
   const biome = sectorBiome(config.seed, sector);
   // Perfil pela fonte unica (garantia da descida inclusa): ver sectorProfile.
-  const profile = sectorProfile(config.seed, sector);
+  const profile = sectorProfile(config.seed, sector, depth);
   const world = generateWorld(
     sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector),
     width,

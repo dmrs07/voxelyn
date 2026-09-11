@@ -1825,6 +1825,108 @@ Duas correções vieram da captura no jogo, e nenhuma das duas aparecia no atlas
   apagar o que acendeu — uma fratura tem de continuar sendo uma pedra rachada, ou o
   estado deixa de ser um estado _dela_.
 
+#### A câmara central (`SIMULATION_VERSION` 85, `bossArena`)
+
+O campo tem **treze tiles de raio** e a luta inteira é ler duas bordas
+concêntricas e atravessar a faixa entre elas. A câmara, porém, nascia onde o mapa
+levasse: o Núcleo caía no ponto mais distante da entrada (`bfsFarthest`), que
+costuma ser um **canto**, e o chefe se encostava nele.
+
+Num canto, metade do campo nasce dentro da parede. O anel que o jogador precisa
+ler sai cortado, a faixa vira um corredor em vez de um corredor circular, e o
+ciclo do ferro perde o chão elegível de que as massas precisam — foi a mesma
+escassez que a câmara da seed 216 expôs, e que `claimMagnetShards` só conseguiu
+contornar até onde o chão permitia.
+
+E não era ocasional. Medido em dez seeds que entregam o chefe, comparando a mesma
+seed com os dois modos — o chão aberto a dez tiles do corpo, de um máximo de 314
+células:
+
+| Seed | Câmara natural | Largura | Câmara central | Largura |
+| ---- | -------------- | ------- | -------------- | ------- |
+| 22   | (83, 90)       | 185     | (48, 48)       | 310     |
+| 44   | (90, 92)       | **109** | (48, 48)       | 310     |
+| 70   | (91, 88)       | 124     | (48, 48)       | 310     |
+| 92   | (90, 91)       | 124     | (48, 48)       | 310     |
+| 100  | (90, 92)       | **110** | (48, 48)       | 310     |
+
+O encontro rodava com **35% a 59%** da área que o campo dele alcança. E o canto
+era quase sempre o **mesmo**: `bfsFarthest` parte de uma entrada que nasce na
+quina superior-esquerda, então o ponto mais distante cai no canto inferior-direito
+em oito das dez seeds. Não era variedade — era um viés.
+
+O perfil de geração ganhou `bossArena`. Com `central`, a arena é escavada no
+**centro exato do mapa** — disco de raio 11, que é `MAGNETARCH_TETHER_RANGE` (9)
+mais dois tiles de folga para sair da faixa, deixando os dois últimos na rocha
+para a câmara continuar tendo parede. O corpo fica no centro e é o **Núcleo que
+se encosta nele**, pela mesma tabela de vizinhança (`BOSS_CORE_OFFSETS`) que a
+câmara natural usa na direção oposta: a relação entre objetivo e dono não muda,
+só a âncora troca de lado.
+
+Três decisões que sustentam o resto:
+
+- **O centro é exato, não aproximado.** Procurar "o chão aberto mais próximo do
+  meio" daria uma câmara quase central, e quase central é a mesma promessa
+  quebrada de novo: o campo encostaria na parede de um lado só, que é pior que
+  encostar nos dois — o jogador aprende um anel que vale em metade das direções.
+- **É o único traço de terreno que sai do CHEFE**, e não do estrato. Por isso ele
+  mora em `sectorProfile` e não em `biomeProfile`: o ferrífero continua sendo
+  ferrífero quando quem o ocupa é outro, e o Magnetarca leva a câmara central para
+  onde quer que ele apareça. É também a razão de `sectorProfile` passar a pedir a
+  **profundidade** da run — quem é o dono de um setor depende de quantos setores a
+  descida tem (`bossForSector`).
+- **Nenhum outro chefe pede isto.** O Arquicantor precisa de espaço e recua a
+  rotunda para dentro (`halls: 'radial'`), o que não é a mesma coisa: ele pede
+  **margem**, o Magnetarca pede **centro**. Um canto com margem continua sendo um
+  canto.
+
+Um defeito estrutural apareceu na primeira versão e está fechado: o anel do
+pedestal usa **os mesmos oito vizinhos** de `BOSS_CORE_OFFSETS`, e o anel é
+simétrico — com o Núcleo em `chefe + (dx,dy)`, a célula `núcleo + (-dx,-dy)` _é_ o
+chefe. Na câmara natural a ordem esconde (o pedestal é carimbado antes de o chefe
+existir, e `hasGuardianClearance` recusa depois as células que o anel fechou); na
+central o chefe vem primeiro e nascia emparedado. `stampCorePedestal` passou a
+receber o ponto cujo 3x3 ele não pode fechar. Quem pegou foi a prova "ninguém
+nasce DENTRO da moldura", na seed 92.
+
+##### O que a mudança custou, medido
+
+O benchmark foi refeito nas 24 câmaras (mesmo agente: 250 ms de reação, sigma
+0,08 rad). **As medições anteriores desta página foram tiradas na câmara antiga e
+não valem mais** — ficam abaixo só para comparação:
+
+| Estratégia      | Antes (câmara natural) | Agora (câmara central)   |
+| --------------- | ---------------------- | ------------------------ |
+| Ignorar o ferro | 41,8 s · vida 56/100   | **36,8 s · vida 88/100** |
+| Sabotando       | 26,6 s (seed 216)      | **30,4 s · vida 88/100** |
+| Pior partida    | **10/100** (seed 981)  | **48/100** (seed 146)    |
+
+Três leituras, e a terceira é a que decide:
+
+1. **O encontro ficou mais fácil.** A vida restante média subiu de 56–82 para 88,
+   e a pior partida do lote saiu de 10/100 para 48/100. Faz sentido: sem quinas
+   não há como ser encurralado, e os ticks com alvo bloqueado caem para 34.
+2. **A vantagem da sabotagem encolheu.** Ignorar o ferro passou a custar 36,8 s
+   contra 30,4 s sabotando — 17% de ganho, onde antes eram 36%. A câmara aberta
+   entrega mais tempo de mira limpa no corpo, e mira limpa é justamente a moeda
+   que a sabotagem cobrava.
+3. **A cauda sem material voltou a crescer**: 8,5 s por partida, contra os 0,0 a
+   4,1 s da câmara corrigida anterior. As três massas são fraturadas cedo e o
+   encontro termina sem nada em campo.
+
+O eixo `apertada`/`aberta` do benchmark **deixou de separar qualquer coisa**: o
+chão aberto a dez tiles do corpo agora varia de 309 a 311 células em toda a
+amostra. O relatório do bot passou a imprimir essa faixa e a dizer isso em voz
+alta — um corte por extremos sempre produz dois grupos, inclusive quando não há
+dois tipos de câmara, e anunciar uma distinção de duas células como eixo de
+comparação é pior que não ter eixo nenhum.
+
+**O que isto não decide:** nenhuma constante de balanceamento foi mexida.
+`MAGNETARCH_HP` (1.200) e `MAGNETARCH_CYCLE_TICKS` (120) foram escolhidos por
+varredura na câmara antiga, e os números acima dizem que essa varredura está
+vencida. Re-tunar é uma decisão separada, e ela depende de o playtest humano
+dizer se 88 de vida restante é folga confortável ou encontro sem aperto.
+
 ### O objetivo não encosta mais na moldura
 
 `bfsFarthest` procura o ponto mais distante da entrada, e o mais distante costuma ser

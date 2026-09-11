@@ -3190,6 +3190,23 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  * contra-jogo geometrico do campo.
  */
 /**
+ * A VARREDURA QUE FIXOU OS DOIS NUMEROS ABAIXO ESTA VENCIDA.
+ *
+ * `MAGNETARCH_HP` e `MAGNETARCH_CYCLE_TICKS` foram escolhidos medindo o
+ * encontro na camara que a geracao dava na epoca — a natural, que nascia onde o
+ * mapa levasse e costumava ser um canto. Na SIMULATION_VERSION 85 o Magnetarca
+ * passou a ter CAMARA CENTRAL (`bossArena` em worldgen.ts), e o mesmo bot mortal
+ * nas mesmas 24 seeds terminou com 88 de vida em media contra os 56 a 82 de
+ * antes, com a pior partida do lote em 48/100 contra 10/100.
+ *
+ * Os numeros continuam aqui porque eles sao o que esta em jogo, e as tabelas
+ * abaixo continuam valendo como registro do que foi medido e por que. O que NAO
+ * vale mais e usa-las como prova de que 1.200 e 120 ainda sao as escolhas
+ * certas: a camara mudou embaixo delas. Re-tunar e uma decisao separada, e ela
+ * espera o playtest humano dizer se 88 de vida restante e folga confortavel ou
+ * encontro sem aperto.
+ */
+/**
  * A vida, MEDIDA e nao escolhida.
  *
  * Com 720 o chefe morria aos 19,8 s — meio segundo ANTES de a primeira massa

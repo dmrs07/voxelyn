@@ -32,6 +32,8 @@ import {
 } from './constants.js';
 import type { EnemyArchetype } from './types.js';
 import type { WorldgenProfile } from './worldgen.js';
+import { bossForSector } from './bosses.js';
+import type { RunDepthConfig } from './progression.js';
 
 /**
  * Os estratos da primeira leva.
@@ -484,6 +486,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     minerCap: MINER_PER_SECTOR,
     leylines: 0,
     halls: 'none',
+    bossArena: 'natural',
   };
 
   // O basalto tambem tem gramatica ESPACIAL propria (anfiteatros, florestas
@@ -696,11 +699,34 @@ export const leylineGuaranteeSector = (runSeed: number): number | null => {
  * Funcao pura: `sectorBiome` e `lineageOf` nao consomem `state.rng`, entao
  * chamar isto nao desloca a sequencia da run.
  */
-export const sectorProfile = (runSeed: number, sector: number): WorldgenProfile => {
+export const sectorProfile = (
+  runSeed: number,
+  sector: number,
+  depth: RunDepthConfig,
+): WorldgenProfile => {
   const profile = biomeProfile(sectorBiome(runSeed, sector), sector);
   if (leylineGuaranteeSector(runSeed) === sector) {
     profile.leylines = Math.max(profile.leylines, 1);
   }
+  // A CAMARA CENTRAL do Magnetarca. O perfil e por ESTRATO, e este e o unico
+  // traco de terreno que sai do CHEFE — por isso ele mora aqui, e nao em
+  // `biomeProfile`: o ferrifero continua sendo ferrifero quando quem o ocupa e
+  // outro, e o Magnetarca leva a camara central para onde quer que ele apareca
+  // (a anomalia Aurix o coloca fora do estrato dele).
+  //
+  // E a razao de `sectorProfile` pedir a PROFUNDIDADE. Quem e o dono de um
+  // setor depende de quantos setores a descida tem e de onde caem os Nucleos
+  // (`bossForSector`), e antes disto o perfil nao sabia disso. Pedir e melhor
+  // que adivinhar: os tres chamadores de producao — `createRun` e as duas
+  // trocas de setor — ja tem a profundidade congelada em maos, e passar a mesma
+  // e o que impede o mundo reconstruido ao descer de discordar do que nasceu.
+  const boss = bossForSector(
+    (s) => sectorBiome(runSeed, s),
+    sector,
+    depth.sectorCount,
+    depth.coreSectors,
+  );
+  if (boss?.archetype === 'magnetarch') profile.bossArena = 'central';
   return profile;
 };
 

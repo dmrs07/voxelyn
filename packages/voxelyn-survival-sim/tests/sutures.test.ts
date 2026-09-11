@@ -23,6 +23,7 @@ import {
   SURF_MINERAL_SILK,
 } from '../src/constants';
 import { sectorBiome, sectorProfile } from '../src/strata';
+import { DEFAULT_RUN_DEPTH } from '../src/progression';
 import { generateWorld } from '../src/worldgen';
 import { sectorSeed } from '../src/sectors';
 import type { SemanticEvent, SutureRecipe } from '../src/types';
@@ -58,7 +59,7 @@ const fixture = (kind: 'roof' | 'gate' = 'roof', playerCount = 1) => {
 describe('Colônia dos Costureiros', () => {
   it('generates a bounded overlay reproducibly without changing floor connectivity', () => {
     for (const seed of [1, 5, 13, 42, 71]) {
-      const profile = sectorProfile(seed, 3);
+      const profile = sectorProfile(seed, 3, DEFAULT_RUN_DEPTH);
       const plain = generateWorld(sectorSeed(seed, 3), 96, 96, { ...profile, sutureCount: 0 });
       const world = generateWorld(sectorSeed(seed, 3), 96, 96, { ...profile, sutureCount: 10 });
       const again = generateWorld(sectorSeed(seed, 3), 96, 96, { ...profile, sutureCount: 10 });
