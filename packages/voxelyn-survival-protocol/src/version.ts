@@ -1223,27 +1223,33 @@ export const PROTOCOL_VERSION = 43;
 //     G-00 e o Bispo em 27,4% delas, o Diamandis em 18,0%, a Cerzideira em
 //     15,1% — e cada dono de estrato, Guardiao inclusive, em ~6,5%. Com um
 //     chefe qualquer podendo ser o primeiro, uma rampa larga nao e progressao,
-//     e loteria: a faixa e estreita (36 a 52 s) e a ordem dentro dela e a da
-//     DIFICULDADE — pressao de dano medida, o que a luta tem para mostrar, e
-//     com que frequencia alguem a encontra.
+//     e loteria: o grosso da lista fica entre 36 e 50 s, com uma cauda
+//     deliberada de tres (Leviata 60, Cerzideira 72, Devorador 83), e a ordem
+//     dentro dela e a da DIFICULDADE — pressao de dano medida, o que a luta tem
+//     para mostrar, e com que frequencia alguem a encontra.
+//
+//     A CAUDA e leitura de desenho: os tres sao os chefes de JANELA e
+//     BLINDAGEM do lote, e o dano efetivo por segundo mede isso — ~38/s nos
+//     chefes abertos contra 16,9/s no Devorador e 13,9/s na Cerzideira. O
+//     relogio deles conta muito tempo em que o corpo nao esta alcancavel, entao
+//     83 s de Devorador e 38 s de Guardiao nao medem a mesma coisa.
 //
 //     O alvo de cada chefe passa a viver em `BOSS_TTK_SECONDS` (bosses.ts), que
 //     nenhum passo da simulacao le — quem cobra continua sendo a vida:
 //
-//       Magnetarca 1200 -> 1400 (36 s)   Arquicantor  620 -> 1650 (46 s)
-//       Guardiao    420 -> 1450 (38 s)   Diamandis   1400 -> 1700 (46 s)
-//       Bispo       260 -> 1450 (38 s)   Cerzideira   900 ->  500 (46 s)
-//       Pulmao      700 -> 1620 (42 s)   Devorador   1500 ->  880 (48 s)
-//       Fornalha    900 ->  880 (42 s)   Leviata     4000 -> 1700 (52 s)
-//       Rainha      640 ->  950 (44 s)
+//       Magnetarca 1200 -> 1400 (36 s)   Diamandis   1400 -> 1700 (46 s)
+//       Guardiao    420 -> 1450 (38 s)   Fornalha     900 -> 1000 (50 s)
+//       Bispo       260 -> 1450 (38 s)   Leviata     4000 -> 2000 (60 s)
+//       Pulmao      700 -> 1620 (42 s)   Cerzideira   900 -> 1000 (72 s)
+//       Rainha      640 ->  950 (44 s)   Devorador   1500 -> 1400 (83 s)
+//       Arquicantor 620 -> 1650 (46 s)
 //
-//     Tres descem. A Cerzideira e o Devorador por blindagem — a teia dela e o
-//     tempo enterrado dele fazem a vida render muito mais tempo que num chefe
-//     aberto —, e o Leviata porque os 4000 vinham de uma correcao legitima
+//     Duas descem, as duas no topo: o Devorador de 1500 para 1400 e o Leviata
+//     de 4000 para 2000 — este porque os 4000 vinham de uma correcao legitima
 //     (com 800 ele cruzava o limiar do Diluvio antes do primeiro mergulho)
 //     aplicada sem faixa contra a qual conferir. Nenhum perde estrutura:
 //     DELUGE_HP_FRACTION e DEVOURER_HUNGER_HP_FRACTION leem fracao, e as duas
-//     pontas descem juntas.
+//     pontas se mexem juntas.
 //
 //     `MAGNETARCH_SHARDS` FICA EM TRES. A tentativa de subir a vida dele para
 //     1620 com uma quarta massa foi medida e revertida: ela resolve a cauda sem

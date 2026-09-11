@@ -1118,24 +1118,24 @@ export const DIAMANDIS_SALVAGE_CREW_CAP = 4;
  * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
  */
 /**
- * 48 s (ver BOSS_TTK_SECONDS em bosses.ts). Eram 1500, que davam 85,7 s.
+ * 83 s (ver BOSS_TTK_SECONDS em bosses.ts): o mais longo do jogo, e a ponta da
+ * cauda da lista. Eram 1500, que davam 85,7 s — ele praticamente nao se mexeu.
  *
- * Ele continua no alto da faixa — e um chefe de JANELAS, e as janelas sao
- * curtas: fora da boca aberta ele esta enterrado, e vida aqui compra muito
- * menos luta que em qualquer chefe exposto. O que 85 s acrescentavam sobre 48
- * nao era fase nova; era o mesmo ciclo de mergulho, bote e boca mais tres
- * vezes.
+ * E um chefe de JANELAS, e as janelas sao curtas: fora da boca aberta ele esta
+ * enterrado, e vida aqui compra muito menos luta que em qualquer chefe exposto
+ * (~17 de dano efetivo por segundo, contra ~38 nos abertos). Boa parte dos 83 s
+ * e tempo em que ele NAO ESTA LA — e e por isso que a duracao dele nao se
+ * compara de frente com a de um chefe aberto.
  *
- * 880 preservam a estrutura que a vida antiga defendia. A conta de la, que
- * continua valendo: 7,5 s de boca ao dps do parafuso basico sao ~420 de dano
- * por janela, e o encontro nao pode caber em duas. Com 880, a metade fica em
- * 440 — a Fome (ver DEVOURER_HUNGER_HP_FRACTION) abre com uma janela inteira ja
- * gasta e a luta ainda pede outras duas. Com os 760 originais ela chegava no
- * meio da segunda e acabava antes de ensinar alguma coisa.
+ * A conta que a vida antiga defendia continua valendo: 7,5 s de boca ao dps do
+ * parafuso basico sao ~420 de dano por janela, e o encontro nao pode caber em
+ * duas. Com 1400, a metade fica em 700 — a Fome (ver
+ * DEVOURER_HUNGER_HP_FRACTION) abre com mais de uma janela inteira ja gasta e a
+ * luta ainda pede outras tres.
  *
  * `hp`/`maxHp` viajam no snapshot e no hash: um replay anterior nao bate.
  */
-export const DEVOURER_HP = 880;
+export const DEVOURER_HP = 1400;
 /** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
 export const DEVOURER_BURROW_SPEED = 4.6;
 /**
@@ -2685,21 +2685,20 @@ export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
  * nada aqui e inferido do humor compartilhado com o Devorador.
  */
 /**
- * O TETO da faixa (ver BOSS_TTK_SECONDS em bosses.ts): 52 s, e ele e o unico
- * la em cima.
+ * 60 s (ver BOSS_TTK_SECONDS em bosses.ts): a entrada da CAUDA LONGA da lista.
  *
- * Ele merece o teto pelos tres eixos ao mesmo tempo: tem duas fases inteiras,
+ * Ele ganha o tempo pelos tres eixos ao mesmo tempo: tem duas fases inteiras,
  * passa metade do encontro fora de alcance e tem a MENOR pressao de dano da
  * lista (22 no teto sem esquiva, contra 1538 do Guardiao). Duracao alta com
- * pressao baixa e tempo de leitura; com pressao alta seria so exposicao.
+ * pressao baixa e tempo de leitura; com pressao alta seria so exposicao — e e
+ * essa combinacao que autoriza um minuto de encontro sem que ele vire espera.
  *
- * Mas teto e teto. Medido em `tools/boss-ttk.mjs` (agente imortal, mira
- * perfeita, parafuso basico, sete tiles), 4000 davam 126,2 s: o dobro do chefe
- * seguinte da lista e doze vezes o Bispo de entao. O que 126 s acrescentavam
- * sobre 52 nao era fase nova, era o mesmo ciclo de ancorar, sondar e mergulhar
- * mais quatro vezes.
+ * Medido em `tools/boss-ttk.mjs` (agente imortal, mira perfeita, parafuso
+ * basico, sete tiles), 4000 davam 126,2 s: o dobro do chefe seguinte da lista e
+ * doze vezes o Bispo de entao. O que 126 s acrescentavam sobre 60 nao era fase
+ * nova, era o mesmo ciclo de ancorar, sondar e mergulhar mais quatro vezes.
  *
- * 1700 entregam ~52 s com a estrutura intacta: o Diluvio continua caindo no
+ * 2000 entregam 60,0 s com a estrutura intacta: o Diluvio continua caindo no
  * mesmo ponto da vida (DELUGE_HP_FRACTION le fracao, e as duas pontas desceram
  * juntas), a primeira fase continua com mergulhos suficientes para o ciclo ser
  * lido, e a segunda continua sendo a metade que persegue.
@@ -2709,7 +2708,7 @@ export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
  * mergulho —, e a correcao da epoca foi multiplicar a vida por cinco sem uma
  * faixa contra a qual conferir o resultado.
  */
-export const LEVIATHAN_HP = 1700;
+export const LEVIATHAN_HP = 2000;
 /** Velocidade de PERSEGUICAO, na segunda fase. Ele nada; nao ha chao seco. */
 export const LEVIATHAN_SWIM_SPEED = 5;
 /**
@@ -3047,19 +3046,21 @@ export const LUNG_MATRIX_HOLD_TICKS = 12;
  * escolhe quando bater, escolhe onde estar quando puder.
  */
 /**
- * 42 s (ver BOSS_TTK_SECONDS), e a vida praticamente nao se mexeu (eram 900).
+ * 50 s (ver BOSS_TTK_SECONDS), e a vida sobe pouco (eram 900).
  *
  * Ele so aceita dano no RESFRIAMENTO, entao a vida aqui compra menos tempo de
- * luta que em qualquer chefe aberto: 880 sao ~42 s de encontro e pouco mais de
- * vinte de janela. O numero ja estava certo — o que faltava a ele nao era
+ * luta que em qualquer chefe aberto: 1000 sao ~50 s de encontro e pouco mais de
+ * vinte de janela. O numero ja estava quase certo — o que faltava a ele nao era
  * massa, era o resto da lista ter parado de cair em dez segundos.
  *
- * E ele nao sobe mais que isso porque tem a SEGUNDA maior pressao de dano da
- * lista (938 no teto sem esquiva, atras so do Guardiao): a sala inteira acende
- * no superaquecimento, e cada segundo a mais de luta e um segundo a mais de
- * sala acesa. Rico o bastante para 42, caro demais para 46.
+ * O QUE ELE COBRA POR ESSE TEMPO esta medido e nao e pouco: 1161 de dano tomado
+ * no teto sem esquiva (pior partida 1472), a segunda maior pressao da lista
+ * atras so do Guardiao — a sala inteira acende no superaquecimento, e cada
+ * segundo a mais de luta e um segundo a mais de sala acesa. E o chefe em que
+ * duracao e exposicao andam mais juntas, e o primeiro a reconsiderar se o
+ * playtest disser que a Fornalha cansa.
  */
-export const FURNACE_HEART_HP = 880;
+export const FURNACE_HEART_HP = 1000;
 export const FURNACE_HEART_RADIUS = 1;
 export const FURNACE_HEART_CYCLE_TICKS = 150;
 export const FURNACE_HEART_HOT_ARMOR = 0.2;

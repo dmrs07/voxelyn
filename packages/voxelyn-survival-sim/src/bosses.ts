@@ -205,12 +205,21 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
  *    encontro que aparece em metade das runs cansa antes do que aparece em uma
  *    a cada dez, e o teto dele tem de refletir isso.
  *
- * A FAIXA E ESTREITA DE PROPOSITO: de 36 a 52 segundos, e nao de 30 a 60. A
- * curva importa mais que os extremos — com um chefe qualquer podendo ser o
- * primeiro, uma rampa larga nao e progressao, e loteria. O que a faixa tem de
- * impedir continua sendo os dois defeitos das pontas: o encontro que acaba
- * antes de cobrar a fase que o distingue (o Bispo caia em 5 s, o Guardiao em
- * 10,7 s) e o que mostra a mesma fase seis vezes (o Leviata pedia 126,2 s).
+ * O GROSSO DA LISTA E ESTREITO, E A CAUDA E DELIBERADA. Oito chefes cabem
+ * entre 36 e 50 segundos; tres — Leviata, Cerzideira e Devorador — ficam em 60,
+ * 72 e 83. A cauda nao e sobra da faixa antiga: e a leitura de que esses tres
+ * sao os chefes de JANELA e BLINDAGEM do lote, onde o corpo passa a maior parte
+ * do encontro fora de alcance ou couraçado. O dano efetivo por segundo mede
+ * isso direto — ~38/s nos chefes abertos contra 17/s no Devorador e 14/s na
+ * Cerzideira —, entao o relogio deles conta muito tempo em que nao ha luta
+ * acontecendo, e comparar 83 s de Devorador com 38 s de Guardiao e comparar
+ * duas coisas diferentes.
+ *
+ * O que a faixa tem de impedir continua sendo os dois defeitos das pontas: o
+ * encontro que acaba antes de cobrar a fase que o distingue (o Bispo caia em
+ * 5 s, o Guardiao em 10,7 s) e o que mostra a mesma fase seis vezes (o Leviata
+ * pedia 126,2 s). A cauda esta do lado certo dos dois — e e o pedaco da tabela
+ * que o playtest tem de conferir primeiro.
  *
  * COMO CADA UM FOI PARAR ONDE ESTA:
  *
@@ -226,15 +235,22 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
  *       quebra-cabeca territorial, e quebra-cabeca nao fica melhor mais longo.
  *   42  Pulmao-Matriz — o ciclo de respiracao, e a unica janela do jogo que o
  *       JOGADOR abre.
- *   42  Coracao da Fornalha — blindado metade do tempo, e a segunda maior
- *       pressao de dano da lista. Rico o bastante para 42, caro demais para 46.
  *   44  Rainha da Geada — couraça de terreno, congelamento e Espectros.
  *   46  Arquicantor — duas metades (apagar a rede, desmontar o coro).
  *   46  Diamandis — quatro atos, e o segundo mais encontrado do lote.
- *   46  Cerzideira — a teia lida, cortada e refeita.
- *   48  Devorador Branco — janelas curtas e a Fome.
- *   52  Leviata do Lencol — duas fases inteiras, metade do encontro fora de
- *       alcance, e a menor pressao de dano da lista. E o teto, e o unico.
+ *   50  Coracao da Fornalha — blindado metade do tempo, e a SEGUNDA MAIOR
+ *       pressao de dano da lista (1161 tomados). E onde duracao e exposicao
+ *       andam mais juntas, e o primeiro a reconsiderar se o playtest reclamar.
+ *       Fecha o grosso da lista.
+ *   60  Leviata do Lencol — duas fases inteiras, metade do encontro fora de
+ *       alcance, e a MENOR pressao de dano da lista (22 de dano tomado). Um
+ *       minuto de leitura, e nao um minuto de exposicao.
+ *   72  Cerzideira — a teia lida, cortada e refeita. A que mais pede
+ *       confirmacao de playtest: longa, cara (854 de dano tomado) e o terceiro
+ *       encontro mais frequente do jogo.
+ *   83  Devorador Branco — o mais longo, e o que menos tempo passa alcancavel:
+ *       fora da boca aberta ele esta enterrado. O numero mede o ciclo, nao a
+ *       luta.
  *
  * O QUE ESTA TABELA NAO E: ela nao entra na simulacao. Nenhum passo a le, e o
  * que cobra o alvo e a VIDA de cada chefe (`*_HP` em constants.ts), escolhida
@@ -251,13 +267,13 @@ export const BOSS_TTK_SECONDS: Record<BossId, number> = {
   guardian: 38,
   bishop: 38,
   lung_matrix: 42,
-  furnace_heart: 42,
   frost_queen: 44,
   archcantor: 46,
   diamandis: 46,
-  seamstress: 46,
-  white_devourer: 48,
-  sheet_leviathan: 52,
+  furnace_heart: 50,
+  sheet_leviathan: 60,
+  seamstress: 72,
+  white_devourer: 83,
 };
 
 export type BossBiome = {

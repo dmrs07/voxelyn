@@ -500,19 +500,21 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     aggroRange: 0,
   },
   seamstress: {
-    // 500: 46 s (ver BOSS_TTK_SECONDS em bosses.ts), e ela e a maior queda de
-    // vida da lista depois do Leviata.
+    // 1000: 72 s (ver BOSS_TTK_SECONDS em bosses.ts), na cauda longa da lista
+    // junto com o Devorador e o Leviata. Eram 900, que davam 68,2 s.
     //
-    // Eram 900, e a razao de la continua valendo — a segunda fase e blindada
-    // pela teia (WEB_ARMOR), e a luta tem de durar o bastante para a teia ser
-    // lida, cortada e refeita. O que mudou e que a blindagem faz a vida render
-    // muito mais tempo que nos chefes abertos: 900 davam 68,2 s medidos, e os
-    // vinte segundos a mais eram a mesma teia refeita outra vez.
+    // A razao continua sendo a de sempre: a segunda fase e blindada pela teia
+    // (WEB_ARMOR), e a luta tem de durar o bastante para a teia ser lida,
+    // cortada e refeita. A blindagem faz a vida render muito mais tempo que num
+    // chefe aberto — ~14 de dano efetivo por segundo, contra ~38 —, entao boa
+    // parte dos 72 s e tempo com a teia no caminho e nao com o corpo exposto.
     //
-    // Ela fica na metade de cima da faixa (a teia e conteudo de verdade) e nao
-    // no teto, porque e o terceiro chefe mais encontrado do jogo: a ocupacao
-    // dos Cerzidores toma qualquer estrato, e ela abre 15% das runs de G-00.
-    hp: 500,
+    // O CONTRAPONTO, medido e registrado: ela e o terceiro chefe mais
+    // encontrado do jogo (a ocupacao dos Cerzidores toma qualquer estrato, e
+    // ela abre 15% das runs de G-00), e cobra 854 de dano tomado no teto sem
+    // esquiva. Encontro longo, frequente e caro e a combinacao que o playtest
+    // tem de olhar primeiro.
+    hp: 1000,
     speed: 4,
     radius: 0.72,
     contactDamage: 20,

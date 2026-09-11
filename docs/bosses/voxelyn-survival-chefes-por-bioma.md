@@ -2005,8 +2005,9 @@ Magnetarca. Quem lidera a conta são as três **ocupações**, porque ocupação
 qualquer estrato.
 
 Com um chefe qualquer podendo ser o primeiro, uma rampa larga não é progressão: é
-loteria. A faixa ficou **estreita de propósito — de 36 a 52 s** — e a ordem dentro dela
-passou a ser a da **dificuldade**, lida em três eixos declarados:
+loteria. O grosso da lista ficou **estreito de propósito — oito chefes entre 36 e 50 s**,
+com uma **cauda deliberada de três** (Leviatã 60 s, Cerzideira 72 s, Devorador 83 s) — e a
+ordem dentro dela passou a ser a da **dificuldade**, lida em três eixos declarados:
 
 1. **Pressão de dano** — quanto o encontro cobra por segundo, medido. Um chefe que já
    cobra caro não deve também durar muito: as duas coisas multiplicam.
@@ -2062,20 +2063,27 @@ a exposição do jogador às cegas.
 | Guardião            | 420 → **1450**  | 38 s | 10,7 → **38,8 s**  | 39,6 s | 300 → **1538**               |
 | Bispo               | 260 → **1450**  | 38 s | 5,0 → **38,5 s**   | 38,9 s | 16 → 48                      |
 | Pulmão-Matriz       | 700 → **1620**  | 42 s | 16,1 → **41,9 s**  | 41,9 s | 77 → 231                     |
-| Coração da Fornalha | 900 → **880**   | 42 s | 43,4 → **42,6 s**  | 44,6 s | 938 → 938                    |
 | Rainha da Geada     | 640 → **950**   | 44 s | 23,9 → **43,5 s**  | 46,6 s | 0 → 442                      |
 | Arquicantor         | 620 → **1650**  | 46 s | 15,6 → **45,6 s**  | 46,9 s | 52 → 120                     |
 | Diamandis           | 1400 → **1700** | 46 s | 38,3 → **46,3 s**  | 48,9 s | 295 → 437                    |
-| Cerzideira          | 900 → **500**   | 46 s | 68,2 → **46,7 s**  | 49,1 s | 504 → 272                    |
-| Devorador Branco    | 1500 → **880**  | 48 s | 85,7 → **48,1 s**  | 50,9 s | 310 → 160                    |
-| Leviatã do Lençol   | 4000 → **1700** | 52 s | 126,2 → **51,8 s** | 52,5 s | 22 → 22                      |
+| Coração da Fornalha | 900 → **1000**  | 50 s | 43,4 → **50,5 s**  | 54,0 s | 938 → **1161**               |
+| Leviatã do Lençol   | 4000 → **2000** | 60 s | 126,2 → **60,0 s** | 60,8 s | 22 → 22                      |
+| Cerzideira          | 900 → **1000**  | 72 s | 68,2 → **72,1 s**  | 77,2 s | 504 → **854**                |
+| Devorador Branco    | 1500 → **1400** | 83 s | 85,7 → **83,0 s**  | 83,8 s | 310 → 280                    |
 
-Três vidas **desceram**. A Cerzideira e o Devorador pelo mesmo motivo — blindagem faz a
-vida render muito mais tempo que em chefe aberto (a teia dela, o tempo enterrado dele) —,
-e o Leviatã porque 4000 vinham de uma correção legítima (com 800 ele cruzava o limiar do
-Dilúvio **antes do primeiro mergulho**) aplicada sem uma faixa contra a qual conferir o
-resultado. Nenhum perdeu estrutura: `DELUGE_HP_FRACTION` e `DEVOURER_HUNGER_HP_FRACTION`
-leem fração, e as duas pontas desceram juntas.
+**A cauda dos três é leitura de desenho, e não sobra da faixa antiga.** Leviatã,
+Cerzideira e Devorador são os chefes de **janela e blindagem** do lote: o corpo passa a
+maior parte do encontro fora de alcance ou couraçado. O dano efetivo por segundo mede isso
+direto — ~38/s nos chefes abertos contra 19,8/s na Fornalha, 16,9/s no Devorador e 13,9/s
+na Cerzideira —, então o relógio deles conta muito tempo em que não há luta acontecendo.
+Comparar os 83 s do Devorador com os 38 s do Guardião é comparar duas coisas diferentes: o
+primeiro mede um ciclo, o segundo mede uma luta.
+
+Duas vidas **desceram**, as duas no topo: o Devorador de 1500 para 1400, e o Leviatã de
+4000 para 2000 — este porque os 4000 vinham de uma correção legítima (com 800 ele cruzava
+o limiar do Dilúvio **antes do primeiro mergulho**) aplicada sem uma faixa contra a qual
+conferir o resultado. Nenhum perdeu estrutura: `DELUGE_HP_FRACTION` e
+`DEVOURER_HUNGER_HP_FRACTION` leem fração, e as duas pontas se mexeram juntas.
 
 O dano tomado é de um agente que **não esquiva** — é um teto de exposição e não uma
 previsão —, mas a comparação antes/depois é da mesma postura nos dois lados. E ela
@@ -2120,6 +2128,11 @@ vida.
 - **`GUARDIAN_HP` não era lido por ninguém.** A ficha do arquétipo trazia um `420` escrito
   à mão — a única vida de chefe fora de `constants.ts` —, então a constante existia e
   mudá-la não mudava nada no jogo. Agora a ficha lê a constante.
+- **A cauda é o que o playtest tem de conferir primeiro**, e dentro dela a Cerzideira: 72 s
+  de encontro, 854 de dano tomado e o terceiro chefe mais frequente do jogo (15% das runs
+  de G-00) é a única combinação da lista em que _longo_, _caro_ e _frequente_ aparecem
+  juntos. A Fornalha vem logo atrás em versão menor — 50 s e a segunda maior pressão da
+  lista (1161), o chefe em que duração e exposição andam mais juntas.
 - **Nada disto é playtest.** São cenários simulados com um agente que segue regras fixas.
   O que a faixa garante é que os onze encontros passaram a ser comparáveis entre si e que
   nenhum deles acaba antes de cobrar a própria mecânica. Se a **ordem** dentro da faixa
