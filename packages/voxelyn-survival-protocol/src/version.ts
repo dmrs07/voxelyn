@@ -1207,38 +1207,50 @@ export const PROTOCOL_VERSION = 43;
 //     65% da faixa mantem linha para o corpo (pior camara 61%), a vida restante
 //     volta a 57 e a vantagem da sabotagem sobe para 25%. Replays de 85 num
 //     setor com Magnetarca nao batem.
-// 87: A FAIXA DE 30 A 60 SEGUNDOS — a vida dos onze chefes, escolhida contra uma
-//     escala em vez de contra a propria luta.
+// 87: A DURACAO DOS ONZE CHEFES, escolhida contra uma escala em vez de contra a
+//     propria luta.
 //
 //     Cada vida tinha sido fixada por uma medicao propria, sem nada do lado de
 //     fora para conferir o resultado, e o efeito acumulado era um intervalo de
-//     TREZE VEZES entre o encontro mais curto e o mais longo do mesmo jogo:
-//     medido com o mesmo instrumento (`tools/boss-ttk.mjs` — agente imortal,
-//     mira perfeita, parafuso basico e nada mais), o Guardiao caia em 9,1 s e o
-//     Leviata pedia 125,3 s. Os dois extremos sao o mesmo defeito: um encontro
-//     que acaba antes de cobrar a fase que o distingue e um que mostra a mesma
-//     fase seis vezes.
+//     VINTE E CINCO VEZES entre o encontro mais curto e o mais longo do mesmo
+//     jogo: medido com o mesmo instrumento (`tools/boss-ttk.mjs` — agente
+//     imortal, mira perfeita, parafuso basico e nada mais), o Bispo caia em
+//     5,0 s e o Leviata pedia 126,2 s.
+//
+//     NAO EXISTE CHEFE INICIAL, e e isso que define a ordem. A linhagem sai da
+//     seed, entao o dono do setor final de uma run de tres setores e sorteado
+//     junto com o mapa: contado em 20 mil seeds, o PRIMEIRO chefe de uma run de
+//     G-00 e o Bispo em 27,4% delas, o Diamandis em 18,0%, a Cerzideira em
+//     15,1% — e cada dono de estrato, Guardiao inclusive, em ~6,5%. Com um
+//     chefe qualquer podendo ser o primeiro, uma rampa larga nao e progressao,
+//     e loteria: a faixa e estreita (36 a 52 s) e a ordem dentro dela e a da
+//     DIFICULDADE — pressao de dano medida, o que a luta tem para mostrar, e
+//     com que frequencia alguem a encontra.
 //
 //     O alvo de cada chefe passa a viver em `BOSS_TTK_SECONDS` (bosses.ts), que
 //     nenhum passo da simulacao le — quem cobra continua sendo a vida:
 //
-//       Guardiao   420 -> 1200    Rainha       640 ->  950
-//       Bispo      260 -> 1180    Diamandis   1400 -> 1700
-//       Pulmao     700 -> 1380    Fornalha     900 ->  950
-//       Arquicantor 620 -> 1450   Cerzideira   900 ->  730
-//       Magnetarca 1200 -> 1620   Devorador   1500 -> 1000
-//                                 Leviata     4000 -> 2000
+//       Magnetarca 1200 -> 1400 (36 s)   Arquicantor  620 -> 1650 (46 s)
+//       Guardiao    420 -> 1450 (38 s)   Diamandis   1400 -> 1700 (46 s)
+//       Bispo       260 -> 1450 (38 s)   Cerzideira   900 ->  500 (46 s)
+//       Pulmao      700 -> 1620 (42 s)   Devorador   1500 ->  880 (48 s)
+//       Fornalha    900 ->  880 (42 s)   Leviata     4000 -> 1700 (52 s)
+//       Rainha      640 ->  950 (44 s)
 //
-//     Duas descem, e as duas por blindagem: a teia da Cerzideira e o tempo
-//     enterrado do Devorador fazem a vida render muito mais tempo que num chefe
-//     aberto. O Leviata perde metade e nao perde estrutura — `DELUGE_HP_FRACTION`
-//     le fracao, e as duas pontas descem juntas.
+//     Tres descem. A Cerzideira e o Devorador por blindagem — a teia dela e o
+//     tempo enterrado dele fazem a vida render muito mais tempo que num chefe
+//     aberto —, e o Leviata porque os 4000 vinham de uma correcao legitima
+//     (com 800 ele cruzava o limiar do Diluvio antes do primeiro mergulho)
+//     aplicada sem faixa contra a qual conferir. Nenhum perde estrutura:
+//     DELUGE_HP_FRACTION e DEVOURER_HUNGER_HP_FRACTION leem fracao, e as duas
+//     pontas descem juntas.
 //
-//     `MAGNETARCH_SHARDS` vai de 3 para 4 no mesmo movimento: vida maior com o
-//     mesmo estoque de ferro alonga o trecho final SEM material, que e o unico
-//     pedaco da luta sem decisao (a varredura que fixou 1.200 ja media 12,1 s
-//     desse trecho em 1.400). A quarta massa devolve o material que a vida nova
-//     consumiria.
+//     `MAGNETARCH_SHARDS` FICA EM TRES. A tentativa de subir a vida dele para
+//     1620 com uma quarta massa foi medida e revertida: ela resolve a cauda sem
+//     material (3,8 s contra 10,2 s), mas o bot mortal termina com 93/100 de
+//     vida contra 59 e toma 7 de dano contra 36 — e queda de dificuldade, nao
+//     reposicao de estoque, e mudanca de mecanica pede medicao propria. Quem
+//     desceu foi a vida, para 1400, onde a cauda fica em 6,1 s.
 //
 //     E `GUARDIAN_HP` passa a ser LIDO: a ficha do arquetipo trazia um 420
 //     escrito a mao — a unica vida de chefe fora de constants.ts —, entao a

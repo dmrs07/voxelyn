@@ -500,15 +500,19 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     aggroRange: 0,
   },
   seamstress: {
-    // 730: 55 s de faixa (ver BOSS_TTK_SECONDS em bosses.ts), e ela e um dos
-    // dois chefes da lista cuja vida DESCEU.
+    // 500: 46 s (ver BOSS_TTK_SECONDS em bosses.ts), e ela e a maior queda de
+    // vida da lista depois do Leviata.
     //
     // Eram 900, e a razao de la continua valendo — a segunda fase e blindada
     // pela teia (WEB_ARMOR), e a luta tem de durar o bastante para a teia ser
     // lida, cortada e refeita. O que mudou e que a blindagem faz a vida render
-    // muito mais tempo que nos chefes abertos: 900 davam 68 s medidos, e os
-    // dez segundos a mais eram a mesma teia refeita outra vez.
-    hp: 730,
+    // muito mais tempo que nos chefes abertos: 900 davam 68,2 s medidos, e os
+    // vinte segundos a mais eram a mesma teia refeita outra vez.
+    //
+    // Ela fica na metade de cima da faixa (a teia e conteudo de verdade) e nao
+    // no teto, porque e o terceiro chefe mais encontrado do jogo: a ocupacao
+    // dos Cerzidores toma qualquer estrato, e ela abre 15% das runs de G-00.
+    hp: 500,
     speed: 4,
     radius: 0.72,
     contactDamage: 20,

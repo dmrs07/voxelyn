@@ -163,8 +163,7 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
 };
 
 /**
- * A FAIXA DE DURACAO de cada encontro, em segundos, e a unica escala em que
- * onze chefes se comparam.
+ * QUANTO DURA CADA ENCONTRO, em segundos, e por que um dura mais que o outro.
  *
  * O NUMERO E UM TETO, nao uma previsao: e o que `tools/boss-ttk.mjs` mede com
  * um agente imortal, de mira perfeita, armado so com o parafuso basico e sem
@@ -173,45 +172,92 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
  * esquiva, recuo, morte) so pode fazer o encontro DURAR MAIS. O teto e o piso
  * do encontro.
  *
- * A FAIXA E DE 30 A 60 SEGUNDOS, e ela existe porque a lista media nao tinha
- * faixa nenhuma: o Guardiao caia em 9 s e o Leviata pedia 125 s, um intervalo
- * de treze vezes entre o chefe mais curto e o mais longo do mesmo jogo. Os dois
- * extremos eram o mesmo defeito visto de dois lados — um encontro que acaba
- * antes de mostrar a segunda fase e um que mostra a mesma fase seis vezes.
+ * ---------------------------------------------------------------------------
+ * NAO EXISTE CHEFE INICIAL, e esta tabela ja foi escrita uma vez como se
+ * existisse.
+ * ---------------------------------------------------------------------------
  *
- * ABAIXO DE 30 s o contra-jogo nao chega a ser exercido. Um chefe de dez
- * segundos e resolvido pelo dano que o jogador ja trazia: ele nao tem tempo de
- * cobrar a fase que o distingue, e duas runs seguidas contra ele sao a mesma
- * run. ACIMA DE 60 s o encontro passa a se repetir em vez de progredir — o
- * ciclo que era leitura vira espera, e o custo de errar deixa de ser
- * proporcional ao tempo ja investido.
+ * A primeira versao ordenou os alvos pela PROFUNDIDADE — o Guardiao no piso
+ * porque "e o primeiro que quase toda run encontra", o Leviata no teto porque
+ * fecha o ultimo estrato. A premissa esta errada, e a contagem diz por que: a
+ * linhagem sai da SEED (ver `lineageOf`), entao o dono do setor final de uma
+ * run de tres setores e sorteado junto com o mapa. Medido em 20 mil seeds, o
+ * PRIMEIRO chefe de uma run de G-00:
  *
- * A ORDEM DENTRO DA FAIXA e a da descida, e nao a do capricho: quem guarda o
- * estrato mais fundo, ou pede mais do jogador para abrir janela, senta perto do
- * teto de 60 s; quem ensina, senta no piso de 30 s. O Guardiao e o primeiro
- * chefe que quase toda run encontra e o unico cuja luta nao pede leitura
- * nenhuma — ele e o 30. O Leviata fecha o ultimo estrato, passa metade do
- * encontro fora de alcance e tem duas fases inteiras — ele e o 60.
+ *   Bispo 27,4%  ·  Diamandis 18,0%  ·  Cerzideira 15,1%  ·  cada dono de
+ *   estrato ~6,5% (Guardiao inclusive)
+ *
+ * O Guardiao nao e o primeiro chefe do jogo: ele e o primeiro chefe de uma run
+ * em 6,5% delas, exatamente como o Devorador e a Rainha. Quem lidera a conta
+ * sao as tres OCUPACOES, porque ocupacao forte toma qualquer estrato.
+ *
+ * Entao a ordem nao pode ser a da descida. Ela e a da DIFICULDADE, e a
+ * dificuldade aqui e lida em tres eixos declarados:
+ *
+ * 1. PRESSAO DE DANO — quanto o encontro cobra por segundo, medido. E um teto
+ *    (o agente nao esquiva), entao vale como comparacao entre chefes e nao
+ *    como previsao. Um chefe que ja cobra caro nao deve tambem durar muito: as
+ *    duas coisas multiplicam.
+ * 2. O QUE A LUTA TEM PARA MOSTRAR — fases, janelas, contra-jogo. Uma luta com
+ *    duas metades precisa de tempo para as duas acontecerem; uma luta de um
+ *    gesto so nao fica melhor esticada.
+ * 3. FREQUENCIA — com que frequencia alguem a encontra (a conta acima). O
+ *    encontro que aparece em metade das runs cansa antes do que aparece em uma
+ *    a cada dez, e o teto dele tem de refletir isso.
+ *
+ * A FAIXA E ESTREITA DE PROPOSITO: de 36 a 52 segundos, e nao de 30 a 60. A
+ * curva importa mais que os extremos — com um chefe qualquer podendo ser o
+ * primeiro, uma rampa larga nao e progressao, e loteria. O que a faixa tem de
+ * impedir continua sendo os dois defeitos das pontas: o encontro que acaba
+ * antes de cobrar a fase que o distingue (o Bispo caia em 5 s, o Guardiao em
+ * 10,7 s) e o que mostra a mesma fase seis vezes (o Leviata pedia 126,2 s).
+ *
+ * COMO CADA UM FOI PARAR ONDE ESTA:
+ *
+ *   36  Magnetarca — a luta mais rica do lote, e mesmo assim a mais curta: o
+ *       teto dele nao e a vida, e a ECONOMIA DE FERRO. Material finito com
+ *       vida alta alonga o trecho final sem massa, que e o unico pedaco da
+ *       luta sem decisao nenhuma (ver MAGNETARCH_HP).
+ *   38  Guardiao — a luta mais simples do jogo (nao ha janela para abrir nem
+ *       blindagem para derrubar) e a maior pressao de dano da lista. Os dois
+ *       eixos apontam para o piso.
+ *   38  Bispo — o chefe mais encontrado de todos (27% a 56% das runs) e, uma
+ *       vez resolvido o tapete, uma luta plana. A dificuldade dele e o
+ *       quebra-cabeca territorial, e quebra-cabeca nao fica melhor mais longo.
+ *   42  Pulmao-Matriz — o ciclo de respiracao, e a unica janela do jogo que o
+ *       JOGADOR abre.
+ *   42  Coracao da Fornalha — blindado metade do tempo, e a segunda maior
+ *       pressao de dano da lista. Rico o bastante para 42, caro demais para 46.
+ *   44  Rainha da Geada — couraça de terreno, congelamento e Espectros.
+ *   46  Arquicantor — duas metades (apagar a rede, desmontar o coro).
+ *   46  Diamandis — quatro atos, e o segundo mais encontrado do lote.
+ *   46  Cerzideira — a teia lida, cortada e refeita.
+ *   48  Devorador Branco — janelas curtas e a Fome.
+ *   52  Leviata do Lencol — duas fases inteiras, metade do encontro fora de
+ *       alcance, e a menor pressao de dano da lista. E o teto, e o unico.
  *
  * O QUE ESTA TABELA NAO E: ela nao entra na simulacao. Nenhum passo a le, e o
  * que cobra o alvo e a VIDA de cada chefe (`*_HP` em constants.ts), escolhida
  * medindo. Ela esta aqui — e nao num documento — porque foi a falta de um alvo
- * escrito que deixou a lista abrir treze vezes: quem for mexer numa vida
- * amanha precisa ver, no mesmo repositorio, contra o que aquele numero foi
- * escolhido.
+ * escrito que deixou a lista abrir de 5 a 126 segundos: quem for mexer numa
+ * vida amanha precisa ver, no mesmo repositorio, contra o que aquele numero
+ * foi escolhido.
+ *
+ * E ELA NAO E FINAL. Os tres eixos sao leitura de quem tunou, e o instrumento
+ * e um bot. Falta playtest humano, e ele pode reordenar a lista.
  */
 export const BOSS_TTK_SECONDS: Record<BossId, number> = {
-  guardian: 30,
-  bishop: 30,
-  lung_matrix: 35,
-  archcantor: 38,
-  magnetarch: 42,
-  frost_queen: 45,
-  diamandis: 48,
-  furnace_heart: 52,
-  seamstress: 55,
-  white_devourer: 58,
-  sheet_leviathan: 60,
+  magnetarch: 36,
+  guardian: 38,
+  bishop: 38,
+  lung_matrix: 42,
+  furnace_heart: 42,
+  frost_queen: 44,
+  archcantor: 46,
+  diamandis: 46,
+  seamstress: 46,
+  white_devourer: 48,
+  sheet_leviathan: 52,
 };
 
 export type BossBiome = {
