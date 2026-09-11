@@ -26,13 +26,11 @@
         color: #d8cfc0;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         overflow: hidden;
-        /* Sem isto, o navegador reconhece o arrasto do stick virtual como um
-           gesto de rolagem/pan proprio depois de poucos pixels e rouba o
-           toque do jogo no meio do movimento — o stick "perde aderencia" e
-           nunca chega na borda. `input.ts` nao faz `setPointerCapture`; ele
-           conta inteiramente com isto (a mesma regra ja existe em
-           index.html, e a Arena precisa dela tanto quanto a run normal). */
-        touch-action: none;
+        /* `touch-action: none` vive no CANVAS e nao aqui — ver `#game`. No body
+           ele desligava o gesto de rolagem do subarvore INTEIRA, e o que nao
+           rolava era a configuracao: num celular o formulario e mais alto que a
+           tela, e sem poder arrasta-lo o botao "entrar na arena" ficava
+           inalcancavel. A pagina simplesmente nao comecava. */
         overscroll-behavior: none;
         -webkit-user-select: none;
         user-select: none;
@@ -44,6 +42,16 @@
         height: 100%;
         display: block;
         background: #000;
+        /* Sem isto, o navegador reconhece o arrasto do stick virtual como um
+           gesto de rolagem/pan proprio depois de poucos pixels e rouba o toque
+           do jogo no meio do movimento — o stick "perde aderencia" e nunca
+           chega na borda. `input.ts` nao faz `setPointerCapture`; ele conta
+           inteiramente com isto.
+           NO CANVAS e nao no body: todo toque de jogo comeca aqui (os manches e
+           os botoes do HUD sao desenhados nele), e no body a mesma regra
+           desligava a rolagem das telas que PRECISAM rolar — a configuracao, o
+           fim de partida e a galeria. */
+        touch-action: none;
       }
       .hidden {
         display: none !important;
@@ -54,8 +62,23 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 24px;
+        padding: calc(16px + var(--safe-area-inset-top)) calc(16px + var(--safe-area-inset-right))
+          calc(16px + var(--safe-area-inset-bottom)) calc(16px + var(--safe-area-inset-left));
         overflow-y: auto;
+        /* `safe` e o que torna a rolagem util, e e a mesma linha que a overlay
+           do jogo carrega pelo mesmo motivo: com o conteudo mais alto que a
+           caixa, centralizar transborda para os DOIS lados, e o que sai pelo
+           topo fica fora do alcance ate da barra de rolagem. Num celular o
+           formulario tem mais que o dobro da altura da tela, entao o que sumia
+           era o comeco dele — titulo, idioma e o seletor de chefe. Navegador sem
+           suporte descarta a linha e mantem o `center` acima. */
+        align-items: safe center;
+        /* A rolagem por TOQUE precisa ser reautorizada aqui: o canvas desliga o
+           gesto para nao perder o stick, e sem esta linha um dedo arrastando o
+           formulario nao anda. `contain` evita que o arrasto vaze para a pagina
+           quando a lista chega ao fim. */
+        touch-action: pan-y;
+        overscroll-behavior: contain;
         background: radial-gradient(circle at 50% 20%, #14151b 0%, #08090b 70%);
       }
       #setup form {
@@ -64,10 +87,22 @@
         background: #101218;
         border: 1px solid #2a2d38;
         border-radius: 10px;
-        padding: 24px;
+        padding: 20px;
         display: flex;
         flex-direction: column;
         gap: 18px;
+      }
+      /* O BOTAO DE ENTRAR gruda no rodape do formulario.
+         Ele e a unica acao da tela, e num celular ele fica a mais de mil pixels
+         do topo: sem isto, comecar uma partida exige rolar o formulario inteiro
+         toda vez, inclusive quando nao se quer mudar nada. */
+      #setup button[type='submit'] {
+        position: sticky;
+        bottom: 0;
+        margin-top: 8px;
+        /* Ele passa POR CIMA do que ainda nao foi rolado, e sem uma sombra a
+           opcao meio encoberta atras dele le como opcao cortada. */
+        box-shadow: 0 -10px 16px -8px #101218;
       }
       #setup h1 {
         margin: 0;
@@ -107,7 +142,12 @@
       .radio-grid,
       .check-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        /* `auto-fit` e nao `repeat(2, 1fr)`: com duas colunas fixas, "Sopro
+           (lanca-chamas)" e "Respiro de Emergencia" quebram em tres linhas num
+           celular estreito e cada opcao vira um bloco alto. Abaixo de ~300px de
+           largura util a grade cai sozinha para uma coluna, que le melhor que
+           duas espremidas. */
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
         gap: 8px;
       }
       .radio-grid label,
@@ -143,6 +183,73 @@
       }
       #setup button[type='submit']:hover {
         background: #1f8069;
+      }
+      /* DEDO, e nao cursor. Com 8px de respiro a opcao mede ~35px de altura, e
+         a marca de toque confortavel e 44 — a diferenca aparece como "errei o
+         modulo" no playtest de celular, nao como layout feio. */
+      @media (pointer: coarse) {
+        .radio-grid label,
+        .check-grid label {
+          min-height: 44px;
+          padding: 10px;
+        }
+        .field select,
+        .field input[type='number'] {
+          min-height: 44px;
+        }
+        #setup button[type='submit'] {
+          padding: 15px;
+        }
+      }
+      /* TELA ESTREITA: o formulario ocupa a largura e devolve o respiro que a
+         moldura gastava. Nao ha lado ao redor dele para preservar. */
+      @media (max-width: 560px) {
+        #setup {
+          padding: calc(10px + var(--safe-area-inset-top)) calc(10px + var(--safe-area-inset-right))
+            calc(10px + var(--safe-area-inset-bottom)) calc(10px + var(--safe-area-inset-left));
+        }
+        #setup form {
+          padding: 16px;
+          gap: 14px;
+        }
+        #setup h1 {
+          font-size: 16px;
+        }
+      }
+      /* PAISAGEM DE CELULAR: sobra largura e falta altura, e uma coluna so
+         desperdicia as duas coisas. Os campos passam a duas colunas; titulo,
+         subtitulo e o botao atravessam. O subtitulo sai quando a tela e MUITO
+         baixa — ele se explica uma vez, e o botao vale mais que ele. */
+      @media (min-width: 700px) and (max-height: 560px) {
+        #setup form {
+          max-width: 860px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          align-items: start;
+          gap: 12px 18px;
+        }
+        /* Os campos ALTOS atravessam, e os curtos e que se emparelham. Com tudo
+           em duas colunas iguais, a altura de cada linha e a do item mais alto:
+           a grade de ecos sozinha deixava meia coluna vazia ao lado dela. Livres
+           da divisao, as opcoes usam o `auto-fit` e viram uma fileira compacta,
+           que e o que a largura de paisagem tinha para oferecer.
+           Sem suporte a `:has()` a regra cai fora e sobra o par de colunas
+           acima, que continua funcionando. */
+        #setup h1,
+        #setup p.subtitle,
+        #setup button[type='submit'],
+        #setup .field:has(.radio-grid),
+        #setup .field:has(.check-grid) {
+          grid-column: 1 / -1;
+        }
+        #setup p.subtitle {
+          margin-top: -6px;
+        }
+      }
+      @media (max-height: 440px) {
+        #setup p.subtitle {
+          display: none;
+        }
       }
       /* O PAINEL DE GELO: diagnostico da ferramenta, e so dela.
          Canto inferior direito, acima da nota — ele e lido ENTRE as tentativas
@@ -188,7 +295,11 @@
         right: calc(10px + var(--safe-area-inset-right));
         bottom: calc(76px + var(--safe-area-inset-bottom));
         z-index: 6;
-        width: 260px;
+        /* Largura FIXA so enquanto ela cabe. Num celular de 360px um painel de
+           260 ja e tres quartos da tela, e o que passa da borda simplesmente
+           nao existe — o painel e lido entre tentativas, e meio painel nao e
+           leitura nenhuma. A mesma regra vale para os quatro paineis abaixo. */
+        width: min(260px, calc(100vw - 20px));
         font-size: 11px;
         line-height: 1.45;
         color: #9fb3cc;
@@ -216,7 +327,11 @@
         position: fixed;
         left: calc(10px + var(--safe-area-inset-left));
         bottom: calc(150px + var(--safe-area-inset-bottom));
-        width: 300px;
+        width: min(300px, calc(100vw - 20px));
+        max-height: min(46vh, 320px);
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
         background: rgba(10, 12, 18, 0.9);
         border: 1px solid #2a2d38;
         border-radius: 8px;
@@ -296,7 +411,7 @@
       }
       @media (max-width: 640px) {
         #frost-panel {
-          width: 220px;
+          width: min(220px, calc(100vw - 16px));
           bottom: calc(96px + var(--safe-area-inset-bottom));
         }
       }
@@ -308,7 +423,11 @@
         position: fixed;
         right: calc(10px + var(--safe-area-inset-right));
         top: calc(36px + var(--safe-area-inset-top));
-        width: 272px;
+        width: min(272px, calc(100vw - 20px));
+        max-height: min(60vh, 520px);
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
         z-index: 6;
         font-size: 11px;
         line-height: 1.45;
@@ -371,7 +490,7 @@
       }
       @media (max-width: 640px) {
         #bossbar-panel {
-          width: 220px;
+          width: min(220px, calc(100vw - 16px));
           top: calc(8px + var(--safe-area-inset-top));
         }
       }
@@ -390,7 +509,14 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
+        padding: calc(8px + var(--safe-area-inset-top)) 12px 8px;
+        /* Em paisagem de celular os seis controles quebram em quatro linhas e
+           comiam a cena inteira. Teto de altura e rolagem propria: os controles
+           cedem espaco para o que eles controlam. */
+        max-height: 45vh;
+        overflow-y: auto;
+        touch-action: pan-y;
+        flex: 0 0 auto;
         font-size: 11px;
         color: #c9c2b4;
         border-bottom: 1px solid #2a2d38;
@@ -398,7 +524,9 @@
       }
       #gallery-stage {
         flex: 1;
+        min-height: 0;
         overflow: auto;
+        touch-action: pan-x pan-y;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -485,8 +613,16 @@
         position: fixed;
         inset: 0;
         display: flex;
+        /* Duas linhas, e a ordem importa: quem nao entende `safe` descarta a
+           segunda e fica com a primeira. Ver `#setup` para o porque do `safe`. */
         align-items: center;
+        align-items: safe center;
         justify-content: center;
+        padding: calc(12px + var(--safe-area-inset-top)) calc(12px + var(--safe-area-inset-right))
+          calc(12px + var(--safe-area-inset-bottom)) calc(12px + var(--safe-area-inset-left));
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
         background: rgba(6, 7, 9, 0.72);
         z-index: 10;
       }
@@ -494,8 +630,8 @@
         background: #101218;
         border: 1px solid #2a2d38;
         border-radius: 10px;
-        padding: 24px;
-        width: min(420px, 90vw);
+        padding: 20px;
+        width: min(420px, 100%);
         display: flex;
         flex-direction: column;
         gap: 14px;
