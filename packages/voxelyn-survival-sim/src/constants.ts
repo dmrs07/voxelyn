@@ -3194,17 +3194,19 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  *
  * `MAGNETARCH_HP` e `MAGNETARCH_CYCLE_TICKS` foram escolhidos medindo o
  * encontro na camara que a geracao dava na epoca — a natural, que nascia onde o
- * mapa levasse e costumava ser um canto. Na SIMULATION_VERSION 85 o Magnetarca
- * passou a ter CAMARA CENTRAL (`bossArena` em worldgen.ts), e o mesmo bot mortal
- * nas mesmas 24 seeds terminou com 88 de vida em media contra os 56 a 82 de
- * antes, com a pior partida do lote em 48/100 contra 10/100.
+ * mapa levasse e costumava ser um canto. Da SIMULATION_VERSION 86 em diante o
+ * Magnetarca tem CAMARA CENTRAL com cobertura na faixa (`bossArena` e
+ * `BAND_COVER` em worldgen.ts).
  *
- * Os numeros continuam aqui porque eles sao o que esta em jogo, e as tabelas
- * abaixo continuam valendo como registro do que foi medido e por que. O que NAO
- * vale mais e usa-las como prova de que 1.200 e 120 ainda sao as escolhas
- * certas: a camara mudou embaixo delas. Re-tunar e uma decisao separada, e ela
- * espera o playtest humano dizer se 88 de vida restante e folga confortavel ou
- * encontro sem aperto.
+ * A sala nova nao ficou mais facil que a antiga — com os pilares de volta, o
+ * mesmo bot mortal nas mesmas 24 seeds termina com 57 de vida em media contra os
+ * 56 de la —, e isso e um argumento a favor de deixar os dois numeros em paz.
+ * (A versao intermediaria, o disco vazio de raio 11 da 85, media 88: foi ela que
+ * mostrou que faixa sem cobertura nao e "ampla", e sim vazia.)
+ *
+ * O que NAO vale mais e usar as tabelas abaixo como PROVA de que 1.200 e 120 sao
+ * as escolhas certas: elas continuam sendo o registro do que foi medido e por
+ * que, mas a sala mudou embaixo delas. Re-tunar e uma decisao separada.
  */
 /**
  * A vida, MEDIDA e nao escolhida.

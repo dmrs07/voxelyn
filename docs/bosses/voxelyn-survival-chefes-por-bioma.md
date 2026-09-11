@@ -1856,9 +1856,9 @@ quina superior-esquerda, então o ponto mais distante cai no canto inferior-dire
 em oito das dez seeds. Não era variedade — era um viés.
 
 O perfil de geração ganhou `bossArena`. Com `central`, a arena é escavada no
-**centro exato do mapa** — disco de raio 11, que é `MAGNETARCH_TETHER_RANGE` (9)
-mais dois tiles de folga para sair da faixa, deixando os dois últimos na rocha
-para a câmara continuar tendo parede. O corpo fica no centro e é o **Núcleo que
+**centro exato do mapa**, com raio `MAGNETARCH_TETHER_RANGE` (9): a escavação abre
+**a faixa, e nada além dela** — o que fica fora do anel de retorno continua sendo
+o que o mapa já tinha, caverna e não arena. O corpo fica no centro e é o **Núcleo que
 se encosta nele**, pela mesma tabela de vizinhança (`BOSS_CORE_OFFSETS`) que a
 câmara natural usa na direção oposta: a relação entre objetivo e dono não muda,
 só a âncora troca de lado.
@@ -1889,43 +1889,77 @@ central o chefe vem primeiro e nascia emparedado. `stampCorePedestal` passou a
 receber o ponto cujo 3x3 ele não pode fechar. Quem pegou foi a prova "ninguém
 nasce DENTRO da moldura", na seed 92.
 
+##### A cobertura da faixa (`BAND_COVER`)
+
+A primeira versão escavou raio 11 e deixou o disco **vazio**. Ele mediu bem e
+jogava mal — a tabela adiante mostra quanto —, e a razão é de desenho: sem nada
+para cortar linha, a única decisão que sobra é a distância ao corpo, e a distância
+o jogador resolve uma vez.
+
+A faixa ganhou **oito pilares**, e a gramática não foi inventada: **câmara-e-pilar**
+é como se escava um veio horizontal de verdade, deixando colunas de rocha para
+segurar o teto. O Estrato Ferrífero é exatamente isso.
+
+Duas regras de posição, e as duas são sobre leitura:
+
+- **Pilar, nunca muro.** O campo do Magnetarca não consulta parede nenhuma: ele
+  cobra por **distância**. Então cobertura aqui não protege de nada — ela só
+  atrapalha o **tiro**, do jogador e da massa. Uma parede longa cortaria a leitura
+  dos dois anéis, que é a razão de a câmara ser central; um pilar de dois tiles
+  tapa um naco de ângulo e deixa o anel inteiro visível.
+- **Alternada.** Quatro colunas nas diagonais a meia faixa (r ≈ 4,9), quatro nos
+  eixos mais para fora (r ≈ 6,5), defasadas 45°. Cada rumo encontra uma coluna ou
+  outra, nunca as duas em fila — ninguém fica sem linha de tiro, e ninguém ganha
+  uma linha que vale a luta toda. São oito e não doze porque em doze a volta pela
+  faixa deixa de ser caminhada e vira labirinto, e a faixa é o lugar onde o
+  encontro pede que se **ande**.
+
+Medido nas 24 câmaras: **65% da faixa mantém linha de tiro para o corpo** (pior
+câmara 61%). Um terço dela está em sombra — e sair da sombra é uma decisão que a
+câmara vazia não pedia.
+
 ##### O que a mudança custou, medido
 
 O benchmark foi refeito nas 24 câmaras (mesmo agente: 250 ms de reação, sigma
 0,08 rad). **As medições anteriores desta página foram tiradas na câmara antiga e
 não valem mais** — ficam abaixo só para comparação:
 
-| Estratégia      | Antes (câmara natural) | Agora (câmara central)   |
-| --------------- | ---------------------- | ------------------------ |
-| Ignorar o ferro | 41,8 s · vida 56/100   | **36,8 s · vida 88/100** |
-| Sabotando       | 26,6 s (seed 216)      | **30,4 s · vida 88/100** |
-| Pior partida    | **10/100** (seed 981)  | **48/100** (seed 146)    |
+| Estratégia         | Natural (canto)      | Central r=11, vazia | Central r=9, com cobertura |
+| ------------------ | -------------------- | ------------------- | -------------------------- |
+| Ignorar o ferro    | 41,8 s · vida 56/100 | 36,8 s · vida 88    | **39,3 s · vida 57/100**   |
+| Sabotando          | 26,6 s (seed 216)    | 30,4 s · vida 88    | **29,3 s · vida 59/100**   |
+| Pior partida       | 10/100 (seed 981)    | 48/100 (seed 146)   | **28/100** (seed 754)      |
+| Ganho da sabotagem | 36%                  | 17%                 | **25%**                    |
 
-Três leituras, e a terceira é a que decide:
+A coluna do meio é o que a câmara vazia fez, e é ela que justifica a cobertura: a
+vida restante subiu de 56–82 para 88, a pior partida do lote saiu de 10/100 para
+48/100 e o ganho da sabotagem caiu pela metade — porque mira limpa e permanente é
+justamente a moeda que a sabotagem cobrava.
 
-1. **O encontro ficou mais fácil.** A vida restante média subiu de 56–82 para 88,
-   e a pior partida do lote saiu de 10/100 para 48/100. Faz sentido: sem quinas
-   não há como ser encurralado, e os ticks com alvo bloqueado caem para 34.
-2. **A vantagem da sabotagem encolheu.** Ignorar o ferro passou a custar 36,8 s
-   contra 30,4 s sabotando — 17% de ganho, onde antes eram 36%. A câmara aberta
-   entrega mais tempo de mira limpa no corpo, e mira limpa é justamente a moeda
-   que a sabotagem cobrava.
-3. **A cauda sem material voltou a crescer**: 8,5 s por partida, contra os 0,0 a
-   4,1 s da câmara corrigida anterior. As três massas são fraturadas cedo e o
-   encontro termina sem nada em campo.
+Com os pilares de volta, a dificuldade volta ao patamar da câmara antiga (57 de
+vida restante contra os 56 de lá) **sem** devolver o defeito que a centralização
+veio consertar: o anel continua inteiro, e a faixa continua sendo um corredor
+circular. A cauda sem material cai de 8,5 s para 3,1 s por partida.
 
-O eixo `apertada`/`aberta` do benchmark **deixou de separar qualquer coisa**: o
-chão aberto a dez tiles do corpo agora varia de 309 a 311 células em toda a
-amostra. O relatório do bot passou a imprimir essa faixa e a dizer isso em voz
+Uma não vitória no lote, e ela é do **harness** e não do encontro: seed 539,
+estratégia uma-massa-por-ciclo, _timeout_ aos 120 s com o bot em 64 de vida e o
+chefe em 403. Aquela câmara tem 65,7% de linha de tiro — exatamente a média —,
+então não é uma sala sem ângulo: é o agente, que não reposiciona quando a linha
+some, oscilando numa sombra. Um humano dá dois passos para o lado. Fica registrado
+porque o playtest pode mostrar que o passo não é tão óbvio quanto parece.
+
+O eixo `apertada`/`aberta` do benchmark **deixou de separar qualquer coisa**: com
+a câmara sempre no mesmo lugar, o chão aberto a dez tiles do corpo passou a variar
+dentro de um punhado de células em toda a amostra. O relatório do bot passou a imprimir essa faixa e a dizer isso em voz
 alta — um corte por extremos sempre produz dois grupos, inclusive quando não há
 dois tipos de câmara, e anunciar uma distinção de duas células como eixo de
 comparação é pior que não ter eixo nenhum.
 
 **O que isto não decide:** nenhuma constante de balanceamento foi mexida.
 `MAGNETARCH_HP` (1.200) e `MAGNETARCH_CYCLE_TICKS` (120) foram escolhidos por
-varredura na câmara antiga, e os números acima dizem que essa varredura está
-vencida. Re-tunar é uma decisão separada, e ela depende de o playtest humano
-dizer se 88 de vida restante é folga confortável ou encontro sem aperto.
+varredura na câmara antiga. Com a cobertura de volta os números caíram perto de
+onde estavam — o que é um argumento a favor de deixá-los em paz —, mas a varredura
+em si continua sendo de outra sala. Re-tunar é uma decisão separada.
 
 ### O objetivo não encosta mais na moldura
 

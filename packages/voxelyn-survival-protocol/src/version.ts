@@ -1186,7 +1186,28 @@ export const PROTOCOL_VERSION = 43;
 //     Nenhum outro chefe pede isto. O Arquicantor pede MARGEM e recua a rotunda
 //     para dentro; o Magnetarca pede CENTRO, e um canto com margem continua
 //     sendo um canto. Replays de 84 num setor com Magnetarca nao batem.
-export const SIMULATION_VERSION = 85;
+// 86: a camara central AFINADA — raio 9, e cobertura na faixa.
+//
+//     A 85 escavou um disco de raio 11 e o deixou vazio. Ele mediu bem e jogava
+//     mal: o bot mortal terminou com 88 de vida restante em media contra os 56
+//     a 82 da camara antiga, a pior partida do lote subiu de 10/100 para 48/100
+//     e a vantagem de sabotar o ferro caiu de 36% para 17%. Sem nada para
+//     cortar linha, a unica decisao que sobra e a distancia ao corpo — e a
+//     distancia o jogador resolve uma vez.
+//
+//     Duas correcoes. O raio cai para `MAGNETARCH_TETHER_RANGE` (9): a
+//     escavacao abre A FAIXA e nada alem dela, e o que fica fora do anel de
+//     retorno volta a ser o que o mapa ja tinha — caverna, nao arena. E a faixa
+//     ganha COBERTURA (`BAND_COVER`): oito pilares de camara-e-pilar, a
+//     gramatica de mina que o proprio estrato pede, quatro nas diagonais a meia
+//     faixa e quatro nos eixos mais para fora, defasados 45 graus.
+//
+//     Pilar aqui nao protege de nada — o campo cobra por DISTANCIA e nao
+//     consulta parede —, ele atrapalha o TIRO, do jogador e da massa. Medido:
+//     65% da faixa mantem linha para o corpo (pior camara 61%), a vida restante
+//     volta a 57 e a vantagem da sabotagem sobe para 25%. Replays de 85 num
+//     setor com Magnetarca nao batem.
+export const SIMULATION_VERSION = 86;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

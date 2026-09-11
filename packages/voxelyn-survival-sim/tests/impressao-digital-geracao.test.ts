@@ -257,13 +257,19 @@ describe('impressao digital da geracao', () => {
     // inteiro com a ocupacao que saiu. Continua identico em qualquer geracao.
     // 3312224378 (era 2103462241), na SIMULATION_VERSION 85: a CAMARA CENTRAL
     // do Magnetarca. Setor cujo dono e ele passa a ter a arena escavada no
-    // centro EXATO do mapa (disco de raio 11), com o corpo ali e o Nucleo
-    // vizinho — em vez de o Nucleo cair no ponto mais distante da entrada e o
-    // chefe se encostar nele. Muda o terreno inteiro desses setores, e so
-    // deles: o perfil dos outros nao ganha um byte, e a RNG da geracao so e
-    // consumida a mais na camara central (o lado sorteado do Nucleo). Ver
-    // `bossArena` em worldgen.ts.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3312224378);
+    // centro EXATO do mapa, com o corpo ali e o Nucleo vizinho — em vez de o
+    // Nucleo cair no ponto mais distante da entrada e o chefe se encostar nele.
+    // Muda o terreno inteiro desses setores, e so deles: o perfil dos outros
+    // nao ganha um byte, e a RNG da geracao so e consumida a mais na camara
+    // central (o lado sorteado do Nucleo). Ver `bossArena` em worldgen.ts.
+    //
+    // 1950037580 (era 3312224378), na SIMULATION_VERSION 86: a mesma camara,
+    // AFINADA. O raio da escavacao cai de 11 para 9 — ela abre a faixa e nada
+    // alem dela — e a faixa ganha COBERTURA, oito pilares de camara-e-pilar
+    // (`BAND_COVER`). A 11 e vazia o encontro media bem e jogava mal: o bot
+    // mortal terminava com 88 de vida contra os 56 a 82 da camara antiga. Com a
+    // cobertura ele volta a 57. Ver `BAND_COVER` em worldgen.ts.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1950037580);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

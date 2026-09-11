@@ -416,16 +416,21 @@ const CORE_BORDER_MARGIN = 2;
 /**
  * O raio da escavacao da CAMARA CENTRAL, em tiles.
  *
- * Derivado do encontro que a pede (ver `bossArena` em WorldgenProfile): a faixa
- * segura do Magnetarca termina em `MAGNETARCH_TETHER_RANGE` (9) e o campo
- * alcanca `MAGNETARCH_FIELD_RANGE` (13). Onze abre a faixa inteira com dois
- * tiles de folga para sair dela e deixa os dois ultimos na rocha — a camara
- * continua tendo parede, e a borda do campo continua caindo em algum lugar.
+ * E exatamente `MAGNETARCH_TETHER_RANGE`: a escavacao abre A FAIXA, e nada alem
+ * dela. O que fica fora do anel de retorno e o que o mapa ja tinha — caverna, e
+ * nao arena.
+ *
+ * A primeira versao abria 11 (a faixa mais dois tiles de folga) e foi longe
+ * demais: medido, o chao aberto a dez tiles do corpo ficou em 310 de 314
+ * celulas, e o encontro virou um disco vazio. O bot mortal terminou com 88 de
+ * vida em media contra os 56 a 82 de antes, e a pior partida do lote subiu de
+ * 10/100 para 48/100. Uma camara sem nada dentro nao e "ampla" — e um lugar
+ * onde a unica decisao que sobra e a distancia.
  *
  * Importado e nao copiado de proposito: se o alcance do campo mudar, este
- * numero tem de ser reconferido, e um literal aqui nao avisaria ninguem.
+ * numero muda junto, e um literal aqui nao acompanharia.
  */
-const CENTRAL_ARENA_RADIUS = MAGNETARCH_TETHER_RANGE + 2;
+const CENTRAL_ARENA_RADIUS = MAGNETARCH_TETHER_RANGE;
 
 /**
  * Os oito lugares em que o chefe e o Nucleo ficam VIZINHOS, em tiles.
@@ -436,6 +441,72 @@ const CENTRAL_ARENA_RADIUS = MAGNETARCH_TETHER_RANGE + 2;
  * poderiam divergir, e a distancia entre objetivo e dono e contrato do jogo
  * inteiro — nao e algo que a camara central deva renegociar.
  */
+/**
+ * A COBERTURA DA FAIXA — os pilares que ficam de pe dentro da camara central.
+ *
+ * Gramatica de MINA, e nao decoracao: camara-e-pilar e como se escava um veio
+ * horizontal de verdade, deixando colunas de rocha para segurar o teto. O
+ * Estrato Ferrifero e exatamente isso, e o desenho que a camara pedia ja tinha
+ * nome.
+ *
+ * POR QUE ELA PRECISA EXISTIR. Escavar a faixa inteira e deixa-la vazia mede
+ * bem e joga mal: sem nada para cortar linha, a unica decisao que sobra e a
+ * distancia ao corpo, e a distancia o jogador resolve uma vez. Medido, a camara
+ * vazia levou o bot mortal de 56-82 de vida restante para 88, e a vantagem de
+ * sabotar o ferro caiu de 36% para 17% — porque mira limpa e permanente e
+ * justamente a moeda que a sabotagem cobrava.
+ *
+ * POR QUE ELA NAO PODE SER MURO. O campo do Magnetarca nao consulta parede
+ * nenhuma: ele cobra por DISTANCIA. Entao pilar aqui nao protege de nada — ele
+ * so atrapalha o TIRO, do jogador e da massa. Uma parede longa cortaria a
+ * leitura dos dois aneis, que e a razao de a camara ser central; um pilar de
+ * dois tiles tapa um naco de angulo e deixa o anel inteiro visivel.
+ *
+ * A DISPOSICAO e alternada de proposito: quatro colunas nas DIAGONAIS a meia
+ * faixa, quatro nos EIXOS mais para fora. Cada rumo encontra uma coluna ou
+ * outra, nunca as duas em fila — ninguem fica sem linha de tiro, e ninguem
+ * ganha uma linha que vale a luta toda. E sao oito, e nao doze: em doze a
+ * volta pela faixa deixa de ser uma caminhada e vira um labirinto, e a faixa e
+ * o lugar onde o encontro pede que se ANDE.
+ */
+const BAND_COVER: ReadonlyArray<readonly [number, number]> = [
+  // Diagonais, centro em r ~ 4,9 — dentro da metade interna da faixa.
+  [3, 3],
+  [4, 3],
+  [3, 4],
+  [4, 4],
+  [-4, 3],
+  [-3, 3],
+  [-4, 4],
+  [-3, 4],
+  [3, -4],
+  [4, -4],
+  [3, -3],
+  [4, -3],
+  [-4, -4],
+  [-3, -4],
+  [-4, -3],
+  [-3, -3],
+  // Eixos, centro em r ~ 6,5 — a metade externa, defasada 45 graus das
+  // diagonais acima.
+  [6, -1],
+  [7, -1],
+  [6, 0],
+  [7, 0],
+  [-7, -1],
+  [-6, -1],
+  [-7, 0],
+  [-6, 0],
+  [-1, 6],
+  [0, 6],
+  [-1, 7],
+  [0, 7],
+  [-1, -7],
+  [0, -7],
+  [-1, -6],
+  [0, -6],
+];
+
 const BOSS_CORE_OFFSETS = [
   [3, 0],
   [-3, 0],
@@ -1292,6 +1363,7 @@ export const stampBossArena = (
   core: Vec2,
   entry: Vec2,
   halls: WorldgenProfile['halls'],
+  bossArena: WorldgenProfile['bossArena'],
 ): Set<number> => {
   const { solid, surface } = draft;
   const filled = new Set<number>();
@@ -1342,6 +1414,14 @@ export const stampBossArena = (
     for (let k = -r; k <= r; k += 2) {
       ORLA.push([k, -r], [k, r], [-r, k], [r, k]);
     }
+  }
+
+  // A COBERTURA DA FAIXA vem ANTES do sotaque do estrato, e nao no lugar dele:
+  // a camara central escavou a faixa inteira, entao ela e quem devolve as
+  // quinas; o estrato continua assinando por cima do que sobrou (a brasa do
+  // canyon pinta o chao que os pilares deixaram livre). Ver `BAND_COVER`.
+  if (bossArena === 'central') {
+    for (const [dx, dy] of BAND_COVER) put(dx, dy, SOLID_ROCK);
   }
 
   if (halls === 'columns') {
@@ -1620,11 +1700,9 @@ const generateAttempt = (
   // encostar nos dois (o jogador aprende um anel que vale em metade das
   // direcoes).
   //
-  // O RAIO da escavacao sai do encontro e nao de um numero redondo: a faixa
-  // segura termina em `MAGNETARCH_TETHER_RANGE` (9) e o campo alcanca 13. Onze
-  // abre a faixa inteira com dois tiles de folga para sair dela, e deixa os
-  // ultimos dois na rocha — a camara continua tendo parede, e o limite do campo
-  // continua sendo um lugar, nao o vazio.
+  // O RAIO da escavacao sai do encontro e nao de um numero redondo: ele e a
+  // propria faixa (`CENTRAL_ARENA_RADIUS`). O que fica alem do anel de retorno
+  // e o que o mapa ja tinha — caverna, e nao arena.
   const central = profile.bossArena === 'central' ? { x: w >> 1, y: h >> 1 } : null;
   if (central) {
     carveBlob(draft, w, h, central.x, central.y, CENTRAL_ARENA_RADIUS);
@@ -1755,7 +1833,16 @@ const generateAttempt = (
   // leitura. Antes, este ponto carregava um bloco de rebuild manual — e as tres
   // vezes em que ele esteve errado (bicho dentro de pilar, chao orfao, site de
   // tier 3 medido num mundo extinto) foram tres esquecimentos do mesmo reparo.
-  const arenaFilled = stampBossArena(draft, w, h, guardianSpawn, corePos, entry, profile.halls);
+  const arenaFilled = stampBossArena(
+    draft,
+    w,
+    h,
+    guardianSpawn,
+    corePos,
+    entry,
+    profile.halls,
+    profile.bossArena,
+  );
 
   // A PARTIR DAQUI o terreno nao muda mais de abertura: as passadas abaixo so
   // trocam rocha por rocha (minerio, fragil, cristal) e pintam superficie.
