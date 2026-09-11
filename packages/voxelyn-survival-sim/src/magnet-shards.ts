@@ -28,6 +28,7 @@
 //   e a resposta inteira do golpe, e ela so existe porque a linha fica onde
 //   nasceu.
 
+import { hasLineOfSight } from './pathing.js';
 import {
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_EXPOSED_TICKS,
@@ -77,40 +78,90 @@ const walkable = (state: SurvivalState, x: number, y: number): boolean => {
  * nao num golpe — o jogador entra numa sala que ja tem ferro solto, e o
  * primeiro recolhimento e a apresentacao da regra.
  *
- * Nascem NA FAIXA, espalhadas por angulo fixo. Na faixa porque e onde o jogador
- * vai estar (e onde ele pode atirar nelas sem pagar borda), e por angulo fixo
- * porque a posicao delas nao pode consumir a RNG da run: worldgen e sorteio de
- * chefe sao funcoes puras da seed, e um encontro que deslocasse a sequencia
- * faria a mesma seed gerar setores diferentes conforme o jogador tivesse ou nao
- * chegado ate aqui.
+ * A PRIMEIRA VERSAO NAO ENTREGAVA O ENCONTRO DESENHADO. Ela tentava tres
+ * angulos FIXOS (0, 120, 240 graus) com quatro raios cada, e desistia da massa
+ * quando o rumo inteiro estava bloqueado — sem nunca procurar outro angulo.
+ * Medido nas 24 camaras do benchmark: quatro entregavam UMA massa, quinze
+ * entregavam duas, e so cinco entregavam as tres. Media de 2,04 de 3. A seed
+ * 216 nascia com uma unica massa, consumida no recolhimento de abertura: a
+ * partida inteira acontecia sem um arremesso de ferro, e os 34,8 s de "campo
+ * sem material" daquela captura eram isto, e nao um problema de reposicao.
+ *
+ * A regra nova nao tem angulo preferido. Ela ENUMERA o chao elegivel da faixa —
+ * celula aberta, dentro do anel, com linha de visao para o corpo (que e a rota
+ * do recolhimento: sem ela a massa cravaria na parede no caminho de volta) — e
+ * escolhe tres por afastamento maximo: a primeira e a de menor indice de
+ * celula, e cada seguinte e a candidata mais longe da mais proxima ja escolhida.
+ *
+ * Duas propriedades vem de graca com isso, e as duas importam:
+ *
+ * - ela SE ADAPTA a camara. Num salao redondo os tres saem em triangulo; num
+ *   corredor saem espalhados pelo corredor. Nenhum rumo e obrigatorio.
+ * - ela continua PURA e sem RNG. A ordem sai do indice de celula e das
+ *   distancias, nunca de `state.rng`: worldgen e sorteio de chefe sao funcoes
+ *   puras da seed, e um encontro que deslocasse a sequencia faria a mesma seed
+ *   gerar setores diferentes conforme o jogador tivesse ou nao chegado ate aqui.
  */
 export const claimMagnetShards = (state: SurvivalState, boss: Entity): void => {
-  const shards: MagnetShard[] = [];
-  const mid = (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
-  for (let i = 0; i < MAGNETARCH_SHARDS && shards.length < MAGNETARCH_SHARDS; i++) {
-    const angle = (i / MAGNETARCH_SHARDS) * Math.PI * 2;
-    // Tenta do meio da faixa para fora e para dentro: numa camara apertada o
-    // anel do meio pode cair na parede, e uma massa que nao nasce e uma massa a
-    // menos no ciclo inteiro.
-    for (const radius of [mid, mid - 1.5, mid + 1.5, MAGNETARCH_CRUSH_RANGE + 0.6]) {
-      const x = boss.x + Math.cos(angle) * radius;
-      const y = boss.y + Math.sin(angle) * radius;
-      if (!walkable(state, x, y)) continue;
-      shards.push({
-        x,
-        y,
-        tx: x,
-        ty: y,
-        at: state.tick,
-        state: SHARD_LODGED,
-        cracked: 0,
-        hp: MAGNETARCH_SHARD_HP,
-        hitAt: -1,
-      });
-      break;
+  const w = state.config.width;
+  const h = state.config.height;
+  const candidates: Array<{ x: number; y: number; cell: number }> = [];
+  const reach = Math.ceil(MAGNETARCH_TETHER_RANGE);
+  for (let cy = Math.floor(boss.y) - reach; cy <= Math.floor(boss.y) + reach; cy++) {
+    for (let cx = Math.floor(boss.x) - reach; cx <= Math.floor(boss.x) + reach; cx++) {
+      if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= h - 1) continue;
+      if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
+      const x = cx + 0.5;
+      const y = cy + 0.5;
+      const d = Math.hypot(x - boss.x, y - boss.y);
+      // DENTRO DA FAIXA. Fora dela a massa nasceria num lugar que a polaridade
+      // ja esta cobrando, e sabotar exigiria pagar uma borda pelo privilegio.
+      if (d < MAGNETARCH_CRUSH_RANGE + 0.6 || d > MAGNETARCH_TETHER_RANGE) continue;
+      // A ROTA DE VOLTA tem de existir: o recolhimento e uma reta ate o corpo, e
+      // uma massa sem visada cravaria na parede no meio do caminho e ficaria
+      // presa la ate o fim da luta.
+      if (!hasLineOfSight(state, x, y, boss.x, boss.y)) continue;
+      candidates.push({ x, y, cell: cy * w + cx });
     }
   }
-  state.bossRuntime.magnetShards = shards;
+  if (candidates.length === 0) {
+    state.bossRuntime.magnetShards = [];
+    return;
+  }
+  candidates.sort((a, b) => a.cell - b.cell);
+
+  // AFASTAMENTO MAXIMO, deterministico: a primeira e a de menor indice, e cada
+  // seguinte e a que esta mais longe da mais proxima ja escolhida. Empate pelo
+  // indice de celula, que e total — duas maquinas de co-op escolhem as mesmas.
+  const picked: Array<{ x: number; y: number }> = [candidates[0]];
+  while (picked.length < MAGNETARCH_SHARDS && picked.length < candidates.length) {
+    let best = -1;
+    let bestGap = -1;
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      let gap = Infinity;
+      for (const p of picked) gap = Math.min(gap, Math.hypot(c.x - p.x, c.y - p.y));
+      if (gap > bestGap) {
+        bestGap = gap;
+        best = i;
+      }
+    }
+    // Zero significa "a candidata ja foi escolhida": o chao elegivel acabou.
+    if (best < 0 || bestGap <= 0) break;
+    picked.push(candidates[best]);
+  }
+
+  state.bossRuntime.magnetShards = picked.map((p) => ({
+    x: p.x,
+    y: p.y,
+    tx: p.x,
+    ty: p.y,
+    at: state.tick,
+    state: SHARD_LODGED,
+    cracked: 0,
+    hp: MAGNETARCH_SHARD_HP,
+    hitAt: -1,
+  }));
 };
 
 /**

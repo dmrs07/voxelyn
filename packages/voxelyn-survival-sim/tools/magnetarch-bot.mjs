@@ -449,6 +449,22 @@ if (argv.includes('--captures')) {
     { name: '2-vitoria-sabotando', pick: tail },
     { name: `3-pior-caso-${worst.r.outcome}`, pick: worst },
   ];
+  // `--extra=<seed>:<estrategia>` acrescenta uma captura NOMEADA, fora da
+  // escolha automatica. Serve para reconferir uma camara especifica depois de
+  // uma correcao — a comparacao antes/depois precisa da mesma seed, e o criterio
+  // automatico nao tem por que escolher a mesma duas vezes.
+  const extra = argv.find((a) => a.startsWith('--extra='));
+  if (extra) {
+    const [seedText, strat] = extra.split('=')[1].split(':');
+    const seed = Number(seedText);
+    const r = play(seed, strat ?? 'one', { fauna, record: true });
+    if (r) {
+      picks.push({
+        name: `4-seed-${seed}-${strat ?? 'one'}`,
+        pick: { seed, kind: seeds.find((x) => x.seed === seed)?.kind ?? 'desconhecida', r },
+      });
+    }
+  }
   for (const { name, pick } of picks) {
     const { r } = pick;
     writeFileSync(
@@ -514,9 +530,12 @@ for (const strategy of ['none', 'one', 'all']) {
   // dentro da janela, contra o que ele cobra fora dela.
   //
   // E ele PODE passar de 1,6x sem ser erro de conta. O multiplicador atua no
-  // dano por acerto; a janela tambem cala o campo, e um campo calado nao obriga
-  // a andar — o agente fica parado mirando e ACERTA mais. O 1,6x e o piso do que
-  // a janela vale quando usada, nao o teto.
+  // dano por ACERTO; a janela tambem cala o campo, e um campo calado nao obriga
+  // a andar — o agente fica parado mirando e acerta mais vezes.
+  //
+  // O que este numero e: o ganho de dps OBSERVADO nesta amostra, com este
+  // agente. O que ele NAO e: um piso garantido — quem usar mal a janela fica
+  // abaixo de 1,6x, e o multiplicador continua sendo por acerto.
   const dpsIn = exposedTicks > 0 ? (exposedDmg / exposedTicks) * TICK_HZ : 0;
   const dpsOut = normalTicks > 0 ? (normalDmg / normalTicks) * TICK_HZ : 0;
   const byKind = (kind) => {

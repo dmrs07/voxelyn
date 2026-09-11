@@ -1610,6 +1610,32 @@ saber quantas massas alguém prepara enquanto esquiva de verdade.
 De quebra, 6 s responde ao outro defeito do encontro — _"você resolve a distância e
 repete o movimento"_: a faixa troca de lado **42% mais vezes** que antes.
 
+#### A câmara não entregava o encontro desenhado
+
+Antes de qualquer leitura sobre ritmo, um defeito de distribuição: **a maioria das
+câmaras nascia sem o estoque completo de ferro.**
+
+`claimMagnetShards` tentava três ângulos **fixos** (0°, 120°, 240°) com quatro raios
+cada, e desistia da massa quando o rumo inteiro estava bloqueado — sem nunca procurar
+outro ângulo. Medido nas 24 câmaras do benchmark:
+
+| Massas que nasciam | Câmaras |
+| ------------------ | ------- |
+| 1                  | 4       |
+| 2                  | 15      |
+| 3                  | 5       |
+
+Média de **2,04 de 3**. Na seed 216 nascia **uma** massa, consumida no recolhimento de
+abertura aos 2,05 s: a partida inteira passava sem um único arremesso de ferro, e os
+34,8 s de "campo sem material" daquela captura eram isto — não um problema de reposição.
+
+A regra nova não tem ângulo preferido: enumera o chão elegível da faixa (célula aberta,
+dentro do anel, com linha de visão para o corpo — que é a rota do recolhimento) e
+escolhe por **afastamento máximo**, a primeira pela menor célula e cada seguinte a mais
+longe da mais próxima já escolhida. Adapta-se à câmara, continua pura e não consome a
+RNG da run. As 24 câmaras passaram a entregar **3 de 3**, e o teste cobra a invariante
+correta — não "sempre três", mas "tudo o que o chão permite".
+
 #### O bot mortal: o que muda quando o agente erra
 
 O bot anterior era imortal e de mira perfeita — media o **teto** do encontro. Este morre,
@@ -1618,49 +1644,43 @@ agindo só por `PlayerCommand`. Vinte e quatro câmaras reais (G-04 setor 7), do
 e doze apertadas, três estratégias sobre as mesmas seeds e com a **mesma sequência de
 erro de mira** (`packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs`).
 
+Com o estoque completo:
+
 | Estratégia        | Desfechos   | Tempo      | Vida restante | Fraturadas | Janela | dps na janela | Cauda sem massa | Dano tomado |
 | ----------------- | ----------- | ---------- | ------------- | ---------- | ------ | ------------- | --------------- | ----------- |
-| **Ignorar**       | 24 vitórias | 38,7 s     | 77/100        | 0,8        | 2,2 s  | 1,78×         | 1,7 s           | 24          |
-| **Uma por ciclo** | 24 vitórias | **35,2 s** | **91/100**    | 1,5        | 4,2 s  | **2,34×**     | 6,9 s           | 9           |
-| **Todas**         | 24 vitórias | 35,9 s     | 91/100        | 1,5        | 4,0 s  | 2,34×         | 8,3 s           | 9           |
+| **Ignorar**       | 24 vitórias | 38,7 s     | 56/100        | 1,1        | 3,2 s  | 1,94×         | **0,0 s**       | 45          |
+| **Uma por ciclo** | 24 vitórias | **33,7 s** | 71/100        | 2,6        | 6,2 s  | 2,46×         | 1,0 s           | 29          |
+| **Todas**         | 24 vitórias | 33,8 s     | **76/100**    | 2,7        | 6,0 s  | 2,53×         | 4,1 s           | 24          |
 
-> **A primeira rodada deste bot foi retratada.** Ela dizia que sabotar era _dominado_
-> (+8,5 s), e isso era defeito do harness: o bot escolhia massa só pela integridade, sem
-> **linha de visão**, e insistia em ferro atrás de rocha — 218 a 249 ticks por partida
-> (11 a 12 s) atirando em pedra. Com a escolha corrigida, a conclusão inverte. Duas
-> outras medições também eram falsas: "aproveita 41% da janela" contava **gatilho
-> pressionado** (sem confirmar disparo, alvo ou dano), e "15/16 vitórias" juntava morte
-> com estouro de tempo num mesmo "não vitória" — o trace chegava a imprimir MORTE para
-> os dois casos.
+> **Duas rodadas anteriores deste bot foram retratadas.** A primeira dizia que sabotar
+> era _dominado_ (+8,5 s) — defeito do harness, que escolhia massa sem **linha de visão**
+> e insistia em ferro atrás de rocha (218 a 249 ticks por partida atirando em pedra).
+> Também eram falsas duas medições: "aproveita 41% da janela" contava **gatilho
+> pressionado**, e "15/16 vitórias" juntava morte com estouro de tempo. A segunda rodada
+> já corrigia isso, mas rodava sobre o estoque incompleto acima — ela media 1,5 massa
+> fraturada "de 3" quando a média disponível era 2,04.
 
-O que os números sustentam agora:
+O que os números sustentam:
 
-- **Preparar uma massa acessível compensa, e é medível.** O caminho sabotado é ao mesmo
-  tempo **mais rápido** (35,2 s contra 38,7 s) e **mais seguro** (91 de vida contra 77).
-  Não há troca entre velocidade e segurança: ganha nas duas.
-- **A janela vale mais que o próprio multiplicador.** O jogador cobra **2,34×** o dps
-  dele dentro do descompasso, contra um multiplicador de 1,6×. A diferença é o campo
-  calado: sem puxão, ele para de andar e acerta mais. O 1,6× é o piso do que a janela
-  vale quando usada.
-- **Uma por ciclo ≥ todas.** As duas fraturam 1,5 massa por partida — o agente não
-  consegue mais que isso de qualquer jeito — e a ambição só alonga a cauda (8,3 s contra
-  6,9 s). A ambição não aumentou o risco; aumentou o tempo morto.
-- **Ignorar já recebe parte da recompensa por acidente:** 0,8 massa fraturada e 72 de
-  dano de retorno por partida, sem nenhuma intenção. Parte da distância pequena entre as
-  estratégias vem daí.
-
-O que **continua** em aberto, e é o único ponto que ainda argumenta pelos aglomerados: a
-**cauda** de 6,9 a 8,3 s de campo normal sem nenhuma massa, contra 1,7 s de quem ignora.
-Menor do que a primeira rodada dizia (11,9 a 14,3 s), e ainda o maior trecho sem decisão
-do encontro.
+- **Preparar compensa, e mais do que antes.** O caminho sabotado é mais rápido
+  (33,7 s contra 38,7 s) e termina com mais vida (71–76 contra 56). O agente fratura
+  **2,6 de 3**.
+- **O encontro ganhou dentes.** Com uma massa em campo ele terminava com 77 de vida
+  ignorando; com três, termina com **56**, e o dano do ferro sobe de 17 para **40**. A
+  pior partida do lote acaba com **10/100**. Três corredores por ciclo é outra luta.
+- **A cauda quase sumiu:** 0,0 s ignorando e 1,0 s sabotando uma por ciclo, contra os
+  1,7 e 6,9 s medidos com o estoque quebrado. **Ela não era um problema de reposição —
+  era a câmara não entregando o material.** "Todas" ainda gasta o estoque cedo e paga
+  4,1 s de média; e a variação por câmara continua existindo (até 13,0 s numa delas).
+- **A janela rendeu 2,46–2,53× o dps normal** — ver a ressalva de leitura acima.
 
 **Limites deste bot, que valem mais que os números:** ele segue regras fixas, começa
 dentro da faixa com linha de visão (não tem busca de rota, e medir a travessia até a
 câmara seria medir o harness), não usa módulos nem esquiva ofensiva, não faz kite e não
-aprende. Vinte e quatro vitórias em vinte e quatro, com 9 a 24 de 100 de dano, dizem que
-**este agente** lê os avisos — não que os avisos sejam generosos para gente de verdade.
-São cenários simulados, para achar situações impraticáveis e comparar estratégias entre
-si; não estabelecem piso nenhum.
+aprende. Vinte e quatro vitórias em vinte e quatro dizem que **este agente** lê os
+avisos — não que os avisos sejam generosos para gente de verdade. São cenários simulados,
+para achar situações impraticáveis e comparar estratégias entre si; não estabelecem piso
+nenhum.
 
 #### As capturas: o encontro rodando, não cenas montadas
 
@@ -1682,20 +1702,22 @@ o bot gravou, com `stepRun` a 20 Hz, `LocalPlayout` e `SurvivalRenderer`. A fich
 partida (seed, câmara, estratégia, desfecho, cauda) fica na tela — um vídeo de benchmark
 sem ela é um vídeo bonito que não prova nada.
 
-As três escolhidas pelo próprio lote:
+As escolhidas pelo próprio lote, mais uma conferência nomeada da seed 216:
 
-| Cena                                     | Seed | Câmara   | Desfecho          | Vida       | Cauda      |
-| ---------------------------------------- | ---- | -------- | ----------------- | ---------- | ---------- |
-| Vitória mirando no chefe (tempo mediano) | 1063 | aberta   | vitória em 36,5 s | 48/100     | 0,0 s      |
-| Vitória sabotando (cauda mais longa)     | 216  | apertada | vitória em 39,9 s | 82/100     | **34,8 s** |
-| Pior caso do lote                        | 399  | apertada | vitória em 49,5 s | **30/100** | 0,0 s      |
+| Cena                                     | Seed | Câmara   | Desfecho              | Vida       | Cauda      |
+| ---------------------------------------- | ---- | -------- | --------------------- | ---------- | ---------- |
+| Vitória mirando no chefe (tempo mediano) | 146  | apertada | vitória em 37,1 s     | 82/100     | 0,0 s      |
+| Vitória sabotando (cauda mais longa)     | 452  | apertada | vitória em 41,7 s     | 82/100     | **13,0 s** |
+| Pior caso do lote                        | 981  | aberta   | vitória em 52,6 s     | **10/100** | 0,0 s      |
+| Seed 216, sabotando (o antes/depois)     | 216  | apertada | vitória em **26,6 s** | 84/100     | 0,0 s      |
+
+A seed 216 é a comparação que fechou o diagnóstico. Com uma massa: vitória em 39,9 s e
+**34,8 s** sem material, sem nunca ver um arremesso. Com as três: ignorando o ferro,
+41,8 s e **zero** tempo sem material; sabotando, **26,6 s** com 84 de vida — 36% mais
+rápido que ignorar, na mesma câmara.
 
 Não houve morte nem timeout em nenhuma das 24 partidas, então a terceira cena é a que
-chegou mais perto — e ela é uma partida **ignorando** o ferro, terminando com 30 de vida.
-
-A segunda captura é a que mais informa: 34,8 s de campo sem nenhuma massa contra os 6,9 s
-de média. Em câmara apertada o material acaba cedo, e o resto da luta é o campo puro.
-Essa é a variação que a média escondia.
+chegou mais perto: 10 de 100, ignorando o ferro.
 
 #### O que a medição diz sobre a segunda fase
 
@@ -1707,8 +1729,13 @@ encontro segue por mais **7,0 s sem nenhum material em campo**.
 Sete segundos de conclusão é defensável — consumir as três massas e terminar acertando
 o núcleo exposto é um fecho, não um vazio. O que decide se a **recomposição da limalha**
 resolve um problema real é essa última coluna, e ela é o número a vigiar: em 1.400 de
-vida ela já vai a 12,1 s, e aí "acabou o ferro" passa a ser metade da luta. O bot mortal
-mede 6,9 a 8,3 s nessa coluna (ver acima), na mesma ordem de grandeza.
+vida ela já vai a 12,1 s.
+
+Com o estoque de abertura corrigido, o bot mortal mede **0,0 a 4,1 s** de média nessa
+coluna (era 1,7 a 8,3 s com a câmara entregando 2,04 massas). O trecho longo que
+justificava a reposição era, em boa parte, a câmara não entregando o material. O que
+sobra é variação por câmara — uma delas ainda chega a 13,0 s —, e é essa variação, e não
+a média, que decidiria os aglomerados.
 
 Se o playtest mostrar que o trecho final cansa, a recomposição entra **ao terminar o
 primeiro descompasso** e repondo **uma massa por vez** — o jogador vê a consequência da

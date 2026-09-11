@@ -1147,7 +1147,25 @@ export const PROTOCOL_VERSION = 43;
 //     `enemy_contact`. A licao da tela de morte e outra — "saia do corredor", e
 //     nao "ache a faixa" —, e com a causa compartilhada as duas mortes davam a
 //     mesma frase e a contabilidade do encontro somava as duas num numero so.
-export const SIMULATION_VERSION = 83;
+// 84: a CAMARA passa a entregar o estoque de ferro que o chao permite.
+//
+//     `claimMagnetShards` tentava tres angulos FIXOS (0, 120, 240 graus) com
+//     quatro raios cada e desistia da massa quando o rumo inteiro estava
+//     bloqueado, sem procurar outro. Medido nas 24 camaras do benchmark: quatro
+//     entregavam UMA massa, quinze duas, e so cinco as tres — media de 2,04 de
+//     3. Havia camara (seed 216) em que o encontro inteiro passava sem um unico
+//     arremesso de ferro, porque a unica massa era consumida no recolhimento de
+//     abertura.
+//
+//     A regra nova enumera o chao elegivel da faixa (celula aberta, dentro do
+//     anel, com linha de visao para o corpo — que e a rota do recolhimento) e
+//     escolhe tres por afastamento maximo. Adapta-se a camara, continua pura e
+//     nao consome a RNG da run. As 24 camaras passam a entregar 3 de 3.
+//
+//     E outra luta: com tres corredores por ciclo o bot mortal termina com 56
+//     de vida ignorando o ferro (era 77) e a pior partida do lote acaba em
+//     10/100. Replays de 83 num setor com Magnetarca nao batem.
+export const SIMULATION_VERSION = 84;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

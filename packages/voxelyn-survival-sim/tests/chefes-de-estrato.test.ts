@@ -34,6 +34,8 @@ import { biomeProfile, sectorBiome } from '../src/strata';
 import { runDepthForGeneration } from '../src/progression';
 import { magnetField, magnetStanding } from '../src/magnet';
 import { hitMagnetShards } from '../src/magnet-shards';
+import { createMagnetarchBench } from '../src/magnetarch-bench';
+import { hasLineOfSight } from '../src/pathing';
 
 /** Distancia entre dois corpos — os testes do ferro precisam dela solta. */
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
@@ -96,6 +98,7 @@ import {
   MAGNETARCH_EXPOSED_ARMOR,
   MAGNETARCH_FIELD_TICK_INTERVAL,
   MAGNETARCH_FLIP_WINDUP_TICKS,
+  MAGNETARCH_SHARDS,
   MAGNETARCH_SHARD_RETURN_DAMAGE,
   MAGNETARCH_SHARD_WINDUP_TICKS,
   MAGNETARCH_TETHER_RANGE,
@@ -1905,6 +1908,68 @@ describe('Magnetarca — o ciclo do ferro', () => {
     // inversao, e a medicao mostrou que o ciclo nem chegava a fechar uma vez.
     expect(shards.every((shard) => shard.state === SHARD_WINDUP)).toBe(true);
   });
+
+  it('a camara entrega o ESTOQUE que o chao permite — nenhum rumo bloqueado apaga uma massa', () => {
+    // A primeira versao tentava tres angulos FIXOS com quatro raios cada e
+    // desistia da massa quando o rumo inteiro estava bloqueado, sem procurar
+    // outro. Nas 24 camaras do benchmark isso dava media de 2,04 de 3 — e numa
+    // delas (seed 216) o encontro inteiro acontecia com UMA massa, consumida no
+    // recolhimento de abertura: a partida nao chegava a ver um arremesso.
+    //
+    // A invariante nao e "sempre tres": e "tudo o que o chao permite". Uma
+    // camara com duas vagas elegiveis entrega duas, e isso e a camara falando,
+    // nao o codigo desistindo.
+    const eligible = (state: SurvivalState, boss: { x: number; y: number }): number => {
+      const w = state.config.width;
+      let count = 0;
+      const reach = Math.ceil(MAGNETARCH_TETHER_RANGE);
+      for (let cy = Math.floor(boss.y) - reach; cy <= Math.floor(boss.y) + reach; cy++) {
+        for (let cx = Math.floor(boss.x) - reach; cx <= Math.floor(boss.x) + reach; cx++) {
+          if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+          if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
+          const d = Math.hypot(cx + 0.5 - boss.x, cy + 0.5 - boss.y);
+          if (d < MAGNETARCH_CRUSH_RANGE + 0.6 || d > MAGNETARCH_TETHER_RANGE) continue;
+          if (!hasLineOfSight(state, cx + 0.5, cy + 0.5, boss.x, boss.y)) continue;
+          count++;
+        }
+      }
+      return count;
+    };
+
+    let full = 0;
+    let chambers = 0;
+    for (let seed = 1; seed < 600 && chambers < 10; seed++) {
+      const bench = createMagnetarchBench(seed);
+      if (!bench) continue;
+      chambers++;
+      stepRun(bench.state, [emptyCommand()]);
+      const shards = bench.state.bossRuntime.magnetShards;
+      const vagas = eligible(bench.state, bench.boss);
+      expect(shards.length, `seed ${seed}: ${vagas} vagas elegiveis`).toBe(
+        Math.min(MAGNETARCH_SHARDS, vagas),
+      );
+      // Cada massa nasce numa vaga elegivel de verdade: na faixa e com a rota
+      // do recolhimento livre.
+      for (const shard of shards) {
+        const d = Math.hypot(shard.x - bench.boss.x, shard.y - bench.boss.y);
+        expect(d, `seed ${seed}: massa fora da faixa`).toBeGreaterThanOrEqual(
+          MAGNETARCH_CRUSH_RANGE,
+        );
+        expect(d).toBeLessThanOrEqual(MAGNETARCH_TETHER_RANGE + 0.01);
+        expect(
+          hasLineOfSight(bench.state, shard.x, shard.y, bench.boss.x, bench.boss.y),
+          `seed ${seed}: massa sem rota de volta`,
+        ).toBe(true);
+      }
+      if (shards.length === MAGNETARCH_SHARDS) full++;
+    }
+    expect(chambers, 'nenhuma camara de benchmark foi montada').toBeGreaterThan(8);
+    // E o resultado pratico: com a regra nova, praticamente toda camara entrega
+    // as tres. Com a antiga, cinco em vinte e quatro.
+    expect(full, `so ${full} de ${chambers} camaras entregaram o estoque cheio`).toBe(chambers);
+    // Gera setores de verdade, dez deles: o custo e o preco de medir a camara
+    // que o jogador joga, e nao uma caixa vazia montada a mao.
+  }, 60_000);
 
   it('tres tiros fraturam uma massa cravada, e o tiro MORRE nela', () => {
     const { state } = duel(672, 'magnetarch', 6);
