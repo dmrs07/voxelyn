@@ -114,6 +114,7 @@ import {
   MAGNETARCH_SHARD_WINDUP_TICKS,
   SHARD_FLIGHT,
   SHARD_HELD,
+  SHARD_LAUNCH,
   SHARD_WINDUP,
   magnetField,
   type MagnetShard,
@@ -7559,7 +7560,7 @@ export class SurvivalRenderer {
       // 1. A ROTA. So no telegrafo: depois que a massa sai, ela mesma e o
       //    aviso, e uma linha sobrevivendo ao disparo diria que ainda ha algo
       //    por vir naquele corredor.
-      if (shard.state === SHARD_WINDUP) {
+      if (shard.state === SHARD_WINDUP || shard.state === SHARD_LAUNCH) {
         const ready = Math.max(0, Math.min(1, (tick - shard.at) / MAGNETARCH_SHARD_WINDUP_TICKS));
         const [tx, ty] = toScreen(shard.tx, shard.ty);
         ctx.save();

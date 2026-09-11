@@ -3192,28 +3192,26 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
 /**
  * A vida, MEDIDA e nao escolhida.
  *
- * Com 720 o encontro durava 14,7 s contra um alvo que so atira (bot imortal,
- * mira perfeita, parado na faixa) — e nesse tempo cabia UMA inversao. O ciclo
- * do ferro leva um ciclo inteiro para fechar: o campo recolhe na abertura,
- * arremessa na repulsao, o jogador sabota, e o pagamento chega no recolhimento
- * seguinte, por volta dos 20 s. Com 720, o chefe morria aos 19,8 s — cinco
- * decimos de segundo ANTES de a massa fraturada chegar nele. O contra-jogo
- * caracteristico da luta nao cabia na luta.
+ * Com 720 o chefe morria aos 19,8 s — meio segundo ANTES de a primeira massa
+ * fraturada chegar nele. O contra-jogo caracteristico da luta nao cabia na luta.
  *
- * A varredura (ver a tabela no documento dos chefes) mediu os dois caminhos:
+ * A varredura abaixo foi REFEITA depois de tres correcoes que mudaram os
+ * numeros (a sabotagem passou a valer durante o telegrafo, o estilhaco deixou
+ * de amplificar a si mesmo e a morte deixou de ser desfeita pelo passo das
+ * massas). Medida na polaridade de 6 s, com bot imortal e mira perfeita:
  *
- *   vida    ignorando   sabotando
- *    720      14,7 s      19,8 s   (0 estilhacos: ele morre antes)
- *    900      19,5 s      19,8 s
- *   1050      22,0 s      19,8 s
- *   1200      26,3 s      20,8 s
- *   1400      29,8 s      22,8 s
+ *   vida  ignorando  sabotando  1o estilhaco  sem material no fim
+ *    900    19,8 s     14,7 s    aos 14,2 s (4% de vida)      0,5 s
+ *   1050    22,3 s     18,5 s    aos 14,2 s (18%)             4,3 s
+ *   1200    26,6 s     21,2 s    aos 14,2 s (28%)             7,0 s
+ *   1400    30,1 s     26,3 s    aos 14,2 s (38%)            12,1 s
  *
- * 1200 e onde SABER a luta separa de nao saber: 21% mais rapido, e o caminho
- * sabotado cai na mediana dos chefes do jogo (~20 s) enquanto o ignorado paga
- * seis segundos a mais. Acima disso o caminho ignorado vira uma luta plana de
- * trinta segundos — que e exatamente o defeito que este rework existe para
- * corrigir, so que mais longo.
+ * 1200 e o ponto de equilibrio entre as tres colunas que importam: saber a luta
+ * vale 20% do tempo dela; o pagamento chega com 28% de vida pela frente (ou
+ * seja, como janela e nao como golpe de misericordia); e o trecho final sem
+ * material fica em 7 s — uma conclusao, e nao um vazio. Em 1400 esse trecho
+ * dobra para doze segundos, que e onde "acabou o ferro" vira problema de
+ * verdade.
  */
 export const MAGNETARCH_HP = 1200;
 /**
@@ -3234,23 +3232,34 @@ export const MAGNETARCH_RADIUS = 0.8;
 /**
  * Quanto dura CADA polaridade, telegrafo incluido.
  *
- * Era 170 (8,5 s), e o numero caiu por MEDICAO e nao por gosto. O ciclo do
- * ferro tem periodo de um ciclo inteiro — ele arremessa na repulsao, o jogador
- * sabota, e o pagamento chega no recolhimento seguinte —, entao a polaridade
- * decide quando o contra-jogo caracteristico da luta acontece. Onde ele cai,
- * em fracao da vida do chefe (bot imortal, mira perfeita, vida 1.200):
+ * Era 170 (8,5 s). O ciclo do ferro tem periodo de uma polaridade inteira — ele
+ * arremessa na repulsao, o jogador sabota, e o pagamento chega no recolhimento
+ * seguinte —, entao e a polaridade que decide QUANDO o contra-jogo acontece. E
+ * ela decide junto o tamanho do trecho final sem material, porque o material e
+ * finito: quanto mais cedo o pagamento, mais luta sobra depois dele.
  *
- *   polaridade   primeiro estilhaco
- *    8,5 s        aos 19,8 s, com ele a  6% de vida  (e um golpe de misericordia)
- *    7,0 s        aos 16,8 s, a 19%
- *    6,0 s        aos 14,8 s, a 33%                  <- aqui
- *    5,0 s        aos 22,8 s, a  3%  (a janela de sabotagem encolhe demais e o
- *                                     recolhimento passa sem a massa pronta)
+ * Medido com vida 1.200, bot imortal e mira perfeita, ja com a sabotagem
+ * valendo durante o telegrafo:
  *
- * Seis segundos e o unico ponto em que a janela de sabotagem ainda cabe na
- * repulsao E o pagamento chega com luta pela frente. De quebra ele responde ao
- * outro defeito do encontro — "voce resolve a distancia e repete o movimento":
- * a faixa troca de lado com o dobro da frequencia de antes.
+ *   polaridade  sabotando  1o estilhaco  sem material no fim
+ *     8,5 s       20,9 s    aos 19,2 s (12% de vida)    1,8 s
+ *     7,0 s       20,8 s    aos 16,2 s (22%)            4,5 s
+ *     6,0 s       21,2 s    aos 14,2 s (28%)            7,0 s   <- aqui
+ *     5,0 s       19,9 s    aos 12,2 s (38%)            7,8 s
+ *
+ * Seis segundos e uma ESCOLHA dentro de uma faixa que funciona, e nao um otimo
+ * isolado: de 7 a 5 segundos o encontro fecha, e o que muda e a troca entre
+ * "pagamento cedo" e "cauda sem ferro". Em 5 s a folga da inversao (30 ticks)
+ * passaria a ocupar 30% de cada polaridade — o campo ficaria calado quase um
+ * terco do tempo, e a luta de base perde ritmo antes de o ferro compensar. Em
+ * 7 s o pagamento volta para os 16 s, com o chefe ja em 22%.
+ *
+ * O desempate final e de PLAYTEST e nao de bot: o numero que falta e quantas
+ * massas alguem prepara enquanto esquiva de verdade.
+ *
+ * De quebra, seis segundos respondem ao outro defeito do encontro — "voce
+ * resolve a distancia e repete o movimento": a faixa troca de lado 42% mais
+ * vezes que antes.
  */
 export const MAGNETARCH_CYCLE_TICKS = 120;
 /**

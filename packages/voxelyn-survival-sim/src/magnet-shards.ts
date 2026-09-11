@@ -48,6 +48,7 @@ import {
 import {
   SHARD_FLIGHT,
   SHARD_HELD,
+  SHARD_LAUNCH,
   SHARD_LODGED,
   SHARD_WINDUP,
   type Entity,
@@ -134,8 +135,12 @@ export const routeMagnetShards = (
     // Atraindo, so o que esta LA FORA e recolhido; repelindo, sai tudo o que
     // ele tem na mao — o que estava cravado e o que ele reincorporou.
     if (shard.state !== SHARD_LODGED && !(shard.state === SHARD_HELD && !attracting)) continue;
+    // A massa que sai DE DENTRO do corpo marca a rota por `SHARD_LAUNCH`: a
+    // rota e desenhada igual, mas ela nao e alvo enquanto esta ali (ver o
+    // estado em `types.ts`). A que ja estava la fora continua sendo.
+    const fromBody = shard.state === SHARD_HELD;
     shard.at = state.tick;
-    shard.state = SHARD_WINDUP;
+    shard.state = fromBody ? SHARD_LAUNCH : SHARD_WINDUP;
     shard.hitAt = -1;
     if (attracting) {
       shard.tx = boss.x;
@@ -195,9 +200,11 @@ export const stepMagnetShards = (
   const rt = state.bossRuntime;
   const step = MAGNETARCH_SHARD_SPEED / TICK_HZ;
   const survivors: MagnetShard[] = [];
+  /** Quantas massas fraturadas voltaram NESTE tick. Cobradas depois do laco. */
+  let shattered = 0;
 
   for (const shard of rt.magnetShards) {
-    if (shard.state === SHARD_WINDUP) {
+    if (shard.state === SHARD_WINDUP || shard.state === SHARD_LAUNCH) {
       if (state.tick - shard.at >= MAGNETARCH_SHARD_WINDUP_TICKS) {
         shard.state = SHARD_FLIGHT;
         shard.at = state.tick;
@@ -287,8 +294,27 @@ export const stepMagnetShards = (
     // A MASSA FRATURADA NAO SOBREVIVE AO RETORNO. Ela se despedaca contra os
     // aneis: cobra do chefe, desregula o campo e ACABA — o material e finito, e
     // e isso que impede o contra-jogo de virar farm numa luta curta.
+    //
+    // O dano NAO sai daqui: e contado agora e cobrado depois do laco. As duas
+    // razoes estao abaixo, e as duas so aparecem quando mais de uma massa volta
+    // no mesmo tick — que e exatamente a jogada grande do encontro.
+    shattered++;
+  }
+
+  // A LISTA PRIMEIRO, O DANO DEPOIS. `damageEntity` limpa as massas quando o
+  // chefe cai (ver o funil), e gravar `survivors` DEPOIS disso ressuscitaria a
+  // lista que a morte acabou de apagar — inclusive uma massa em voo, que
+  // ficaria congelada no ar pelo resto da run porque so o passo do chefe a faz
+  // andar. Nada dentro do laco cobra do chefe, entao aqui ele ainda esta de pe.
+  rt.magnetShards = survivors;
+  if (shattered === 0) return;
+
+  for (let k = 0; k < shattered; k++) {
+    // Se a massa anterior ja o derrubou, as seguintes nao cobram de um corpo
+    // morto: o encontro acabou no primeiro estilhaco, e tres despedacamentos
+    // sobre um cadaver nao sao tres acontecimentos.
+    if (!boss.alive) break;
     damageEntity(state, boss, MAGNETARCH_SHARD_RETURN_DAMAGE, events, { kind: 'player_shot' });
-    rt.magnetExposedUntil = state.tick + MAGNETARCH_EXPOSED_TICKS;
     events.push({ t: 'pulse', x: boss.x, y: boss.y, radius: MAGNETARCH_CRUSH_RANGE });
     events.push({
       t: 'boss_state',
@@ -299,7 +325,19 @@ export const stepMagnetShards = (
     });
   }
 
-  rt.magnetShards = survivors;
+  // A JANELA ABRE DEPOIS DE TODOS OS RETORNOS TEREM COBRADO, e isto e uma
+  // decisao de balanceamento e nao uma arrumacao de codigo.
+  //
+  // Enquanto ela abria no primeiro estilhaco, os seguintes passavam pelo
+  // proprio multiplicador dela: tres massas no mesmo recolhimento cobravam
+  // 96 + 153,6 + 153,6 = 403,2 em vez dos 288 que a ficha promete. A
+  // amplificacao era invisivel, automatica, e inflava toda tabela de tuning
+  // medida em cima dela.
+  //
+  // O nucleo exposto amplifica o que o JOGADOR faz com a janela — nunca a coisa
+  // que abriu a janela. Quem quiser o combo de volta troca a ordem destas duas
+  // etapas; o que nao pode e ele existir sem ninguem ter escolhido.
+  if (boss.alive) rt.magnetExposedUntil = state.tick + MAGNETARCH_EXPOSED_TICKS;
 };
 
 /**
@@ -309,9 +347,17 @@ export const stepMagnetShards = (
  * motivo dele: a massa nao e entidade nem celula, entao nenhuma das duas
  * colisoes do laco a encontraria sozinha.
  *
- * So CRAVADA. Uma massa em voo atravessa o tiro — ela ja e o golpe, e permitir
- * abate-la no ar transformaria o contra-jogo ("prepare a proxima") em reflexo
- * ("derrube esta"), que e o oposto do que o encontro pede.
+ * CRAVADA OU MARCADA — ou seja, enquanto a massa esta FORA DO CORPO. A primeira
+ * versao aceitava so `SHARD_LODGED`, e isso desmentia em silencio o que a ficha
+ * do telegrafo anunciava: os 26 ticks do aviso de recolhimento eram descritos
+ * como tempo disponivel para os tres tiros, e eram justamente os ticks em que a
+ * massa ficava intocavel. O ultimo instante para decidir e o instante em que a
+ * rota acende — e ele tem de ser jogavel.
+ *
+ * Em VOO ela atravessa o tiro: permitir abate-la no ar transformaria o
+ * contra-jogo ("prepare a proxima") em reflexo ("derrube esta"), que e o oposto
+ * do que o encontro pede. REINCORPORADA (`SHARD_HELD`) ela esta dentro do
+ * corpo, e nao ha o que acertar.
  *
  * Devolve `true` quando a massa consumiu o tiro. O tiro morre nela: ferro com
  * um palmo de espessura nao deixa bolt passar, e um tiro que atravessasse
@@ -325,7 +371,7 @@ export const hitMagnetShards = (
   events: SemanticEvent[],
 ): boolean => {
   for (const shard of state.bossRuntime.magnetShards) {
-    if (shard.state !== SHARD_LODGED) continue;
+    if (shard.state !== SHARD_LODGED && shard.state !== SHARD_WINDUP) continue;
     if (segmentDistance(from, to, shard) > MAGNETARCH_SHARD_RADIUS) continue;
     if (shard.cracked === 1) {
       // Ja fraturada: o tiro ainda para nela (ela continua sendo um palmo de

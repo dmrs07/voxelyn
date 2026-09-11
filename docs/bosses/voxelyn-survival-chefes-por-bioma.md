@@ -1537,9 +1537,14 @@ Quatro decisões que sustentam o resto:
 - **O material é finito e não repovoa.** A massa que se despedaça acabou. Uma luta
   curta com material infinito seria farm; com material finito ela vira uma conta —
   quantas você prepara antes de ele cair.
-- **A hora de sabotar é enquanto a massa está lá fora.** A massa recolhida inteira é
+- **A hora de sabotar é enquanto a massa está lá fora** — incluindo durante o telégrafo
+  do recolhimento, que é o último instante para decidir. A massa recolhida inteira é
   **reincorporada** (`SHARD_HELD`): some dentro do corpo, não é alvo e sai de novo no
-  próximo arremesso. O estado existe para dizer isso sem comentário.
+  próximo arremesso. E a que sai **de dentro** do corpo tem telégrafo próprio
+  (`SHARD_LAUNCH`): a rota é desenhada igual, mas ela não é alvo enquanto está ali —
+  três blocos de ferro em cima do chefe comeriam todo tiro mirado nele e se fraturariam
+  sozinhos, e a decisão "gastar tiro na massa ou no chefe" deixaria de ser tomada por
+  alguém.
 - **A massa em voo não pode ser abatida.** Derrubá-la no ar transformaria o pedido
   ("prepare a próxima") em reflexo ("derrube esta").
 - **Nada disto é sólido.** Uma massa cravada não escreve célula, não fecha rota e não
@@ -1553,68 +1558,80 @@ decisão que faltava — _"estou na faixa, mas aquela peça vai passar por aqui"
 #### A duração, medida antes de distribuir novidade
 
 A pergunta certa veio antes do código: 8,5 s por polaridade davam 17 s para um ciclo
-completo, e o disparo básico contra 720 de vida dava ~13 s teóricos. Medindo o
-encontro de verdade (bot imortal, mira perfeita, parado na faixa), o número real era
-**14,7 s e uma única inversão** — o ciclo de ida e volta do ferro **não chegava a
-fechar uma vez**. Na primeira versão do protótipo o chefe morria aos 19,8 s, meio
-segundo antes de a primeira massa fraturada alcançá-lo.
+completo, e o disparo básico contra 720 de vida dava ~13 s teóricos. Medindo o encontro
+de verdade (bot imortal, mira perfeita, parado na faixa), o número real era **14,7 s e
+uma única inversão** — o ciclo de ida e volta do ferro **não chegava a fechar uma vez**.
+Na primeira versão do protótipo o chefe morria aos 19,8 s, meio segundo antes de a
+primeira massa fraturada alcançá-lo.
 
 Para comparação, a mesma medição nos outros chefes: Guardião 9,8 s · Bispo 14,4 s ·
 Pulmão 14,2 s · Arquicantor 18,8 s · Rainha 27,1 s · Diamandis 36,3 s · Fornalha
 37,8 s · Cerzideira 61,7 s · Devorador 66,8 s. O Magnetarca estava no piso da lista
 carregando a mecânica mais elaborada dos donos de estrato.
 
-Duas correções saíram daí, e as duas são medidas e não escolhidas:
+> **As tabelas abaixo foram refeitas.** A primeira leva foi medida sobre três defeitos
+> que inflavam os números: a sabotagem não valia durante o telégrafo (os 26 ticks
+> anunciados como janela eram justamente os ticks intocáveis), o estilhaço amplificava
+> a si mesmo (três retornos cobravam 460,8 em vez de 288) e a morte do chefe podia ser
+> desfeita pelo passo das massas. Corrigidos os três, **a conclusão sobre a polaridade
+> mudou** — ver abaixo.
 
-1. **A abertura já recolhe.** O encontro começa em atração, e atração recolhe — o ferro
-   só se mexia na primeira inversão. Como a abertura pega as massas ainda na faixa, as
-   rotas são curtas e radiais, longe de quem acabou de entrar: o primeiro recolhimento
-   é uma **demonstração**, e não um golpe. A regra é aprendida sem ser paga.
-2. **A vida vai de 720 para 1.200.** A varredura:
+**A vida**, medida na polaridade de 6 s:
 
-   | Vida     | Ignorando o ferro | Sabotando                               |
-   | -------- | ----------------- | --------------------------------------- |
-   | 720      | 14,7 s            | 19,8 s (0 estilhaços — ele morre antes) |
-   | 900      | 19,5 s            | 19,8 s                                  |
-   | 1050     | 22,0 s            | 19,8 s                                  |
-   | **1200** | **26,3 s**        | **20,8 s**                              |
-   | 1400     | 29,8 s            | 22,8 s                                  |
+| Vida     | Ignorando  | Sabotando  | 1º estilhaço        | Sem material no fim |
+| -------- | ---------- | ---------- | ------------------- | ------------------- |
+| 900      | 19,8 s     | 14,7 s     | 14,2 s (4% de vida) | 0,5 s               |
+| 1050     | 22,3 s     | 18,5 s     | 14,2 s (18%)        | 4,3 s               |
+| **1200** | **26,6 s** | **21,2 s** | **14,2 s (28%)**    | **7,0 s**           |
+| 1400     | 30,1 s     | 26,3 s     | 14,2 s (38%)        | 12,1 s              |
 
-   1.200 é onde **saber a luta separa de não saber**: com a polaridade de 8,5 s, 21%
-   mais rápido, e acima disso o caminho ignorado vira uma luta plana de trinta segundos
-   — que é o defeito que este rework existe para corrigir, só que mais longo.
+1.200 equilibra as três colunas: saber a luta vale 20% do tempo dela, o pagamento chega
+com 28% de vida pela frente (janela, e não golpe de misericórdia) e o trecho final sem
+material fica em 7 s — uma conclusão, e não um vazio. Em 1.400 esse trecho dobra.
 
-3. **A polaridade cai de 8,5 s para 6 s.** Com a vida certa e a abertura certa, o
-   pagamento ainda chegava tarde demais — o primeiro estilhaço acontecia com o chefe já
-   a **6% de vida**, ou seja, como golpe de misericórdia e não como janela. O período
-   do ciclo do ferro é uma polaridade inteira (arremessa, sabota, recolhe), então é a
-   polaridade que decide onde o contra-jogo acontece:
+**A polaridade**, medida com vida 1.200:
 
-   | Polaridade | Primeiro estilhaço | Vida do chefe nele                                              |
-   | ---------- | ------------------ | --------------------------------------------------------------- |
-   | 8,5 s      | 19,8 s             | 6%                                                              |
-   | 7,0 s      | 16,8 s             | 19%                                                             |
-   | **6,0 s**  | **14,8 s**         | **33%**                                                         |
-   | 5,0 s      | 22,8 s             | 3% (a janela de sabotagem encolhe e o recolhimento passa vazio) |
+| Polaridade | Sabotando  | 1º estilhaço         | Sem material no fim |
+| ---------- | ---------- | -------------------- | ------------------- |
+| 8,5 s      | 20,9 s     | 19,2 s (12% de vida) | 1,8 s               |
+| 7,0 s      | 20,8 s     | 16,2 s (22%)         | 4,5 s               |
+| **6,0 s**  | **21,2 s** | **14,2 s (28%)**     | **7,0 s**           |
+| 5,0 s      | 19,9 s     | 12,2 s (38%)         | 7,8 s               |
 
-   Seis segundos é o único ponto em que a janela de sabotagem ainda cabe na repulsão
-   **e** o pagamento chega com luta pela frente. De quebra ele responde ao outro
-   defeito do encontro — _"você resolve a distância e repete o movimento"_: a faixa
-   passa a trocar de lado com o dobro da frequência.
+Com a janela de sabotagem funcionando, **5 s deixou de ser o ponto ruim que a primeira
+medição indicava** — ele era ruim porque a janela real era menor do que se acreditava.
+Hoje a faixa de 7 a 5 segundos inteira funciona, e o que muda dentro dela é a troca
+entre _pagamento cedo_ e _cauda sem ferro_. Seis segundos é uma **escolha** dentro
+dessa faixa, não um ótimo isolado: em 5 s a folga da inversão (30 ticks) passaria a
+ocupar 30% de cada polaridade e a luta de base perde ritmo antes de o ferro compensar;
+em 7 s o pagamento volta para os 16 s. O desempate é de playtest, não de bot — falta
+saber quantas massas alguém prepara enquanto esquiva de verdade.
+
+De quebra, 6 s responde ao outro defeito do encontro — _"você resolve a distância e
+repete o movimento"_: a faixa troca de lado **42% mais vezes** que antes.
 
 #### O que a medição diz sobre a segunda fase
 
-Com três massas finitas, o protótipo entrega **um** pagamento grande, e não um laço que
-se repete: o jogador racha as três durante a repulsão e as três se despedaçam juntas no
-recolhimento seguinte. Depois disso o encontro volta a ser o campo puro.
+Com três massas finitas, o protótipo entrega **um** pagamento grande e não um laço: o
+jogador racha as três e elas se despedaçam juntas no recolhimento seguinte. Na
+configuração escolhida isso acontece aos 14,2 s, com o chefe a 28% de vida, e o
+encontro segue por mais **7,0 s sem nenhum material em campo**.
 
-Isso é um argumento a favor dos **aglomerados de limalha** da segunda fase, e mais forte
-do que parecia: eles não são tempero, são o **combustível do laço**. Uma massa que se
-despedaça vira limalha; limalha que se reúne devolve material ao ciclo, e só então o
-"prepare o próximo ciclo" se repete em vez de acontecer uma vez. O limiar de vida da
-virada também depende disso — a 60% de 1.200, a fase entraria por volta dos 9 s, antes
-mesmo da primeira inversão anunciada; medido, o ponto que cai **junto** com o primeiro
-estilhaço é mais perto de 45%.
+Sete segundos de conclusão é defensável — consumir as três massas e terminar acertando
+o núcleo exposto é um fecho, não um vazio. O que decide se a **recomposição da limalha**
+resolve um problema real é essa última coluna, e ela é o número a vigiar: em 1.400 de
+vida ela já vai a 12,1 s, e aí "acabou o ferro" passa a ser metade da luta.
+
+Se o playtest mostrar que o trecho final cansa, a recomposição entra **ao terminar o
+primeiro descompasso** e repondo **uma massa por vez** — o jogador vê a consequência da
+própria sabotagem criando o próximo problema. O comportamento de add (limalha que se
+desloca e muda o ponto de origem do recolhimento) vem depois disso, e não junto.
+
+O limiar de vida para uma segunda etapa **não está fixado**. O primeiro estilhaço é o
+acontecimento coerente para orientar a transformação — ele já é o momento em que o
+encontro muda de mão —, e onde ele cai depende da polaridade escolhida (28% em 6 s, 38%
+em 5 s, 12% em 8,5 s). Fixar uma porcentagem antes de escolher a polaridade seria fixar
+o efeito antes da causa.
 
 ### O objetivo não encosta mais na moldura
 

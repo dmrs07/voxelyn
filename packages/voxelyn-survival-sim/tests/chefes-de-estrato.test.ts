@@ -96,6 +96,7 @@ import {
   MAGNETARCH_EXPOSED_ARMOR,
   MAGNETARCH_FIELD_TICK_INTERVAL,
   MAGNETARCH_FLIP_WINDUP_TICKS,
+  MAGNETARCH_SHARD_RETURN_DAMAGE,
   MAGNETARCH_SHARD_WINDUP_TICKS,
   MAGNETARCH_TETHER_RANGE,
   SOLID_CRYSTAL,
@@ -123,6 +124,7 @@ import {
   MAGNET_REPEL,
   SHARD_FLIGHT,
   SHARD_HELD,
+  SHARD_LAUNCH,
   SHARD_LODGED,
   SHARD_WINDUP,
   RESONANT_CHOIR,
@@ -1921,6 +1923,95 @@ describe('Magnetarca — o ciclo do ferro', () => {
     }
     expect(hits, 'a arma basica precisa fraturar, e em tres tiros').toBe(3);
     expect(shard.cracked).toBe(1);
+  });
+
+  it('a massa MARCADA ainda pode ser fraturada: o telegrafo e jogavel', () => {
+    // A ficha do telegrafo anunciava 26 ticks como tempo disponivel para os tres
+    // tiros, e eram justamente os ticks em que a massa ficava intocavel
+    // (`hitMagnetShards` so aceitava `SHARD_LODGED`). O ultimo instante para
+    // decidir e o instante em que a rota acende.
+    const { state } = duel(678, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_WINDUP),
+      ),
+    ).toBe(true);
+    const marked = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_WINDUP)!;
+    let hits = 0;
+    while (marked.cracked === 0 && hits < 10) {
+      expect(
+        hitMagnetShards(state, { x: marked.x - 3, y: marked.y }, marked, BOLT_DAMAGE, []),
+        'a massa marcada recusou o tiro',
+      ).toBe(true);
+      hits++;
+    }
+    expect(hits, 'a massa marcada nao fratura em tres tiros').toBe(3);
+  });
+
+  it('tres retornos no mesmo tick cobram 3x96 — a janela nao amplifica quem a abriu', () => {
+    // O nucleo exposto amplifica o que o JOGADOR faz com a janela, e nunca a
+    // coisa que abriu a janela. Enquanto a janela abria no primeiro estilhaco,
+    // os dois seguintes passavam pelo proprio multiplicador dela: 403,2 em vez
+    // dos 288 que a ficha promete, invisivel e automatico.
+    const { state, boss } = duel(679, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    let prepared = 0;
+    for (const shard of state.bossRuntime.magnetShards) {
+      if (shard.state !== SHARD_LODGED) continue;
+      shard.cracked = 1;
+      shard.hp = 0;
+      prepared++;
+    }
+    expect(prepared, 'o teste precisa de mais de uma massa para medir o combo').toBeGreaterThan(1);
+    const hpBefore = boss.hp;
+    expect(advanceUntil(state, () => state.tick < state.bossRuntime.magnetExposedUntil, 600)).toBe(
+      true,
+    );
+    expect(hpBefore - boss.hp).toBeCloseTo(prepared * MAGNETARCH_SHARD_RETURN_DAMAGE, 5);
+  });
+
+  it('a massa que DA o golpe final nao ressuscita as outras', () => {
+    // `damageEntity` limpa as massas na morte do chefe, mas o passo delas
+    // continuava e gravava a propria lista de sobreviventes por cima — inclusive
+    // uma massa em voo, que ficaria congelada no ar pelo resto da run porque so
+    // o passo do chefe a faz andar.
+    const { state, boss } = duel(680, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    for (const shard of state.bossRuntime.magnetShards) {
+      if (shard.state !== SHARD_LODGED) continue;
+      shard.cracked = 1;
+      shard.hp = 0;
+    }
+    // Vida baixa o bastante para o PRIMEIRO retorno derrubar.
+    boss.hp = MAGNETARCH_SHARD_RETURN_DAMAGE - 1;
+    expect(
+      advanceUntil(state, () => !boss.alive, 600),
+      'o chefe nao chegou a cair',
+    ).toBe(true);
+    expect(state.bossRuntime.magnetShards, 'a lista voltou depois da limpeza').toEqual([]);
+    expect(state.bossRuntime.magnetExposedUntil, 'abriu janela num cadaver').toBe(0);
+  });
+
+  it('a massa que sai DO CORPO nao e alvo: ela nao come os tiros mirados nele', () => {
+    // O outro lado da correcao acima. Sabotar vale enquanto a massa esta fora do
+    // corpo; uma massa em cima do chefe durante o aviso ficaria na linha de todo
+    // tiro mirado NELE — tres blocos de ferro comendo os tiros do jogador e se
+    // fraturando sozinhos. A decisao "gastar tiro na massa ou no chefe"
+    // deixaria de ser tomada por alguem.
+    const { state, boss } = duel(681, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_LAUNCH),
+      ),
+      'nenhuma massa chegou a sair do corpo',
+    ).toBe(true);
+    const launching = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_LAUNCH)!;
+    // Um tiro mirado NO CHEFE passa pelo mesmo ponto em que ela esta.
+    expect(
+      hitMagnetShards(state, { x: boss.x - 5, y: boss.y }, { x: boss.x, y: boss.y }, 999, []),
+      'a massa saindo do corpo comeu um tiro mirado no chefe',
+    ).toBe(false);
+    expect(launching.cracked).toBe(0);
   });
 
   it('a massa em voo NAO pode ser abatida: ela ja e o golpe', () => {

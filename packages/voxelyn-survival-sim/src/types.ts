@@ -790,7 +790,7 @@ export type MagnetShard = {
 
 /** Cravada onde parou: parada, e ALVO. */
 export const SHARD_LODGED = 0;
-/** A rota esta marcada no chao e ainda nao saiu. */
+/** A rota esta marcada no chao, com a massa LA FORA. Alvo ate o ultimo tick. */
 export const SHARD_WINDUP = 1;
 /** Em voo pela rota marcada. */
 export const SHARD_FLIGHT = 2;
@@ -803,6 +803,21 @@ export const SHARD_FLIGHT = 2;
  * enquanto a massa esta LA FORA, e o estado e o que diz isso sem comentario.
  */
 export const SHARD_HELD = 3;
+/**
+ * A rota esta marcada, mas a massa ainda esta DENTRO do corpo: o telegrafo de
+ * um arremesso que sai dele.
+ *
+ * Estado proprio e nao `SHARD_WINDUP`, e a diferenca e inteira de jogabilidade.
+ * Sabotar vale enquanto a massa esta fora do corpo, e uma massa em cima do
+ * chefe durante o aviso ficaria na linha de todo tiro mirado NELE: tres blocos
+ * de ferro comendo os tiros do jogador e se fraturando sozinhos, de graca. A
+ * decisao que o ciclo do ferro existe para criar — gastar tiro na massa ou no
+ * chefe — deixaria de ser tomada por alguem.
+ *
+ * A ROTA dele e desenhada como qualquer outra: o corredor atravessa a arena, e
+ * um telegrafo invisivel seria dano sem sinal.
+ */
+export const SHARD_LAUNCH = 4;
 
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */

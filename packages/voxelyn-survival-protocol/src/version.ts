@@ -1121,15 +1121,20 @@ export const PROTOCOL_VERSION = 43;
 //     o dano entra a 1,6x). O material e finito: a massa que se despedaca
 //     acabou.
 //
-//     A vida sobe de 720 para 1.200 pelo motivo medido: com 720 o chefe morria
-//     aos 19,8 s, meio segundo ANTES de a primeira massa fraturada chegar nele
-//     — o contra-jogo caracteristico da luta nao cabia na luta. Em 1.200,
-//     sabotar termina em 20,8 s e ignorar em 26,3 s. E a polaridade cai de 8,5 s
-//     para 6 s (`MAGNETARCH_CYCLE_TICKS` 170 -> 120), tambem medido: e o unico
-//     ponto em que a janela de sabotagem cabe na repulsao E o pagamento chega
-//     com luta pela frente (primeiro estilhaco a 33% da vida, contra 6% em
-//     8,5 s). Ver a varredura em
-//     `docs/bosses/voxelyn-survival-chefes-por-bioma.md`.
+//     A vida sobe de 720 para 1.200 e a polaridade cai de 8,5 s para 6 s
+//     (`MAGNETARCH_CYCLE_TICKS` 170 -> 120), os dois por medicao: com 720 o
+//     chefe morria aos 19,8 s, meio segundo ANTES de a primeira massa fraturada
+//     chegar nele. Em 1.200 e 6 s, sabotar termina em 21,2 s contra 26,6 s
+//     ignorando, com o primeiro estilhaco aos 14,2 s e o chefe ainda em 28%.
+//     Ver as tabelas em `docs/bosses/voxelyn-survival-chefes-por-bioma.md`.
+//
+//     Tres correcoes de revisao entram na mesma versao, e as tres mudam numero:
+//     a sabotagem passa a valer durante o TELEGRAFO do recolhimento (os 26 ticks
+//     anunciados como janela eram justamente os intocaveis); o estilhaco deixa
+//     de amplificar a si mesmo (tres retornos cobravam 460,8 em vez de 288,
+//     porque a janela de 1,6x abria antes de os outros dois cobrarem); e a morte
+//     do chefe deixa de poder ser desfeita pelo passo das massas, que gravava a
+//     propria lista de sobreviventes por cima da limpeza.
 export const SIMULATION_VERSION = 82;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
