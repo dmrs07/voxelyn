@@ -1154,7 +1154,17 @@ export const damageEntity = (
   // se volta contra o corpo. Multiplicador e nao dano fixo de proposito: o
   // premio de ter preparado a massa tem de escalar com o que o jogador consegue
   // fazer na janela, senao ele vira um numero que chega sozinho.
-  if (ent.archetype === 'magnetarch' && state.tick < state.bossRuntime.magnetExposedUntil) {
+  //
+  // O RETORNO fica FORA: a janela amplifica o que o jogador faz com ela, e nunca
+  // a coisa que a abriu. A exclusao mora aqui, e nao na ordem das operacoes de
+  // quem cobra, porque massas com distancias de recolhimento diferentes chegam
+  // em TICKS diferentes — agrupar o dano antes de abrir a janela protegia
+  // apenas as que voltavam juntas, e a segunda cobrava 153,6 em vez de 96.
+  if (
+    ent.archetype === 'magnetarch' &&
+    cause.kind !== 'magnet_return' &&
+    state.tick < state.bossRuntime.magnetExposedUntil
+  ) {
     amount *= MAGNETARCH_EXPOSED_ARMOR;
   }
   if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
@@ -1176,6 +1186,11 @@ export const damageEntity = (
   }
   const attributable =
     cause.kind === 'player_shot' ||
+    // A massa que volta e credito DELE: quem gastou os tres tiros para fraturar
+    // aquele ferro foi o jogador, e o estilhaco e a consequencia atrasada do
+    // tiro. Deixa-la de fora faria o contra-jogo mais caro da luta nao aparecer
+    // no dano causado da run.
+    cause.kind === 'magnet_return' ||
     ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
   if (attributable) {
     state.stats.damageDealtTenths = addDamageTenths(

@@ -1610,6 +1610,55 @@ saber quantas massas alguém prepara enquanto esquiva de verdade.
 De quebra, 6 s responde ao outro defeito do encontro — _"você resolve a distância e
 repete o movimento"_: a faixa troca de lado **42% mais vezes** que antes.
 
+#### O bot mortal: o que muda quando o agente erra
+
+O bot anterior era imortal e de mira perfeita — media o **teto** do encontro. Este morre,
+erra a mira (σ 0,08 rad) e reage com **250 ms** de atraso, lendo só o que a tela mostra.
+Dezesseis câmaras reais (G-04 setor 7), oito abertas e oito apertadas, três estratégias
+sobre as mesmas seeds, tudo pelos comandos normais
+(`packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs`).
+
+| Estratégia        | Vitórias | Tempo médio | Massas fraturadas | Núcleo exposto  | Campo sem massas | Dano tomado (de 100) |
+| ----------------- | -------- | ----------- | ----------------- | --------------- | ---------------- | -------------------- |
+| **Ignorar**       | 16/16    | **40,2 s**  | 0,8               | 2,2 s (usa 32%) | 1,8 s            | 17                   |
+| **Uma por ciclo** | 15/16    | 48,7 s      | 1,8               | 4,8 s (usa 41%) | **11,9 s**       | 7                    |
+| **Todas**         | 15/16    | 49,8 s      | 1,8               | 4,5 s (usa 43%) | **14,3 s**       | 7                    |
+
+Com a fauna do setor ligada os números praticamente não mudam (15/16, 14/16, 14/16; o
+dano sobe de 17 para 22 no pior caso).
+
+Três leituras, e as três contrariam a varredura de mira perfeita:
+
+- **O encontro não mata.** Dezesseis vitórias em dezesseis ignorando a mecânica, com 17
+  de 100 de dano — e a maior parte disso é o campo mordendo uma vez quando o puxão
+  arrasta para dentro do anel. O ferro quase nunca conecta (menos de uma pancada por
+  partida): o telégrafo funciona bem demais para um agente que só precisa sair de uma
+  linha parada. **Nenhuma estratégia é arriscada porque a luta não oferece risco.**
+- **Sabotar é DOMINADO.** Custa 8,5 s a mais. A varredura perfeita dizia o contrário
+  (21,2 s contra 26,6 s) porque lá as três massas racham em dez ticks; aqui o agente
+  fratura 1,8 de 3, e os tiros gastos mirando ferro valem menos que os mesmos tiros no
+  chefe. A mecânica, como está afinada, é uma **armadilha para quem não tem mira
+  perfeita**.
+- **A cauda explode.** 11,9 a 14,3 s de campo normal sem nenhuma massa, contra 1,8 s de
+  quem ignora — porque consumir o material cedo é justamente o que abre o vazio. Os
+  7,0 s medidos com mira perfeita eram otimistas.
+
+O que isso sugere sobre o próximo passo: **o problema não é a sabotagem ser cara, é
+ignorar não custar nada.** Hoje a massa recolhida inteira volta para o corpo e não
+acontece nada — o jogador que nunca atira no ferro paga zero por isso. Enquanto essa
+linha existir, qualquer barateamento da fratura só aproxima as duas estratégias sem
+tornar nenhuma interessante. A forma clássica seria a massa reincorporada **valer
+alguma coisa para ele** (couraça, alcance, um pedaço de vida), transformando o
+recolhimento numa ameaça que se nega — e aí sabotar deixa de ser um investimento
+opcional e passa a ser a resposta.
+
+**Limites deste bot, que valem mais que os números:** ele segue regras fixas, começa
+dentro da faixa com linha de visão (não tem busca de rota, e medir a travessia até a
+câmara seria medir o harness), não usa módulos nem esquiva ofensiva, não faz kite e não
+aprende. Os resultados são **cenários simulados** — servem para encontrar situações
+impraticáveis e comparar estratégias entre si, e não estabelecem piso nenhum para
+jogadores humanos.
+
 #### O que a medição diz sobre a segunda fase
 
 Com três massas finitas, o protótipo entrega **um** pagamento grande e não um laço: o

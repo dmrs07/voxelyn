@@ -272,6 +272,24 @@ export type DamageCause =
    * morte tem para fazer.
    */
   | { kind: 'contamination' }
+  /**
+   * O RETORNO: uma massa fraturada do Magnetarca se despedacando nele.
+   *
+   * Causa propria por um motivo que nao e apresentacao — ela nunca chega a uma
+   * tela de morte, porque so cobra do chefe. Ela existe para o FUNIL poder
+   * excluir este dano do multiplicador do nucleo exposto.
+   *
+   * Sem a distincao, a exclusao so valia dentro do mesmo tick (o dano era
+   * agrupado antes de a janela abrir), e duas massas com distancias de
+   * recolhimento diferentes chegam em ticks diferentes: a segunda passava pelo
+   * 1,6x e cobrava 153,6 em vez dos 96 que a ficha promete. A regra e "o nucleo
+   * exposto amplifica o que o JOGADOR faz com a janela, nunca a coisa que abriu
+   * a janela", e uma regra dessas tem de morar onde o multiplicador mora.
+   *
+   * CONTA como dano do jogador nas estatisticas (`attributable`): quem preparou
+   * a massa foi ele.
+   */
+  | { kind: 'magnet_return' }
   | { kind: 'discharge'; source: EffectOrigin['source'] }
   | { kind: 'leviathan_discharge' }
   | { kind: 'explosion'; source: EffectOrigin['source'] }

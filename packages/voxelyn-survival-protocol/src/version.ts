@@ -1135,7 +1135,19 @@ export const PROTOCOL_VERSION = 43;
 //     porque a janela de 1,6x abria antes de os outros dois cobrarem); e a morte
 //     do chefe deixa de poder ser desfeita pelo passo das massas, que gravava a
 //     propria lista de sobreviventes por cima da limpeza.
-export const SIMULATION_VERSION = 82;
+// 83: duas correcoes do ciclo do ferro que mudam numero, e por isso versao.
+//
+//     O RETORNO ganha causa propria (`magnet_return`) e sai do multiplicador do
+//     nucleo exposto no FUNIL. A correcao anterior agrupava o dano antes de
+//     abrir a janela, e isso so protegia as massas que voltavam no MESMO tick:
+//     duas com distancias de recolhimento diferentes chegam em ticks diferentes,
+//     e a segunda cobrava 153,6 em vez dos 96 que a ficha promete.
+//
+//     O ATROPELO da massa passa a ser `enemy_projectile` (pedra) e nao
+//     `enemy_contact`. A licao da tela de morte e outra — "saia do corredor", e
+//     nao "ache a faixa" —, e com a causa compartilhada as duas mortes davam a
+//     mesma frase e a contabilidade do encontro somava as duas num numero so.
+export const SIMULATION_VERSION = 83;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

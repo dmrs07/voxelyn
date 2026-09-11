@@ -1970,6 +1970,53 @@ describe('Magnetarca — o ciclo do ferro', () => {
     expect(hpBefore - boss.hp).toBeCloseTo(prepared * MAGNETARCH_SHARD_RETURN_DAMAGE, 5);
   });
 
+  it('dois retornos em TICKS diferentes somam 2x96 — e o tiro na janela continua 1,6x', () => {
+    // O caso que o agrupamento por tick nao cobria. A janela dura 60 ticks e
+    // massas com distancias de recolhimento diferentes chegam em ticks
+    // diferentes: a segunda passava pelo multiplicador e cobrava 153,6. A
+    // garantia mora no funil, e nao na ordem das operacoes de quem cobra.
+    const { state, boss } = duel(682, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    // Duas massas fraturadas a distancias BEM diferentes do corpo: quatro tiles
+    // de diferenca sao ~9 ticks de voo entre uma chegada e a outra.
+    const pair = state.bossRuntime.magnetShards
+      .filter((sh) => sh.state === SHARD_LODGED)
+      .slice(0, 2);
+    expect(pair.length, 'o teste precisa de duas massas cravadas').toBe(2);
+    state.bossRuntime.magnetShards = pair;
+    pair.forEach((shard, i) => {
+      shard.cracked = 1;
+      shard.hp = 0;
+      shard.x = boss.x - (4 + i * 4);
+      shard.y = boss.y;
+    });
+
+    const hpBefore = boss.hp;
+    const arrivals: number[] = [];
+    advanceUntil(
+      state,
+      () => {
+        if (state.bossRuntime.magnetShards.length < pair.length - arrivals.length) {
+          arrivals.push(state.tick);
+        }
+        return arrivals.length === 2 || state.bossRuntime.magnetShards.length === 0;
+      },
+      600,
+    );
+    expect(state.bossRuntime.magnetShards, 'as duas massas nao voltaram').toEqual([]);
+    expect(
+      hpBefore - boss.hp,
+      'a segunda massa foi amplificada pela janela da primeira',
+    ).toBeCloseTo(2 * MAGNETARCH_SHARD_RETURN_DAMAGE, 5);
+
+    // E a outra metade da regra: o que o JOGADOR faz com a janela continua
+    // valendo 1,6x. Sem isto, "corrigir a amplificacao" teria apagado o premio.
+    expect(state.tick, 'a janela ja fechou e o teste nao mede nada').toBeLessThan(
+      state.bossRuntime.magnetExposedUntil,
+    );
+    expect(damageTaken(state, boss)).toBeCloseTo(100 * MAGNETARCH_EXPOSED_ARMOR, 5);
+  });
+
   it('a massa que DA o golpe final nao ressuscita as outras', () => {
     // `damageEntity` limpa as massas na morte do chefe, mas o passo delas
     // continuava e gravava a propria lista de sobreviventes por cima — inclusive

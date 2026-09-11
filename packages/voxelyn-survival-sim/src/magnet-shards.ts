@@ -252,10 +252,16 @@ export const stepMagnetShards = (
           continue;
         }
         shard.hitAt = state.tick;
+        // ARREMESSO, e nao contato. A massa e pedra atravessando a arena por uma
+        // rota marcada, e a licao da tela de morte tem de ser essa — "saia do
+        // corredor" — e nao a das bordas do campo, que e "ache a faixa". Com a
+        // causa compartilhada, as duas mortes diferentes davam a mesma frase e a
+        // contabilidade do encontro somava as duas num numero so.
         damageEntity(state, victim, MAGNETARCH_SHARD_DAMAGE, events, {
-          kind: 'enemy_contact',
+          kind: 'enemy_projectile',
           archetype: 'magnetarch',
           elite: boss.elite,
+          projectile: 'rock',
         });
         events.push({ t: 'pulse', x: shard.x, y: shard.y, radius: MAGNETARCH_SHARD_RADIUS });
         break;
@@ -314,7 +320,7 @@ export const stepMagnetShards = (
     // morto: o encontro acabou no primeiro estilhaco, e tres despedacamentos
     // sobre um cadaver nao sao tres acontecimentos.
     if (!boss.alive) break;
-    damageEntity(state, boss, MAGNETARCH_SHARD_RETURN_DAMAGE, events, { kind: 'player_shot' });
+    damageEntity(state, boss, MAGNETARCH_SHARD_RETURN_DAMAGE, events, { kind: 'magnet_return' });
     events.push({ t: 'pulse', x: boss.x, y: boss.y, radius: MAGNETARCH_CRUSH_RANGE });
     events.push({
       t: 'boss_state',
@@ -325,18 +331,15 @@ export const stepMagnetShards = (
     });
   }
 
-  // A JANELA ABRE DEPOIS DE TODOS OS RETORNOS TEREM COBRADO, e isto e uma
-  // decisao de balanceamento e nao uma arrumacao de codigo.
+  // A JANELA, depois dos retornos. A ordem aqui NAO e o que garante os 96 por
+  // massa — quem garante e o funil, que exclui `magnet_return` do multiplicador
+  // em qualquer tick (ver `damageEntity`). A primeira versao tentou garantir
+  // pela ordem, e so protegia as massas que voltavam JUNTAS: duas com
+  // distancias de recolhimento diferentes chegam em ticks diferentes, e a
+  // segunda cobrava 153,6.
   //
-  // Enquanto ela abria no primeiro estilhaco, os seguintes passavam pelo
-  // proprio multiplicador dela: tres massas no mesmo recolhimento cobravam
-  // 96 + 153,6 + 153,6 = 403,2 em vez dos 288 que a ficha promete. A
-  // amplificacao era invisivel, automatica, e inflava toda tabela de tuning
-  // medida em cima dela.
-  //
-  // O nucleo exposto amplifica o que o JOGADOR faz com a janela — nunca a coisa
-  // que abriu a janela. Quem quiser o combo de volta troca a ordem destas duas
-  // etapas; o que nao pode e ele existir sem ninguem ter escolhido.
+  // A ordem continua importando por outra razao, essa sim de codigo: a janela
+  // nao pode abrir num cadaver.
   if (boss.alive) rt.magnetExposedUntil = state.tick + MAGNETARCH_EXPOSED_TICKS;
 };
 
