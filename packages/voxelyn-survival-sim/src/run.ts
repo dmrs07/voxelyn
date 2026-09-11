@@ -5,6 +5,7 @@ import {
   BLEEDOUT_TICKS,
   BOLT_COOLDOWN_TICKS,
   BOLT_DAMAGE,
+  BOLT_TTL_TICKS,
   BOLT_SPEED,
   BRUISER_ROCK_STUN_TICKS,
   CONDUCTIVE_STUN_TICKS,
@@ -2248,7 +2249,9 @@ const stepPlayer = (
         distanceTravelled: 0,
         hostile: false,
         leavesBiofluid: false,
-        ttl: Math.ceil(TICK_HZ * 1.4),
+        // O ALCANCE vem de `BOLT_RANGE` (tiles), e nao de um tempo de voo
+        // escrito aqui: quem ajusta alcance pensa em distancia, nao em ticks.
+        ttl: BOLT_TTL_TICKS,
       });
     }
     events.push({

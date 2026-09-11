@@ -35,6 +35,7 @@
 // - Um vetor manual diferente de zero sempre substitui o auto-aim.
 
 import {
+  BOLT_RANGE,
   BOLT_SPEED,
   DEFAULT_PLAYER_TUNING,
   DEVOURER_BURROWED,
@@ -72,11 +73,15 @@ export const hasCombatSense = (combat: CombatTuning): boolean =>
 /**
  * Alcance de aquisicao, em tiles: NO MAXIMO o alcance efetivo do bolt.
  *
- * Derivado das mesmas constantes que a simulacao usa (velocidade x vida util),
- * e arredondado para BAIXO: a IA nunca pode prometer um alvo que o armamento
- * nao alcanca.
+ * Le `BOLT_RANGE` da simulacao, e nao uma copia da conta dela. Antes esta linha
+ * refazia `velocidade x 1,4 s` a mao, com o 1,4 escrito aqui e la: o corte de
+ * alcance da SIMULATION_VERSION 88 teria deixado a IA prometendo alvos a 18
+ * tiles para uma arma que chega a 13, e nada no teste teria reclamado.
+ *
+ * `floor` continua: a IA nunca pode prometer um alvo que o armamento nao
+ * alcanca.
  */
-export const ACQUIRE_RANGE_TILES = Math.floor(BOLT_SPEED * (Math.ceil(TICK_HZ * 1.4) / TICK_HZ));
+export const ACQUIRE_RANGE_TILES = Math.floor(BOLT_RANGE);
 
 /** IA-04: o teto da correcao vem do tuning; estes sao os cones AUXILIARES. */
 /** Cone de aquisicao para a memoria quando IA-04 nao esta instalado. */

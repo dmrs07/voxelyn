@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEVOURER_HEAD_GONE_AT } from './devourer-spine';
 import {
+  BOLT_RANGE,
   BOLT_SPEED,
   DEFAULT_PLAYER_TUNING,
   DEVOURER_AIRBORNE,
@@ -88,8 +89,10 @@ const wallColumn = (state: SurvivalState, x: number, y0: number, y1: number): vo
 
 describe('alcance de aquisicao', () => {
   it('nunca passa do alcance efetivo do bolt', () => {
-    const boltRange = BOLT_SPEED * (Math.ceil(TICK_HZ * 1.4) / TICK_HZ);
-    expect(ACQUIRE_RANGE_TILES).toBeLessThanOrEqual(boltRange);
+    // O alcance vem da simulacao (BOLT_RANGE, em tiles), e nao de uma conta
+    // refeita aqui: era a copia do `1.4` nos dois lados que este teste deixava
+    // passar em silencio quando o alcance mudasse de um lado so.
+    expect(ACQUIRE_RANGE_TILES).toBeLessThanOrEqual(BOLT_RANGE);
     expect(ACQUIRE_RANGE_TILES).toBeGreaterThan(0);
   });
 });

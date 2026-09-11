@@ -1760,6 +1760,41 @@ export const DEVOURER_TRAIL_WIDTH = 1;
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;
+/**
+ * ATE ONDE O PARAFUSO CHEGA, em tiles. Eram 18,2, e 18,2 resolviam luta demais.
+ *
+ * O numero nao existia: o alcance era um `ttl: Math.ceil(TICK_HZ * 1.4)` escrito
+ * dentro do disparo, e o cliente tinha o mesmo 1,4 copiado a mao em
+ * `ACQUIRE_RANGE_TILES`. Alcance e uma decisao de desenho e nao um detalhe de
+ * projetil, entao ele vira um numero com nome, em TILES, e o tempo de voo passa
+ * a ser derivado dele.
+ *
+ * POR QUE 13. O aggro dos chefes e o que a medicao encontrou: Bispo 14,
+ * Devorador 11, Arquicantor 10, Guardiao 7. Com 18 de alcance dava para ficar
+ * FORA do problema e resolver a luta sem exercer o contra-jogo dela — medido no
+ * `tools/boss-ttk.mjs`, a 11 tiles o Bispo cobra ZERO de dano por encontro
+ * (contra 48 a seis), o Devorador cai de 280 para 46, o Arquicantor de 120 para
+ * 26 e a Rainha de 442 para 60. Quatro encontros eram neutralizaveis por
+ * posicao.
+ *
+ * Nao e um nerf cego, e os numeros que sobem dizem isso: contra chefe de ataque
+ * a distancia, recuar ja custava caro (o Pulmao cobra 329 a onze tiles contra
+ * 231 a seis, a Cerzideira 1026 contra 854, o Diamandis 620 contra 437). O que
+ * 13 tira e a opcao de ignorar a metade do bestiario que precisa chegar perto.
+ *
+ * A TABELA DE CHEFES NAO SE MEXE: `BOSS_TTK_SECONDS` e medida com o agente a
+ * seis tiles, e seis continua dentro de treze. O que muda e o dano tomado por
+ * quem jogava recuado.
+ *
+ * E o alcance de ontem nao sumiu — virou um modulo. Ver PROSPECT_LANCE_RANGE.
+ */
+export const BOLT_RANGE = 13;
+/**
+ * A vida util do projetil, DERIVADA do alcance. Um tick a mais por seguranca de
+ * arredondamento seria alcance a mais; `floor` deixaria o ultimo meio tile
+ * inalcancavel. `ceil` sobre a divisao exata da 20 ticks redondos a 13/13.
+ */
+export const BOLT_TTL_TICKS = Math.ceil((BOLT_RANGE / BOLT_SPEED) * TICK_HZ);
 
 export const ABILITY_COOLDOWN_TICKS = 120; // pulso cinetico
 export const ABILITY_RADIUS = 2.6;
@@ -2979,10 +3014,14 @@ export const AQUIFER_PIPE_COUNT = 10;
  * tick zero, atravessando parede e agua. O jogador entrava no mapa e o chefe ja
  * estava a caminho.
  *
- * Dezesseis e um raio de CAMARA: bem alem do alcance do bolt (18 e o limite
- * util dele, e um chefe que so acorda depois de apanhar seria um chefe morto de
- * graca), e curto o bastante para a descida ate ele continuar sendo a descida
- * ate ele, e nao uma fuga do comeco ao fim.
+ * Dezesseis e um raio de CAMARA: alem do alcance do bolt (13 desde
+ * `BOLT_RANGE`, e um chefe que so acorda depois de apanhar seria um chefe morto
+ * de graca), e curto o bastante para a descida ate ele continuar sendo a
+ * descida ate ele, e nao uma fuga do comeco ao fim.
+ *
+ * A margem CRESCEU com o corte de alcance, e na direcao certa: com 18 de bolt
+ * contra 16 de aggro, quem mirasse do limite acertava antes de ser notado. Com
+ * 13 contra 16, ele nota primeiro — que e o que esta linha sempre quis dizer.
  */
 export const DIVER_BOSS_AGGRO_RANGE = 16;
 

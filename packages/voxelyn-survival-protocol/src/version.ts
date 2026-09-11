@@ -1263,7 +1263,30 @@ export const PROTOCOL_VERSION = 43;
 //     constante existia e mudar o valor dela nao mudava nada no jogo.
 //
 //     `hp`/`maxHp` viajam no snapshot e no hash: replays de 86 nao batem.
-export const SIMULATION_VERSION = 87;
+// 88: O ALCANCE DO PARAFUSO cai de 18,2 para 13 tiles, e vira um numero com
+//     nome (`BOLT_RANGE`, em tiles) em vez de um `ttl` de 1,4 s escrito dentro
+//     do disparo — com o mesmo 1,4 copiado a mao no cliente
+//     (`ACQUIRE_RANGE_TILES`), que agora le a constante.
+//
+//     O MOTIVO esta medido. O aggro dos chefes e curto (Bispo 14, Devorador 11,
+//     Arquicantor 10, Guardiao 7) e o parafuso alcancava 18: dava para ficar
+//     FORA do problema e resolver a luta sem exercer o contra-jogo dela. No
+//     `tools/boss-ttk.mjs`, com o alcance antigo e o agente a 15 tiles, o Bispo
+//     cobrava ZERO de dano por encontro, e o mesmo valia para a Rainha, o
+//     Pulmao e o Magnetarca. A 13 tiles o Pulmao volta a cobrar (152), e os 15
+//     deixam de existir como posicao de tiro.
+//
+//     NAO E UM NERF CEGO: contra chefe de ataque a distancia, recuar ja custava
+//     caro (a Cerzideira cobrava 1078 a quinze tiles contra 810 a seis, o
+//     Diamandis 580 contra 437). O que o corte tira e a opcao de ignorar a
+//     metade do bestiario que precisa chegar perto.
+//
+//     A TABELA DE CHEFES NAO SE MEXE, e isso e verificado: `BOSS_TTK_SECONDS` e
+//     medida com o agente a seis tiles, e seis continua dentro de treze. As onze
+//     medianas saem iguais as da 87.
+//
+//     O ttl viaja no hash dos projeteis: replays de 87 nao batem.
+export const SIMULATION_VERSION = 88;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
