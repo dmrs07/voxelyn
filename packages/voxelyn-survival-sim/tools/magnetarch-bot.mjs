@@ -29,13 +29,9 @@
 //   node packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs [--runs=24] [--fauna]
 
 import {
-  BOLT_DAMAGE,
-  DODGE_COOLDOWN_TICKS,
   HEAT_MAX,
   HEAT_PER_SHOT,
   MAGNETARCH_CRUSH_RANGE,
-  MAGNETARCH_FIELD_RANGE,
-  MAGNETARCH_SHARD_HP,
   MAGNETARCH_SHARD_RADIUS,
   MAGNETARCH_SHARD_RETURN_DAMAGE,
   MAGNETARCH_TETHER_RANGE,
@@ -445,7 +441,6 @@ if (traceSeed) {
 }
 
 const seeds = findSeeds(RUNS);
-const pct = (a, b) => (b > 0 ? `${Math.round((100 * a) / b)}%` : '—');
 
 console.log(
   `\nBOT MORTAL — ${seeds.length} camaras reais (G-04 setor 7), fauna ${fauna ? 'LIGADA' : 'desligada'}`,

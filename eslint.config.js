@@ -54,6 +54,7 @@ export default [
     // scripts de build/validacao de sprites: rodam em Node, nao no browser
     files: [
       'packages/voxelyn-survival-content/tools/**/*.mjs',
+      'packages/voxelyn-survival-sim/tools/**/*.mjs',
       'packages/voxelyn-atlas-studio/scripts/**/*.mjs',
     ],
     languageOptions: {
