@@ -1,4 +1,5 @@
 import { createSutures, hitSutures, stepSutures } from './sutures.js';
+import { hitMagnetShards } from './magnet-shards.js';
 import { RNG } from '@voxelyn/core';
 import {
   BLEEDOUT_TICKS,
@@ -410,7 +411,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
   // reconstroi o mesmo estrato e a mesma ocupacao sem consumir a RNG da run.
   const biome = sectorBiome(config.seed, sector);
   // Perfil pela fonte unica (garantia da descida inclusa): ver sectorProfile.
-  const profile = sectorProfile(config.seed, sector);
+  const profile = sectorProfile(config.seed, sector, depth);
   const world = generateWorld(
     sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector),
     width,
@@ -2861,6 +2862,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       if (state.solid[i] === SOLID_NONE)
         hitSutures(state, { x: prevX, y: prevY }, proj, events, ownerSlot);
 
+      // AS MASSAS DO MAGNETARCA, ao lado das suturas e pelo mesmo motivo: elas
+      // nao sao entidade nem celula, entao nenhuma das duas colisoes do laco as
+      // encontraria sozinha. O tiro MORRE nela — um palmo de ferro nao deixa
+      // bolt passar, e um tiro que atravessasse apagaria a escolha, porque
+      // fraturar deixaria de custar alguma coisa.
+      if (
+        !proj.hostile &&
+        state.bossRuntime.magnetShards.length > 0 &&
+        hitMagnetShards(state, { x: prevX, y: prevY }, proj, proj.damage, events)
+      ) {
+        dead = true;
+        break;
+      }
+
       if (state.solid[i] !== SOLID_NONE) {
         // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por
         // uma detonacao, e essa e a escolha — nao um dos dois sumindo em silencio.
@@ -3993,6 +4008,31 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.choirPattern);
   mix(state.bossRuntime.choirRotateAt);
   mix(state.bossRuntime.choirRecruitAt);
+  // A POLARIDADE DO MAGNETARCA em um numero. `magnetFlipAt` decide, a cada
+  // tick, para que lado o campo empurra, se ele esta na folga silenciosa e qual
+  // das duas bordas cobra — ou seja, decide dano e POSICAO do jogador. Duas
+  // simulacoes que discordassem dele divergiriam em vida e em coordenada no
+  // primeiro ciclo. O `mood` do corpo entra pelo laco de inimigos, como
+  // qualquer outro; o que falta e o prazo.
+  mix(state.bossRuntime.magnetFlipAt);
+  // O CICLO DO FERRO. Cada massa decide dano (o atropelo, o estilhaco) e decide
+  // posicao (o jogador sai da rota marcada), entao as sete grandezas de cada
+  // uma entram no hash — como as crateras da Fome. `hitAt` tambem: ele gateia a
+  // cobranca do atropelo, e duas simulacoes que discordassem dele cobrariam
+  // numeros diferentes do mesmo passo.
+  mix(state.bossRuntime.magnetShards.length);
+  for (const shard of state.bossRuntime.magnetShards) {
+    mix(Math.round(shard.x * 1000));
+    mix(Math.round(shard.y * 1000));
+    mix(Math.round(shard.tx * 1000));
+    mix(Math.round(shard.ty * 1000));
+    mix(shard.at);
+    mix(shard.state);
+    mix(shard.cracked);
+    mix(Math.round(shard.hp * 10));
+    mix(shard.hitAt);
+  }
+  mix(state.bossRuntime.magnetExposedUntil);
   // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
   // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
   // ja e hasheado por conta propria. Duas simulacoes discordando de

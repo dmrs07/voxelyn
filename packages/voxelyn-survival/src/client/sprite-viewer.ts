@@ -12,6 +12,7 @@ import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
 import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
+import magnetShardManifest from '@voxelyn/survival-content/assets/atlases/fx-magnet-shard.json';
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
@@ -22,6 +23,7 @@ import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
 import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
+import magnetShardUrl from '@voxelyn/survival-content/assets/atlases/fx-magnet-shard.png?url';
 
 type Item = { manifest: SpriteManifestEntry; url: string };
 const ITEMS: Item[] = [
@@ -35,7 +37,15 @@ const ITEMS: Item[] = [
   [impactManifest, impactUrl],
   [droneManifest, droneUrl],
   [cycloneManifest, cycloneUrl],
-].map(([manifest, url]) => ({ manifest: manifest as unknown as SpriteManifestEntry, url: url as string }));
+  // A massa de ferro do Magnetarca. Aqui de proposito: o visualizador desenha a
+  // CAIXA DE COLISAO por cima do sprite, e foi a divergencia entre as duas que
+  // este atlas veio consertar — o corpo saia a 23% do raio que a simulacao
+  // acerta. E a unica tela do projeto onde esse erro e visivel sem jogar.
+  [magnetShardManifest, magnetShardUrl],
+].map(([manifest, url]) => ({
+  manifest: manifest as unknown as SpriteManifestEntry,
+  url: url as string,
+}));
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 const grid = $('grid');
@@ -68,13 +78,17 @@ const build = (): void => {
   }
 };
 
-const preload = (): Promise<void>[] => ITEMS.map(({ manifest, url }) => new Promise((resolve) => {
-  const image = new Image();
-  image.onload = () => resolve();
-  image.onerror = () => resolve();
-  image.src = url;
-  images.set(manifest.id, image);
-}));
+const preload = (): Promise<void>[] =>
+  ITEMS.map(
+    ({ manifest, url }) =>
+      new Promise((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve();
+        image.onerror = () => resolve();
+        image.src = url;
+        images.set(manifest.id, image);
+      }),
+  );
 
 const draw = (now: number): void => {
   const zoom = controls.zoom();
@@ -82,7 +96,12 @@ const draw = (now: number): void => {
   const speed = controls.speed();
   const dirSelection = controls.dir();
   for (const { canvas, manifest, anim } of canvases) {
-    const direction = manifest.directions === 1 ? manifest.authoredDirs[0] : dirSelection === 'n' ? 'dr' : dirSelection;
+    const direction =
+      manifest.directions === 1
+        ? manifest.authoredDirs[0]
+        : dirSelection === 'n'
+          ? 'dr'
+          : dirSelection;
     const def = manifest.animations[anim];
     const frame = Math.floor((now / 1000) * def.fps * speed) % def.frames;
     const rect = resolveFrame(manifest, anim, direction, frame);
@@ -98,7 +117,8 @@ const draw = (now: number): void => {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, width, height);
     const image = images.get(manifest.id);
-    if (image?.complete) ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, width, height);
+    if (image?.complete)
+      ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, width, height);
 
     if (controls.anchor()) {
       ctx.fillStyle = '#59f2c2';

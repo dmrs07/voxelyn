@@ -2,6 +2,7 @@ import { box, collapse, renderVoxels } from './voxel.mjs';
 import { STITCHER_SPECS } from './stitchers.mjs';
 import { SILK_NET_SPEC } from './silk-net.mjs';
 import { SILK_COCOON_SPEC } from './silk-cocoon.mjs';
+import { MAGNET_SHARD_SPEC } from './magnet-shard.mjs';
 import {
   ANCHOR_X as PROSPECTOR_ANCHOR_X,
   ANCHOR_Y as PROSPECTOR_ANCHOR_Y,
@@ -4570,4 +4571,8 @@ export const ENTITY_SPECS = [
     prompt:
       'voxel-isometric fire tornado, tall funnel of ember and white-hot flame, two counter-rotating spiral threads, smoke curling off the top, embers kicked up at the base',
   },
+  // A massa de ferro do Magnetarca. No FIM da lista, como todo acrescimo: a
+  // ordem daqui nao entra em nenhum frameMap, mas e a ordem em que os atlas
+  // sao assados, e diffs de geracao ficam legiveis quando nada se move.
+  MAGNET_SHARD_SPEC,
 ];

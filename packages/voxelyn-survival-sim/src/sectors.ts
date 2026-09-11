@@ -707,7 +707,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.lineage = biome.lineage;
   // A mesma fonte unica do createRun — a troca de setor regenera o mundo pelo
   // perfil identico, garantia inclusa.
-  const profile = sectorProfile(state.config.seed, state.sector);
+  const profile = sectorProfile(state.config.seed, state.sector, runDepth(state));
   const world = generateWorld(
     sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
     width,
@@ -861,7 +861,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   state.lineage = biome.lineage;
   // A mesma fonte unica do createRun — a troca de setor regenera o mundo pelo
   // perfil identico, garantia inclusa.
-  const profile = sectorProfile(state.config.seed, state.sector);
+  const profile = sectorProfile(state.config.seed, state.sector, runDepth(state));
   const world = generateWorld(
     sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
     width,

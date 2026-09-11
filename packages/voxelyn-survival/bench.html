@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voxelyn Survival — Captura do benchmark</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #06070a;
+        overflow: hidden;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+        color: #cfd6e0;
+      }
+      #game {
+        display: block;
+        touch-action: none;
+      }
+      #badge {
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        padding: 5px 9px;
+        background: rgba(6, 7, 10, 0.78);
+        border: 1px solid rgba(146, 158, 170, 0.35);
+        border-radius: 4px;
+        letter-spacing: 0.02em;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <!-- A FICHA DA PARTIDA fica na tela de proposito: um video de benchmark sem
+         a seed, a camara e o desfecho e um video bonito que nao prova nada. -->
+    <div id="badge">carregando…</div>
+    <script type="module" src="/src/client/bench-main.ts"></script>
+  </body>
+</html>

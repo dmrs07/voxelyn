@@ -35,6 +35,7 @@ import {
   arenaIceCensus,
   clampArenaHp,
   createArenaRun,
+  resolveArenaSeed,
   type ArenaConditions,
 } from './arena-setup';
 import {
@@ -140,6 +141,23 @@ const setupEl = document.getElementById('setup') as HTMLDivElement;
 const formEl = document.getElementById('setup-form') as HTMLFormElement;
 const bossSelect = document.getElementById('boss') as HTMLSelectElement;
 const bossPlaceEl = document.getElementById('boss-place') as HTMLSpanElement;
+
+/**
+ * A seed pedida na URL (`arena.html?seed=216`), ou null.
+ *
+ * Lida UMA vez: ela e um parametro de sessao de playtest, e nao um controle do
+ * seletor. Quem quiser outra camara troca a URL — que e tambem como ela se
+ * compartilha entre duas pessoas observando a mesma luta.
+ *
+ * Nao e validada aqui de proposito: a validacao depende do chefe escolhido, e o
+ * chefe muda no seletor. Quem valida e `resolveArenaSeed`, na hora de abrir.
+ */
+const requestedSeed = ((): number | null => {
+  const raw = new URLSearchParams(location.search).get('seed');
+  if (raw === null) return null;
+  const seed = Number(raw);
+  return Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff ? seed : null;
+})();
 const hpInput = document.getElementById('hp') as HTMLInputElement;
 const abilityGrid = document.getElementById('ability-grid') as HTMLDivElement;
 const moduleGrid = document.getElementById('module-grid') as HTMLDivElement;
@@ -233,7 +251,19 @@ for (const id of ARENA_BOSS_ORDER) {
 }
 const updateBossPlace = (): void => {
   const id = bossSelect.value as ArenaBossId;
-  bossPlaceEl.textContent = ARENA_CATALOG[id]?.place ?? '';
+  const entry = ARENA_CATALOG[id];
+  // A SEED ATIVA FICA NA TELA, sempre — nao so quando alguem a forcou. Uma
+  // ferramenta de medicao que esconde qual camara abriu produz conversa sobre
+  // "aquela luta" sem ninguem saber qual luta era; e, quando o override e
+  // RECUSADO (seed que nao entrega este chefe), a tela tem de dizer que caiu de
+  // volta na canonica, senao o playtest inteiro acontece na camara errada
+  // achando que esta na certa.
+  const active = resolveArenaSeed(id, requestedSeed ?? entry?.seed);
+  const refused = requestedSeed !== null && active !== requestedSeed;
+  const seedNote = refused
+    ? ` · seed ${active} (a ${requestedSeed} nao entrega este chefe)`
+    : ` · seed ${active}`;
+  bossPlaceEl.textContent = `${entry?.place ?? ''}${entry ? seedNote : ''}`;
 };
 bossSelect.addEventListener('change', updateBossPlace);
 updateBossPlace();
@@ -279,6 +309,9 @@ const readConditions = (): ArenaConditions => {
     modules,
     stabilisers: stabilisersInput.checked,
     coop: coopInput.checked,
+    // `undefined` quando ninguem pediu: a arena abre a camara do catalogo, que
+    // continua sendo o fluxo normal da ferramenta.
+    seed: requestedSeed ?? undefined,
   };
 };
 
@@ -844,6 +877,13 @@ const runArena = (conditions: ArenaConditions): void => {
   setupEl.classList.add('hidden');
   endOverlay.classList.add('hidden');
   canvas.classList.remove('hidden');
+  // A SEED ATIVA TAMBEM DURANTE A LUTA. O mostrador do seletor some quando o
+  // jogo comeca, e e justamente no meio da luta que alguem pergunta "que camara
+  // e essa?". Uma ferramenta de medicao que esconde a camara produz conversa
+  // sobre "aquela partida" sem ninguem saber qual partida era.
+  hudNote.textContent =
+    `Arena de teste — sem telemetria, sem placar, sem gravação de replay. ` +
+    `Câmara: seed ${resolveArenaSeed(conditions.boss, conditions.seed ?? ARENA_CATALOG[conditions.boss].seed)}.`;
   hudNote.classList.remove('hidden');
   toolsToggle.classList.remove('hidden');
   // O censo so faz sentido onde ha gelo. Nos outros chefes o painel seria cinco

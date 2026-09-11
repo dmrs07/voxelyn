@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 import { RUN_SEED_MIX, DEFAULT_SECTOR_COUNT, SOLID_NONE, WORLD_H, WORLD_W } from '../src/constants';
 import { sectorSeed } from '../src/sectors';
 import { sectorProfile } from '../src/strata';
+import { DEFAULT_RUN_DEPTH } from '../src/progression';
 import { createTerrainDraft, floodOpen, generateWorld } from '../src/worldgen';
 
 // Pela fonte unica (`sectorProfile`), e nao por remontagem: o terreno medido
@@ -33,7 +34,7 @@ const worldFor = (seed: number, sector: number) =>
     sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
     WORLD_W,
     WORLD_H,
-    sectorProfile(seed, sector),
+    sectorProfile(seed, sector, DEFAULT_RUN_DEPTH),
   );
 
 /** Devolve o laco de eventos ao vitest no meio da varredura — ver arena-chefe.test.ts. */

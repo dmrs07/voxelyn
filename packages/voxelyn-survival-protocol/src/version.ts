@@ -250,7 +250,21 @@
 // 40: echo evidence and thermal guard in snapshots; bit 7 tags echo choices in command logs.
 // 41: o viewer ganha `sprintUntil` (a Disparada). Um cliente de 40 nao acenderia
 //     o botao nem saberia por que o parceiro atravessou a agua funda.
-export const PROTOCOL_VERSION = 41;
+// 42: `WorldFlags` ganha `magnetFlipAt` — o tick em que a polaridade do
+//     MAGNETARCA vira (-1 = o campo ainda dorme). Dele saem, no cliente, a fase
+//     que vale, a folga silenciosa da inversao e qual das duas bordas cobra
+//     agora. Um cliente de 41 nunca receberia o prazo e desenharia o campo sem
+//     a folga — prometendo esmagamento no tick em que o servidor ja cobra pelo
+//     arco de retorno. `BossMoment` aceita `invert`, o instante em que a folga
+//     abre: um cliente antigo receberia um estado que ele nao conhece.
+// 43: O CICLO DO FERRO do Magnetarca. `WorldFlags` ganha `magnetShards` (as
+//     massas de minerio e sucata: posicao, rota marcada, estado, fratura,
+//     integridade e ultima cobranca) e `magnetExposedUntil` (o descompasso do
+//     campo depois de um estilhaco). `BossAbility` aceita `shard` e
+//     `BossMoment` aceita `crack` e `shatter`. Um cliente de 42 nao desenharia
+//     nem as massas nem as rotas marcadas no chao — e as rotas SAO o telegrafo:
+//     sem elas o ferro atravessa a arena sem sinal.
+export const PROTOCOL_VERSION = 43;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1079,7 +1093,121 @@ export const PROTOCOL_VERSION = 41;
 //     habilidades desbloqueadas (antes: as duas de maior contagem, sempre as
 //     mesmas com tudo desbloqueado). Replays de 79 que usaram o Passo ou
 //     chegaram ao poco com tres ou mais Ecos nao batem.
-export const SIMULATION_VERSION = 80;
+// 81: O MAGNETARCA — onde ele mora e como a luta dele se le.
+//
+//     ONDE: as posicoes 3 e 4 da linhagem industrial deixam de ser Cicatriz
+//     Aurix e passam a ser veio ferrifero SEM ocupacao. O Ferrifero era o unico
+//     estrato que nunca respondia pelo proprio chefe — a ocupacao forte
+//     substitui o dono do estrato, e a cicatriz cobria todas as posicoes de
+//     chefe que a linhagem oferecia —, entao o Magnetarca aparecia em ZERO por
+//     cento das runs de G-00, G-01 e G-02 e em 8,9% das de G-04. Agora ele
+//     aparece em toda geracao, na mesma frequencia dos outros donos de estrato.
+//     O terreno das seeds industriais muda nesses dois setores (a impressao
+//     digital da geracao acompanha), e replays de 80 nessas seeds nao batem.
+//
+//     COMO: a polaridade sai do relogio GLOBAL (`floor(tick / ciclo) % 2`) e
+//     passa a ter relogio proprio, hasheado (`bossRuntime.magnetFlipAt`). O
+//     campo dorme ate alguem entrar nele, acorda sempre em atracao com um ciclo
+//     inteiro pela frente e emite `boss_awake`; o fim de cada ciclo tem uma
+//     folga de 30 ticks em que ele nao puxa nem cobra — o telegrafo da
+//     inversao. `MAGNETARCH_SPEED` vai a zero: ele ja nao andava, e agora a
+//     ficha diz isso.
+// 82: O CICLO DO FERRO. O campo do Magnetarca passa a mover a MATERIA que a
+//     lore dele sempre descreveu: atraindo ele recolhe as massas cravadas na
+//     arena, repelindo ele as arremessa de volta, e entre um e outro elas sao
+//     alvo. Tres tiros do disparo basico fraturam uma massa; fraturada, ela nao
+//     sobrevive ao recolhimento — se despedaca contra os aneis, cobra 96 do
+//     proprio chefe e deixa o nucleo exposto por 3 s (o campo para de cobrar e
+//     o dano entra a 1,6x). O material e finito: a massa que se despedaca
+//     acabou.
+//
+//     A vida sobe de 720 para 1.200 e a polaridade cai de 8,5 s para 6 s
+//     (`MAGNETARCH_CYCLE_TICKS` 170 -> 120), os dois por medicao: com 720 o
+//     chefe morria aos 19,8 s, meio segundo ANTES de a primeira massa fraturada
+//     chegar nele. Em 1.200 e 6 s, sabotar termina em 21,2 s contra 26,6 s
+//     ignorando, com o primeiro estilhaco aos 14,2 s e o chefe ainda em 28%.
+//     Ver as tabelas em `docs/bosses/voxelyn-survival-chefes-por-bioma.md`.
+//
+//     Tres correcoes de revisao entram na mesma versao, e as tres mudam numero:
+//     a sabotagem passa a valer durante o TELEGRAFO do recolhimento (os 26 ticks
+//     anunciados como janela eram justamente os intocaveis); o estilhaco deixa
+//     de amplificar a si mesmo (tres retornos cobravam 460,8 em vez de 288,
+//     porque a janela de 1,6x abria antes de os outros dois cobrarem); e a morte
+//     do chefe deixa de poder ser desfeita pelo passo das massas, que gravava a
+//     propria lista de sobreviventes por cima da limpeza.
+// 83: duas correcoes do ciclo do ferro que mudam numero, e por isso versao.
+//
+//     O RETORNO ganha causa propria (`magnet_return`) e sai do multiplicador do
+//     nucleo exposto no FUNIL. A correcao anterior agrupava o dano antes de
+//     abrir a janela, e isso so protegia as massas que voltavam no MESMO tick:
+//     duas com distancias de recolhimento diferentes chegam em ticks diferentes,
+//     e a segunda cobrava 153,6 em vez dos 96 que a ficha promete.
+//
+//     O ATROPELO da massa passa a ser `enemy_projectile` (pedra) e nao
+//     `enemy_contact`. A licao da tela de morte e outra — "saia do corredor", e
+//     nao "ache a faixa" —, e com a causa compartilhada as duas mortes davam a
+//     mesma frase e a contabilidade do encontro somava as duas num numero so.
+// 84: a CAMARA passa a entregar o estoque de ferro que o chao permite.
+//
+//     `claimMagnetShards` tentava tres angulos FIXOS (0, 120, 240 graus) com
+//     quatro raios cada e desistia da massa quando o rumo inteiro estava
+//     bloqueado, sem procurar outro. Medido nas 24 camaras do benchmark: quatro
+//     entregavam UMA massa, quinze duas, e so cinco as tres — media de 2,04 de
+//     3. Havia camara (seed 216) em que o encontro inteiro passava sem um unico
+//     arremesso de ferro, porque a unica massa era consumida no recolhimento de
+//     abertura.
+//
+//     A regra nova enumera o chao elegivel da faixa (celula aberta, dentro do
+//     anel, com linha de visao para o corpo — que e a rota do recolhimento) e
+//     escolhe tres por afastamento maximo. Adapta-se a camara, continua pura e
+//     nao consome a RNG da run. As 24 camaras passam a entregar 3 de 3.
+//
+//     E outra luta: com tres corredores por ciclo o bot mortal termina com 56
+//     de vida ignorando o ferro (era 77) e a pior partida do lote acaba em
+//     10/100. Replays de 83 num setor com Magnetarca nao batem.
+// 85: a CAMARA CENTRAL do Magnetarca.
+//
+//     O campo dele tem treze tiles de raio e a luta inteira e ler DUAS BORDAS
+//     concentricas e atravessar a faixa entre elas. A camara nascia onde o mapa
+//     levasse — o Nucleo no ponto mais distante da entrada (`bfsFarthest`), que
+//     costuma ser um canto, e o chefe encostado nele. Num canto metade do campo
+//     nasce dentro da parede: o anel que o jogador precisa ler sai cortado, a
+//     faixa vira um corredor em vez de um corredor circular, e o ciclo do ferro
+//     perde o chao elegivel de que as massas precisam.
+//
+//     O perfil de geracao ganha `bossArena`. Com `central`, a arena e escavada
+//     no centro EXATO do mapa (disco de raio 11 = alcance do arco de retorno
+//     mais dois tiles de folga), o corpo fica ali e o Nucleo e que se encosta
+//     nele — a mesma vizinhanca de sempre, com a ancora trocada de lado. E o
+//     unico traco de terreno que sai do CHEFE e nao do estrato, e por isso
+//     `sectorProfile` passou a pedir a profundidade da run: quem e o dono de um
+//     setor depende de quantos setores a descida tem.
+//
+//     Nenhum outro chefe pede isto. O Arquicantor pede MARGEM e recua a rotunda
+//     para dentro; o Magnetarca pede CENTRO, e um canto com margem continua
+//     sendo um canto. Replays de 84 num setor com Magnetarca nao batem.
+// 86: a camara central AFINADA — raio 9, e cobertura na faixa.
+//
+//     A 85 escavou um disco de raio 11 e o deixou vazio. Ele mediu bem e jogava
+//     mal: o bot mortal terminou com 88 de vida restante em media contra os 56
+//     a 82 da camara antiga, a pior partida do lote subiu de 10/100 para 48/100
+//     e a vantagem de sabotar o ferro caiu de 36% para 17%. Sem nada para
+//     cortar linha, a unica decisao que sobra e a distancia ao corpo — e a
+//     distancia o jogador resolve uma vez.
+//
+//     Duas correcoes. O raio cai para `MAGNETARCH_TETHER_RANGE` (9): a
+//     escavacao abre A FAIXA e nada alem dela, e o que fica fora do anel de
+//     retorno volta a ser o que o mapa ja tinha — caverna, nao arena. E a faixa
+//     ganha COBERTURA (`BAND_COVER`): oito pilares de camara-e-pilar, a
+//     gramatica de mina que o proprio estrato pede, quatro nas diagonais a meia
+//     faixa e quatro nos eixos mais para fora, defasados 45 graus.
+//
+//     Pilar aqui nao protege de nada — o campo cobra por DISTANCIA e nao
+//     consulta parede —, ele atrapalha o TIRO, do jogador e da massa. Medido:
+//     65% da faixa mantem linha para o corpo (pior camara 61%), a vida restante
+//     volta a 57 e a vantagem da sabotagem sobe para 25%. Replays de 85 num
+//     setor com Magnetarca nao batem.
+export const SIMULATION_VERSION = 86;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -1287,7 +1415,16 @@ export const SIMULATION_VERSION = 80;
 //     teto — nove quadros, nas vagas da ultima linha) e o atlas
 //     `enemy-silk-spiderling`, sob demanda no grupo da Cerzideira.
 // 41: seismic, slipstream and vent echoes; expanded per-sector resonance.
-export const CONTENT_VERSION = 41;
+// 42: o atlas `fx-magnet-shard` — a massa de ferro do Magnetarca, sob demanda
+//     com o grupo dele. O ciclo do ferro desenhava as massas a mao no cliente,
+//     e a mao saia a 23% do raio que a simulacao acerta e atropela (0,7 tile):
+//     o jogador mirava num cascalho e o tiro passava por cima da unica coisa
+//     que o contra-jogo do encontro pede que ele acerte. O sprite e autorado
+//     NAQUELE raio, em dois estados — inteira (faiscas frias do campo) e
+//     fraturada (o corpo aberto, a fenda em branco quente e a limalha
+//     escapando). Um cliente com a precache antiga continuaria sem o atlas e
+//     cairia no recuo chapado; o bump invalida a precache.
+export const CONTENT_VERSION = 42;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -12,13 +12,13 @@
 A profundidade de uma run deixa de ser uma constante do jogo e passa a ser a
 **autorização operacional** que a geração do Prospector concede.
 
-| Geração | Setores acessíveis | Núcleos |
-| --- | --- | --- |
-| G-00 | 3 | setor 3 |
-| G-01 | 3 | setor 3 |
-| G-02 | 4 | setor 4 |
-| G-03 | 5 | setores 3 e 5 |
-| G-04 | 7 | setores 3 e 7 |
+| Geração | Setores acessíveis | Núcleos       |
+| ------- | ------------------ | ------------- |
+| G-00    | 3                  | setor 3       |
+| G-01    | 3                  | setor 3       |
+| G-02    | 4                  | setor 4       |
+| G-03    | 5                  | setores 3 e 5 |
+| G-04    | 7                  | setores 3 e 7 |
 
 Toda linhagem geológica passa a resolver **sete** posições. Quantas delas a run
 visita é outra pergunta, e a resposta é a geração congelada.
@@ -79,11 +79,11 @@ e re-derivar é exatamente o que o congelamento existe para impedir.
 
 ### 2.2 As três perguntas (`depth.ts`)
 
-| Pergunta | API |
-| --- | --- |
-| este é o último setor? | `isFinalSector(sector, sectorCount)`, `isRunFinalSector(state)` |
+| Pergunta                            | API                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| este é o último setor?              | `isFinalSector(sector, sectorCount)`, `isRunFinalSector(state)`                        |
 | há Núcleo aqui, e já foi recolhido? | `hasCoreInSector`, `isCoreTaken`, `markCoreTaken`, `clearCoreTaken`, `countCoresTaken` |
-| o selo deste setor já cedeu? | `sectorHasBoss`, `descentUnlocked`, `coreUnlocked`, `markSectorBossDown` |
+| o selo deste setor já cedeu?        | `sectorHasBoss`, `descentUnlocked`, `coreUnlocked`, `markSectorBossDown`               |
 
 Tudo função pura do estado; nenhuma consulta ao perfil, nenhuma RNG, nenhuma
 escrita fora dos dois `mark*`. É o que permite ao cliente responder as mesmas
@@ -107,15 +107,24 @@ seed derivada, regras de extração ou hash.
 `LineageStep`, com estrato, ocupação e o nome editorial da posição. As posições
 1–3 são **exatamente** as históricas em toda linhagem.
 
-| Linhagem | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| hídrica | Galerias Úmidas | Aquífero Superior | Reservatório Negro | Galerias Submersas | Lençol Profundo | Colônia Abissal | Fossa do Aquífero |
-| mineral | Basalto Cristalizado | Galerias Prismáticas | Catedral Prismática | Nervuras Ressonantes | Coro Mineral | Câmara de Reflexão | Coração Ressonante |
-| industrial | Escavação Inicial | Galerias Ferríferas | Complexo Aurix | Linha de Extração | Cicatriz Aurix | Instalação de Recuperação | Poço Diamandis |
-| térmica | Basalto Fraturado | Fenda Sulfurosa | Câmara de Ventilação | Galeria Carbonizada | Pulmão Profundo | Mar de Escória | Coração da Fornalha |
-| árida | Basalto Seco | Sílica Fraturada | Sumidouros de Sílica | Galerias Móveis | Deserto Subterrâneo | Sílica Vitrificada | Ninho do Devorador |
-| criogênica | Basalto Frio | Galerias de Geada | Cripta Glacial | Lençol Congelado | Câmara dos Ecos | Palácio de Gelo | Trono da Geada |
-| basáltica | Galerias de Basalto | Galerias Inferiores | Câmara do Guardião | Fratura Basáltica | Colunata Profunda | Anfiteatro Negro | Raiz do Veio |
+| Linhagem   | 1                    | 2                    | 3                    | 4                    | 5                   | 6                         | 7                   |
+| ---------- | -------------------- | -------------------- | -------------------- | -------------------- | ------------------- | ------------------------- | ------------------- |
+| hídrica    | Galerias Úmidas      | Aquífero Superior    | Reservatório Negro   | Galerias Submersas   | Lençol Profundo     | Colônia Abissal           | Fossa do Aquífero   |
+| mineral    | Basalto Cristalizado | Galerias Prismáticas | Catedral Prismática  | Nervuras Ressonantes | Coro Mineral        | Câmara de Reflexão        | Coração Ressonante  |
+| industrial | Escavação Inicial    | Galerias Ferríferas  | Complexo Aurix       | Linha de Extração    | Cicatriz Aurix      | Instalação de Recuperação | Poço Diamandis      |
+| térmica    | Basalto Fraturado    | Fenda Sulfurosa      | Câmara de Ventilação | Galeria Carbonizada  | Pulmão Profundo     | Mar de Escória            | Coração da Fornalha |
+| árida      | Basalto Seco         | Sílica Fraturada     | Sumidouros de Sílica | Galerias Móveis      | Deserto Subterrâneo | Sílica Vitrificada        | Ninho do Devorador  |
+| criogênica | Basalto Frio         | Galerias de Geada    | Cripta Glacial       | Lençol Congelado     | Câmara dos Ecos     | Palácio de Gelo           | Trono da Geada      |
+| basáltica  | Galerias de Basalto  | Galerias Inferiores  | Câmara do Guardião   | Fratura Basáltica    | Colunata Profunda   | Anfiteatro Negro          | Raiz do Veio        |
+
+> **Atualização (`SIMULATION_VERSION` 81).** A linha **industrial** mudou nas
+> posições 3 e 4: "Complexo Aurix" e "Linha de Extração" viraram **Veio Exposto**
+> e **Desvio da Linha**, as duas `ferric/none`. A tabela acima é a desta spec, e
+> não a de hoje. O motivo está em
+> `docs/bosses/voxelyn-survival-chefes-por-bioma.md`, §_O Magnetarca — a anomalia
+> que parte a linhagem industrial_: com a Cicatriz Aurix cobrindo o Ferrífero
+> inteiro, o dono do estrato não podia aparecer em nenhuma run de G-00, G-01 ou
+> G-02.
 
 A metade profunda não é a repetição da rasa. Três decisões editoriais dão a
 volta que a curva pedia:
@@ -216,12 +225,12 @@ Quando o portador cai, cada Núcleo volta **ao pedestal dele**. Um contador diri
 - **todo setor de Núcleo** tem: o Núcleo está selado, e o selo precisa de um
   dono. Um pedestal que qualquer um alcança não é objetivo, é parada.
 
-| Geração | Setores | Chefes |
-| --- | --- | --- |
-| G-00 / G-01 | 3 | 3 |
-| G-02 | 4 | 4 |
-| G-03 | 5 | 3 e 5 |
-| G-04 | 7 | 3 e 7 |
+| Geração     | Setores | Chefes |
+| ----------- | ------- | ------ |
+| G-00 / G-01 | 3       | 3      |
+| G-02        | 4       | 4      |
+| G-03        | 5       | 3 e 5  |
+| G-04        | 7       | 3 e 7  |
 
 Numa run de três setores isso dá exatamente o que sempre deu: um chefe, no
 terceiro.
@@ -241,18 +250,18 @@ finge estar implementado.
 
 Bosses suportados hoje (tabela completa, todos com arquétipo):
 
-| Fonte | Bioma | Chefe |
-| --- | --- | --- |
-| ocupação | micelial | Bispo |
-| ocupação | Aurix | Diamandis |
-| estrato | basalto | Guardião |
-| estrato | prismático | Arquicantor |
-| estrato | aquífero | Leviatã do Lençol |
-| estrato | enxofre | Pulmão-Matriz |
-| estrato | fornalha | Coração da Fornalha |
-| estrato | sílica | Devorador Branco |
-| estrato | glacial | Rainha da Geada |
-| estrato | ferrífero | Magnetarca |
+| Fonte    | Bioma      | Chefe               |
+| -------- | ---------- | ------------------- |
+| ocupação | micelial   | Bispo               |
+| ocupação | Aurix      | Diamandis           |
+| estrato  | basalto    | Guardião            |
+| estrato  | prismático | Arquicantor         |
+| estrato  | aquífero   | Leviatã do Lençol   |
+| estrato  | enxofre    | Pulmão-Matriz       |
+| estrato  | fornalha   | Coração da Fornalha |
+| estrato  | sílica     | Devorador Branco    |
+| estrato  | glacial    | Rainha da Geada     |
+| estrato  | ferrífero  | Magnetarca          |
 
 ### 6.3 Um chefe por run
 
@@ -287,7 +296,7 @@ jogador parado a doze tiles matava 900 de vida sem risco nenhum: não era uma
 luta difícil nem fácil, não era uma luta.
 
 - **raio 8 → 15**: a promessa "a luta é contra a sala" só vale se a sala
-  inteira for a luta. O que continua sendo escolha é *onde* estar dentro dela —
+  inteira for a luta. O que continua sendo escolha é _onde_ estar dentro dela —
   a varredura é um setor girando, não um pulso total;
 - **dano na passagem** (`FURNACE_HEART_WAVE_DAMAGE`): a onda só pintava chão, e
   chão cobra de quem fica parado — o que um jogador em movimento nunca era;
@@ -385,7 +394,7 @@ rodando `stepCollapse` e continua cobrando na hora marcada. Sem a derivação, a
 reconexão produzia uma pancada sem telegrafo nenhum.
 
 `WorldFlags` espelha as duas listas, mais `blastAt` (a Salva guarda as células
-no runtime mas o relógio na *ação* do chefe). Sem relógio o cliente não desenha
+no runtime mas o relógio na _ação_ do chefe). Sem relógio o cliente não desenha
 nada: meia marca — onde, mas não quando — para de comunicar urgência e continua
 ocupando o chão.
 
@@ -405,7 +414,11 @@ marca de chão com hora certa), então as duas passaram a dividir
 ### 6.6 Estado genérico
 
 ```ts
-type SectorBossState = { archetype: EnemyArchetype | null; entityId: number | null; defeated: boolean };
+type SectorBossState = {
+  archetype: EnemyArchetype | null;
+  entityId: number | null;
+  defeated: boolean;
+};
 ```
 
 Deliberadamente magro. Mecânicas próprias continuam em `bossRuntime` e nos
@@ -599,12 +612,12 @@ Quatro documentos novos, um por geração, com o mesmo gatilho dos marcos
 autorização é um documento sobre o **Veio**. No Codex aparecem lado a lado pela
 cronologia.
 
-| Doc | Geração | Título | Ato |
-| --- | --- | --- | --- |
-| `AX-ENG-037` | G-01 | Autorização de Descida Padrão | II — Engenharia |
-| `AX-PRC-027` | G-02 | Extensão de Garantia Estrutural | III — Aquisições |
-| `AX-EXE-049` | G-03 | Protocolo de Recuperação Dupla | V — Executivo |
-| `AX-UNK-068` | G-04 | Licença de Profundidade Irrestrita | VI — Não classificado |
+| Doc          | Geração | Título                             | Ato                   |
+| ------------ | ------- | ---------------------------------- | --------------------- |
+| `AX-ENG-037` | G-01    | Autorização de Descida Padrão      | II — Engenharia       |
+| `AX-PRC-027` | G-02    | Extensão de Garantia Estrutural    | III — Aquisições      |
+| `AX-EXE-049` | G-03    | Protocolo de Recuperação Dupla     | V — Executivo         |
+| `AX-UNK-068` | G-04    | Licença de Profundidade Irrestrita | VI — Não classificado |
 
 A curva editorial acompanha a mecânica: três setores apresentados como
 tolerância estrutural → um quarto autorizado porque a conta fechou (perder o

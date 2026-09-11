@@ -541,6 +541,22 @@ export class GameRoom {
       leviathanSurfaceAt: this.state.bossRuntime.leviathanSurfaceAt,
       // A BOCA em um numero. O cliente refaz o vortice inteiro a partir dele.
       mawOpenedAt: this.state.bossRuntime.mawOpenedAt,
+      // O CAMPO do Magnetarca pela mesma economia: um prazo, e o cliente refaz
+      // a fase, a folga da inversao e a borda que cobra agora.
+      magnetFlipAt: this.state.bossRuntime.magnetFlipAt,
+      magnetExposedUntil: this.state.bossRuntime.magnetExposedUntil,
+      // AS MASSAS do ciclo do ferro. Tres no maximo, e elas nao repovoam.
+      magnetShards: this.state.bossRuntime.magnetShards.map((shard) => ({
+        x: round3(shard.x),
+        y: round3(shard.y),
+        tx: round3(shard.tx),
+        ty: round3(shard.ty),
+        at: shard.at,
+        state: shard.state,
+        cracked: shard.cracked,
+        hp: round3(shard.hp),
+        hitAt: shard.hitAt,
+      })),
       // OS SUMIDOUROS da Fome, pela mesma economia: dois numeros e um tick por
       // cratera aberta, e o cliente refaz o campo inteiro.
       sinkholes: this.state.bossRuntime.sinkholes.map((hole) => ({

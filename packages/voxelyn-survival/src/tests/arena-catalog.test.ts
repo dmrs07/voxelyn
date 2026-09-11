@@ -23,6 +23,7 @@ import {
   stepRun,
 } from '@voxelyn/survival-sim';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from '../client/arena-catalog';
+import { resolveArenaSeed } from '../client/arena-setup';
 import {
   ARENA_KEEP_RADIUS,
   ARENA_MAX_HP,
@@ -60,6 +61,59 @@ describe('ARENA_CATALOG', () => {
       });
       expect(state.sectorBoss.archetype, `chefe de '${boss}'`).toBe(boss);
       expect(state.sectorBoss.entityId, `corpo do chefe de '${boss}' em campo`).not.toBeNull();
+    }
+  });
+});
+
+describe('resolveArenaSeed', () => {
+  // A promessa do seletor e "voce vai lutar contra ESTE chefe". Uma seed que
+  // nao a cumpre abriria a camara errada — ou uma sem dono — sem nada na tela
+  // dizendo por que, e o playtest inteiro aconteceria no caso errado achando
+  // que esta no certo.
+  it('sem pedido, e a seed canonica do catalogo', () => {
+    for (const [boss, entry] of Object.entries(ARENA_CATALOG)) {
+      expect(resolveArenaSeed(boss as ArenaBossId, entry.seed)).toBe(entry.seed);
+    }
+  });
+
+  it('aceita a seed que ENTREGA aquele chefe — e a 216 do benchmark e uma', () => {
+    // 216 e uma das camaras medidas pelo bot mortal, e poder abri-la na arena e
+    // a razao de este override existir: discutir "aqueles treze segundos finais"
+    // exige jogar a mesma camara, e nao uma parecida.
+    expect(resolveArenaSeed('magnetarch', 216)).toBe(216);
+    const state = createArenaRun({
+      boss: 'magnetarch',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+      seed: 216,
+    });
+    expect(state.sectorBoss.archetype).toBe('magnetarch');
+  });
+
+  it('RECUSA a seed que nao entrega aquele chefe, e cai na canonica', () => {
+    const entry = ARENA_CATALOG.magnetarch;
+    // Uma seed do catalogo de OUTRO chefe: formato valido, promessa quebrada.
+    const alheia = ARENA_CATALOG.frost_queen.seed;
+    expect(resolveArenaSeed('magnetarch', alheia)).toBe(entry.seed);
+    // E a arena de verdade obedece a recusa: quem chamar direto, sem passar
+    // pela URL, tambem nao consegue abrir a camara errada.
+    const state = createArenaRun({
+      boss: 'magnetarch',
+      maxHp: 100,
+      ability: 'pulse',
+      modules: [],
+      stabilisers: false,
+      seed: alheia,
+    });
+    expect(state.sectorBoss.archetype).toBe('magnetarch');
+  });
+
+  it('recusa lixo de formato sem explodir', () => {
+    const canonica = ARENA_CATALOG.magnetarch.seed;
+    for (const lixo of [-1, 1.5, NaN, Infinity, 'abc', null, undefined, {}]) {
+      expect(resolveArenaSeed('magnetarch', lixo)).toBe(canonica);
     }
   });
 });

@@ -77,6 +77,7 @@ import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-b
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
 import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
 import silkNetManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-net.json';
+import magnetShardManifest from '@voxelyn/survival-content/assets/atlases/fx-magnet-shard.json';
 import silkCocoonManifest from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.json';
 import spiderlingManifest from '@voxelyn/survival-content/assets/atlases/enemy-silk-spiderling.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
@@ -154,6 +155,7 @@ import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
 import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
 import silkNetUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-net.png?url';
+import magnetShardUrl from '@voxelyn/survival-content/assets/atlases/fx-magnet-shard.png?url';
 import silkCocoonUrl from '@voxelyn/survival-content/assets/atlases/fx-silk-cocoon.png?url';
 import spiderlingUrl from '@voxelyn/survival-content/assets/atlases/enemy-silk-spiderling.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
@@ -654,6 +656,17 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
  */
 export const DIAMANDIS_CHASSIS_ATLAS = 'enemy-diamandis';
 export const SILK_COCOON_ATLAS = 'fx-silk-cocoon';
+/**
+ * A MASSA DE FERRO do Magnetarca, sob demanda com o grupo dele.
+ *
+ * Sob demanda e nao no boot por uma regra escrita, e nao por gosto: o
+ * orcamento de memoria de video do boot esta a menos de 300 KiB do teto, e o
+ * comentario que fixou esse teto (`validate.mjs`) diz o que fazer com o proximo
+ * peso — paga-se com carregamento sob demanda, nunca com teto maior. O sprite
+ * so existe dentro de UMA camara do jogo; uma run que nao encontra o Magnetarca
+ * nao deve pagar um byte por ele.
+ */
+export const MAGNET_SHARD_ATLAS = 'fx-magnet-shard';
 export const DIAMANDIS_PART_ATLASES: readonly string[] = [
   'part-diamandis-drill',
   'part-diamandis-rack',
@@ -671,8 +684,15 @@ export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
   // encontro dela precisa. Pedido em `requestPart` quando um Prospector cai
   // na rede; retido e liberado com o grupo `seamstress`.
   SILK_COCOON_ATLAS,
+  // A massa de ferro: pedida em `requestPart` assim que o corpo do Magnetarca
+  // entra na cena, e liberada com o grupo `magnetarch`.
+  MAGNET_SHARD_ATLAS,
 ]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
+  'fx-magnet-shard': {
+    manifest: magnetShardManifest as unknown as SpriteManifestEntry,
+    url: magnetShardUrl,
+  },
   'enemy-seamstress-brood': {
     manifest: silkBroodManifest as unknown as SpriteManifestEntry,
     url: silkBroodUrl,

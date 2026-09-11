@@ -398,7 +398,15 @@ describe('a janela de dano tem voz', () => {
 });
 
 describe('Magnetarca: atracao e repulsao soam opostas, e sem olhar', () => {
-  it('a polaridade e o rele mais a polaridade, globais', () => {
+  it('o rele AVISA e a polaridade CONFIRMA — em instantes diferentes', () => {
+    // Os dois sons saiam no mesmo tick, e com isso o aviso tinha o timing do
+    // fato consumado: quando o rele soava, a polaridade nova ja estava
+    // cobrando. Agora o rele e o primeiro tick da folga e a voz da polaridade e
+    // o fim dela.
+    const invert = cuesForEvent(
+      { t: 'boss_state', archetype: 'magnetarch', state: 'invert', x: 1, y: 1 },
+      ctx,
+    );
     const attract = cuesForEvent(
       { t: 'boss_state', archetype: 'magnetarch', state: 'attract', x: 1, y: 1 },
       ctx,
@@ -407,9 +415,12 @@ describe('Magnetarca: atracao e repulsao soam opostas, e sem olhar', () => {
       { t: 'boss_state', archetype: 'magnetarch', state: 'repel', x: 1, y: 1 },
       ctx,
     );
-    expect(attract.map((c) => c.voice)).toEqual(['magnetarchFlip', 'magnetarchAttract']);
-    expect(repel.map((c) => c.voice)).toEqual(['magnetarchFlip', 'magnetarchRepel']);
-    for (const cue of [...attract, ...repel]) expect(VOICE_SPECS[cue.voice].spatial).toBe(false);
+    expect(invert.map((c) => c.voice)).toEqual(['magnetarchFlip']);
+    expect(attract.map((c) => c.voice)).toEqual(['magnetarchAttract']);
+    expect(repel.map((c) => c.voice)).toEqual(['magnetarchRepel']);
+    for (const cue of [...invert, ...attract, ...repel]) {
+      expect(VOICE_SPECS[cue.voice].spatial).toBe(false);
+    }
   });
 
   it('o esmagamento e o arco sao golpes distintos, e o arco nao e o do Leviata', () => {

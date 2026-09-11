@@ -30,8 +30,22 @@ import {
   setSurface,
 } from '../src/cells';
 import { generateWorld } from '../src/worldgen';
-import { biomeProfile } from '../src/strata';
-import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
+import { biomeProfile, sectorBiome } from '../src/strata';
+import { runDepthForGeneration } from '../src/progression';
+import { magnetField, magnetStanding } from '../src/magnet';
+import { hitMagnetShards } from '../src/magnet-shards';
+import { createMagnetarchBench } from '../src/magnetarch-bench';
+import { hasLineOfSight } from '../src/pathing';
+
+/** Distancia entre dois corpos — os testes do ferro precisam dela solta. */
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+  Math.hypot(a.x - b.x, a.y - b.y);
+import {
+  BOSS_OF_STRATUM,
+  IMPLEMENTED_BOSS,
+  bossArchetypeForBiome,
+  bossForSector,
+} from '../src/bosses';
 import {
   BOSS_PHASE_DELUGE,
   BOSS_PHASE_OVERHEAT,
@@ -79,6 +93,14 @@ import {
   ARCHCANTOR_CRYSTAL_BUDGET,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
+  MAGNETARCH_FIELD_RANGE,
+  BOLT_DAMAGE,
+  MAGNETARCH_EXPOSED_ARMOR,
+  MAGNETARCH_FIELD_TICK_INTERVAL,
+  MAGNETARCH_FLIP_WINDUP_TICKS,
+  MAGNETARCH_SHARDS,
+  MAGNETARCH_SHARD_RETURN_DAMAGE,
+  MAGNETARCH_SHARD_WINDUP_TICKS,
   MAGNETARCH_TETHER_RANGE,
   SOLID_CRYSTAL,
   SOLID_NONE,
@@ -103,6 +125,11 @@ import {
   DISCOVERY_QUEEN_THAWED,
   MAGNET_ATTRACT,
   MAGNET_REPEL,
+  SHARD_FLIGHT,
+  SHARD_HELD,
+  SHARD_LAUNCH,
+  SHARD_LODGED,
+  SHARD_WINDUP,
   RESONANT_CHOIR,
   RESONANT_SOLOIST,
   RESONANT_WILD,
@@ -212,6 +239,53 @@ describe('a tabela de chefes esta completa', () => {
     for (const stratum of Object.keys(BOSS_OF_STRATUM) as (keyof typeof BOSS_OF_STRATUM)[]) {
       const id = BOSS_OF_STRATUM[stratum];
       expect(IMPLEMENTED_BOSS[id], `${stratum} -> ${id}`).toBeDefined();
+    }
+  });
+
+  /**
+   * O DONO DO FERRIFERO PRECISA PODER APARECER.
+   *
+   * "Um chefe que nao spawna nao esta implementado" ja aposentou o Guardiao
+   * (a linhagem basaltica) e o Devorador (a arida). O Magnetarca era o terceiro
+   * caso e o mais escondido: a tabela dizia que ele era o dono do Ferrifero, e
+   * o Ferrifero era um estrato inteiramente coberto pela Cicatriz Aurix — que,
+   * sendo ocupacao forte, entrega a camara ao Diamandis. Ele nao aparecia em
+   * NENHUMA run de G-00, G-01 ou G-02.
+   *
+   * Este teste varre a selecao PURA (nao gera mundo nenhum) e cobra duas
+   * coisas: ele existe em toda geracao, e a frequencia dele fica na mesma casa
+   * dos outros donos de estrato daquela geracao. A segunda metade e o ponto —
+   * "aparece uma vez em mil" tambem passaria por um teste de presenca.
+   */
+  it('o Magnetarca e alcancavel em TODA geracao, na frequencia dos outros donos de estrato', () => {
+    const SEEDS = 3000;
+    for (const generation of ['G-00', 'G-02', 'G-03', 'G-04'] as const) {
+      const depth = runDepthForGeneration(generation);
+      const tally = new Map<string, number>();
+      for (let seed = 0; seed < SEEDS; seed++) {
+        const owners = new Set<string>();
+        for (let sector = 1; sector <= depth.sectorCount; sector++) {
+          const def = bossForSector(
+            (s) => sectorBiome(seed, s),
+            sector,
+            depth.sectorCount,
+            depth.coreSectors,
+          );
+          if (def) owners.add(def.boss);
+        }
+        for (const boss of owners) tally.set(boss, (tally.get(boss) ?? 0) + 1);
+      }
+      const magnetarch = tally.get('magnetarch') ?? 0;
+      expect(magnetarch, `${generation}: o Ferrifero nao tem dono alcancavel`).toBeGreaterThan(0);
+      // O Guardiao e a referencia justa: dono de estrato tambem, e o basalto
+      // tambem so e final numa linhagem. Metade da frequencia dele e a margem —
+      // as intrusoes nao caem igual em todo estrato, e o teste mede ordem de
+      // grandeza, nao paridade decimal.
+      const guardian = tally.get('guardian') ?? 0;
+      expect(
+        magnetarch * 2,
+        `${generation}: magnetarca ${magnetarch} contra guardiao ${guardian} em ${SEEDS} seeds`,
+      ).toBeGreaterThanOrEqual(guardian);
     }
   });
 
@@ -1563,7 +1637,44 @@ describe('Rainha da Geada — a couraça e o estrato', () => {
 });
 
 describe('Magnetarca — a faixa troca de lado', () => {
-  it('a polaridade alterna sozinha, pelo relogio', () => {
+  /**
+   * Anda a simulacao ate a polaridade pedida estar valendo E fora da folga.
+   *
+   * Substitui o `Math.floor(tick / CICLO) % 2` que estes testes usavam: aquele
+   * relogio era o GLOBAL, e desde o telegrafo o ciclo e do encontro. Um teste
+   * que continuasse consultando o relogio do mundo estaria medindo a fase certa
+   * por coincidencia — que e exatamente o defeito que o rework corrigiu.
+   */
+  const settleInto = (
+    state: SurvivalState,
+    boss: { mood?: number },
+    polarity: 'attract' | 'repel',
+  ): boolean =>
+    advanceUntil(state, () => {
+      const field = magnetField(state.tick, state.bossRuntime.magnetFlipAt, boss.mood ?? -1);
+      return field.live && field.polarity === polarity;
+    });
+
+  it('o campo DORME ate alguem entrar nele, e acorda em atracao', () => {
+    // Longe do alcance: o encontro nem comecou, e o relogio nao pode estar
+    // correndo. Enquanto ele era global, ja estava.
+    const { state, boss } = duel(650, 'magnetarch', MAGNETARCH_FIELD_RANGE + 4);
+    for (let t = 0; t < 40; t++) stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.magnetFlipAt, 'o campo acordou sem ninguem nele').toBe(-1);
+
+    state.player.x = boss.x - (MAGNETARCH_FIELD_RANGE - 2);
+    const events = advanceCollecting(state, 2);
+    expect(state.bossRuntime.magnetFlipAt, 'entrou no campo e ele continuou dormindo').toBe(
+      state.tick + MAGNETARCH_CYCLE_TICKS - 1,
+    );
+    expect(boss.mood, 'o encontro nao comecou em atracao').toBe(MAGNET_ATTRACT);
+    expect(
+      events.some((ev) => ev.t === 'boss_awake' && ev.archetype === 'magnetarch'),
+      'o campo acordou sem se apresentar',
+    ).toBe(true);
+  });
+
+  it('a polaridade alterna sozinha, pelo relogio DO ENCONTRO', () => {
     const { state, boss } = duel(651, 'magnetarch', 6);
     const seen = new Set<number>();
     for (let t = 0; t < MAGNETARCH_CYCLE_TICKS * 3; t++) {
@@ -1575,14 +1686,81 @@ describe('Magnetarca — a faixa troca de lado', () => {
     expect(seen.has(MAGNET_REPEL)).toBe(true);
   });
 
+  it('a INVERSAO se anuncia, e durante ela o campo nao puxa nem cobra', () => {
+    const { state } = duel(655, 'magnetarch', 6);
+    // Ate a folga do primeiro ciclo abrir.
+    expect(
+      advanceUntil(
+        state,
+        () =>
+          state.bossRuntime.magnetFlipAt > 0 &&
+          state.bossRuntime.magnetFlipAt - state.tick <= MAGNETARCH_FLIP_WINDUP_TICKS,
+      ),
+      'a folga nunca abriu',
+    ).toBe(true);
+
+    // O aviso sai UMA vez, no tick em que a janela abre — e nao a cada tick
+    // dela: o estado continuo de quem reconecta sai de `magnetFlipAt`.
+    const events = advanceCollecting(state, MAGNETARCH_FLIP_WINDUP_TICKS - 1);
+    const warnings = events.filter(
+      (ev) => ev.t === 'boss_state' && ev.archetype === 'magnetarch' && ev.state === 'invert',
+    );
+    expect(warnings.length, 'o aviso de inversao repetiu ou nao saiu').toBeLessThanOrEqual(1);
+
+    // A FOLGA E REAL: nem deslocamento nem dano enquanto ela dura.
+    const { state: quiet, boss: quietBoss } = duel(656, 'magnetarch', 2);
+    expect(
+      advanceUntil(
+        quiet,
+        () =>
+          quiet.bossRuntime.magnetFlipAt > 0 &&
+          quiet.bossRuntime.magnetFlipAt - quiet.tick <= MAGNETARCH_FLIP_WINDUP_TICKS,
+      ),
+      'a folga nunca abriu',
+    ).toBe(true);
+    // Colado no corpo, dentro do anel de esmagamento: fora da folga isto cobra
+    // todo segundo.
+    quiet.player.x = quietBoss.x - (MAGNETARCH_CRUSH_RANGE - 1);
+    quiet.player.y = quietBoss.y;
+    const hp = quiet.player.hp;
+    const where = quiet.player.x;
+    for (let t = 0; t < MAGNETARCH_FLIP_WINDUP_TICKS - 2; t++) stepRun(quiet, [emptyCommand()]);
+    expect(quiet.player.hp, 'a folga cobrou dano').toBe(hp);
+    expect(Math.abs(quiet.player.x - where), 'a folga puxou o jogador').toBeLessThan(0.01);
+  });
+
+  it('o aviso sobrevive ao atordoamento — no Ferrifero a parede conduz', () => {
+    // O laco de inimigos pula o corpo inteiro enquanto ele esta atordoado, e
+    // atordoar e a resposta natural do estrato (a parede e fiacao). Um aviso
+    // preso a um tick exato seria engolido justamente por quem joga o bioma
+    // como ele pede.
+    const { state, boss } = duel(659, 'magnetarch', 6);
+    expect(
+      advanceUntil(
+        state,
+        () =>
+          state.bossRuntime.magnetFlipAt > 0 &&
+          state.bossRuntime.magnetFlipAt - state.tick <= MAGNETARCH_FLIP_WINDUP_TICKS + 1,
+      ),
+      'a folga nunca chegou',
+    ).toBe(true);
+    // A janela ainda nao abriu: o prazo decresce de um em um, entao o primeiro
+    // tick em que a condicao acima vale e o de VESPERA. E dali que o
+    // atordoamento cobre a abertura inteira.
+    expect(state.bossRuntime.magnetFlipAt - state.tick).toBe(MAGNETARCH_FLIP_WINDUP_TICKS + 1);
+    boss.stunnedUntil = state.tick + MAGNETARCH_FLIP_WINDUP_TICKS - 4;
+    const events = advanceCollecting(state, MAGNETARCH_FLIP_WINDUP_TICKS);
+    expect(
+      events.filter(
+        (ev) => ev.t === 'boss_state' && ev.archetype === 'magnetarch' && ev.state === 'invert',
+      ).length,
+      'o atordoamento engoliu o aviso (ou o repetiu)',
+    ).toBe(1);
+  });
+
   it('atraindo ele PUXA; repelindo, empurra', () => {
     const { state, boss } = duel(652, 'magnetarch', 8);
-    boss.mood = MAGNET_ATTRACT;
-    // Congela a fase para medir uma coisa de cada vez: o ciclo sai do relogio,
-    // entao o teste anda a simulacao ate a janela que quer.
-    expect(
-      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0),
-    ).toBe(true);
+    expect(settleInto(state, boss, 'attract'), 'nunca entrou em atracao').toBe(true);
     const startPull = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1590,9 +1768,7 @@ describe('Magnetarca — a faixa troca de lado', () => {
     }
     expect(Math.abs(state.player.x - boss.x), 'atraindo, nao puxou').toBeLessThan(startPull);
 
-    expect(
-      advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1),
-    ).toBe(true);
+    expect(settleInto(state, boss, 'repel'), 'nunca entrou em repulsao').toBe(true);
     const startPush = Math.abs(state.player.x - boss.x);
     for (let t = 0; t < 30; t++) {
       stepRun(state, [emptyCommand()]);
@@ -1603,26 +1779,436 @@ describe('Magnetarca — a faixa troca de lado', () => {
 
   it('perto machuca numa polaridade, longe machuca na outra', () => {
     const near = duel(653, 'magnetarch', 2);
-    near.boss.mood = MAGNET_ATTRACT;
-    expect(
-      advanceUntil(
-        near.state,
-        () => Math.floor(near.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0,
-      ),
-    ).toBe(true);
+    expect(settleInto(near.state, near.boss, 'attract'), 'nunca entrou em atracao').toBe(true);
     near.state.player.x = near.boss.x - MAGNETARCH_CRUSH_RANGE + 1;
     const nearHp = near.state.player.hp;
     for (let t = 0; t < 40; t++) stepRun(near.state, [emptyCommand()]);
     expect(near.state.player.hp, 'atraindo, a proximidade nao cobrou').toBeLessThan(nearHp);
 
     const far = duel(654, 'magnetarch', 2);
-    expect(
-      advanceUntil(far.state, () => Math.floor(far.state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 1),
-    ).toBe(true);
+    expect(settleInto(far.state, far.boss, 'repel'), 'nunca entrou em repulsao').toBe(true);
     far.state.player.x = far.boss.x - MAGNETARCH_TETHER_RANGE - 1;
     const farHp = far.state.player.hp;
     for (let t = 0; t < 40; t++) stepRun(far.state, [emptyCommand()]);
     expect(far.state.player.hp, 'repelindo, a distancia nao cobrou').toBeLessThan(farHp);
+  });
+
+  it('o campo cobra dos DOIS Prospectores, e nao so do mais proximo', () => {
+    // O campo valia so para o alvo que o laco de inimigos escolhe (o mais
+    // proximo), e numa sala de dois isso deixava o segundo fora do encontro:
+    // sem puxao, sem cobranca, atirando de onde quisesse. Um campo e uma regra
+    // sobre distancia, e regra sobre distancia nao tem alvo.
+    const state = createRun({ seed: 658, playerCount: 2 });
+    const w = state.config.width;
+    const px = Math.floor(state.players[0].x);
+    const py = Math.floor(state.players[0].y);
+    for (let y = py - 18; y <= py + 18; y++) {
+      for (let x = px - 18; x <= px + 18; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        state.solid[y * w + x] = SOLID_NONE;
+        state.surface[y * w + x] = SURF_NONE;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+    state.enemies = [];
+    const boss = spawnEnemy(state, 'magnetarch', px, py, false);
+    state.bossRuntime.awake = true;
+    // Os dois COLADOS no corpo, em lados opostos: atraindo, o anel de
+    // esmagamento cobra dos dois.
+    const place = (): void => {
+      state.players[0].x = boss.x - (MAGNETARCH_CRUSH_RANGE - 1);
+      state.players[0].y = boss.y;
+      state.players[1].x = boss.x + (MAGNETARCH_CRUSH_RANGE - 1);
+      state.players[1].y = boss.y;
+    };
+    place();
+    const before = state.players.map((p) => p.hp);
+    for (let t = 0; t < MAGNETARCH_FIELD_TICK_INTERVAL * 2; t++) {
+      place();
+      stepRun(state, [emptyCommand(), emptyCommand()]);
+    }
+    expect(state.players[0].hp, 'o slot 0 nao foi cobrado').toBeLessThan(before[0]);
+    expect(state.players[1].hp, 'o parceiro ficou fora do encontro').toBeLessThan(before[1]);
+  });
+
+  it('a FAIXA e a mesma nas duas polaridades — e as duas pontas leem a mesma', () => {
+    // O contrato entre a simulacao e o desenho: `magnetStanding` responde
+    // 'band' exatamente onde `magnetarchStep` nao cobra. Se um dos dois mudar
+    // sozinho, o anel desenhado passa a mentir sobre onde o dano mora.
+    expect(magnetStanding(MAGNETARCH_CRUSH_RANGE - 0.5)).toBe('crush');
+    expect(magnetStanding(MAGNETARCH_CRUSH_RANGE + 0.5)).toBe('band');
+    expect(magnetStanding(MAGNETARCH_TETHER_RANGE - 0.5)).toBe('band');
+    expect(magnetStanding(MAGNETARCH_TETHER_RANGE + 0.5)).toBe('tether');
+    expect(magnetStanding(MAGNETARCH_FIELD_RANGE + 0.5)).toBe('outside');
+
+    const band = duel(657, 'magnetarch', 6);
+    band.state.player.x = band.boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
+    band.state.player.y = band.boss.y;
+    const hp = band.state.player.hp;
+    // Um ciclo inteiro parado na faixa, atravessando uma inversao: as duas
+    // polaridades passam, e nenhuma cobra. (O deslocamento do campo tira o
+    // jogador do lugar, entao ele e recolocado a cada tick — o que se mede aqui
+    // e a cobranca, nao a capacidade de resistir ao puxao.)
+    //
+    // Sem MASSAS em campo, e a ausencia delas e o proposito: a faixa protege do
+    // CAMPO, e nunca prometeu proteger do ferro. Deixa-las aqui mediria as duas
+    // coisas de uma vez e nao diria qual das duas quebrou.
+    for (let t = 0; t < MAGNETARCH_CYCLE_TICKS * 2; t++) {
+      band.state.bossRuntime.magnetShards = [];
+      band.state.player.x = band.boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
+      band.state.player.y = band.boss.y;
+      stepRun(band.state, [emptyCommand()]);
+    }
+    expect(band.state.player.hp, 'a faixa cobrou').toBe(hp);
+  });
+
+  it('a faixa NAO protege do ferro — e por isso ele tem marca propria no chao', () => {
+    // O complemento do teste acima, e a razao de o ciclo do ferro existir: a
+    // faixa resolvia a luta inteira depois de aprendida. Uma massa atravessando
+    // a faixa e a decisao que faltava — "estou no lugar certo, mas aquela peca
+    // vai passar por aqui".
+    const { state, boss } = duel(670, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_FLIGHT),
+      ),
+      'nenhuma massa chegou a sair',
+    ).toBe(true);
+    const shard = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_FLIGHT)!;
+    // Bem no meio da faixa, e bem na frente da massa.
+    state.player.x = shard.x;
+    state.player.y = shard.y;
+    const standing = magnetStanding(distance(state.player, boss));
+    const hp = state.player.hp;
+    for (let t = 0; t < 4; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.x = shard.x;
+      state.player.y = shard.y;
+    }
+    expect(standing === 'band' || standing === 'crush' || standing === 'tether').toBe(true);
+    expect(state.player.hp, 'a massa passou por cima e nao cobrou').toBeLessThan(hp);
+  });
+});
+
+describe('Magnetarca — o ciclo do ferro', () => {
+  /** Anda ate haver uma massa cravada la fora, que e quando ela vira alvo. */
+  const untilLodged = (state: SurvivalState) =>
+    advanceUntil(state, () =>
+      state.bossRuntime.magnetShards.some(
+        (shard) => shard.state === SHARD_LODGED && shard.cracked === 0,
+      ),
+    );
+
+  it('o campo reclama a sucata da camara ao acordar, e ja a recolhe', () => {
+    const { state } = duel(671, 'magnetarch', 6);
+    advanceCollecting(state, 2);
+    const shards = state.bossRuntime.magnetShards;
+    expect(shards.length, 'o campo acordou sem material').toBeGreaterThan(0);
+    // Rota JA marcada na abertura. Sem isto o ferro so se mexia na primeira
+    // inversao, e a medicao mostrou que o ciclo nem chegava a fechar uma vez.
+    expect(shards.every((shard) => shard.state === SHARD_WINDUP)).toBe(true);
+  });
+
+  it('a camara entrega o ESTOQUE que o chao permite — nenhum rumo bloqueado apaga uma massa', () => {
+    // A primeira versao tentava tres angulos FIXOS com quatro raios cada e
+    // desistia da massa quando o rumo inteiro estava bloqueado, sem procurar
+    // outro. Nas 24 camaras do benchmark isso dava media de 2,04 de 3 — e numa
+    // delas (seed 216) o encontro inteiro acontecia com UMA massa, consumida no
+    // recolhimento de abertura: a partida nao chegava a ver um arremesso.
+    //
+    // A invariante nao e "sempre tres": e "tudo o que o chao permite". Uma
+    // camara com duas vagas elegiveis entrega duas, e isso e a camara falando,
+    // nao o codigo desistindo.
+    const eligible = (state: SurvivalState, boss: { x: number; y: number }): number => {
+      const w = state.config.width;
+      let count = 0;
+      const reach = Math.ceil(MAGNETARCH_TETHER_RANGE);
+      for (let cy = Math.floor(boss.y) - reach; cy <= Math.floor(boss.y) + reach; cy++) {
+        for (let cx = Math.floor(boss.x) - reach; cx <= Math.floor(boss.x) + reach; cx++) {
+          if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+          if (state.solid[cy * w + cx] !== SOLID_NONE) continue;
+          const d = Math.hypot(cx + 0.5 - boss.x, cy + 0.5 - boss.y);
+          if (d < MAGNETARCH_CRUSH_RANGE + 0.6 || d > MAGNETARCH_TETHER_RANGE) continue;
+          if (!hasLineOfSight(state, cx + 0.5, cy + 0.5, boss.x, boss.y)) continue;
+          count++;
+        }
+      }
+      return count;
+    };
+
+    let full = 0;
+    let chambers = 0;
+    for (let seed = 1; seed < 600 && chambers < 10; seed++) {
+      const bench = createMagnetarchBench(seed);
+      if (!bench) continue;
+      chambers++;
+      stepRun(bench.state, [emptyCommand()]);
+      const shards = bench.state.bossRuntime.magnetShards;
+      const vagas = eligible(bench.state, bench.boss);
+      expect(shards.length, `seed ${seed}: ${vagas} vagas elegiveis`).toBe(
+        Math.min(MAGNETARCH_SHARDS, vagas),
+      );
+      // Cada massa nasce numa vaga elegivel de verdade: na faixa e com a rota
+      // do recolhimento livre.
+      for (const shard of shards) {
+        const d = Math.hypot(shard.x - bench.boss.x, shard.y - bench.boss.y);
+        expect(d, `seed ${seed}: massa fora da faixa`).toBeGreaterThanOrEqual(
+          MAGNETARCH_CRUSH_RANGE,
+        );
+        expect(d).toBeLessThanOrEqual(MAGNETARCH_TETHER_RANGE + 0.01);
+        expect(
+          hasLineOfSight(bench.state, shard.x, shard.y, bench.boss.x, bench.boss.y),
+          `seed ${seed}: massa sem rota de volta`,
+        ).toBe(true);
+      }
+      if (shards.length === MAGNETARCH_SHARDS) full++;
+    }
+    expect(chambers, 'nenhuma camara de benchmark foi montada').toBeGreaterThan(8);
+    // E o resultado pratico: com a regra nova, praticamente toda camara entrega
+    // as tres. Com a antiga, cinco em vinte e quatro.
+    expect(full, `so ${full} de ${chambers} camaras entregaram o estoque cheio`).toBe(chambers);
+    // Gera setores de verdade, dez deles: o custo e o preco de medir a camara
+    // que o jogador joga, e nao uma caixa vazia montada a mao.
+  }, 60_000);
+
+  it('tres tiros fraturam uma massa cravada, e o tiro MORRE nela', () => {
+    const { state } = duel(672, 'magnetarch', 6);
+    expect(untilLodged(state), 'nenhuma massa chegou a cravar').toBe(true);
+    const shard = state.bossRuntime.magnetShards.find(
+      (s) => s.state === SHARD_LODGED && s.cracked === 0,
+    )!;
+    const from = { x: shard.x - 3, y: shard.y };
+    let hits = 0;
+    while (shard.cracked === 0 && hits < 10) {
+      // O tiro para NELA: `hitMagnetShards` devolvendo true e o que consome o
+      // projetil no laco. Um tiro que atravessasse apagaria a escolha, porque
+      // fraturar deixaria de custar alguma coisa.
+      expect(hitMagnetShards(state, from, shard, BOLT_DAMAGE, [])).toBe(true);
+      hits++;
+    }
+    expect(hits, 'a arma basica precisa fraturar, e em tres tiros').toBe(3);
+    expect(shard.cracked).toBe(1);
+  });
+
+  it('a massa MARCADA ainda pode ser fraturada: o telegrafo e jogavel', () => {
+    // A ficha do telegrafo anunciava 26 ticks como tempo disponivel para os tres
+    // tiros, e eram justamente os ticks em que a massa ficava intocavel
+    // (`hitMagnetShards` so aceitava `SHARD_LODGED`). O ultimo instante para
+    // decidir e o instante em que a rota acende.
+    const { state } = duel(678, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_WINDUP),
+      ),
+    ).toBe(true);
+    const marked = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_WINDUP)!;
+    let hits = 0;
+    while (marked.cracked === 0 && hits < 10) {
+      expect(
+        hitMagnetShards(state, { x: marked.x - 3, y: marked.y }, marked, BOLT_DAMAGE, []),
+        'a massa marcada recusou o tiro',
+      ).toBe(true);
+      hits++;
+    }
+    expect(hits, 'a massa marcada nao fratura em tres tiros').toBe(3);
+  });
+
+  it('tres retornos no mesmo tick cobram 3x96 — a janela nao amplifica quem a abriu', () => {
+    // O nucleo exposto amplifica o que o JOGADOR faz com a janela, e nunca a
+    // coisa que abriu a janela. Enquanto a janela abria no primeiro estilhaco,
+    // os dois seguintes passavam pelo proprio multiplicador dela: 403,2 em vez
+    // dos 288 que a ficha promete, invisivel e automatico.
+    const { state, boss } = duel(679, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    let prepared = 0;
+    for (const shard of state.bossRuntime.magnetShards) {
+      if (shard.state !== SHARD_LODGED) continue;
+      shard.cracked = 1;
+      shard.hp = 0;
+      prepared++;
+    }
+    expect(prepared, 'o teste precisa de mais de uma massa para medir o combo').toBeGreaterThan(1);
+    const hpBefore = boss.hp;
+    expect(advanceUntil(state, () => state.tick < state.bossRuntime.magnetExposedUntil, 600)).toBe(
+      true,
+    );
+    expect(hpBefore - boss.hp).toBeCloseTo(prepared * MAGNETARCH_SHARD_RETURN_DAMAGE, 5);
+  });
+
+  it('dois retornos em TICKS diferentes somam 2x96 — e o tiro na janela continua 1,6x', () => {
+    // O caso que o agrupamento por tick nao cobria. A janela dura 60 ticks e
+    // massas com distancias de recolhimento diferentes chegam em ticks
+    // diferentes: a segunda passava pelo multiplicador e cobrava 153,6. A
+    // garantia mora no funil, e nao na ordem das operacoes de quem cobra.
+    const { state, boss } = duel(682, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    // Duas massas fraturadas a distancias BEM diferentes do corpo: quatro tiles
+    // de diferenca sao ~9 ticks de voo entre uma chegada e a outra.
+    const pair = state.bossRuntime.magnetShards
+      .filter((sh) => sh.state === SHARD_LODGED)
+      .slice(0, 2);
+    expect(pair.length, 'o teste precisa de duas massas cravadas').toBe(2);
+    state.bossRuntime.magnetShards = pair;
+    pair.forEach((shard, i) => {
+      shard.cracked = 1;
+      shard.hp = 0;
+      shard.x = boss.x - (4 + i * 4);
+      shard.y = boss.y;
+    });
+
+    const hpBefore = boss.hp;
+    const arrivals: number[] = [];
+    advanceUntil(
+      state,
+      () => {
+        if (state.bossRuntime.magnetShards.length < pair.length - arrivals.length) {
+          arrivals.push(state.tick);
+        }
+        return arrivals.length === 2 || state.bossRuntime.magnetShards.length === 0;
+      },
+      600,
+    );
+    expect(state.bossRuntime.magnetShards, 'as duas massas nao voltaram').toEqual([]);
+    expect(
+      hpBefore - boss.hp,
+      'a segunda massa foi amplificada pela janela da primeira',
+    ).toBeCloseTo(2 * MAGNETARCH_SHARD_RETURN_DAMAGE, 5);
+
+    // E a outra metade da regra: o que o JOGADOR faz com a janela continua
+    // valendo 1,6x. Sem isto, "corrigir a amplificacao" teria apagado o premio.
+    expect(state.tick, 'a janela ja fechou e o teste nao mede nada').toBeLessThan(
+      state.bossRuntime.magnetExposedUntil,
+    );
+    expect(damageTaken(state, boss)).toBeCloseTo(100 * MAGNETARCH_EXPOSED_ARMOR, 5);
+  });
+
+  it('a massa que DA o golpe final nao ressuscita as outras', () => {
+    // `damageEntity` limpa as massas na morte do chefe, mas o passo delas
+    // continuava e gravava a propria lista de sobreviventes por cima — inclusive
+    // uma massa em voo, que ficaria congelada no ar pelo resto da run porque so
+    // o passo do chefe a faz andar.
+    const { state, boss } = duel(680, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    for (const shard of state.bossRuntime.magnetShards) {
+      if (shard.state !== SHARD_LODGED) continue;
+      shard.cracked = 1;
+      shard.hp = 0;
+    }
+    // Vida baixa o bastante para o PRIMEIRO retorno derrubar.
+    boss.hp = MAGNETARCH_SHARD_RETURN_DAMAGE - 1;
+    expect(
+      advanceUntil(state, () => !boss.alive, 600),
+      'o chefe nao chegou a cair',
+    ).toBe(true);
+    expect(state.bossRuntime.magnetShards, 'a lista voltou depois da limpeza').toEqual([]);
+    expect(state.bossRuntime.magnetExposedUntil, 'abriu janela num cadaver').toBe(0);
+  });
+
+  it('a massa que sai DO CORPO nao e alvo: ela nao come os tiros mirados nele', () => {
+    // O outro lado da correcao acima. Sabotar vale enquanto a massa esta fora do
+    // corpo; uma massa em cima do chefe durante o aviso ficaria na linha de todo
+    // tiro mirado NELE — tres blocos de ferro comendo os tiros do jogador e se
+    // fraturando sozinhos. A decisao "gastar tiro na massa ou no chefe"
+    // deixaria de ser tomada por alguem.
+    const { state, boss } = duel(681, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_LAUNCH),
+      ),
+      'nenhuma massa chegou a sair do corpo',
+    ).toBe(true);
+    const launching = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_LAUNCH)!;
+    // Um tiro mirado NO CHEFE passa pelo mesmo ponto em que ela esta.
+    expect(
+      hitMagnetShards(state, { x: boss.x - 5, y: boss.y }, { x: boss.x, y: boss.y }, 999, []),
+      'a massa saindo do corpo comeu um tiro mirado no chefe',
+    ).toBe(false);
+    expect(launching.cracked).toBe(0);
+  });
+
+  it('a massa em voo NAO pode ser abatida: ela ja e o golpe', () => {
+    const { state } = duel(673, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_FLIGHT),
+      ),
+    ).toBe(true);
+    const flying = state.bossRuntime.magnetShards.find((s) => s.state === SHARD_FLIGHT)!;
+    expect(hitMagnetShards(state, { x: flying.x - 2, y: flying.y }, flying, 999, [])).toBe(false);
+    expect(flying.cracked, 'derrubar no ar viraria reflexo, e o pedido e preparo').toBe(0);
+  });
+
+  it('a massa FRATURADA se despedaca no recolhimento: cobra dele e expoe o nucleo', () => {
+    const { state, boss } = duel(674, 'magnetarch', 6);
+    expect(untilLodged(state)).toBe(true);
+    for (const shard of state.bossRuntime.magnetShards) {
+      if (shard.state !== SHARD_LODGED) continue;
+      shard.cracked = 1;
+      shard.hp = 0;
+    }
+    const hpBefore = boss.hp;
+    const shattered = advanceUntil(
+      state,
+      () => state.tick < state.bossRuntime.magnetExposedUntil,
+      600,
+    );
+    expect(shattered, 'a massa fraturada voltou e nao aconteceu nada').toBe(true);
+    expect(boss.hp, 'o estilhaco nao cobrou do chefe').toBeLessThan(hpBefore);
+
+    // O DESCOMPASSO tem as duas metades: o campo para de cobrar E o dano entra
+    // amplificado. Uma sem a outra nao e uma janela — e um numero maior, ou uma
+    // pausa que nao serve para nada.
+    const field = magnetField(
+      state.tick,
+      state.bossRuntime.magnetFlipAt,
+      boss.mood ?? 0,
+      state.bossRuntime.magnetExposedUntil,
+    );
+    expect(field.polarity).toBe('exposed');
+    expect(field.quiet).toBe(true);
+    const exposedHit = damageTaken(state, boss);
+    expect(exposedHit).toBeCloseTo(100 * MAGNETARCH_EXPOSED_ARMOR, 5);
+  });
+
+  it('a massa INTEGRA volta inteira: recolher nao cobra nada dele', () => {
+    const { state, boss } = duel(675, 'magnetarch', 6);
+    // A abertura ja e um recolhimento, e nenhuma massa esta fraturada nele.
+    const hpBefore = boss.hp;
+    advanceCollecting(state, MAGNETARCH_SHARD_WINDUP_TICKS + 40);
+    expect(boss.hp, 'recolher material integro cobrou do proprio chefe').toBe(hpBefore);
+    expect(
+      state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_HELD),
+      'nenhuma massa foi reincorporada',
+    ).toBe(true);
+    expect(state.bossRuntime.magnetExposedUntil, 'material integro abriu janela').toBe(0);
+  });
+
+  it('o ferro morre com o campo: nada fica congelado no ar', () => {
+    // Uma massa em voo so anda dentro do passo do chefe. Sem limpar na morte
+    // dela, ela ficaria parada no ar pelo resto da run — desenhada, hasheada e
+    // prometendo um atropelo que nunca vem.
+    const { state, boss } = duel(677, 'magnetarch', 6);
+    expect(
+      advanceUntil(state, () =>
+        state.bossRuntime.magnetShards.some((shard) => shard.state === SHARD_FLIGHT),
+      ),
+    ).toBe(true);
+    damageEntity(state, boss, boss.maxHp, [], { kind: 'player_shot' });
+    expect(boss.alive).toBe(false);
+    expect(state.bossRuntime.magnetShards, 'ferro sobrou no ar').toEqual([]);
+    expect(state.bossRuntime.magnetExposedUntil).toBe(0);
+  });
+
+  it('nenhuma massa fecha rota: elas nao escrevem celula', () => {
+    // A unica coisa que um objeto novo no chao de uma camara GERADA nao pode
+    // quebrar. Como nada aqui toca `solid`, a garantia vale por construcao — e
+    // este teste e o que impede alguem de trocar isso por um bloco solido
+    // "so para ele parar de atravessar parede".
+    const { state } = duel(676, 'magnetarch', 6);
+    const before = state.solid.slice();
+    advanceCollecting(state, MAGNETARCH_CYCLE_TICKS * 2);
+    expect(state.bossRuntime.magnetShards.length).toBeGreaterThan(0);
+    expect(Array.from(state.solid), 'uma massa escreveu no terreno').toEqual(Array.from(before));
   });
 });
 

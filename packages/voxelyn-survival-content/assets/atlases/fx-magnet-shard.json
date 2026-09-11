@@ -1,0 +1,65 @@
+{
+  "id": "fx-magnet-shard",
+  "version": 1,
+  "atlas": "fx-magnet-shard.png",
+  "frameWidth": 84,
+  "frameHeight": 76,
+  "columns": 8,
+  "anchorX": 40,
+  "anchorY": 53,
+  "directions": 1,
+  "authoredDirs": [
+    "n"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.4,
+    "h": 1.4
+  },
+  "footprint": {
+    "w": 1.4,
+    "h": 1.4,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v02",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#ff7a2f",
+    "#ffa63f",
+    "#ffe9b8"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "special": {
+      "frames": 4,
+      "fps": 8,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "n": {
+      "idle": 0,
+      "special": 4
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric chunk of ferric ore held in a magnetic field, warm rust-and-brass faceted boulder with dark magnetite veins on a cold base, blue field sparks clinging to it; fractured variant split open with a glowing white-hot fissure and iron filings escaping",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

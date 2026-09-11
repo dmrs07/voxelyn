@@ -1118,7 +1118,9 @@ Notas de desenho que valem registrar:
 - **O Magnetarca não tem posição segura, tem uma faixa.** Atraindo, perto machuca;
   repelindo, longe machuca. O deslocamento usa o passo-a-passo do eletroímã do Coveiro
   — colisão respeitada, sem teleporte — porque a quina no caminho continua sendo o
-  contra-jogo geométrico do campo.
+  contra-jogo geométrico do campo. A faixa é **desenhada** e a inversão é
+  **telegrafada** desde a `SIMULATION_VERSION` 81 (ver §_O campo do Magnetarca,
+  legível_); e ele é **FIXO**, como o Pulmão e o Coração.
 - **Os Espectros da Rainha saem do gelo, não dela.** São extensões do estrato, não
   filhotes, e nascem com vida parcial.
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
@@ -1424,6 +1426,540 @@ sorteando micélio, Aurix e rocha suturada do setor 2 em diante, então ela term
 chefes de ocupação e o de estrato disputam a mesma câmara.
 
 Custo: uma linhagem a mais remapeia **toda seed** (o sorteio é `% LINEAGE_ORDER.length`).
+
+### O Magnetarca — a anomalia que parte a linhagem industrial (`SIMULATION_VERSION` 81)
+
+O mesmo defeito da árida e da basáltica, pela terceira vez e mais escondido que as
+duas: **o Magnetarca era o dono do Estrato Ferrífero, e o Ferrífero era um estrato
+inteiramente coberto pela Cicatriz Aurix.** Ocupação forte substitui o chefe do estrato
+— é a primeira linha da regra —, então todas as posições de chefe que a linhagem
+oferecia pertenciam ao Diamandis. O que sobrava para o Magnetarca era sobra mesmo: o
+sétimo setor de G-04 quando o sorteio de intrusão o deixasse limpo, ou um Núcleo
+intermediário que cedesse o posto por repetição.
+
+Medido sobre a seleção pura, 3.000 seeds por geração:
+
+| Geração     | Antes  | Depois |
+| ----------- | ------ | ------ |
+| G-00 / G-01 | **0%** | 6,5%   |
+| G-02        | **0%** | 6,4%   |
+| G-03        | 14,0%  | 9,0%   |
+| G-04        | 8,9%   | 11,3%  |
+
+Zero por cento em três das cinco gerações — inclusive a de fábrica, que é a que a
+maioria das runs usa. Ele não era "raro", era **inalcançável**, e a tabela dizia o
+contrário. Os outros donos de estrato ficam todos em ~6,5% nas runs curtas e ~11,5% em
+G-04; o Magnetarca agora está exatamente ali.
+
+A correção não é um número de sorteio, é a lore dele. `AX-UNK-067` registra que **o
+campo antecede a mina** — a operação foi construída sobre um cabo que ela não instalou.
+Onde o veio está magnetizado, a Aurix **não conseguiu trabalhar**: as posições 3 e 4 da
+linhagem industrial deixaram de ser Cicatriz Aurix e passaram a ser veio ferrífero
+**sem ocupação** — o trecho que a linha de extração teve de contornar, e que ela só
+retoma na quinta, já do outro lado. As duas ficam juntas porque são os dois fundos
+possíveis das runs curtas (G-00/G-01 acabam no 3, G-02 no 4).
+
+O que mais mudou junto: o **Diamandis** aparecia em 32% das runs de G-02 e passa a 21%
+— ele era, de longe, o chefe mais visto do jogo, e boa parte disso vinha de ele ocupar
+sozinho um estrato inteiro. As intrusões Aurix continuam trazendo ele em qualquer
+linhagem; o que acabou foi o monopólio.
+
+Custo: o terreno das seeds industriais muda nos setores 3 e 4 (a ocupação que saiu
+levava as estruturas dela junto). A impressão digital da geração acompanha, e replays
+de 80 nessas seeds não batem.
+
+### O campo do Magnetarca, legível (`SIMULATION_VERSION` 81, `PROTOCOL_VERSION` 42)
+
+O segundo relato sobre ele foi mais curto que o primeiro: _"não faço ideia de como
+funciona a luta dele"_. Estava certo, e dá para ler a causa no código antigo.
+
+O encontro inteiro era um campo invisível. O corpo não anda (`MAGNETARCH_SPEED` era
+1,8 e **nunca foi usado** — `magnetarchStep` sai do fluxo comum antes da perseguição),
+não telegrafa e não tem golpe com forma: o que existia era um deslocamento contínuo do
+Prospector e um dano a cada segundo. A polaridade vinha do **relógio global da run**
+(`floor(tick / ciclo) % 2`), então a fase em que o jogador entrava na câmara era
+sorteada pelo tempo de jogo — às vezes meio segundo antes de uma inversão que ele não
+tinha como prever — e a troca acontecia **entre dois quadros**, sem aviso. A regra do
+encontro está escrita há muito tempo ("há uma faixa, e ela troca de lado"), e nada na
+tela a dizia.
+
+Quatro mudanças, e as quatro servem à mesma frase:
+
+- **O relógio é do encontro.** `bossRuntime.magnetFlipAt` é autoritativo e hasheado. O
+  campo **dorme** até alguém entrar nele, acorda sempre em **atração** com um ciclo
+  inteiro pela frente e se apresenta com `boss_awake` — o encontro passa a ter começo.
+- **A inversão tem instante.** Os últimos 30 ticks (1,5 s) de cada ciclo são uma
+  **folga silenciosa**: o campo não puxa e não cobra, e emite `boss_state: 'invert'`.
+  A folga é real, e não um enfeite — ela é do tamanho de atravessar a faixa inteira (6
+  tiles a 4,6 tiles/s) partindo de qualquer uma das duas bordas.
+- **O campo aparece no chão** (`drawMagnetField`, `magnet-filings.ts`). A **faixa**
+  preenchida entre os dois anéis (a única coisa constante da luta, e por isso a única
+  preenchida); a **borda que cobra agora** quente e grossa, a outra apagada; a
+  **limalha** atravessando o campo no sentido da polaridade — é ela que diz para que
+  lado o campo empurra sem uma palavra de HUD, e é ela que congela na folga; e a
+  **borda do campo**, fina, para "fora do campo" ser um lugar. Nada disso é
+  transmitido: sai de `magnetField`, a mesma função que a simulação usa para cobrar, e
+  por isso o anel desenhado não pode discordar do anel que machuca.
+- **O som deixou de chegar tarde.** `magnetarchFlip` (o relé) e a voz da polaridade
+  saíam no mesmo tick: quando o relé soava, a polaridade nova já estava cobrando. Agora
+  o relé é o **primeiro** tick da folga e a voz da polaridade é o fim dela.
+
+E `MAGNETARCH_SPEED` foi a zero. Ele já não andava; agora a ficha diz isso — e a
+imobilidade é o que sustenta o resto, porque a faixa só é legível como **lugar** com os
+dois anéis onde nasceram. Ele é o terceiro chefe fixo, com o Pulmão e o Coração, e pelo
+mesmo motivo dos dois: a luta não é contra um corpo, é contra a sala.
+
+### O ciclo do ferro (`SIMULATION_VERSION` 82, `PROTOCOL_VERSION` 43)
+
+O campo já era legível. O que ele ainda não era é **decidível**: depois de aprender
+onde ficar, o encontro não pedia mais nada — você resolvia a distância e repetia o
+passo contra o campo enquanto atirava. E havia uma promessa aberta desde a lore: o
+campo dele move **material ferroso**, o estrato inteiro é minério e sucata, e a única
+coisa que o campo movia era o Prospector.
+
+O ciclo do ferro é a mesma regra do campo aplicada à matéria — nenhum sistema novo:
+
+| Polaridade   | O que o campo faz com o ferro              | O que o jogador decide                                     |
+| ------------ | ------------------------------------------ | ---------------------------------------------------------- |
+| **Atração**  | **recolhe** as massas cravadas na arena    | sair das rotas de recolhimento — e colher o que preparou   |
+| **Repulsão** | **arremessa** as massas de volta para fora | sair dos corredores — e escolher em qual massa gastar tiro |
+
+Entre uma e outra a massa fica cravada onde parou, e cravada ela é **alvo**. Três tiros
+do disparo básico a fraturam. Uma massa fraturada não sobrevive ao recolhimento: ela se
+despedaça contra os anéis, cobra **96** do próprio chefe e deixa o **núcleo exposto**
+por 3 s — o campo para de cobrar e o dano entra a **1,6×**.
+
+Quatro decisões que sustentam o resto:
+
+- **A arma básica tem de fraturar.** O contra-jogo característico do encontro não pode
+  morar num módulo. Três tiros cabem no telégrafo do recolhimento (26 ticks contra os
+  10 que os três levam), então a escolha é real: dá tempo, mas custa a janela de mira.
+- **O material é finito e não repovoa.** A massa que se despedaça acabou. Uma luta
+  curta com material infinito seria farm; com material finito ela vira uma conta —
+  quantas você prepara antes de ele cair.
+- **A hora de sabotar é enquanto a massa está lá fora** — incluindo durante o telégrafo
+  do recolhimento, que é o último instante para decidir. A massa recolhida inteira é
+  **reincorporada** (`SHARD_HELD`): some dentro do corpo, não é alvo e sai de novo no
+  próximo arremesso. E a que sai **de dentro** do corpo tem telégrafo próprio
+  (`SHARD_LAUNCH`): a rota é desenhada igual, mas ela não é alvo enquanto está ali —
+  três blocos de ferro em cima do chefe comeriam todo tiro mirado nele e se fraturariam
+  sozinhos, e a decisão "gastar tiro na massa ou no chefe" deixaria de ser tomada por
+  alguém.
+- **A massa em voo não pode ser abatida.** Derrubá-la no ar transformaria o pedido
+  ("prepare a próxima") em reflexo ("derrube esta").
+- **Nada disto é sólido.** Uma massa cravada não escreve célula, não fecha rota e não
+  tampa objetivo. A câmara gerada continua atravessável em qualquer combinação, por
+  construção — e há um teste que impede alguém de trocar isso por um bloco sólido.
+
+A faixa continua protegendo do **campo**, e nunca prometeu proteger do **ferro**: as
+rotas das massas têm marcação própria no chão, que enche conforme o prazo corre. É a
+decisão que faltava — _"estou na faixa, mas aquela peça vai passar por aqui"_.
+
+#### A duração, medida antes de distribuir novidade
+
+A pergunta certa veio antes do código: 8,5 s por polaridade davam 17 s para um ciclo
+completo, e o disparo básico contra 720 de vida dava ~13 s teóricos. Medindo o encontro
+de verdade (bot imortal, mira perfeita, parado na faixa), o número real era **14,7 s e
+uma única inversão** — o ciclo de ida e volta do ferro **não chegava a fechar uma vez**.
+Na primeira versão do protótipo o chefe morria aos 19,8 s, meio segundo antes de a
+primeira massa fraturada alcançá-lo.
+
+Para comparação, a mesma medição nos outros chefes: Guardião 9,8 s · Bispo 14,4 s ·
+Pulmão 14,2 s · Arquicantor 18,8 s · Rainha 27,1 s · Diamandis 36,3 s · Fornalha
+37,8 s · Cerzideira 61,7 s · Devorador 66,8 s. O Magnetarca estava no piso da lista
+carregando a mecânica mais elaborada dos donos de estrato.
+
+> **As tabelas abaixo foram refeitas.** A primeira leva foi medida sobre três defeitos
+> que inflavam os números: a sabotagem não valia durante o telégrafo (os 26 ticks
+> anunciados como janela eram justamente os ticks intocáveis), o estilhaço amplificava
+> a si mesmo (três retornos cobravam 460,8 em vez de 288) e a morte do chefe podia ser
+> desfeita pelo passo das massas. Corrigidos os três, **a conclusão sobre a polaridade
+> mudou** — ver abaixo.
+
+**A vida**, medida na polaridade de 6 s:
+
+| Vida     | Ignorando  | Sabotando  | 1º estilhaço        | Sem material no fim |
+| -------- | ---------- | ---------- | ------------------- | ------------------- |
+| 900      | 19,8 s     | 14,7 s     | 14,2 s (4% de vida) | 0,5 s               |
+| 1050     | 22,3 s     | 18,5 s     | 14,2 s (18%)        | 4,3 s               |
+| **1200** | **26,6 s** | **21,2 s** | **14,2 s (28%)**    | **7,0 s**           |
+| 1400     | 30,1 s     | 26,3 s     | 14,2 s (38%)        | 12,1 s              |
+
+1.200 equilibra as três colunas: saber a luta vale 20% do tempo dela, o pagamento chega
+com 28% de vida pela frente (janela, e não golpe de misericórdia) e o trecho final sem
+material fica em 7 s — uma conclusão, e não um vazio. Em 1.400 esse trecho dobra.
+
+**A polaridade**, medida com vida 1.200:
+
+| Polaridade | Sabotando  | 1º estilhaço         | Sem material no fim |
+| ---------- | ---------- | -------------------- | ------------------- |
+| 8,5 s      | 20,9 s     | 19,2 s (12% de vida) | 1,8 s               |
+| 7,0 s      | 20,8 s     | 16,2 s (22%)         | 4,5 s               |
+| **6,0 s**  | **21,2 s** | **14,2 s (28%)**     | **7,0 s**           |
+| 5,0 s      | 19,9 s     | 12,2 s (38%)         | 7,8 s               |
+
+Com a janela de sabotagem funcionando, **5 s deixou de ser o ponto ruim que a primeira
+medição indicava** — ele era ruim porque a janela real era menor do que se acreditava.
+Hoje a faixa de 7 a 5 segundos inteira funciona, e o que muda dentro dela é a troca
+entre _pagamento cedo_ e _cauda sem ferro_. Seis segundos é uma **escolha** dentro
+dessa faixa, não um ótimo isolado: em 5 s a folga da inversão (30 ticks) passaria a
+ocupar 30% de cada polaridade e a luta de base perde ritmo antes de o ferro compensar;
+em 7 s o pagamento volta para os 16 s. O desempate é de playtest, não de bot — falta
+saber quantas massas alguém prepara enquanto esquiva de verdade.
+
+De quebra, 6 s responde ao outro defeito do encontro — _"você resolve a distância e
+repete o movimento"_: a faixa troca de lado **42% mais vezes** que antes.
+
+#### A câmara não entregava o encontro desenhado
+
+Antes de qualquer leitura sobre ritmo, um defeito de distribuição: **a maioria das
+câmaras nascia sem o estoque completo de ferro.**
+
+`claimMagnetShards` tentava três ângulos **fixos** (0°, 120°, 240°) com quatro raios
+cada, e desistia da massa quando o rumo inteiro estava bloqueado — sem nunca procurar
+outro ângulo. Medido nas 24 câmaras do benchmark:
+
+| Massas que nasciam | Câmaras |
+| ------------------ | ------- |
+| 1                  | 4       |
+| 2                  | 15      |
+| 3                  | 5       |
+
+Média de **2,04 de 3**. Na seed 216 nascia **uma** massa, consumida no recolhimento de
+abertura aos 2,05 s: a partida inteira passava sem um único arremesso de ferro, e os
+34,8 s de "campo sem material" daquela captura eram isto — não um problema de reposição.
+
+A regra nova não tem ângulo preferido: enumera o chão elegível da faixa (célula aberta,
+dentro do anel, com linha de visão para o corpo — que é a rota do recolhimento) e
+escolhe por **afastamento máximo**, a primeira pela menor célula e cada seguinte a mais
+longe da mais próxima já escolhida. Adapta-se à câmara, continua pura e não consome a
+RNG da run. As 24 câmaras passaram a entregar **3 de 3**, e o teste cobra a invariante
+correta — não "sempre três", mas "tudo o que o chão permite".
+
+#### O bot mortal: o que muda quando o agente erra
+
+O bot anterior era imortal e de mira perfeita — media o **teto** do encontro. Este morre,
+erra a mira (σ 0,08 rad) e reage com **250 ms** de atraso, lendo só o que a tela mostra e
+agindo só por `PlayerCommand`. Vinte e quatro câmaras reais (G-04 setor 7), doze abertas
+e doze apertadas, três estratégias sobre as mesmas seeds e com a **mesma sequência de
+erro de mira** (`packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs`).
+
+Com o estoque completo:
+
+| Estratégia        | Desfechos   | Tempo      | Vida restante | Fraturadas | Janela | dps na janela | Cauda sem massa | Dano tomado |
+| ----------------- | ----------- | ---------- | ------------- | ---------- | ------ | ------------- | --------------- | ----------- |
+| **Ignorar**       | 24 vitórias | 38,7 s     | 56/100        | 1,1        | 3,2 s  | 1,94×         | **0,0 s**       | 45          |
+| **Uma por ciclo** | 24 vitórias | **33,7 s** | 71/100        | 2,6        | 6,2 s  | 2,46×         | 1,0 s           | 29          |
+| **Todas**         | 24 vitórias | 33,8 s     | **76/100**    | 2,7        | 6,0 s  | 2,53×         | 4,1 s           | 24          |
+
+> **Duas rodadas anteriores deste bot foram retratadas.** A primeira dizia que sabotar
+> era _dominado_ (+8,5 s) — defeito do harness, que escolhia massa sem **linha de visão**
+> e insistia em ferro atrás de rocha (218 a 249 ticks por partida atirando em pedra).
+> Também eram falsas duas medições: "aproveita 41% da janela" contava **gatilho
+> pressionado**, e "15/16 vitórias" juntava morte com estouro de tempo. A segunda rodada
+> já corrigia isso, mas rodava sobre o estoque incompleto acima — ela media 1,5 massa
+> fraturada "de 3" quando a média disponível era 2,04.
+
+O que os números sustentam:
+
+- **Preparar compensa, e mais do que antes.** O caminho sabotado é mais rápido
+  (33,7 s contra 38,7 s) e termina com mais vida (71–76 contra 56). O agente fratura
+  **2,6 de 3**.
+- **O encontro ganhou dentes.** Com uma massa em campo ele terminava com 77 de vida
+  ignorando; com três, termina com **56**, e o dano do ferro sobe de 17 para **40**. A
+  pior partida do lote acaba com **10/100**. Três corredores por ciclo é outra luta.
+- **A cauda quase sumiu:** 0,0 s ignorando e 1,0 s sabotando uma por ciclo, contra os
+  1,7 e 6,9 s medidos com o estoque quebrado. **Ela não era um problema de reposição —
+  era a câmara não entregando o material.** "Todas" ainda gasta o estoque cedo e paga
+  4,1 s de média; e a variação por câmara continua existindo (até 13,0 s numa delas).
+- **A janela rendeu 2,46–2,53× o dps normal** — ver a ressalva de leitura acima.
+
+**Limites deste bot, que valem mais que os números:** ele segue regras fixas, começa
+dentro da faixa com linha de visão (não tem busca de rota, e medir a travessia até a
+câmara seria medir o harness), não usa módulos nem esquiva ofensiva, não faz kite e não
+aprende. Vinte e quatro vitórias em vinte e quatro dizem que **este agente** lê os
+avisos — não que os avisos sejam generosos para gente de verdade. São cenários simulados,
+para achar situações impraticáveis e comparar estratégias entre si; não estabelecem piso
+nenhum.
+
+#### As capturas: o encontro rodando, não cenas montadas
+
+Três vídeos saem do **mesmo** benchmark — mesma vida, mesma arena, mesmos parâmetros —,
+reproduzidos no renderer de verdade:
+
+```
+pnpm --filter @voxelyn/survival-sim build
+node packages/voxelyn-survival-sim/tools/magnetarch-bot.mjs --runs=24 --captures --out=/tmp/caps
+pnpm --filter @voxelyn/survival build
+node packages/voxelyn-survival/scripts/capture-magnetarch-bench.mjs /tmp/caps /tmp/videos
+```
+
+O que garante que o vídeo mostre a partida que foi medida é `createMagnetarchBench`, na
+simulação: o bot (em Node) e o rig (`bench.html`, no navegador) montam o estado inicial
+pela **mesma função**, e a simulação é determinística — mesmo estado mais mesma sequência
+de comandos dá a mesma partida. O rig não decide nada: ele reproduz o log de comandos que
+o bot gravou, com `stepRun` a 20 Hz, `LocalPlayout` e `SurvivalRenderer`. A ficha da
+partida (seed, câmara, estratégia, desfecho, cauda) fica na tela — um vídeo de benchmark
+sem ela é um vídeo bonito que não prova nada.
+
+As escolhidas pelo próprio lote, mais uma conferência nomeada da seed 216:
+
+| Cena                                     | Seed | Câmara   | Desfecho              | Vida       | Cauda      |
+| ---------------------------------------- | ---- | -------- | --------------------- | ---------- | ---------- |
+| Vitória mirando no chefe (tempo mediano) | 146  | apertada | vitória em 37,1 s     | 82/100     | 0,0 s      |
+| Vitória sabotando (cauda mais longa)     | 452  | apertada | vitória em 41,7 s     | 82/100     | **13,0 s** |
+| Pior caso do lote                        | 981  | aberta   | vitória em 52,6 s     | **10/100** | 0,0 s      |
+| Seed 216, sabotando (o antes/depois)     | 216  | apertada | vitória em **26,6 s** | 84/100     | 0,0 s      |
+
+A seed 216 é a comparação que fechou o diagnóstico. Com uma massa: vitória em 39,9 s e
+**34,8 s** sem material, sem nunca ver um arremesso. Com as três: ignorando o ferro,
+41,8 s e **zero** tempo sem material; sabotando, **26,6 s** com 84 de vida — 36% mais
+rápido que ignorar, na mesma câmara.
+
+Não houve morte nem timeout em nenhuma das 24 partidas, então a terceira cena é a que
+chegou mais perto: 10 de 100, ignorando o ferro.
+
+#### O que a medição diz sobre a segunda fase
+
+Com três massas finitas, o protótipo entrega **um** pagamento grande e não um laço: o
+jogador racha as três e elas se despedaçam juntas no recolhimento seguinte. Na
+configuração escolhida isso acontece aos 14,2 s, com o chefe a 28% de vida, e o
+encontro segue por mais **7,0 s sem nenhum material em campo**.
+
+Sete segundos de conclusão é defensável — consumir as três massas e terminar acertando
+o núcleo exposto é um fecho, não um vazio. O que decide se a **recomposição da limalha**
+resolve um problema real é essa última coluna, e ela é o número a vigiar: em 1.400 de
+vida ela já vai a 12,1 s.
+
+Com o estoque de abertura corrigido, o bot mortal mede **0,0 a 4,1 s** de média nessa
+coluna (era 1,7 a 8,3 s com a câmara entregando 2,04 massas). O trecho longo que
+justificava a reposição era, em boa parte, a câmara não entregando o material. O que
+sobra é variação por câmara — uma delas ainda chega a 13,0 s —, e é essa variação, e não
+a média, que decidiria os aglomerados.
+
+Se o playtest mostrar que o trecho final cansa, a recomposição entra **ao terminar o
+primeiro descompasso** e repondo **uma massa por vez** — o jogador vê a consequência da
+própria sabotagem criando o próximo problema. O comportamento de add (limalha que se
+desloca e muda o ponto de origem do recolhimento) vem depois disso, e não junto.
+
+O limiar de vida para uma segunda etapa **não está fixado**. O primeiro estilhaço é o
+acontecimento coerente para orientar a transformação — ele já é o momento em que o
+encontro muda de mão —, e onde ele cai depende da polaridade escolhida (28% em 6 s, 38%
+em 5 s, 12% em 8,5 s). Fixar uma porcentagem antes de escolher a polaridade seria fixar
+o efeito antes da causa.
+
+#### As massas em atlas (`CONTENT_VERSION` 42, `fx-magnet-shard`)
+
+O playtest da seed 216 parou antes de começar, e o relato foi curto: **os ferros não
+aparecem**. Ele estava certo, e o defeito era meu.
+
+As massas eram desenhadas à mão no cliente — um hexágono de cor chapada — e o corpo saía
+de `z * MAGNETARCH_SHARD_RADIUS * 5.2`. Nesta isometria um raio de R tiles projeta em
+`R * TILE_W/2 * raiz(2)`, ou seja **22,6 px por tile**: uma massa de raio 0,7 mede 15,8 px
+de semi-eixo, e `0,7 * 5,2 = 3,6`. O desenho estava a **23% do tamanho real**.
+
+Isso não é um erro de acabamento. `MAGNETARCH_SHARD_RADIUS` é o raio em que o tiro
+acerta a massa e em que ela atropela o jogador: a coisa que o contra-jogo inteiro do
+encontro pede que se acerte estava sendo desenhada como um cascalho no meio de um corpo
+de colisão quatro vezes maior. O jogador mirava no que via e o tiro passava por cima.
+
+O conserto tem duas metades, e a segunda é a que o autor do jogo pediu:
+
+1. **O tamanho passou a sair da projeção**, a mesma conta do vórtice do Devorador, com a
+   raiz que já estava documentada lá — sem ela o corpo sai a 71% do raio que anuncia.
+2. **A aparência foi autorada em atlas**, no pipeline de conteúdo, em vez de desenhada
+   em `canvas`. `fx-magnet-shard`: oito quadros de 84x76, um rumo, dois estados.
+
+O que o atlas resolve além do tamanho é a **matéria**. Chapada e cinza, a massa lia como
+entulho de cenário num chão de rocha cinza-azulada — nada dizia "isto é alvo". O corpo
+agora é minério quente (`ferrite`, rampa nova em `voxel.mjs`: latão no topo, ferrugem e
+carvão nas laterais) salpicado de `rust` claro, sobre uma base de magnetita. A separação
+do chão é de **matiz e de valor** ao mesmo tempo, que é o que faz ela sobreviver à
+distância, à limalha do campo por cima e à escala de cinza.
+
+E os dois estados são **animações distintas**, não uma tinta aplicada por cima:
+
+| Estado    | Anim      | O que diz                                                                       |
+| --------- | --------- | ------------------------------------------------------------------------------- |
+| Íntegra   | `idle`    | três faíscas `electric` (frias) orbitando: o campo do chefe segurando o minério |
+| Fraturada | `special` | o corpo **abre**, a fenda acende em `lamp` (quente) e solta limalha             |
+
+A fenda é geometria e não um risco pintado: o estado sobrevive à silhueta, como a classe
+dos cofres sobrevive à escala de cinza. Quem gastou os três tiros precisa ver, do outro
+lado da câmara, que não precisa gastar o quarto — é a segunda das três perguntas do
+playtest.
+
+O atlas chega **sob demanda**, com o grupo `magnetarch`, e não no boot. Não é preferência:
+o orçamento de memória de vídeo do boot está a menos de 300 KiB do teto, e o comentário
+que fixou esse teto em `validate.mjs` diz o que fazer com o próximo peso — paga-se com
+carregamento sob demanda, nunca com teto maior. Este é o primeiro peso que veio depois
+daquela frase. O pedido sai quando o corpo do chefe entra na cena, e não quando a
+primeira massa é arremessada: o download tem de caber na travessia da câmara, ou a massa
+em que o jogador aprende a mecânica sairia no recuo chapado.
+
+Três formas foram descartadas antes desta, e valem como registro do que **não** lê:
+
+- **Caixas concêntricas empilhadas** — zigurate. Leitura de construção, no objeto que
+  precisa ler como pedra arrancada de um veio.
+- **Elipsóide com ruído no raio, célula a célula** — falha nos dois sentidos conforme a
+  intensidade: fraco vira terraço, forte vira coral. Perto do topo o campo quadrático
+  muda depressa, então a mesma perturbação vale meio degrau no equador e três no alto.
+- **Magnetita salpicada (ou em faixa) sobre corpo claro** — mancha escura em pedra lê
+  como **buraco**, e faixa horizontal lê como andar de prédio. O que dá textura de
+  minério é o contrário: salpico claro sobre corpo escuro.
+
+O que ficou é um **mapa de altura** com três domos, rugosidade dada em degraus (±0,8
+célula) e nenhuma célula solta ou enterrada — por construção não há vão interno, que é
+a falha que só aparece depois de assado.
+
+Duas correções vieram da captura no jogo, e nenhuma das duas aparecia no atlas isolado:
+
+- **A massa saía por baixo das paredes.** Ela era desenhada entre as _marcas de chão_,
+  junto das rotas, e marca de chão é pintura no piso: tudo o que tem volume é desenhado
+  depois. Uma massa cravada ao pé de um paredão aparecia cortada na base — 1/3 do corpo,
+  e do outro lado da câmara ninguém reconhecia o alvo. O corpo passou para a **fila de
+  profundidade**, como os Ecos do Poço, e as rotas e o rastro ficaram onde estavam.
+- **A fratura virou uma bola de luz.** A parede da fenda acendia em `lamp`, cuja rampa
+  topa no branco quente e tem as três cores emissivas: com o halo do cliente por cima, o
+  corpo de pedra sumia dentro do brilho. Em `fire` (brasa/chama) o miolo acende sem
+  apagar o que acendeu — uma fratura tem de continuar sendo uma pedra rachada, ou o
+  estado deixa de ser um estado _dela_.
+
+#### A câmara central (`SIMULATION_VERSION` 85, `bossArena`)
+
+O campo tem **treze tiles de raio** e a luta inteira é ler duas bordas
+concêntricas e atravessar a faixa entre elas. A câmara, porém, nascia onde o mapa
+levasse: o Núcleo caía no ponto mais distante da entrada (`bfsFarthest`), que
+costuma ser um **canto**, e o chefe se encostava nele.
+
+Num canto, metade do campo nasce dentro da parede. O anel que o jogador precisa
+ler sai cortado, a faixa vira um corredor em vez de um corredor circular, e o
+ciclo do ferro perde o chão elegível de que as massas precisam — foi a mesma
+escassez que a câmara da seed 216 expôs, e que `claimMagnetShards` só conseguiu
+contornar até onde o chão permitia.
+
+E não era ocasional. Medido em dez seeds que entregam o chefe, comparando a mesma
+seed com os dois modos — o chão aberto a dez tiles do corpo, de um máximo de 314
+células:
+
+| Seed | Câmara natural | Largura | Câmara central | Largura |
+| ---- | -------------- | ------- | -------------- | ------- |
+| 22   | (83, 90)       | 185     | (48, 48)       | 310     |
+| 44   | (90, 92)       | **109** | (48, 48)       | 310     |
+| 70   | (91, 88)       | 124     | (48, 48)       | 310     |
+| 92   | (90, 91)       | 124     | (48, 48)       | 310     |
+| 100  | (90, 92)       | **110** | (48, 48)       | 310     |
+
+O encontro rodava com **35% a 59%** da área que o campo dele alcança. E o canto
+era quase sempre o **mesmo**: `bfsFarthest` parte de uma entrada que nasce na
+quina superior-esquerda, então o ponto mais distante cai no canto inferior-direito
+em oito das dez seeds. Não era variedade — era um viés.
+
+O perfil de geração ganhou `bossArena`. Com `central`, a arena é escavada no
+**centro exato do mapa**, com raio `MAGNETARCH_TETHER_RANGE` (9): a escavação abre
+**a faixa, e nada além dela** — o que fica fora do anel de retorno continua sendo
+o que o mapa já tinha, caverna e não arena. O corpo fica no centro e é o **Núcleo que
+se encosta nele**, pela mesma tabela de vizinhança (`BOSS_CORE_OFFSETS`) que a
+câmara natural usa na direção oposta: a relação entre objetivo e dono não muda,
+só a âncora troca de lado.
+
+Três decisões que sustentam o resto:
+
+- **O centro é exato, não aproximado.** Procurar "o chão aberto mais próximo do
+  meio" daria uma câmara quase central, e quase central é a mesma promessa
+  quebrada de novo: o campo encostaria na parede de um lado só, que é pior que
+  encostar nos dois — o jogador aprende um anel que vale em metade das direções.
+- **É o único traço de terreno que sai do CHEFE**, e não do estrato. Por isso ele
+  mora em `sectorProfile` e não em `biomeProfile`: o ferrífero continua sendo
+  ferrífero quando quem o ocupa é outro, e o Magnetarca leva a câmara central para
+  onde quer que ele apareça. É também a razão de `sectorProfile` passar a pedir a
+  **profundidade** da run — quem é o dono de um setor depende de quantos setores a
+  descida tem (`bossForSector`).
+- **Nenhum outro chefe pede isto.** O Arquicantor precisa de espaço e recua a
+  rotunda para dentro (`halls: 'radial'`), o que não é a mesma coisa: ele pede
+  **margem**, o Magnetarca pede **centro**. Um canto com margem continua sendo um
+  canto.
+
+Um defeito estrutural apareceu na primeira versão e está fechado: o anel do
+pedestal usa **os mesmos oito vizinhos** de `BOSS_CORE_OFFSETS`, e o anel é
+simétrico — com o Núcleo em `chefe + (dx,dy)`, a célula `núcleo + (-dx,-dy)` _é_ o
+chefe. Na câmara natural a ordem esconde (o pedestal é carimbado antes de o chefe
+existir, e `hasGuardianClearance` recusa depois as células que o anel fechou); na
+central o chefe vem primeiro e nascia emparedado. `stampCorePedestal` passou a
+receber o ponto cujo 3x3 ele não pode fechar. Quem pegou foi a prova "ninguém
+nasce DENTRO da moldura", na seed 92.
+
+##### A cobertura da faixa (`BAND_COVER`)
+
+A primeira versão escavou raio 11 e deixou o disco **vazio**. Ele mediu bem e
+jogava mal — a tabela adiante mostra quanto —, e a razão é de desenho: sem nada
+para cortar linha, a única decisão que sobra é a distância ao corpo, e a distância
+o jogador resolve uma vez.
+
+A faixa ganhou **oito pilares**, e a gramática não foi inventada: **câmara-e-pilar**
+é como se escava um veio horizontal de verdade, deixando colunas de rocha para
+segurar o teto. O Estrato Ferrífero é exatamente isso.
+
+Duas regras de posição, e as duas são sobre leitura:
+
+- **Pilar, nunca muro.** O campo do Magnetarca não consulta parede nenhuma: ele
+  cobra por **distância**. Então cobertura aqui não protege de nada — ela só
+  atrapalha o **tiro**, do jogador e da massa. Uma parede longa cortaria a leitura
+  dos dois anéis, que é a razão de a câmara ser central; um pilar de dois tiles
+  tapa um naco de ângulo e deixa o anel inteiro visível.
+- **Alternada.** Quatro colunas nas diagonais a meia faixa (r ≈ 4,9), quatro nos
+  eixos mais para fora (r ≈ 6,5), defasadas 45°. Cada rumo encontra uma coluna ou
+  outra, nunca as duas em fila — ninguém fica sem linha de tiro, e ninguém ganha
+  uma linha que vale a luta toda. São oito e não doze porque em doze a volta pela
+  faixa deixa de ser caminhada e vira labirinto, e a faixa é o lugar onde o
+  encontro pede que se **ande**.
+
+Medido nas 24 câmaras: **65% da faixa mantém linha de tiro para o corpo** (pior
+câmara 61%). Um terço dela está em sombra — e sair da sombra é uma decisão que a
+câmara vazia não pedia.
+
+##### O que a mudança custou, medido
+
+O benchmark foi refeito nas 24 câmaras (mesmo agente: 250 ms de reação, sigma
+0,08 rad). **As medições anteriores desta página foram tiradas na câmara antiga e
+não valem mais** — ficam abaixo só para comparação:
+
+| Estratégia         | Natural (canto)      | Central r=11, vazia | Central r=9, com cobertura |
+| ------------------ | -------------------- | ------------------- | -------------------------- |
+| Ignorar o ferro    | 41,8 s · vida 56/100 | 36,8 s · vida 88    | **39,3 s · vida 57/100**   |
+| Sabotando          | 26,6 s (seed 216)    | 30,4 s · vida 88    | **29,3 s · vida 59/100**   |
+| Pior partida       | 10/100 (seed 981)    | 48/100 (seed 146)   | **28/100** (seed 754)      |
+| Ganho da sabotagem | 36%                  | 17%                 | **25%**                    |
+
+A coluna do meio é o que a câmara vazia fez, e é ela que justifica a cobertura: a
+vida restante subiu de 56–82 para 88, a pior partida do lote saiu de 10/100 para
+48/100 e o ganho da sabotagem caiu pela metade — porque mira limpa e permanente é
+justamente a moeda que a sabotagem cobrava.
+
+Com os pilares de volta, a dificuldade volta ao patamar da câmara antiga (57 de
+vida restante contra os 56 de lá) **sem** devolver o defeito que a centralização
+veio consertar: o anel continua inteiro, e a faixa continua sendo um corredor
+circular. A cauda sem material cai de 8,5 s para 3,1 s por partida.
+
+Uma não vitória no lote, e ela é do **harness** e não do encontro: seed 539,
+estratégia uma-massa-por-ciclo, _timeout_ aos 120 s com o bot em 64 de vida e o
+chefe em 403. Aquela câmara tem 65,7% de linha de tiro — exatamente a média —,
+então não é uma sala sem ângulo: é o agente, que não reposiciona quando a linha
+some, oscilando numa sombra. Um humano dá dois passos para o lado. Fica registrado
+porque o playtest pode mostrar que o passo não é tão óbvio quanto parece.
+
+O eixo `apertada`/`aberta` do benchmark **deixou de separar qualquer coisa**: com
+a câmara sempre no mesmo lugar, o chão aberto a dez tiles do corpo passou a variar
+dentro de um punhado de células em toda a amostra. O relatório do bot passou a imprimir essa faixa e a dizer isso em voz
+alta — um corte por extremos sempre produz dois grupos, inclusive quando não há
+dois tipos de câmara, e anunciar uma distinção de duas células como eixo de
+comparação é pior que não ter eixo nenhum.
+
+**O que isto não decide:** nenhuma constante de balanceamento foi mexida.
+`MAGNETARCH_HP` (1.200) e `MAGNETARCH_CYCLE_TICKS` (120) foram escolhidos por
+varredura na câmara antiga. Com a cobertura de volta os números caíram perto de
+onde estavam — o que é um argumento a favor de deixá-los em paz —, mas a varredura
+em si continua sendo de outra sala. Re-tunar é uma decisão separada.
 
 ### O objetivo não encosta mais na moldura
 

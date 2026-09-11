@@ -33,9 +33,11 @@ import {
   SURF_NONE,
   SURF_SCORCHED,
   SURF_WATER,
+  bossForSector,
   createRun,
   derivePlayerTuning,
   grantOrRechargeModule,
+  sectorBiome,
   type AbilityId,
   type ModuleId,
   type SurvivalState,
@@ -44,6 +46,20 @@ import { ARENA_CATALOG, type ArenaBossId } from './arena-catalog';
 
 export type ArenaConditions = {
   boss: ArenaBossId;
+  /**
+   * A seed da camara, quando alguem pede uma diferente da do catalogo.
+   *
+   * Existe para uma coisa so: repetir no jogo uma camara que ja foi MEDIDA.
+   * O benchmark do Magnetarca (`createMagnetarchBench`) nomeia camaras por
+   * seed, e discutir um caso concreto — "aqueles treze segundos finais da 452"
+   * — exige poder abri-lo. Sem isto a arena so sabe abrir a entrada do
+   * catalogo, e o playtest de um caso conhecido vira um playtest de outro caso.
+   *
+   * Ausente e o normal: a arena abre a camara canonica do chefe, que continua
+   * sendo a que o seletor promete. Uma seed que nao entregue aquele chefe e
+   * RECUSADA e cai de volta na do catalogo — ver `resolveArenaSeed`.
+   */
+  seed?: number;
   maxHp: number;
   ability: AbilityId;
   modules: readonly ModuleId[];
@@ -479,8 +495,37 @@ const stampArenaIceField = (state: SurvivalState, bossArchetype: string): void =
   for (let c = 0; c < state.chunkVersion.length; c++) state.chunkVersion[c]++;
 };
 
+/**
+ * A seed que a arena vai ABRIR de fato, validada.
+ *
+ * A validacao nao e de formato, e de PROMESSA: a entrada do seletor diz qual
+ * chefe vai aparecer, e uma seed que nao o entrega naquele setor abriria a
+ * camara errada — ou uma sem dono — sem nada na tela explicando por que. Aqui
+ * ela e recusada e a do catalogo volta a valer.
+ *
+ * A checagem e a mesma que o teste do catalogo faz, e e PURA: `bossForSector`
+ * sobre `sectorBiome` nao gera mundo nenhum, entao ela cabe no carregamento da
+ * pagina sem custo perceptivel.
+ */
+export const resolveArenaSeed = (boss: ArenaBossId, raw: unknown): number => {
+  const entry = ARENA_CATALOG[boss];
+  const seed = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) return entry.seed;
+  const def = bossForSector(
+    (sector) => sectorBiome(seed, sector),
+    entry.sector,
+    entry.sectorCount,
+    entry.coreSectors,
+  );
+  return def?.archetype === boss ? seed : entry.seed;
+};
+
 export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
   const entry = ARENA_CATALOG[conditions.boss];
+  // A seed passa pela validacao AQUI, e nao so em quem le a URL: um chamador
+  // novo (um teste, uma ferramenta) nao pode conseguir abrir a arena numa
+  // camara sem o chefe que ela promete.
+  const seed = resolveArenaSeed(conditions.boss, conditions.seed ?? entry.seed);
   // MV-04 entra pela porta da PROGRESSAO, e nao por um campo editado a mao: e a
   // mesma derivacao que a expedicao usa, entao o que a arena mede e o upgrade
   // real. Um `iceGlide: 1` escrito aqui mediria um numero que talvez nao exista
@@ -488,7 +533,7 @@ export const createArenaRun = (conditions: ArenaConditions): SurvivalState => {
   const base = conditions.stabilisers ? derivePlayerTuning(['MV-04']) : DEFAULT_PLAYER_TUNING;
   const tuning = { ...base, maxHp: clampArenaHp(conditions.maxHp) };
   const state = createRun({
-    seed: entry.seed,
+    seed,
     sector: entry.sector,
     playerCount: conditions.coop ? 2 : 1,
     tuning,

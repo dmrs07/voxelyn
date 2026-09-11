@@ -804,6 +804,18 @@ export const PT_BR = {
   'toast.ability.assimilated': '{ability} ASSIMILADO',
   'toast.core.deeper': 'NÚCLEO {taken}/{total} RECUPERADO — DESCIDA ADICIONAL AUTORIZADA',
   'toast.furnace.cooled': 'A SALA ESFRIA',
+  // O MAGNETARCA. Cada frase diz a REGRA que passou a valer, e nao o nome do
+  // golpe: "atracao" sozinho nao ensina nada a quem nunca viu o campo, e o que
+  // o jogador precisa saber e qual das duas bordas esta cobrando agora. O aviso
+  // sai na folga, antes de a polaridade nova entrar em vigor.
+  'toast.magnetarch.attract': 'ATRAÇÃO — FIQUE FORA DO ANEL INTERNO',
+  'toast.magnetarch.repel': 'REPULSÃO — NÃO SAIA DO ANEL EXTERNO',
+  'toast.magnetarch.invert': 'O CAMPO SE CALA — A POLARIDADE VAI INVERTER',
+  // O ciclo do ferro. A rachadura diz que os tiros bastaram (a decisao seguinte
+  // e parar de gastar); o estilhaco diz o que o jogador ganhou com isso — e
+  // "nucleo exposto" e a frase util, nao "voce causou dano".
+  'toast.magnetarch.crack': 'MASSA FRATURADA — ELE VAI RECOLHÊ-LA ASSIM',
+  'toast.magnetarch.shatter': 'NÚCLEO EXPOSTO — O CAMPO PERDEU O COMPASSO',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   // As FALAS do Diamandis, como legenda. A voz e sintetizada em fonemas e as
   // palavras nao ficam inteligiveis — a legenda devolve a palavra, no mesmo

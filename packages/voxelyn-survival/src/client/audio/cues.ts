@@ -206,6 +206,10 @@ const GENERIC_WINDUP_VOICE: Record<BossAbility, VoiceId | null> = {
   wave: null,
   freeze: 'telegraphPulse',
   crush: null,
+  // A massa saindo da marca: o telegrafo generico de arremesso, porque e
+  // exatamente isso que ela e. A rota ja estava desenhada no chao — o som so
+  // diz o INSTANTE em que ela deixa de ser aviso e passa a ser pedra no ar.
+  shard: 'telegraphHurl',
   tether: null,
 };
 
@@ -233,7 +237,7 @@ const BOSS_ATTACK_VOICE: BossVoiceTable<BossAbility> = {
   },
   furnace_heart: { wave: 'furnaceWave' },
   frost_queen: { freeze: 'frostQueenFreeze' },
-  magnetarch: { crush: 'magnetarchCrush', tether: 'magnetarchArc' },
+  magnetarch: { crush: 'magnetarchCrush', tether: 'magnetarchArc', shard: 'magnetarchHaul' },
 };
 
 const BOSS_STATE_VOICE: BossVoiceTable<BossMoment> = {
@@ -479,13 +483,28 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     }
 
     case 'boss_state': {
-      // A polaridade do Magnetarca e duas vozes: o rele invertendo e a
-      // polaridade que entrou — e as duas sao globais, porque a resposta
-      // certa depende de saber qual vale sem olhar para nada.
+      // A polaridade do Magnetarca e duas vozes em dois INSTANTES, e desde o
+      // telegrafo elas deixaram de sair juntas: o rele (`magnetarchFlip`) soa
+      // quando a folga ABRE — e o aviso, o unico som que chega antes do dano —
+      // e a voz da polaridade soa quando ela FECHA e a nova entra em vigor.
+      // Empilhar as duas no mesmo tick, como era, dava ao aviso o timing do
+      // fato consumado. As duas sao globais, porque a resposta certa depende de
+      // saber qual polaridade vale sem olhar para nada.
       if (ev.archetype === 'magnetarch') {
+        if (ev.state === 'invert') {
+          return [{ voice: 'magnetarchFlip', x: ev.x, y: ev.y, scale: 1 }];
+        }
+        // O CICLO DO FERRO: a rachadura e o estilhaco. Espaciais, ao contrario
+        // da polaridade — a polaridade e uma regra que vale em todo lugar, e
+        // estas duas sao coisas que aconteceram num ponto do chao.
+        if (ev.state === 'crack') {
+          return [{ voice: 'magnetarchCrack', x: ev.x, y: ev.y, scale: 1 }];
+        }
+        if (ev.state === 'shatter') {
+          return [{ voice: 'magnetarchShatter', x: ev.x, y: ev.y, scale: 1 }];
+        }
         if (ev.state === 'attract' || ev.state === 'repel') {
           return [
-            { voice: 'magnetarchFlip', x: ev.x, y: ev.y, scale: 1 },
             {
               voice: ev.state === 'attract' ? 'magnetarchAttract' : 'magnetarchRepel',
               x: ev.x,

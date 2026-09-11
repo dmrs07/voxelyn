@@ -93,6 +93,9 @@ export default defineConfig({
         sprites: resolve(__dirname, 'sprites.html'),
         salvage: resolve(__dirname, 'salvage.html'),
         arena: resolve(__dirname, 'arena.html'),
+        // O rig de captura do benchmark (bench-main.ts): reproduz um log de
+        // comandos do bot mortal com o renderer de verdade, para virar video.
+        bench: resolve(__dirname, 'bench.html'),
         replay: resolve(__dirname, 'replay.html'),
       },
     },

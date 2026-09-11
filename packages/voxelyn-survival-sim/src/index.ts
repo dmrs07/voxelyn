@@ -142,7 +142,29 @@ export {
 // refaz a mesma conta da simulacao, a partir do unico tick que viaja
 // (`bossRuntime.mawOpenedAt`), e chega no mesmo alcance e na mesma forca.
 export { mawIntensity, mawPull, mawReach, sinkholePull, sinkholeReach } from './maw.js';
+// O CAMPO DO MAGNETARCA, pela mesma economia: do prazo que viaja
+// (`bossRuntime.magnetFlipAt`) mais o humor do corpo saem a polaridade, a folga
+// da inversao e a borda que cobra — nas duas pontas, pela mesma funcao.
+export {
+  MAGNET_BAND_INNER,
+  MAGNET_BAND_OUTER,
+  magnetField,
+  magnetStanding,
+  type MagnetField,
+  type MagnetPolarity,
+  type MagnetStanding,
+} from './magnet.js';
 export { hasLineOfSight } from './pathing.js';
+// O ANDAIME DE MEDICAO do encontro do Magnetarca. Exportado porque duas pontas
+// precisam montar o MESMO estado inicial — o bot em Node, que joga e grava o log
+// de comandos, e o rig de captura no navegador, que reproduz o log com o
+// renderer de verdade. Nao e jogo: e o que garante que o video mostre a partida
+// que foi medida.
+export {
+  createMagnetarchBench,
+  magnetarchBenchSeed,
+  type MagnetarchBench,
+} from './magnetarch-bench.js';
 export {
   FREEZE_THAW_RELEASE_AT,
   applyFreezeDose,

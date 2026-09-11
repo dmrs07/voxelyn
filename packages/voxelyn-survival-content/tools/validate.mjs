@@ -32,6 +32,10 @@ const CANONICAL = {
   'fx-seeker-drone': [32, 32],
   'fx-fire-cyclone': [32, 32],
   'fx-silk-net': [48, 48],
+  // A massa de ferro: o canvas sai do RAIO AUTORITATIVO (0,7 tile), e nao de
+  // um numero redondo — ver magnet-shard.mjs. Alto e nao quadrado por causa da
+  // limalha que escapa da fratura.
+  'fx-magnet-shard': [84, 76],
   // O casulo usa o canvas e a ancora do Prospector: e carimbado onde ele esta.
   'fx-silk-cocoon': [96, 112],
 };
@@ -158,6 +162,11 @@ export const ON_DEMAND_ATLASES = new Set([
   'fx-silk-cocoon',
   // A aranhinha so existe na rocha suturada: vai com o grupo da Cerzideira.
   'enemy-silk-spiderling',
+  // A massa de ferro so existe na camara do Magnetarca: vai com o grupo dele.
+  // Oito quadros de 84x76, e o orcamento de boot esta a menos de 300 KiB do
+  // teto — e a regra escrita acima aplicada ao primeiro peso que veio depois
+  // dela: paga-se com carregamento sob demanda, nao com teto maior.
+  'fx-magnet-shard',
 ]);
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;

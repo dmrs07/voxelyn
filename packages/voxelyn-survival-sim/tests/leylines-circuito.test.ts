@@ -30,6 +30,7 @@ import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src
 import { descend } from '../src/sectors';
 import { deriveLeylineCircuit, deriveLeylineNetwork, generateWorld } from '../src/worldgen';
 import { sectorBiome, sectorProfile } from '../src/strata';
+import { DEFAULT_RUN_DEPTH } from '../src/progression';
 import { sectorSeed } from '../src/sectors';
 import { DISCOVERY_LEYLINE_CIRCUIT } from '../src/types';
 import type { PlayerCommand, SemanticEvent, SurvivalState } from '../src/types';
@@ -334,7 +335,10 @@ describe('circuito: o Ferrifero fica de fora', () => {
       for (let sector = 1; sector <= 7; sector++) {
         if (sectorBiome(seed, sector).stratum !== 'ferric') continue;
         ferricos++;
-        expect(sectorProfile(seed, sector).leylines, `seed ${seed} setor ${sector}`).toBe(0);
+        expect(
+          sectorProfile(seed, sector, DEFAULT_RUN_DEPTH).leylines,
+          `seed ${seed} setor ${sector}`,
+        ).toBe(0);
       }
     }
     // A amostra tem de conter ferricos, senao o teste passaria por vacuidade.
@@ -346,7 +350,7 @@ describe('circuito: a rede derivada da seed', () => {
   it('a nascente e a juncao mais proxima da entrada, e o membro e o maior componente', () => {
     let testados = 0;
     for (let seed = 1; seed <= 60 && testados < 8; seed++) {
-      const profile = sectorProfile(seed, 2);
+      const profile = sectorProfile(seed, 2, DEFAULT_RUN_DEPTH);
       if (profile.leylines <= 0) continue;
       const world = generateWorld(sectorSeed(seed, 2), WORLD_W, WORLD_H, profile);
       const network = deriveLeylineNetwork(world, WORLD_W);

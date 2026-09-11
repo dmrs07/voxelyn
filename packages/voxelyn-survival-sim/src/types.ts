@@ -272,6 +272,24 @@ export type DamageCause =
    * morte tem para fazer.
    */
   | { kind: 'contamination' }
+  /**
+   * O RETORNO: uma massa fraturada do Magnetarca se despedacando nele.
+   *
+   * Causa propria por um motivo que nao e apresentacao — ela nunca chega a uma
+   * tela de morte, porque so cobra do chefe. Ela existe para o FUNIL poder
+   * excluir este dano do multiplicador do nucleo exposto.
+   *
+   * Sem a distincao, a exclusao so valia dentro do mesmo tick (o dano era
+   * agrupado antes de a janela abrir), e duas massas com distancias de
+   * recolhimento diferentes chegam em ticks diferentes: a segunda passava pelo
+   * 1,6x e cobrava 153,6 em vez dos 96 que a ficha promete. A regra e "o nucleo
+   * exposto amplifica o que o JOGADOR faz com a janela, nunca a coisa que abriu
+   * a janela", e uma regra dessas tem de morar onde o multiplicador mora.
+   *
+   * CONTA como dano do jogador nas estatisticas (`attributable`): quem preparou
+   * a massa foi ele.
+   */
+  | { kind: 'magnet_return' }
   | { kind: 'discharge'; source: EffectOrigin['source'] }
   | { kind: 'leviathan_discharge' }
   | { kind: 'explosion'; source: EffectOrigin['source'] }
@@ -759,6 +777,66 @@ export type ProtectiveBubble = { x: number; y: number; radius: number };
  */
 export type Sinkhole = { x: number; y: number; at: number };
 
+/**
+ * Uma massa de minerio e sucata sob o campo do Magnetarca.
+ *
+ * O ciclo dela e o ciclo do campo: atraindo ele a RECOLHE, repelindo ele a
+ * ARREMESSA. Entre os dois ela fica cravada onde parou, e cravada ela e alvo —
+ * fratura-la e o contra-jogo caracteristico do encontro.
+ *
+ * `x, y` e onde ela esta; `tx, ty` e o destino JA MARCADO no chao (o corpo do
+ * chefe no recolhimento, um ponto da arena no arremesso). O destino congela no
+ * telegrafo e nao persegue: sair da linha e a resposta inteira, e ela so existe
+ * porque a linha fica onde nasceu.
+ */
+export type MagnetShard = {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  /** Tick em que o estado atual comecou. */
+  at: number;
+  /** `SHARD_LODGED`, `SHARD_HELD`, `SHARD_WINDUP` ou `SHARD_FLIGHT`. */
+  state: number;
+  /** 1 depois de fraturada. Fraturada ela nao sobrevive ao recolhimento. */
+  cracked: number;
+  /** Integridade restante. So cai enquanto ela esta cravada. */
+  hp: number;
+  /** Ultimo tick em que ESTA massa cobrou de alguem, ou -1. */
+  hitAt: number;
+};
+
+/** Cravada onde parou: parada, e ALVO. */
+export const SHARD_LODGED = 0;
+/** A rota esta marcada no chao, com a massa LA FORA. Alvo ate o ultimo tick. */
+export const SHARD_WINDUP = 1;
+/** Em voo pela rota marcada. */
+export const SHARD_FLIGHT = 2;
+/**
+ * Reincorporada ao corpo: o recolhimento deu certo e ela voltou inteira.
+ *
+ * Estado proprio e nao "cravada em cima dele", por duas razoes que sao a mesma:
+ * ela nao pode ser recolhida de novo (o recolhimento so olha para as cravadas)
+ * e ela nao pode ser alvo (o tiro so encontra as cravadas). A hora de sabotar e
+ * enquanto a massa esta LA FORA, e o estado e o que diz isso sem comentario.
+ */
+export const SHARD_HELD = 3;
+/**
+ * A rota esta marcada, mas a massa ainda esta DENTRO do corpo: o telegrafo de
+ * um arremesso que sai dele.
+ *
+ * Estado proprio e nao `SHARD_WINDUP`, e a diferenca e inteira de jogabilidade.
+ * Sabotar vale enquanto a massa esta fora do corpo, e uma massa em cima do
+ * chefe durante o aviso ficaria na linha de todo tiro mirado NELE: tres blocos
+ * de ferro comendo os tiros do jogador e se fraturando sozinhos, de graca. A
+ * decisao que o ciclo do ferro existe para criar — gastar tiro na massa ou no
+ * chefe — deixaria de ser tomada por alguem.
+ *
+ * A ROTA dele e desenhada como qualquer outra: o corredor atravessa a arena, e
+ * um telegrafo invisivel seria dano sem sinal.
+ */
+export const SHARD_LAUNCH = 4;
+
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
   awake: boolean;
@@ -964,6 +1042,59 @@ export type BossRuntime = {
   frostArmored: number;
   archcantorSilent: boolean;
   /**
+   * O tick em que a polaridade do MAGNETARCA vira, ou -1 enquanto o campo
+   * dorme.
+   *
+   * Autoritativo e HASHEADO, e nao derivado do relogio global como era antes
+   * (`floor(tick / CICLO) % 2`). Tres coisas dependem disso:
+   *
+   * - O encontro comeca SEMPRE em atracao e com um ciclo inteiro pela frente.
+   *   Com o relogio global, quem entrava na camara herdava um pedaco de fase
+   *   sorteado pelo tempo de jogo — as vezes meio segundo antes de uma
+   *   inversao que ele nao tinha como prever.
+   * - O TELEGRAFO precisa de um prazo: `magnetFlipAt - tick` e o que diz se o
+   *   campo esta na janela silenciosa (`MAGNETARCH_FLIP_WINDUP_TICKS`), e e o
+   *   mesmo numero dos dois lados — a simulacao cobra por ele e o cliente
+   *   desenha por ele.
+   * - Quem reconecta no meio do encontro recebe o prazo pronto em `WorldFlags`
+   *   e desenha a inversao no instante certo, em vez de comecar a contar do
+   *   zero e mentir por um ciclo.
+   */
+  magnetFlipAt: number;
+  /**
+   * O prazo (`magnetFlipAt`) cujo aviso de inversao JA saiu, ou -1.
+   *
+   * Memoria de apresentacao, como `drillLockedAt`: fora do hash e fora do wire.
+   * Existe porque o aviso nao pode depender de um tick exato ser processado. O
+   * laco de inimigos pula o corpo inteiro enquanto ele esta atordoado
+   * (`stunnedUntil`), e no Ferrifero atordoar e rotina — a parede conduz, e a
+   * descarga e uma das respostas naturais do estrato. Uma comparacao com o tick
+   * da folga perderia o aviso justamente nas runs em que o jogador mais usa a
+   * ferramenta do bioma; comparar com o PRAZO faz o aviso sair no primeiro tick
+   * util depois do atordoamento, uma vez por ciclo.
+   */
+  magnetWarnedAt: number;
+  /**
+   * As MASSAS que o campo carrega: minerio e sucata do proprio estrato.
+   *
+   * Estado autoritativo e hasheado, e no wire pela mesma razao das crateras da
+   * Fome: quem reconecta no meio de um recolhimento nunca recebeu a marca da
+   * rota, e a massa atropelaria vindo de um chao que, para ele, estava parado.
+   *
+   * Elas nao sao SOLIDAS e nao escrevem celula nenhuma: uma massa cravada nao
+   * fecha rota nem tampa objetivo, em nenhuma combinacao. E a unica garantia
+   * que um objeto novo no chao de uma camara gerada tem de dar.
+   */
+  magnetShards: MagnetShard[];
+  /**
+   * Ate quando o nucleo do Magnetarca esta EXPOSTO — o descompasso que uma
+   * massa fraturada provoca ao se despedacar nele. Zero e "nunca aconteceu".
+   *
+   * Hasheado: decide dano (o multiplicador no funil) e decide posicao (durante
+   * ele o campo nao puxa).
+   */
+  magnetExposedUntil: number;
+  /**
    * O CORO CARDINAL: a entidade que ocupa cada assento da formacao, ou 0.
    *
    * Quatro ids e nao quatro coordenadas. A posicao de um guarda e DERIVADA —
@@ -1060,9 +1191,10 @@ export type BossAbility =
   | 'wave'
   // Rainha da Geada.
   | 'freeze'
-  // Magnetarca.
+  // Magnetarca: as duas bordas do campo, e a massa saindo da marca.
   | 'crush'
-  | 'tether';
+  | 'tether'
+  | 'shard';
 
 /**
  * Os momentos de ESTADO/PRESENCA de chefe (`boss_state`): nem preparacao nem
@@ -1098,9 +1230,19 @@ export type BossMoment =
   // Rainha da Geada: os Espectros saindo do gelo; o tiro absorvido pela couraça.
   | 'wraiths'
   | 'armor_hit'
-  // Magnetarca: a polaridade que acabou de valer.
+  // Magnetarca: a polaridade que acabou de valer, e a INVERSAO comecando —
+  // a janela em que o campo se cala antes de trocar de lado. `invert` sai uma
+  // vez por ciclo, no primeiro tick da folga, e e o unico aviso que o encontro
+  // da: sem ele a troca acontece entre dois quadros e o jogador so descobre a
+  // regra pelo dano.
   | 'attract'
   | 'repel'
+  | 'invert'
+  // Magnetarca, o ciclo do ferro: a massa RACHOU (a limalha escapa — o unico
+  // sinal de que os tres tiros bastaram) e a massa fraturada se DESPEDACOU
+  // contra os aneis, que e o instante da janela.
+  | 'crack'
+  | 'shatter'
   // Cerzideira: a subida pelo fio vertical, a descida e o frenesi.
   | 'ascend'
   | 'descend'

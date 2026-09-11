@@ -31,6 +31,7 @@ import { isBossArchetype } from '../src/bosses';
 import { sectorSeed } from '../src/sectors';
 import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
 import { lineageOf, sectorProfile } from '../src/strata';
+import { DEFAULT_RUN_DEPTH } from '../src/progression';
 import type { SurvivalState } from '../src/types';
 
 /**
@@ -98,7 +99,7 @@ const chamberOf = (seed: number, sector: number): { x: number; y: number } =>
     sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
     WORLD_W,
     WORLD_H,
-    sectorProfile(seed, sector),
+    sectorProfile(seed, sector, DEFAULT_RUN_DEPTH),
   ).guardianSpawn;
 
 describe('arena do chefe por estrato', () => {
@@ -358,7 +359,7 @@ describe('arena do chefe por estrato', () => {
     for (let seed = 1; seed <= 200; seed++) {
       if (seed % BREATHE_EVERY === 0) await breathe();
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
-        const profile = sectorProfile(seed, sector);
+        const profile = sectorProfile(seed, sector, DEFAULT_RUN_DEPTH);
         const alvo = esperado[profile.halls];
         if (alvo === undefined) continue; // karst e lakes so pintam chao
         // Mesma derivacao de createRun, para olhar o MESMO mundo que a run ve.
@@ -406,7 +407,7 @@ describe('arena do chefe por estrato', () => {
     for (let seed = 1; seed <= 220; seed++) {
       if (seed % BREATHE_EVERY === 0) await breathe();
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
-        const profile = sectorProfile(seed, sector);
+        const profile = sectorProfile(seed, sector, DEFAULT_RUN_DEPTH);
         const world = generateWorld(
           sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
           WORLD_W,
