@@ -125,7 +125,20 @@ const paintPool = (state, cx, cy, rim = 2.6) => {
   }
 };
 
-/** Clareira limpa no meio do mapa, com o chefe a `gap` tiles a leste. */
+/**
+ * O RUMO do encontro nesta seed, em radianos.
+ *
+ * A clareira e sempre a mesma — e o que torna as partidas comparaveis —, e por
+ * isso o chefe nao pode nascer sempre a leste: contra um agente que segue regra
+ * fixa, uma cena identica da uma partida identica, e doze seeds eram doze copias
+ * da mesma medicao com um P90 que so repetia a mediana. O que varia e a
+ * GEOMETRIA do engajamento: de que lado o corpo esta quando a luta comeca, e
+ * portanto para onde o chefe telegrafa, por onde o coro gira, de que lado o gelo
+ * se acumula. Deriva da seed, entao continua reproduzivel.
+ */
+const bearing = (seed) => ((seed * 2654435761) % 4096) * ((Math.PI * 2) / 4096);
+
+/** Clareira limpa no meio do mapa, com o chefe a `gap` tiles no rumo da seed. */
 const duel = (seed, archetype, gap, hp) => {
   const state = createRun({ seed });
   const w = state.config.width;
@@ -146,12 +159,26 @@ const duel = (seed, archetype, gap, hp) => {
   // O LENCOL: ancoradouro a leste e dois destinos, como na camara do estrato.
   // Sem pocas o Leviata nao ancora, nao sonda e nao mergulha — e o numero seria
   // sobre um chefe que o jogo nao serve.
+  const a = bearing(seed);
+  const bx = Math.round(px + Math.cos(a) * gap);
+  const by = Math.round(py + Math.sin(a) * gap);
   if (archetype === 'sheet_leviathan') {
-    paintPool(state, px + gap, py);
-    paintPool(state, px - 8, py - 2);
-    paintPool(state, px + 1, py - 9);
+    // O ancoradouro e os dois destinos GIRAM JUNTO com o rumo: pocas fixas com
+    // corpo girando fariam o Leviata nascer em terra seca em tres quartos das
+    // seeds, e a primeira fase dele nao existe fora da agua.
+    paintPool(state, bx, by);
+    paintPool(
+      state,
+      Math.round(px + Math.cos(a + 2.6) * 9),
+      Math.round(py + Math.sin(a + 2.6) * 9),
+    );
+    paintPool(
+      state,
+      Math.round(px + Math.cos(a - 2.6) * 9),
+      Math.round(py + Math.sin(a - 2.6) * 9),
+    );
   }
-  const boss = spawnEnemy(state, archetype, px + gap, py, false);
+  const boss = spawnEnemy(state, archetype, bx, by, false);
   // A VIDA POR FORA existe para a varredura: trocar `*_HP` e reconstruir o
   // pacote a cada candidato transformaria uma busca de dez valores numa tarde.
   // As fases lidas em fracao de `maxHp` continuam corretas porque as duas
@@ -253,6 +280,17 @@ const play = (seed, archetype, hp) => {
   const limit = LIMIT_SECONDS * TICK_HZ;
   let ticks = 0;
   let last = null;
+  // O QUE A IMORTALIDADE ESTA PAGANDO. Cada ponto reposto e um ponto que o
+  // encontro cobrou, e a soma e o outro lado da duracao: alongar um chefe sem
+  // olhar esta coluna e alongar a exposicao do jogador as cegas.
+  //
+  // SEPARADO POR CAUSA, e nao um total. O afogamento nas pocas do Leviata e
+  // artefato DESTE bot — ele nao tem busca de rota e sai da agua pelo rumo mais
+  // curto, nao pelo certo —, e somado ao resto inflaria o unico chefe da lista
+  // que tem agua. Fica numa coluna propria, declarado.
+  let hurt = 0;
+  let drowned = 0;
+  let lastHp = state.player.hp;
   while (boss.alive && ticks < limit) {
     const cmd = emptyCommand();
     // MANTER A FAIXA, e so isso: um passo para dentro quando o chefe se afasta,
@@ -277,7 +315,14 @@ const play = (seed, archetype, hp) => {
     // linha o afogamento nao aparecia como morte — aparecia como um chefe
     // eterno, que e o diagnostico oposto.
     if (state.phase !== 'running') state.phase = 'running';
+    const lost = Math.max(0, lastHp - state.player.hp);
+    if (lost > 0) {
+      const cause = state.playerExtras[0].lastDamage?.cause?.kind ?? 'unknown';
+      if (cause === 'deep_water') drowned += lost;
+      else hurt += lost;
+    }
     state.player.hp = state.player.maxHp;
+    lastHp = state.player.maxHp;
     state.player.alive = true;
     ticks++;
   }
@@ -287,6 +332,8 @@ const play = (seed, archetype, hp) => {
     killed: !boss.alive,
     seconds: ticks / TICK_HZ,
     maxHp: boss.maxHp,
+    hurt,
+    drowned,
   };
 };
 
@@ -303,9 +350,20 @@ const sweep = arg('sweep', null);
 const list = only ? only.split(',') : BOSSES;
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
-const median = (xs) => {
+const median = (xs) => quantile(xs, 0.5);
+
+/**
+ * O quantil pelo metodo do vizinho mais proximo, e nao interpolado.
+ *
+ * Interpolar inventaria uma camara que nao foi jogada: com doze seeds, o P90 e
+ * a decima primeira partida da amostra ordenada, e ela existe. Um numero
+ * interpolado entre a decima e a decima primeira nao corresponde a nenhuma
+ * medicao e nao da para ir olhar.
+ */
+const quantile = (xs, q) => {
   const s = [...xs].sort((a, b) => a - b);
-  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  if (s.length === 0) return 0;
+  return s[Math.min(s.length - 1, Math.max(0, Math.ceil(q * s.length) - 1))];
 };
 
 const measure = (archetype, hp) => {
@@ -316,31 +374,54 @@ const measure = (archetype, hp) => {
     archetype,
     hp: runs[0].maxHp,
     median: median(times),
+    p90: quantile(times, 0.9),
     min: times[0],
     max: times[times.length - 1],
     failed: runs.filter((r) => !r.killed).length,
+    hurt: median(runs.map((r) => r.hurt)),
+    hurtMax: Math.max(...runs.map((r) => r.hurt)),
+    drowned: median(runs.map((r) => r.drowned)),
   };
 };
 
 const header =
-  'chefe               vida   TTK mediano      min      max   dano/s   alvo   desvio  sem morte';
+  'chefe               vida    alvo   mediana      P90      max     min   dano/s   dano tomado   sem morte';
 // O DANO POR SEGUNDO EFETIVO e a coluna que se usa para escolher a vida nova:
 // ele ja traz dentro tudo o que o encontro tira do jogador (blindagem, corpo
 // fora de alcance, fase sem alvo), entao vida = alvo de TTK x dano/s acerta de
 // primeira em quem nao muda de fase com a vida.
 const line = (r) =>
   `${r.archetype.padEnd(18)} ${String(Math.round(r.hp)).padStart(5)}  ` +
-  `${(fmt(r.median) + ' s').padStart(11)}  ${(fmt(r.min) + ' s').padStart(7)}  ` +
-  `${(fmt(r.max) + ' s').padStart(7)}  ${fmt(r.hp / r.median).padStart(7)}  ` +
-  `${(String(targetOf(r.archetype)) + ' s').padStart(5)}  ` +
-  `${((r.median >= targetOf(r.archetype) ? '+' : '') + fmt(r.median - targetOf(r.archetype))).padStart(6)}  ` +
+  `${(String(targetOf(r.archetype)) + ' s').padStart(6)}  ` +
+  `${(fmt(r.median) + ' s').padStart(8)}  ${(fmt(r.p90) + ' s').padStart(7)}  ` +
+  `${(fmt(r.max) + ' s').padStart(7)}  ${(fmt(r.min) + ' s').padStart(6)}  ` +
+  `${fmt(r.hp / r.median).padStart(7)}  ` +
+  `${(String(Math.round(r.hurt)) + ' / ' + String(Math.round(r.hurtMax))).padStart(13)}  ` +
   `${r.failed || ''}`;
 
 console.log('');
 console.log(header);
+console.log('(dano tomado: mediana / pior partida, em pontos de vida, com PLAYER_HP = 100)');
+const measured = [];
 for (const archetype of list) {
-  if (sweep)
-    for (const hp of sweep.split(',').map(Number)) console.log(line(measure(archetype, hp)));
-  else console.log(line(measure(archetype, null)));
+  const hps = sweep ? sweep.split(',').map(Number) : [null];
+  for (const hp of hps) {
+    const row = measure(archetype, hp);
+    measured.push(row);
+    console.log(line(row));
+  }
+}
+// O AFOGAMENTO sai do rodape e nao da tabela: e limitacao do agente e nao conta
+// do encontro, e uma coluna com zero em dez linhas sugeriria que a decima e
+// pior do que e.
+const drowning = measured.filter((r) => r.drowned > 0);
+if (drowning.length > 0) {
+  console.log('');
+  for (const r of drowning) {
+    console.log(
+      `nota: ${r.archetype} — mais ${Math.round(r.drowned)} de afogamento por partida (mediana), ` +
+        'que e o bot sem busca de rota saindo da poca pelo rumo mais curto e nao pelo certo.',
+    );
+  }
 }
 console.log('');

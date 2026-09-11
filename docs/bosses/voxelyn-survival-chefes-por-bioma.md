@@ -2023,19 +2023,35 @@ senta no piso. O alvo de cada um vive em `BOSS_TTK_SECONDS` (`bosses.ts`) — **
 repositório, e não só aqui**, porque foi a falta de um alvo escrito que deixou a lista
 abrir treze vezes.
 
-| Chefe               | Vida (antes → depois) | TTK antes | Alvo | TTK depois |
-| ------------------- | --------------------- | --------- | ---- | ---------- |
-| Guardião            | 420 → **1200**        | 9,1 s     | 30 s | 31,0 s     |
-| Bispo               | 260 → **1180**        | 5,2 s     | 30 s | 30,4 s     |
-| Pulmão-Matriz       | 700 → **1380**        | 16,1 s    | 35 s | 35,2 s     |
-| Arquicantor         | 620 → **1450**        | 19,9 s    | 38 s | 39,5 s     |
-| Magnetarca          | 1200 → **1620**       | 30,0 s    | 42 s | 41,8 s     |
-| Rainha da Geada     | 640 → **950**         | 24,1 s    | 45 s | 45,1 s     |
-| Diamandis           | 1400 → **1700**       | 40,5 s    | 48 s | 48,5 s     |
-| Coração da Fornalha | 900 → **950**         | 45,0 s    | 52 s | 52,0 s     |
-| Cerzideira          | 900 → **730**         | 67,8 s    | 55 s | 56,8 s     |
-| Devorador Branco    | 1500 → **1000**       | 85,7 s    | 58 s | 57,3 s     |
-| Leviatã do Lençol   | 4000 → **2000**       | 125,3 s   | 60 s | 59,2 s     |
+Doze seeds por chefe, e o que a tabela reporta é **mediana, P90 e dano tomado** — não um
+número só. Um alvo cumprido na mediana e estourado no P90 não é um alvo cumprido, e a
+coluna de dano é o outro lado da duração: alongar um encontro sem olhar quanto ele cobra
+é alongar a exposição do jogador às cegas.
+
+| Chefe               | Vida            | TTK mediana        | P90    | máx    | Dano tomado (mediana / pior) |
+| ------------------- | --------------- | ------------------ | ------ | ------ | ---------------------------- |
+| Guardião            | 420 → **1200**  | 10,7 → **31,8 s**  | 33,0 s | 33,0 s | 300 → **1275** / 1705        |
+| Bispo               | 260 → **1180**  | 5,0 → **30,4 s**   | 30,9 s | 32,1 s | 16 → **32** / 32             |
+| Pulmão-Matriz       | 700 → **1380**  | 16,1 → **35,2 s**  | 35,3 s | 35,3 s | 77 → **184** / 195           |
+| Arquicantor         | 620 → **1450**  | 15,6 → **39,2 s**  | 41,4 s | 42,1 s | 52 → **104** / 156           |
+| Magnetarca          | 1200 → **1620** | 30,1 → **41,8 s**  | 41,8 s | 41,8 s | 72 → **108** / 126           |
+| Rainha da Geada     | 640 → **950**   | 23,9 → **43,5 s**  | 46,6 s | 48,2 s | 0 → **442** / 756            |
+| Diamandis           | 1400 → **1700** | 38,3 → **46,3 s**  | 48,9 s | 56,5 s | 295 → **437** / 603          |
+| Coração da Fornalha | 900 → **950**   | 43,4 → **44,6 s**  | 52,8 s | 53,2 s | 938 → **1022** / 1290        |
+| Cerzideira          | 900 → **730**   | 68,2 → **59,1 s**  | 64,0 s | 71,5 s | 504 → **442** / 640          |
+| Devorador Branco    | 1500 → **1000** | 85,7 → **59,5 s**  | 60,3 s | 60,3 s | 310 → **220** / 240          |
+| Leviatã do Lençol   | 4000 → **2000** | 126,2 → **60,0 s** | 60,8 s | 61,0 s | 22 → **22** / 397            |
+
+O dano tomado é de um agente que **não esquiva** — é um teto de exposição e não uma
+previsão —, mas a comparação antes/depois é da mesma postura nos dois lados, e é ela que
+interessa. Duas leituras saltam da coluna:
+
+- **O Guardião custa 4,25× mais** (300 → 1275) para durar 3×. A conta é superlinear
+  porque a fase de fúria (abaixo de metade da vida) passa a ocupar o dobro de tempo
+  absoluto. É o único dos rasos onde o argumento de exposição pesa de verdade.
+- **O Bispo custa 2×, de 16 para 32** — um terço de uma barra de vida, em qualquer das
+  duas durações. Ele não machuca quem mantém distância: a dificuldade dele é o
+  quebra-cabeça territorial, e alongá-lo é uma decisão de **ritmo**, não de perigo.
 
 Duas vidas **desceram**, e as duas pelo mesmo motivo: blindagem faz a vida render muito
 mais tempo que em chefe aberto. A Cerzideira tem a teia (`WEB_ARMOR`) e o Devorador
@@ -2079,12 +2095,14 @@ massa tinha de proteger.
 
 ### O que a medição deixou em aberto
 
-- **A Rainha tem a maior dispersão da lista**, e é do terreno: enquanto há gelo em volta
-  entra 22% do golpe, e ela recongela a placa a cada 14 s. A mediana fica em 45 s, mas a
-  pior câmara da amostra chegou a 79 s — e é a câmara em que o gelo nunca sai, ou seja,
-  a partida em que o jogador não derreteu nada. É por isso que ela fica no meio da faixa
-  e não perto do teto: o que a empurraria para os 60 s medidos seria sorte de terreno, e
-  não desenho.
+- **A Rainha continua sendo a de leitura mais frágil**, mesmo tendo fechado em P90
+  46,6 s: a couraça dela é o terreno (enquanto há gelo em volta entra 22% do golpe, e ela
+  recongela a placa a cada 14 s), então o número depende de quanto gelo sobrou por perto.
+  É por isso que ela fica no meio da faixa e não perto do teto — o que a empurraria para
+  o teto seria sorte de terreno, e não desenho.
+- **A Cerzideira estoura o teto no P90** (64,0 s, máx 71,5 s) com os 730 desta leva. Foi
+  a medição com rumo variável que mostrou isso; 620 fecham a distribuição inteira abaixo
+  de 60 s (mediana 49,9 · P90 54,5 · máx 59,6).
 - **`GUARDIAN_HP` não era lido por ninguém.** A ficha do arquétipo trazia um `420`
   escrito à mão — a única vida de chefe fora de `constants.ts` —, então a constante
   existia e mudá-la não mudava nada no jogo. Agora a ficha lê a constante.
