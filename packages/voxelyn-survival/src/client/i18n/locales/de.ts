@@ -288,7 +288,8 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   // Panel „Replay“ (replay.html)
   // ---------------------------------------------------------------------
   'replay.badge': 'Maßgeblicher Replay — neu simuliert aus dem freigegebenen Protokoll',
-  'replay.badge.local': 'Lokaler Replay — neu simuliert aus dem auf diesem Gerät erfassten Protokoll',
+  'replay.badge.local':
+    'Lokaler Replay — neu simuliert aus dem auf diesem Gerät erfassten Protokoll',
   'replay.back': '← zurück zur Bestenliste',
   'replay.unavailable.local':
     'Das Protokoll dieses Abstiegs liegt nicht mehr auf diesem Gerät — oder wurde von einer anderen Simulationsversion erstellt.',
@@ -596,8 +597,7 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'summary.outcome.cores': 'KERNE GEBORGEN ×{cores}',
   'summary.outcome.extracted': 'OHNE KERN GEBORGEN',
   'summary.outcome.dead': 'DIE ADER HAT SIE VERZEHRT',
-  'summary.reputation.one':
-    'KONZERNREGISTER: 1 inaktive Einheit zerstört — ohne Verwertungswert.',
+  'summary.reputation.one': 'KONZERNREGISTER: 1 inaktive Einheit zerstört — ohne Verwertungswert.',
   'summary.reputation.other':
     'KONZERNREGISTER: {count} inaktive Einheiten zerstört — ohne Verwertungswert.',
   'summary.nextStar.three': '★★★ erfordert alle Kerne in {target} — Sie brauchten {over} mehr.',
@@ -747,8 +747,7 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'upgrade.SV-X.name': 'Kontaminationsprognose',
   'upgrade.SV-X.desc': 'Anzeige der nächsten Welle im HUD',
   'upgrade.IA-01.name': 'Signaturklassifikation',
-  'upgrade.IA-01.desc':
-    'Klammern an nahen Feinden; unterscheidet feindlich, passiv und fliehend',
+  'upgrade.IA-01.desc': 'Klammern an nahen Feinden; unterscheidet feindlich, passiv und fliehend',
   'upgrade.IA-02.name': 'Absichtserkennung',
   'upgrade.IA-02.desc': 'hebt das Ausholen von Stürmen und Schüssen vor der Ausführung hervor',
   'upgrade.IA-03.name': 'Abfanglösung',
@@ -829,15 +828,18 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'sim.partnerRevived': 'Partner wiederbelebt.',
   'sim.reviveBeforeDescend': 'Den abgestürzten Partner wiederbeleben, bevor Sie absteigen.',
   'sim.waitAtShaft': 'Am Schacht auf alle warten, um abzusteigen.',
-  'sim.coreTaken': 'Kern geborgen. Die Ader ist erwacht — steigen Sie zur Oberfläche auf, Sektor für Sektor!',
-  'sim.wellSealedReturn': 'Der Schacht hat sich versiegelt. Der Ausgang liegt dort, wo Sie eingestiegen sind.',
+  'sim.coreTaken':
+    'Kern geborgen. Die Ader ist erwacht — steigen Sie zur Oberfläche auf, Sektor für Sektor!',
+  'sim.wellSealedReturn':
+    'Der Schacht hat sich versiegelt. Der Ausgang liegt dort, wo Sie eingestiegen sind.',
   'sim.reviveBeforeExtract': 'Den abgestürzten Partner wiederbeleben, bevor Sie bergen.',
   'sim.waitAtExit': 'Am Ausgang auf alle warten, um zu bergen.',
   'sim.contaminationRising': 'Die Ader regt sich — die Kontamination steigt.',
   'sim.contaminationCritical':
     'Die Luft ist gesättigt. Jede Sekunde hier unten kostet jetzt Blut — bergen oder absteigen.',
   'sim.coreDropped': 'Der Kern fiel mit seinem Träger.',
-  'sim.leylineCircuitClosed': 'Der Leiter hat sich geschlossen. Das Gestein gibt nach bis zum Abstieg.',
+  'sim.leylineCircuitClosed':
+    'Der Leiter hat sich geschlossen. Das Gestein gibt nach bis zum Abstieg.',
   'sim.arenaSealed': 'Die Ader schließt sich. Weg freikämpfen oder kämpfen.',
   'sim.ceilingCollapsing': 'Die Decke gibt nach. Die Kammer stürzt ein.',
   'sim.delugeRising': 'Der Grundwasserspiegel steigt — der ganze Sektor wird untergehen.',
@@ -846,8 +848,10 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'sim.furnaceUnstable': 'Das Konstrukt hat die Form verloren — der Raum ist jetzt Feuer.',
   'sim.furnaceCooled': 'Das Herz ist stehen geblieben. Die Hitze ging mit ihm.',
   'sim.siegeCollapsed': 'Die Belagerung bricht mit dem Hüter zusammen.',
-  'sim.descentSealedByBoss': 'Der Schacht antwortet nicht: Das Siegel dieses Sektors ist noch aktiv.',
-  'sim.coreSealedByBoss': 'Der Sockel verweigert die Kopplung. Das Siegel dieses Sektors ist noch aktiv.',
+  'sim.descentSealedByBoss':
+    'Der Schacht antwortet nicht: Das Siegel dieses Sektors ist noch aktiv.',
+  'sim.coreSealedByBoss':
+    'Der Sockel verweigert die Kopplung. Das Siegel dieses Sektors ist noch aktiv.',
   'sim.coreTakenDeeper': 'Kern geborgen — weiterer Abstieg autorisiert.',
 
   // ---------------------------------------------------------------------
@@ -870,7 +874,8 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'choice.rechargeAction': '[{index}] AUFLADEN',
 
   'module.piercing.label': 'PIERCING',
-  'module.piercing.description': 'Durchdringt Ziele, ohne Schaden während des Durchgangs zu wiederholen.',
+  'module.piercing.description':
+    'Durchdringt Ziele, ohne Schaden während des Durchgangs zu wiederholen.',
   'module.piercing.proc': 'DURCHGÄNGE',
   'module.conductive.label': 'CONDUCTIVE',
   'module.conductive.description': 'Entlädt verbundene Bioflüssigkeit und Materialien.',
@@ -880,7 +885,8 @@ export const DE: Record<keyof typeof PT_BR, string> = {
     'Zündet scharfe Treffer in einem Bereich. Auf kurze Distanz gefährlich.',
   'module.explosive.proc': 'EXPLOSIONEN',
   'module.siphon.label': 'SIPHON',
-  'module.siphon.description': 'Stellt 2 HP wieder her, wenn ein nützlicher Treffer abgesaugt wird.',
+  'module.siphon.description':
+    'Stellt 2 HP wieder her, wenn ein nützlicher Treffer abgesaugt wird.',
   'module.siphon.proc': 'ABSAUGUNGEN',
   'module.ricochet.label': 'RICOCHET LENS',
   'module.ricochet.description': 'Lässt den Bolzen einmal an einer festen Oberfläche abprallen.',
@@ -893,6 +899,14 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'module.minigun.description':
     'Die Läufe brauchen einen Moment zum Hochlaufen. Danach entlädt sie schwache Geschosse, bis der Lauf blockiert.',
   'module.minigun.proc': 'GESCHOSSE',
+  'module.prospect_lance.label': 'PROSPEKTIONSLANZE',
+  'module.prospect_lance.description':
+    'Belegt den Abzug: ein Schuss nach dem anderen, härter, und drei Felder weiter als der Bolzen. Kein Burst-Fenster — was sie gibt, ist Stetigkeit und Reichweite.',
+  'module.prospect_lance.proc': 'SCHÜSSE',
+  'module.blunderbuss.label': 'DONNERBÜCHSE',
+  'module.blunderbuss.description':
+    'Belegt den Abzug: fünf Schrotkugeln in kurzem Fächer. Aufgesetzt treffen alle fünf; auf fünf Feldern stirbt der Schuss in der Luft.',
+  'module.blunderbuss.proc': 'LADUNGEN',
   'hud.minigun.spinup': 'LÄUFT AN',
   'hud.minigun.overheated': 'LAUF BLOCKIERT',
   'hud.freeze.label': 'EIS',
@@ -952,16 +966,19 @@ export const DE: Record<keyof typeof PT_BR, string> = {
 
   'ability.unlock.current': '{count} Stromvorgänge in diesem Sektor. Erforderlich: {required}.',
 
-  'ability.unlock.blast': '{count} ausgelöste Detonationen in diesem Sektor. Erforderlich: {required}.',
+  'ability.unlock.blast':
+    '{count} ausgelöste Detonationen in diesem Sektor. Erforderlich: {required}.',
 
   'ability.unlock.kinetic':
     '{count} Einschläge oder Zerstreuungen mit dem Impuls in diesem Sektor. Erforderlich: {required}.',
 
   'ability.unlock.evasion': '{count} Ausweichmanöver in diesem Sektor. Erforderlich: {required}.',
 
-  'ability.unlock.purge': '{count} verbrauchte Entlüftungszellen in diesem Sektor. Erforderlich: {required}.',
+  'ability.unlock.purge':
+    '{count} verbrauchte Entlüftungszellen in diesem Sektor. Erforderlich: {required}.',
 
-  'ability.unlock.first': 'Garantierte Vorführung beim ersten Abstieg. Keine vorherigen Aktionen erforderlich.',
+  'ability.unlock.first':
+    'Garantierte Vorführung beim ersten Abstieg. Keine vorherigen Aktionen erforderlich.',
 
   'ability.choice.title': 'EIN ECHO STIMMEN',
 
