@@ -11,7 +11,7 @@ import { createRun, runDepthForGeneration, type ProspectorGeneration } from '@vo
 import { setLocale, t } from '../client/i18n';
 import { objectiveViewOf } from '../client/objective-prop';
 
-const LOCALES = ['pt-BR', 'en'] as const;
+const LOCALES = ['pt-BR', 'en', 'de'] as const;
 
 const runFor = (generation: ProspectorGeneration, sector = 1) =>
   createRun({ seed: 7, sector, depth: runDepthForGeneration(generation) });

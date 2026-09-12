@@ -20,11 +20,12 @@
 
 import { PT_BR } from './locales/pt-BR';
 import { EN } from './locales/en';
+import { DE } from './locales/de';
 
 export type MessageKey = keyof typeof PT_BR;
-export type Locale = 'pt-BR' | 'en';
+export type Locale = 'pt-BR' | 'en' | 'de';
 
-export const LOCALES: readonly Locale[] = ['pt-BR', 'en'];
+export const LOCALES: readonly Locale[] = ['pt-BR', 'en', 'de'];
 
 /** A língua em que o jogo foi escrito, e o destino de qualquer detecção falha. */
 export const DEFAULT_LOCALE: Locale = 'pt-BR';
@@ -38,11 +39,13 @@ export const DEFAULT_LOCALE: Locale = 'pt-BR';
 export const LOCALE_LABELS: Record<Locale, string> = {
   'pt-BR': 'Português',
   en: 'English',
+  de: 'Deutsch',
 };
 
 const CATALOGS: Record<Locale, Record<MessageKey, string>> = {
   'pt-BR': PT_BR,
   en: EN,
+  de: DE,
 };
 
 const STORAGE_KEY = 'voxelyn.locale';
@@ -59,6 +62,7 @@ export const normalizeLocale = (tag: string | null | undefined): Locale | null =
   const lower = tag.toLowerCase();
   if (lower === 'pt-br' || lower.startsWith('pt')) return 'pt-BR';
   if (lower.startsWith('en')) return 'en';
+  if (lower.startsWith('de')) return 'de';
   return null;
 };
 

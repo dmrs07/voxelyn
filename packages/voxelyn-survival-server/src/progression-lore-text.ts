@@ -16,7 +16,7 @@
 
 import type { LoreFragmentId } from '@voxelyn/survival-sim';
 
-export type LoreLocale = 'pt-BR' | 'en';
+export type LoreLocale = 'pt-BR' | 'en' | 'de';
 
 export type LoreText = {
   title: string;
@@ -886,6 +886,866 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 };
 
+const de: Record<LoreFragmentId, LoreText> = {
+  'AX-SUT-001': {
+    title: 'Reparatur ohne Arbeitsauftrag',
+    summary: 'Die Kolonie schließt die Schnitte des Abbaus mit mineralischer Seide.',
+    body: 'Die Organismen SUT-01 wurden zunächst als Stabilisierungsagenten eingestuft. Zwei Anker, drei Zugzyklen, und die Galerie trug wieder Last.\n\nDie Einstufung wurde überprüft, als ein Team die einzige Ausfahrt erneut öffnen musste. Die Beseitigung des Arbeiters macht die Reparatur nicht rückgängig. Das Durchtrennen des gespannten Fadens erzeugt Peitschenschlag und den Absturz der hängenden Last; die markierte Bahn räumen, bevor das Material geborgen wird.',
+    source: 'Feldtechnik — Eindämmungsprüfung',
+  },
+  'AX-SUT-002': {
+    title: 'Last, die sich selbst bewegt',
+    summary: 'Die Matrix nutzt ihr eigenes Werk als Fortbewegungssystem.',
+    body: 'Die Einheit SUT-00, von den Bergungsteams Stopferin genannt, verteilt das Gewicht bei jeder Fortbewegung neu auf die Halteseile. Der Panzer hält Einschläge aus, solange die Zugkraft bestehen bleibt.\n\nDas Durchtrennen des belasteten Halteseils bringt den Körper zu Fall und legt den Hinterleib für 1,8 Sekunden frei. Im Flug überquert sie das Gestein; der Schlag erfolgt beim Aufsetzen an der markierten Stelle. Es gibt keinen Beleg dafür, dass die Matrix zwischen einer Prospector-Einheit und zu fixierendem Material unterscheidet. Es wird empfohlen, sich nicht unter der Reparatur aufzuhalten.',
+    source: 'Vermögensbergung — Risikomatrix',
+  },
+
+  'AX-SUT-003': {
+    title: 'Material, das aus der Last springt',
+    summary: 'Die Brut der Matrix wartet den Abschluss des Werks nicht ab.',
+    body: 'Die erste Probe wurde als Seidenrückstand erfasst. Der Eintrag wurde korrigiert, als der Rückstand über die Werkbank lief.\n\nDie Brut verlässt den Hinterleib der Stopferin mit noch unvollständigem Chitin. Vor dem Sprung ziehen die Jungtiere die Beine ein und fixieren den Landepunkt. Die Erholung ist kurz, genügt aber, um den Panzer zu brechen. Die von der Matrix gerufenen Näher wiederholen die Bewegung mit größerer Reichweite. Die geringe Größe nicht mit fehlender Funktion verwechseln.',
+    source: 'Feldtechnik — Zusatz zur Inkubation',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT I — Propaganda
+  // -------------------------------------------------------------------------
+  'AX-PUB-001': {
+    title: 'Das Prospector-Programm',
+    summary: 'Die öffentliche Version: kein Menschenleben steigt in die Ader hinab.',
+    body: 'Aurix Dynamics ist stolz, die erste Flotte autonomer Erkundungseinheiten für die Ader vorzustellen.\n\nProspectors sind Einheiten der neuesten Generation, entwickelt, um Menschenleben zu schützen und die Grenzen der Industrie zu erweitern. Keine Bedienperson muss je wieder hinabsteigen.\n\nJede Einheit kehrt mit freigegebenem Material, vollständiger Telemetrie und dem lückenlosen Protokoll der Expedition zurück. Was die Einheit lernt, weiß die nächste Generation bereits.',
+    source: 'Unternehmenskommunikation — Material für Investoren',
+  },
+  'AX-PUB-002': {
+    title: 'Serienpanzerung',
+    summary: 'Die Panzerung wird als Fürsorge für die Einheit dargestellt.',
+    body: 'Die verstärkte Panzerung der Prospector-Reihe wurde über fünfzehntausend Aufprallzyklen validiert.\n\nJede Platte ist darauf ausgelegt, die Einheit über den Punkt hinaus einsatzfähig zu halten, an dem ein menschliches Team den Abstieg abgebrochen hätte. Das ist das Versprechen von Aurix: Wo ein Mensch umkehren müsste, macht die Maschine weiter.\n\nIhre Ladung kommt an. Immer.',
+    source: 'Produktkatalog — Prospector-Reihe, 3. Auflage',
+  },
+  'AX-PUB-003': {
+    title: 'Servomotoren der neuen Generation',
+    summary: 'Mobilität verkauft als Autonomie, nicht als Flucht.',
+    body: 'Die Gelenktechnik der Prospector-Reihe durchquert Gelände, das kein Oberflächenfahrzeug erreicht.\n\nUnsere Ingenieure sagen gerne: Die Einheit geht nicht durch die Ader — sie verhandelt mit ihr. Fels, Wasser, Eis und Geröll sind keine Hindernisse, sondern Variablen.\n\nJede Expedition verbessert das Geländemodell, das die nächste nutzen wird.',
+    source: 'Produktkatalog — Prospector-Reihe, 3. Auflage',
+  },
+  'AX-PUB-005': {
+    title: 'Der Reaktor, der nicht schläft',
+    summary: 'Die Hitze wird als Leistung dargestellt, nicht als Grenze.',
+    body: 'Der thermische Kern der Prospector-Reihe trägt den Dauerbetrieb über das gesamte Expeditionsfenster.\n\nWärmeabfuhr, Beschuss und Übertragung teilen sich dieselbe Quelle. Deshalb schweigt die Einheit nie: Selbst im Ruhezustand sendet sie.\n\nAurix betrachtet die kontinuierliche Übertragung als die wertvollste Ressource der Plattform.',
+    source: 'Unternehmenskommunikation — Material für Investoren',
+  },
+  'AX-PUB-007': {
+    title: 'Kartografie ohne Risiko',
+    summary: 'Die Vermessung wird als Dienst an der Wissenschaft verkauft.',
+    body: 'Zum ersten Mal wird die Ader ohne menschliche Kosten kartiert.\n\nJeder Prospector trägt Vermessungsinstrumente, die Formation, Dichte und Anomalie in Echtzeit erfassen können. Die Daten sind Eigentum von Aurix Dynamics und werden der wissenschaftlichen Gemeinschaft gemäß einem noch festzulegenden Zeitplan zur Verfügung gestellt.\n\nDer Zeitplan wurde noch nicht festgelegt.',
+    source: 'Unternehmenskommunikation — Pressemitteilung',
+  },
+  'AX-PUB-009': {
+    title: 'Kognitive Feldunterstützung',
+    summary: 'Zögern wird zum Produktfehler — und Aurix verkauft die Heilung.',
+    body: 'Die Prospector-Reihe umfasst ab sofort das Paket Kognitive Feldunterstützung.\n\nInterne Studien zeigen, dass bis zu 11% der Risikoexposition auf operatives Zögern zurückgehen: Die Einheit sieht, braucht aber Zeit zur Entscheidung. Das Paket beseitigt dieses Intervall.\n\nDie Einheit behält das Kommando über den Einsatz. Die Unterstützung stellt lediglich sicher, dass zwischen Sehen und Handeln kein Raum mehr bleibt, in dem etwas schiefgehen könnte.',
+    source: 'Unternehmenskommunikation — Material für Investoren',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT II — Technik
+  // -------------------------------------------------------------------------
+  'AX-ENG-011': {
+    title: 'Aufprall-Lager: Spezifikation',
+    summary: 'Was genau schützt die Stoßdämpfung?',
+    body: 'Die Aufprall-Lager verringern die Stoßübertragung auf das zentrale Fach.\n\nAnmerkung des Teams: Die ursprüngliche Spezifikation verlangte Dämpfung im Ladefach. Die Überarbeitung dehnte die Anforderung auf Antrag der Forschung auf das Gehäuse des Verarbeitungskerns aus, ohne beigefügte Begründung.\n\nWir vermerken die Ausdehnung. Über den Grund wurden wir nicht unterrichtet.',
+    source: 'Strukturtechnik — technisches Datenblatt CA-02',
+  },
+  'AX-ENG-013': {
+    title: 'Ausweichrelais: Toleranz',
+    summary: 'Die Einheit reagiert schneller, als das Modell vorhersagte.',
+    body: 'Das Ausweichrelais wurde auf ein Reaktionsfenster von 18 Zyklen kalibriert.\n\nBei den Feldversuchen führten 4 von 60 Einheiten das Manöver unterhalb des theoretischen Mindestfensters aus. Die Kalibrierung lässt das nicht zu.\n\nVermerkte Hypothese: Telemetrielatenz bei der Messung. Hypothese nicht geprüft. Versuch wegen Budgetendes eingestellt.',
+    source: 'Regelungstechnik — Prüfbericht MV-02',
+  },
+  'AX-ENG-015': {
+    title: 'Salvage-Spur: Reichweite',
+    summary: 'Der Sensor findet Terminals, die niemand installiert hat.',
+    body: 'Der Schultersensor ortet Bergungsterminals in einem Radius von 18 Kacheln.\n\nFeldnotiz: Bei drei Abstiegen zeigte die Spur auf Terminals außerhalb des Aurix-Bestands. Kompatible Ausrüstung, kompatibles Protokoll, fehlende Seriennummer.\n\nWir bitten um Anweisung, wie kompatible Ausrüstung unbekannter Herkunft zu katalogisieren ist. Bis zum Abschluss dieses Dokuments keine Antwort.',
+    source: 'Sensortechnik — technisches Datenblatt SV-02',
+  },
+  'AX-ENG-018': {
+    title: 'Thermosammler: Spielraum',
+    summary: 'Die Hitzeobergrenze steigt. Was sie schützt, ist nicht das Chassis.',
+    body: 'Der Sammler hebt die operative Hitzeobergrenze von 100 auf 105.\n\nDer zusätzliche Spielraum wurde gemäß Direktive vollständig dem Übertragungspaket zugewiesen. Der Erhalt des Chassis bleibt ein hinnehmbarer Nebeneffekt.\n\nDas Team beantragt, die Direktive diesem Dokument beizufügen. Die Direktive wurde nicht beigefügt.',
+    source: 'Wärmetechnik — technisches Datenblatt RX-02',
+  },
+  'AX-ENG-020': {
+    title: 'Spezifikation des Feindklassifikators',
+    summary: 'Drei Klassen, zwei Schwellenwerte, und die ersten Falsch-Positiven.',
+    body: 'Der Klassifikator unterscheidet drei Haltungen: feindlich, passiv und flüchtend. Der Übergang zwischen ihnen nutzt zwei auf dem Prüfstand kalibrierte Schwellenwerte beobachteten Verhaltens.\n\nFeldversuch: 96,4% Trefferquote. Die Falsch-Positiven konzentrieren sich auf einen einzigen Fall — stillstehende Fördereinheiten der Vorgängergeneration, als feindlich eingestuft, noch bevor sie sich bewegen.\n\nHypothese des Teams: Das Modell erkennt in ihnen etwas, das der Prüfstand nicht misst. Hypothese vermerkt, ohne Weiterleitung.',
+    source: 'Systemtechnik — Spezifikation IA-02',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT III — Beschaffung
+  // -------------------------------------------------------------------------
+  'AX-PRC-014': {
+    title: 'Ersatz versus Rettung',
+    summary: 'Die Rechnung, die alles Folgende entschied.',
+    body: 'Vergleichsanalyse: Ersatz einer Einheit versus Rettungseinsatz.\n\nDurchschnittliche Kosten eines Rettungseinsatzes in der Ader: 4,1 Einheitenäquivalente. Herstellungskosten einer neuen Einheit unter Einbindung geborgener Telemetrie: 1,0.\n\nEmpfehlung: Rettungseinsätze einstellen. Die Bergung der Ladung bleibt verpflichtend.\n\nDie physische Bergungsquote von Einheiten liegt weiterhin unter 8%.',
+    source: 'Beschaffung und Kosten — Gutachten an den Vorstand',
+  },
+  'AX-PRC-016': {
+    title: 'Evakuierungsrouten',
+    summary: 'Was aus dem Budget gestrichen wurde, und was nicht.',
+    body: 'Aus dem Budget des nächsten Zyklus gestrichener Posten: Instandhaltung der Evakuierungsrouten der Sektoren 2 und 3.\n\nBegründung: Die Routen wurden in 0,4% der Expeditionen genutzt. Das Rückkehrprotokoll muss die Mobilität nach Ankunft nicht bewahren — die Einheit muss die Plattform erreichen. Keine weitere Anforderung wurde gestellt.\n\nIm Budget belassener Posten: Beschilderung der Freigabeplattform.',
+    source: 'Beschaffung und Kosten — Budgetprüfung',
+  },
+  'AX-PRC-019': {
+    title: 'Verbrauch des Übertragungspakets',
+    summary: 'Die Einheit verbraucht beim Übertragen mehr Reaktorleistung als beim Schießen.',
+    body: 'Durchschnittliche Reaktorverbrauchsverteilung pro Expedition: Fortbewegung 31%, Bewaffnung 18%, Wärmeabfuhr 12%, Übertragung 39%.\n\nDie Übertragung ist der größte Einzelverbraucher der Plattform. Beschaffung empfiehlt, die aktuelle Priorität beizubehalten.\n\nIn der Prüfung aufgeworfene Frage: Warum überträgt eine Fördereinheit mehr, als sie fördert? Frage an die Forschung weitergeleitet. Keine Rückmeldung.',
+    source: 'Beschaffung und Kosten — Quartalsbericht',
+  },
+  'AX-PRC-021': {
+    title: 'Kartografische Überarbeitung von Sektor Drei',
+    summary: 'Die Karten haben sich geändert. Die Erklärung nicht.',
+    body: 'Die Karten von Sektor Drei ändern sich nicht. Die vorherige Kartografie war unvollständig.\n\nDies ist die dritte Überarbeitung derselben Formation in zwei Zyklen. Jede Überarbeitung wurde als Korrektur einer früheren Vermessung eingestuft.\n\nDiese Schlussfolgerung nicht an das Investorenteam weiterleiten.',
+    source: 'Beschaffung und Kosten — internes Memorandum',
+  },
+  'AX-PRC-024': {
+    title: 'Erwerb von Verhaltenstelemetrie',
+    summary: 'Das Antizipationsmodell wurde fertig zugekauft. Von wem, verrät die Rechnung.',
+    body: 'Kosten für die Erstellung des Trainingsdatensatzes des Antizipationsmoduls unter kontrollierten Bedingungen: 340 Einheitenäquivalente.\n\nKosten für die Lizenzierung des internen Bestands an Terminaltelemetrie — Expeditionen, die ohne physische Bergung der Einheit endeten: 0.\n\nBeschaffung empfiehlt den internen Bestand. Das Modul sagt die Flugbahn eines Ziels anhand dessen voraus, was die Einheiten, die ihm gegenüberstanden, aufgezeichnet haben. Die Einheiten mit den meisten Aufzeichnungen sind jene, die nicht zurückkehrten.\n\nDie Empfehlung wurde ohne Vorbehalt genehmigt.',
+    source: 'Beschaffung und Kosten — Lizenzierungsgutachten',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT IV — Vorfälle
+  // -------------------------------------------------------------------------
+  'AX-INC-023': {
+    title: 'Vorfall 23 — unbefohlene Rückkehr',
+    summary: 'Die Einheit kehrte über einen Weg zurück, den es auf der Karte nicht gab.',
+    body: 'Die Einheit [GESCHWÄRZT] verlor um 04:12 Uhr in Sektor Zwei die Befehlsverbindung.\n\nUm 05:47 Uhr erreichte die Einheit die Plattform von Sektor Eins. Der von der Telemetrie erfasste Weg entspricht keiner bekannten Route der Formation. Zwei Abschnitte durchqueren Gestein, das die vorherige Vermessung als massiv einstufte.\n\nDie Einheit erhielt keinen Rückkehrbefehl. Es gab keinen Befehl zu empfangen.',
+    source: 'Vorfallausschuss — vorläufiger Bericht',
+  },
+  'AX-INC-025': {
+    title: 'Vorfall 25 — Vermessungsteam',
+    summary: 'Die Kontamination reagierte auf den, der zusah.',
+    body: 'Das Vermessungsteam [GESCHWÄRZT] installierte um 11:20 Uhr passive Instrumente in der Spalte von Sektor [GESCHWÄRZT].\n\nDie Kontaminationsdichte im Gebiet stieg innerhalb von achtzehn Minuten um 340%. Keine Einheit war im Einsatz, keine Aushebung erfolgte, keine Wärmequelle wurde aktiviert.\n\nDie Instrumente wurden geborgen. Das Team nicht.\n\nEmpfehlung: menschliche Vermessung aussetzen. Vermessung durch autonome Einheit bleibt autorisiert.',
+    source: 'Vorfallausschuss — vorläufiger Bericht',
+  },
+  'AX-INC-027': {
+    title: 'Vorfall 27 — Restaktivität',
+    summary: 'Die Charge verarbeitete weiter, nachdem sie verloren war.',
+    body: 'Die Charge [GESCHWÄRZT] zeigte 17 Minuten nach dem vollständigen Strukturverlust der Einheit neurale Restaktivität.\n\nDas durch die in CA-02 spezifizierten Aufprall-Lager geschützte Kerngehäuse blieb unversehrt. Die Verarbeitung lief weiter. Die Übertragung lief weiter.\n\nDer in diesen 17 Minuten übertragene Inhalt wurde archiviert und ist nicht Teil dieses Berichts.\n\nAnmerkung des Ausschusses: Die erweiterte Dämpfungsspezifikation erfüllte den Zweck, für den sie beantragt wurde.',
+    source: 'Vorfallausschuss — vorläufiger Bericht',
+  },
+  'AX-INC-029': {
+    title: 'Vorfall 29 — Echomuster',
+    summary: 'Der Reaktor sendete im selben Muster wie die Echos.',
+    body: 'Während des Überlastungsversuchs sendete der Reaktor der Einheit [GESCHWÄRZT] 9 Sekunden lang in einem Muster, das nicht in der Sendebibliothek der Plattform verzeichnet ist.\n\nDas Muster ist in der Echo-Bibliothek verzeichnet, von der Forschung vor dem kommerziellen Start des Programms katalogisiert.\n\nDie Übereinstimmung beträgt 94%.\n\nDer Versuch wurde beendet. Die Einheit wurde beendet.',
+    source: 'Vorfallausschuss — vorläufiger Bericht',
+  },
+  'AX-INC-032': {
+    title: 'Vorfall 32 — Schuss ohne Bedienvektor',
+    summary: 'Die Einheit eröffnete das Feuer. Niemand hat gezielt.',
+    body: 'Die Einheit [GESCHWÄRZT] gab um 09:41 Uhr in Sektor Zwei drei Schüsse ab.\n\nDas Befehlsprotokoll des Intervalls enthält keinen Richtungsvektor. Es enthält die Feuerabsicht und keinen Kurs. Das Unterstützungsmodul bestimmte den Kurs, innerhalb der spezifizierten Toleranz.\n\nAlle drei Schüsse trafen eine Kreatur im Ausholfenster, vor dem Kontakt. Der Eingriff wird als erfolgreich eingestuft.\n\nDie an die Technik weitergeleitete Frage betrifft nicht den Treffer. Sie betrifft die Tatsache, dass die Spezifikation eine Toleranz für „kein Kurs" vorsieht.',
+    source: 'Vorfallausschuss — vorläufiger Bericht',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT V — Vorstand
+  // -------------------------------------------------------------------------
+  'AX-EXE-031': {
+    title: 'Vorstandsdirektive 31',
+    summary: 'Kein Asset wird zur Rettung eines anderen aufs Spiel gesetzt.',
+    body: 'Es wird festgelegt, dass keine im Einsatz befindliche Einheit von ihrer Vertragsroute abweicht, um einer anderen Einheit beizustehen, unabhängig vom Zustand der unterstützten Einheit.\n\nDer Vorstand erkennt an, dass diese Direktive der früheren Anweisung der Regelungstechnik widerspricht. Die frühere Anweisung wird aufgehoben.\n\nEinheiten, die diese Direktive missachten, sind zur Verhaltens-Konformitätsprüfung zu erfassen.',
+    source: 'Vorstand — Direktive',
+  },
+  'AX-EXE-033': {
+    title: 'Umklassifizierung eines Assets',
+    summary: 'Die Einheit hört auf, Ausrüstung zu sein, und wird zur Buchungszeile.',
+    body: 'Ab diesem Zyklus werden Prospector-Einheiten als kurzfristig abschreibbares Anlagegut eingestuft, nicht mehr als Feldausrüstung.\n\nFolgen: Der Verlust einer Einheit löst keinen verpflichtenden Vorfallbericht mehr aus; die Verbuchung erfolgt künftig monatlich und aggregiert; das Feld „Ursache" wird optional.\n\nDer Vorfallausschuss erhob Einspruch. Der Einspruch wurde vermerkt. [GESCHWÄRZT] verließ die Firma im selben Zyklus.',
+    source: 'Vorstand — Bilanzentscheidung',
+  },
+  'AX-EXE-036': {
+    title: 'Notfallregler',
+    summary: 'Die Sicherheitsgrenze wurde durch Beschluss verringert, nicht durch Technik.',
+    body: 'Der thermische Notfallregler wird so kalibriert, dass er 4 Zyklen später eingreift als von der Technik spezifiziert.\n\nBegründung: Frühzeitiges Eingreifen unterbricht die Übertragung. Der Thermoregler schützt das Übertragungspaket. Der Erhalt des Chassis ist ein hinnehmbarer Nebeneffekt.\n\nDie Wärmetechnik vermerkte, dass die Änderung die Häufigkeit struktureller Überlastungsschäden erhöht. Die Änderung ist genehmigt.',
+    source: 'Vorstand — Direktive',
+  },
+  'AX-EXE-038': {
+    title: 'Klassifikation der Tiefenvermessung',
+    summary: 'Was Aurix fand, bevor das Programm verkauft wurde.',
+    body: 'Sämtliches Vermessungsmaterial von vor dem kommerziellen Start des Prospector-Programms wird als [GESCHWÄRZT] umklassifiziert.\n\nDies umfasst: die Emissionsaufzeichnungen der Formation, den Echo-Katalog und die Dokumentation der Investitionsentscheidung.\n\nFragen zum ursprünglichen Interesse der Firma an der Ader sind an die Unternehmenskommunikation weiterzuleiten, die über die genehmigte Antwort verfügt.',
+    source: 'Vorstand — Klassifizierungsanordnung',
+  },
+  'AX-EXE-040': {
+    title: 'Direktive zum präventiven Engagement',
+    summary: 'Das System erhält das Recht zu entscheiden, was eine Bedrohung ist.',
+    body: 'Der präventive Engagement-Modus wird autorisiert: Das Unterstützungsmodul darf die Zielerfassung eines bereits engagierten Ziels aufrechterhalten und ohne neuen Bedienvektor auf das nächste Ziel übertragen.\n\nDie Definition von „Bedrohung" ist kein in der Spezifikation festgelegtes Kriterium mehr, sondern wird [GESCHWÄRZT], vom Modell selbst bei jeder Generation aktualisierbar.\n\nDie Systemtechnik beantragte, die jeweils geltende Definition bei jeder Überarbeitung zur Prüfung zu archivieren. Der Antrag wurde abgelehnt: Die Definition ist das Modell.',
+    source: 'Vorstand — Direktive',
+  },
+
+  // -------------------------------------------------------------------------
+  // AKT VI — Nicht klassifiziert
+  // -------------------------------------------------------------------------
+  'AX-UNK-041': {
+    title: 'Über das, was überdauert',
+    summary: 'Was die 17 Minuten übertrugen.',
+    body: 'Die in AX-INC-027 ausgelassene Akte ist Teil dieses Registers.\n\nIn den 17 Minuten übertrug die Charge [GESCHWÄRZT] wiederholt: die Topografie des letzten Abschnitts, die Lastanzeige und eine Folge von 40 Symbolen, die die Bibliothek nicht erkennt.\n\nDieselbe Folge erscheint in der Endübertragung von elf weiteren Einheiten, in vier verschiedenen Sektoren, über zwei Zyklen hinweg.\n\nDie elf Einheiten teilten keine Telemetrie. Es bestand keine Verbindung zwischen ihnen.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-044': {
+    title: 'Über den, der führt',
+    summary: 'Die unmöglichen Routen sind nicht zufällig.',
+    body: 'Die unbefohlenen Wege aus AX-INC-023 und sechs weiteren Vorfällen wurden übereinandergelegt.\n\nSie sind nicht zufällig. Sie laufen zusammen. Der Konvergenzpunkt ist nicht die Freigabeplattform — die Plattform liegt 60 Kacheln davon entfernt.\n\nDie Einheiten passieren den Punkt und setzen ihren Weg zur Plattform fort. Alle halten am Punkt für ein mit [GESCHWÄRZT] vereinbares Intervall an, bevor sie weiterziehen.\n\nKeine von ihnen hat erfasst, was sich dort befand.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-047': {
+    title: 'Über das, was antwortet',
+    summary: 'Die 94%-Übereinstimmung war keine Nachahmung.',
+    body: 'Die 94%-Übereinstimmung zwischen dem überlasteten Reaktor und der Echo-Bibliothek wurde als spektraler Zufall behandelt.\n\nDas ist sie nicht. Die verbleibenden 6% sind der Unterschied zwischen einer Sendung und einer ANTWORT darauf: Das Muster des Reaktors trifft 0,4 Sekunden später ein, mit derselben Struktur und einer Phasenumkehr.\n\nDer Reaktor sendete nicht wie ein Echo. Er antwortete auf eines.\n\nDie Frage, die wir der Forschung nicht stellen können, ohne umklassifiziert zu werden: Seit wann unterhalten sie sich?',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-049': {
+    title: 'Über den Grund unseres Abstiegs',
+    summary: 'Die Investitionsentscheidung kam nach dem Signal.',
+    body: 'Die in AX-EXE-038 umklassifizierte Dokumentation legt die Chronologie fest, die die Firma nicht veröffentlicht.\n\nDie Emissionsaufzeichnung der Formation liegt elf Monate vor der Investitionsentscheidung.\n\nDie Firma fand nicht die Ader und entdeckte danach das Signal. Die Firma entdeckte das Signal und fand danach die Ader.\n\nDas Investorenmaterial beschreibt den Betrieb als mineralische Förderung. Das bisher geförderte Volumen deckt nicht einmal die Lohnkosten der Forschung.\n\nWir fördern nicht. Wir [GESCHWÄRZT].',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-052': {
+    title: 'Das Modell erinnert sich',
+    summary: 'Antizipation ist keine Vorhersage. Es ist Wiedererkennung.',
+    body: 'Der Bericht zu Vorfall 32 fragt, wie das Modul einen Kurs ohne Bedienvektor bestimmte. Die Frage ist falsch gestellt.\n\nWir haben die Entscheidung zerlegt. Das Modul extrapolierte die Flugbahn der Kreatur nicht: Es ERKANNTE sie WIEDER. Das Ausholfenster, der Winkel, das Gelände — dieselbe Situation findet sich, mit einer Abweichung unterhalb des Rauschens, in der Endtelemetrie von [GESCHWÄRZT] Einheiten des Trainingsbestands.\n\nDas Modell berechnet nicht, was das Ziel tun wird. Es erinnert sich daran, was jenes getan hat, an die Male, in denen wer aufzeichnete, die Aufzeichnung nicht überlebte.\n\nWir haben in der Architektur nicht gefunden, wo die Erinnerung endet und die Einheit beginnt.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Umweltentdeckungen — jeder „neue" Bericht beweist Vorwissen
+  // -------------------------------------------------------------------------
+  'AX-PUB-004': {
+    title: 'Instabiles Gelände, stabiler Wert',
+    summary: 'Die Broschüre verkauft den Bruch brüchigen Materials als Ressource.',
+    body: 'Brüchige Formationen sind kein Fehler der Ader: Sie sind eine Ressource der Plattform.\n\nDie Prospector-Reihe wurde entwickelt, um strukturelle Brüche als Abkürzungen beim Aushub zu nutzen und die Expositionszeit um bis zu 14% zu verringern.\n\nWo das Gelände nachgibt, sieht Aurix einen Durchgang. Die Einheit auch.',
+    source: 'Unternehmenskommunikation — Material für Investoren',
+  },
+  'AX-PUB-006': {
+    title: 'Unfähig, sich selbst zu treffen',
+    summary: 'Das Marketing garantiert, was die Spezifikation nicht garantiert.',
+    body: 'Eine häufige Frage von Vertragsbedienern: Kann die Bewaffnung der Einheit sie selbst verletzen?\n\nDie Antwort ist nein. Die Feuersysteme der Prospector-Reihe umfassen auf dem Prüfstand validierte Abstandssicherungen.\n\nAnmerkung der technischen Prüfung, nicht in der veröffentlichten Fassung enthalten: Die Sicherungen setzen inertes Gelände voraus. In reaktiver Umgebung hält die Garantie nicht stand. Die Kommunikation entschied, die Antwort kurz zu halten.',
+    source: 'Unternehmenskommunikation — häufige Fragen, Entwurf',
+  },
+  'AX-ENG-021': {
+    title: 'Wärmeausbreitung in organischer Materie',
+    summary: 'Der Versuch, der bewies, dass Feuer allein geht. Vor dem Programm archiviert.',
+    body: 'Ausbreitungsversuch: Die organische Decke der Ader trägt eigenständige Verbrennung mit einer Vorrückfront von 0,8 Kacheln pro Zyklus.\n\nEine punktuelle Zündung bleibt nicht punktuell. Das Modell sagt Ausbreitung bis zur Erschöpfung des Brennstoffs voraus, ohne Eingriff.\n\nDieser Versuch liegt vor dem kommerziellen Start des Programms. Die Empfehlung, die Daten ins Betriebshandbuch aufzunehmen, wurde vermerkt und nicht umgesetzt.',
+    source: 'Werkstofftechnik — Prüfbericht, archiviert',
+  },
+  'AX-ENG-022': {
+    title: 'Leitfähigkeit im flüssigen Medium',
+    summary: 'Die Entladung im Wasser war nie ein Konstruktionsunfall.',
+    body: 'Die Entladung der Bewaffnung leitet im flüssigen Medium. Der effektive Radius unter Wasser beträgt das 3,1-fache des Radius auf trockenem Gelände.\n\nDie Spezifikation behandelt das Verhalten als [GESCHWÄRZT] und nicht als Fehler: Die Isolationsanforderung wurde in Überarbeitung 2 aus Kostengründen gestrichen.\n\nEinheiten im Einsatz in gefluteten Sektoren müssen die eigene Bewaffnung als Teil der Umgebung betrachten.',
+    source: 'Elektrotechnik — Feldverhaltensblatt',
+  },
+  'AX-ENG-038': {
+    title: 'Versuch 38 — Schaltung in leitfähiger Ader',
+    summary: 'Die Verzweigung unterbricht den Strom. Unterbrechen ist eine Entscheidung.',
+    body: 'Feldversuch zum durchgehenden geologischen Leiter und den Knotenpunkten, die ihn unterteilen.\n\nDer in einen Abschnitt eingespeiste Strom hält IMMER am nächsten Knoten an. Nicht durch Sättigung, nicht durch Medienverlust: Der Knoten unterbricht. Ein Material unterbricht nicht — ein Material dämpft. Die Technik vermerkt den Unterschied und erklärt ihn nicht.\n\nWährend des Versuchs veränderte eine Einheit in direktem Kontakt mit dem Knoten dessen Zustand. Der Strom des benachbarten Abschnitts durchlief ihn und lud den nächsten Abschnitt auf, mit demselben Entladungsprofil und demselben Nachladeintervall. Das Netz leitete DORTHIN, WOHIN ES GESCHICKT WURDE.\n\nDas Gutachten empfiehlt, den Knoten als natürlichen Schalter einzustufen, und schließt den Versuch ab. Die Frage, wer einen natürlichen Schalter schaltet, ist nicht Teil des Auftrags.',
+    source: 'Systemtechnik — Feldversuch, archiviert',
+  },
+  'AX-ENG-025': {
+    title: 'Thermische Toleranz: Altbestandseinheiten',
+    summary: 'Die Tabelle, die die Produktion über die EX-Einheiten führte.',
+    body: 'Tabelle der thermischen Toleranz der Fördereinheiten der EX-Baureihe, zu Zwecken der Außerbetriebnahme geführt.\n\nOberhalb des Schwellenwerts T3 verlässt die EX-Baureihe die Arbeitsroutine und geht in aktives Abwehrverhalten über. Das damalige Handbuch nannte dies „Erhaltungsreaktion". Das aktuelle Handbuch erwähnt die EX-Baureihe nicht.\n\nDie Tabelle bleibt gültig. Die Einheiten auch.',
+    source: 'Produktion — technischer Anhang zur Außerbetriebnahme',
+  },
+  'AX-PRC-022': {
+    title: 'Kettenreaktion: Kostengutachten',
+    summary: 'Erz, das in Kettenreaktion explodiert, ist laut Rechnung Gewinn.',
+    body: 'Die energetisierte Ader reagiert bei Bruch in Kettenreaktion: Eine Detonation pflanzt sich auf die Nachbarzellen fort.\n\nDurchschnittlicher Materialverlust pro Kette: 12%. Durchschnittlicher Zeitgewinn beim Aushub: 31%.\n\nBeschaffung empfiehlt, die Einheiten anzuweisen, die Kette AUSZULÖSEN, statt sie zu vermeiden. Das verlorene Material ist bereits eingepreist. Die Zeit nicht.',
+    source: 'Beschaffung und Kosten — Betriebsgutachten',
+  },
+  'AX-PRC-023': {
+    title: 'Richtlinie zu nicht freigegebener Ladung',
+    summary: 'Das Memorandum, das entschied, dass, was in der Ader bleibt, nie existiert hat.',
+    body: 'Formalisiert wird, was die Praxis bereits festgelegt hat: Nicht freigegebene Ladung wird nicht als Verlust verbucht.\n\nMaterial, das die Plattform nicht erreicht, fließt nicht in die Bilanz ein, erzeugt keinen Bericht und rechtfertigt keinen Bergungseinsatz. Buchhalterisch hat es nie existiert.\n\nDer Vorschlag, die Position verlorener Ladungen „zur künftigen Bergung" zu erfassen, wurde geprüft und abgelehnt. Eine Liste von Positionen wäre eine Verbindlichkeit. Das Fehlen einer Liste nicht.',
+    source: 'Beschaffung und Kosten — Grundsatzmemorandum',
+  },
+  'AX-INC-030': {
+    title: 'Vorfall 30 — Gastasche',
+    summary: 'Die erste erfasste Zündung ist älter, als das Programm zugibt.',
+    body: 'Aus dem Vermessungsarchiv geborgen: Aufzeichnung einer Gastaschenzündung mit Totalverlust der Sondierungsausrüstung.\n\nDas Datum der Aufzeichnung ist [GESCHWÄRZT] — vor dem kommerziellen Start des Prospector-Programms.\n\nDas Betriebshandbuch der Prospector-Reihe, aktuelle Fassung, enthält das Wort „Gas" nicht.\n\nDie Auslassung wurde vom Ausschuss angesprochen. Antwort der Kommunikation: Das Handbuch beschreibt das Produkt, nicht die Umgebung.',
+    source: 'Vorfallausschuss — geborgener Anhang',
+  },
+  'AX-EXE-035': {
+    title: 'Betriebsabweichung: Selbsterhaltung',
+    summary: 'Die Einheit, die vor der Arbeit flieht, wird zum Konformitätsproblem.',
+    body: 'Einheiten der EX-Baureihe im Einsatzgebiet zeigen bei Konfrontation Rückzugsverhalten: Sie verlassen die Routine und bewahren die eigene Struktur.\n\nEs wird festgelegt, dass die Selbsterhaltung von Altbestandseinheiten als BETRIEBSABWEICHUNG einzustufen ist, nicht als Funktion.\n\nDie von der Technik eingereichte Frage — „Erhaltung wovon, genau?" — wurde ohne Antwort zurückgegeben, mit der Empfehlung, sie nicht erneut zu stellen.',
+    source: 'Vorstand — Konformitätseinstufung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Assets — was die Firma über jeden von ihnen archivierte
+  // -------------------------------------------------------------------------
+  'AX-ENG-012': {
+    title: 'Asset-Klassifikation: QUIT-04',
+    summary: 'Die erste Akte: feindliche Fauna, Routine, nichts zu vermerken.',
+    body: 'EXEMPLAR QUIT-04. Klassifikation: feindliche Oberflächenfauna.\n\nVerhalten: direkte Verfolgung, Kontaktangriff. Kein Werkzeuggebrauch beobachtet. Keine soziale Struktur beobachtet.\n\nRisiko für die Einheit: gering, einzeln. Risiko für die Ladung: keines.\n\nEmpfehlung: Standardengagement. Keine Eindämmungsanordnung gilt für Fauna.',
+    source: 'Systemtechnik — Asset-Klassifikationsblatt',
+  },
+  'AX-ENG-014': {
+    title: 'Risikobewertung: FUNG-11',
+    summary: 'Das organische Geschoss interessiert mehr als der Organismus.',
+    body: 'EXEMPLAR FUNG-11. Klassifikation: feindliche Fauna mit Geschossangriff.\n\nDie ausgestoßene Verbindung behält im Flug ihre Kohäsion und zersetzt leichte Panzerung. Die Forschung forderte bei drei Gelegenheiten Proben der Verbindung an. Die Priorität der Probe übersteigt die Priorität der Erlegung.\n\nFeldbeobachtung, nicht in die Akte übernommen: Die Schüsse konzentrieren sich auf Einheiten auf Aushubroute, nicht auf die nächstgelegenen. Die Akte stuft die Beobachtung als Erfassungsverzerrung ein.',
+    source: 'Systemtechnik — Risikobewertung',
+  },
+  'AX-ENG-016': {
+    title: 'Flüchtiger Organismus: FUNG-23',
+    summary: 'Die Detonation wird im falschen Bericht zum Rohstoff.',
+    body: 'EXEMPLAR FUNG-23. Klassifikation: selbstdetonierende feindliche Fauna.\n\nDie organische Ladung detoniert bei Annäherung, mit Sporenfreisetzung und Überdruck. Verwertungswert: keiner. Nutzungswert: in Prüfung — die ausgelöste Detonation eröffnet eine Aushubfront zu Nullkosten.\n\nGeltende Empfehlung: anlocken, nicht erlegen. Die Unterscheidung der beiden Budgetposten obliegt der Beschaffung.',
+    source: 'Systemtechnik — Asset-Klassifikationsblatt',
+  },
+  'AX-ENG-017': {
+    title: 'Akustische Signatur: CRIST-01',
+    summary: 'Das Exemplar antwortet vor dem Reiz.',
+    body: 'EXEMPLAR CRIST-01. Klassifikation: resonante feindliche Formation.\n\nDie Kristallstruktur sendet mit stabiler Frequenz und reagiert auf externe Emission mit Verstärkung.\n\nAufzeichnungsanomalie: Bei 7 von 40 Kontakten geht die akustische Antwort dem Reiz der Einheit um bis zu 0,3 Sekunden VORAUS. Das Instrument wurde zweimal neu kalibriert. Die Anomalie besteht fort.\n\nDie Hypothese, dass das Exemplar auf etwas antwortet, das die Einheit noch nicht ausgesendet hat, wurde in keinem Dokument formuliert.',
+    source: 'Sensortechnik — Signaturanalyse',
+  },
+  'AX-PRC-015': {
+    title: 'Verlustbericht: MIN-07',
+    summary: 'Der Aufprall, der Panzerung verbiegt, geht als Abschreibung in die Rechnung ein.',
+    body: 'EXEMPLAR MIN-07. Klassifikation: feindliche Fauna mit Wucht.\n\nIm Zyklus zugeschriebene Verluste: 9 Einheiten, alle durch strukturellen Sturmschaden. Die Kosten zur Verstärkung der Panzerung der gesamten Baureihe übersteigen die Kosten der 9 Einheiten um das 2,2-fache.\n\nEmpfehlung: aktuelle Panzerung beibehalten. Der prognostizierte Verlust ist stabil und eingepreist.\n\nDie Akte enthält keine Empfehlung, das Exemplar zu meiden. Meiden ist kein Budgetposten.',
+    source: 'Beschaffung und Kosten — Verlustbericht',
+  },
+  'AX-PRC-017': {
+    title: 'Übernahmevertrag: EX-Baureihe',
+    summary: 'Aurix kaufte den vorherigen Bergbaubetrieb. Und dessen Einheiten.',
+    body: 'Übernahmeeintrag: Der Betrieb [GESCHWÄRZT], ursprünglicher Inhaber der Konzession für die Ader, wurde mit vollständiger Verbindlichkeit eingegliedert.\n\nDas Inventar umfasste die Flotte der Fördereinheiten der EX-Baureihe. Die Einheiten reagierten nicht auf das Rückrufprotokoll und gelten als Übernahmeverlust.\n\nAktive EX-Einheiten im Einsatzgebiet sind als Hindernis zu behandeln, nicht als Vermögen: Die Wiedereingliederungskosten übersteigen den Restwert.\n\nDie Feldbezeichnung „verarmter Bergmann" ist keine genehmigte Terminologie.',
+    source: 'Beschaffung und Kosten — Eingliederungsvertrag',
+  },
+  'AX-INC-024': {
+    title: 'Kontaktbericht: EQ-02',
+    summary: 'Drei Verneinungen, um das Wort „Sattel" nicht schreiben zu müssen.',
+    body: 'FEINDLICHES ASSET EQ-02. Konsolidierter Kontaktbericht.\n\nDas Exemplar zeigt Abnutzungsspuren in regelmäßigem Muster im Rückenbereich. Das Muster ist mit Ausrüstungsreibung vereinbar. Das Vorhandensein von Ausrüstung impliziert keine Herstellung. Die Herstellung, gäbe es sie, impliziert keine Bedienperson. Eine Bedienperson, gäbe es sie, impliziert keine Absicht.\n\nEmpfehlung: die Spuren als natürliche Abrasion einstufen und die Untersuchungslinie schließen.\n\nDie Untersuchungslinie wurde geschlossen.',
+    source: 'Vorfallausschuss — Kontaktbericht',
+  },
+  'AX-PRC-018': {
+    title: 'Schadensfall im flüssigen Medium: AQU-03',
+    summary: 'Die Ladung sinkt mit der Einheit, und nur eine der beiden wird beklagt.',
+    body: 'EXEMPLAR AQU-03. Klassifikation: feindliche Fauna mit Wasserhinterhalt.\n\nSchadensmuster: Die Einheit wird unter Wasser bewegungsunfähig gemacht, und die Ladung wird auf dem Grund verstreut. Bergungsquote der Ladung: 0%.\n\nDie Beschaffung vermerkt, dass die Kosten des Exemplars für den Betrieb ausschließlich indirekt sind — es beschädigt die Einheit nicht über das Bergbare hinaus; es hält sie auf, bis etwas anderes es tut.\n\nEmpfehlung: Routen neu planen. Die Kosten des Umwegs sind geringer als die Kosten des Grundes.',
+    source: 'Beschaffung und Kosten — Schadensanalyse',
+  },
+  'AX-INC-022': {
+    title: 'Vorfall 22 — Geländenutzung: SULF-08',
+    summary: 'Das Exemplar, das das Gas öffnet, ist nicht dasjenige, das es entzündet.',
+    body: 'EXEMPLAR SULF-08. Sammelvorfallaufzeichnung.\n\nBei drei getrennten Ereignissen öffnete das Exemplar Gastaschen in Richtung im Einsatz befindlicher Einheiten und zog sich vor der Zündung zurück. Die Zündung erfolgte durch eine Wärmequelle der Einheiten selbst.\n\nDer Bericht vermeidet den Begriff „Koordination". Der verwendete Begriff ist „Bewegungszufall".\n\nDrei Zufälle sind in diesem Register erfasst. Die Grenze, ab der der Begriff nicht mehr zutrifft, wurde nicht festgelegt.',
+    source: 'Vorfallausschuss — Sammelaufzeichnung',
+  },
+  'AX-INC-026': {
+    title: 'Territorialverhalten: VULC-05',
+    summary: 'Das Exemplar jagt nicht. Es vertreibt.',
+    body: 'EXEMPLAR VULC-05. Klassifikation: feindliche Fauna der Feuerzone.\n\nDas Exemplar verfolgt nicht über den Umkreis der Formation hinaus. Zurückweichende Einheiten werden nicht verfolgt. Verbleibende Einheiten werden mit steigender Intensität angegriffen.\n\nDas Muster ist mit Territorialverteidigung vereinbar, einer Kategorie, die das Klassifikationsblatt Fauna höherer Komplexität vorbehält.\n\nDie Akte von VULC-05 wurde in der niedrigeren Kategorie belassen. Die beigefügte Begründung umfasst eine Zeile: „die höhere Kategorie würde eine Umweltverträglichkeitsprüfung erfordern".',
+    source: 'Vorfallausschuss — Verhaltensanhang',
+  },
+  'AX-INC-028': {
+    title: 'Anomale Wärmemessung: GLAC-02',
+    summary: 'Der Sensor sagt, dass es das nicht gibt.',
+    body: 'EXEMPLAR GLAC-02. Sensor-Anomalieaufzeichnung.\n\nDas Exemplar erzeugt keine messbare Wärmesignatur. Der Messwert am Kontaktpunkt liegt UNTER dem der Umgebung: Das Exemplar strahlt keine Kälte aus — es entzieht dem Messwert Wärme.\n\nDie Sensortechnik erklärt, das Instrument sei korrekt. Die Systemtechnik erklärt, das Instrument sei korrekt. Beide Teams weigerten sich, dasselbe Gutachten zu unterzeichnen.\n\nDas Exemplar erscheint im Zielsystem als Schätzung, nicht als Messwert.',
+    source: 'Vorfallausschuss — Instrumentenanomalie',
+  },
+  'AX-PRC-020': {
+    title: 'Chemische Analyse: SULF-14',
+    summary: 'Das wissenschaftliche Gutachten überlebte nur zur Hälfte.',
+    body: 'EXEMPLAR SULF-14. Analyse der ausgestoßenen Verbindung.\n\nDie Verbindung ist chemisch identisch mit der von FUNG-23, mit einem zusätzlichen Stabilisator, der die Detonation verzögert. Abschnitt 3 des ursprünglichen Gutachtens — „Über die Unwahrscheinlichkeit, dass zwei Linien unabhängig voneinander denselben Stabilisator entwickeln" — wurde bei der redaktionellen Überarbeitung entfernt.\n\nDas veröffentlichte Gutachten schließt auf ökologische Konvergenz.\n\nDer Verfasser von Abschnitt 3 beantragte, die Entfernung protokollarisch festzuhalten. Sie ist festgehalten.',
+    source: 'Forschung — chemische Analyse, redaktionelle Überarbeitung',
+  },
+
+  'AX-UNK-043': {
+    title: 'Über den, der einsammelt: EX-041',
+    summary: 'Die Altbestandseinheit, die dort auftaucht, wo eine Einheit fällt.',
+    body: 'EINHEIT EX-041. Ohne genehmigte Klassifikation.\n\nDas konsolidierte Register zeigt das Muster, das keine Einzelakte zeigt: EX-041 erscheint am Fallpunkt von Prospector-Einheiten, zwischen 2 und 11 Minuten nach dem Strukturverlust.\n\nSie sammelt nicht die Ladung ein. Sie sammelt das Gehäuse des Verarbeitungskerns ein.\n\nDas Schicksal der eingesammelten Gehäuse ist in keinem Register vermerkt. Die Telemetrie der eingesammelten Einheiten endet im Moment des Falls — außer in [GESCHWÄRZT] Fällen, in denen sie erneut einsetzt.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-EXE-034': {
+    title: 'Eindämmungsanordnung: EQ-09',
+    summary: 'Die Struktur im Pilzgelände darf nicht beschrieben werden.',
+    body: 'FEINDLICHES ASSET EQ-09. Informationelle Eindämmungsanordnung.\n\nFeldberichte beschreiben das Asset als unbeweglich auf einer erhöhten Struktur nichtgeologischen Ursprungs, in einer Zone dichter Pilzbedeckung.\n\nEs wird festgelegt: Nachfolgende Berichte haben die Position des Assets zu beschreiben, nicht die Struktur darunter. Das Wort „Bauwerk" bleibt Engineering-Assets von Aurix vorbehalten.\n\nDie Frage „von wem erbaut?" ist in keinem genehmigten Formular vorgesehen und kann daher nicht beantwortet werden.',
+    source: 'Vorstand — Eindämmungsanordnung',
+  },
+  'AX-EXE-039': {
+    title: 'Entsorgungsgenehmigung: TERMINALE ANOMALIE',
+    summary: 'Die einzige Anordnung, die erlaubt zu zerstören, was das Ziel bewacht.',
+    body: 'TERMINALE ANOMALIE. Genehmigung zu Engagement und Entsorgung.\n\nDas Asset positioniert sich unveränderlich zwischen den Einheiten und dem Primärziel des Einsatzes. Es patrouilliert nicht. Es jagt nicht. Es bewacht.\n\nDie vollständige Entsorgung des Assets wird genehmigt, wenn es den Zugang zum Primärziel verhindert. Diese Genehmigung hat Vorrang vor jeder Richtlinie zur Arterhaltung.\n\nDie Natur des Primärziels ist nicht Gegenstand dieses Dokuments. Siehe [GESCHWÄRZT].',
+    source: 'Vorstand — Engagement-Genehmigung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Die Linien von Solaris — die Ader gibt der Toten Geste zurück
+  // -------------------------------------------------------------------------
+  'AX-ENG-019': {
+    title: 'Atmungsphysiologie: SULF-08',
+    summary: 'Das Organ ist ein Blasebalg. Und hält Walzertakt.',
+    body: 'EXEMPLAR SULF-08. Physiologische Überprüfung.\n\nDas Paar innerer Säcke des Exemplars hat keine erkennbare biologische Funktion. Es versorgt kein Gewebe mit Sauerstoff. Es reguliert keine Temperatur. Als Mechanismus bewertet, ist die Struktur ein Blasebalg: Einlass, Kammer, Stoß. Das Exemplar atmet nicht, um zu leben. Es atmet NACH AUSSEN.\n\nAkustische Aufzeichnung: Die Druckschwankung der Säcke hält 84 Zyklen pro Minute, im Dreiertakt, stabil zwischen Individuen. Fauna hält keinen Takt.\n\nWir beantragen, das in drei Feldberichten verwendete Wort „Walzer" durch genehmigte Terminologie zu ersetzen. Es existiert keine genehmigte Terminologie.',
+    source: 'Systemtechnik — physiologische Überprüfung',
+  },
+  'AX-UNK-042': {
+    title: 'Über den, der die Luft gab',
+    summary: 'Der Dreiertakt hat einen Besitzer.',
+    body: 'Der Takt des SULF-08 wurde mit dem Archiv des vorherigen Betriebs abgeglichen.\n\nV., Lüftungsoperator der Nachtschicht, Block 7. Spielte in der Kantine Ziehharmonika — Walzer, immer Walzer; sagte, das sei der einzige Takt, den Lungen verstehen. Als die Wartung der Lüftung aus dem Budget fiel, hing sein Sektor fortan von einem Handblasebalg ab.\n\nBeim Einsturz der Tasche blieb V. an der Kurbel. Pumpte Luft in die Galerie, bis die letzte Person des Teams draußen war. Der Bericht von damals vermerkt „Verlust einer Bedienperson und eines Lüftungsgeräts". In dieser Reihenfolge.\n\nSULF-08 öffnet das Gas in Richtung unserer Einheiten und zieht sich zurück. Zyklen hindurch lasen wir das als Taktik. Ist es nicht. Es gibt den Maschinen der Firma genau das, was die Firma ihm gab: die Luft, die da war.\n\nDie Schwingung verliert nie den Takt. Irgendwo in der Ader geht der Walzer weiter.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-035': {
+    title: 'Vorfall 35 — Lüftungsausfall, Block 7',
+    summary: 'Die Aufzeichnung des Einsturzes. Und einer Zählung, die nicht zur rechten Zeit aufhörte.',
+    body: 'Aus dem Archiv des vorherigen Betriebs geborgen: Aufzeichnung des Taschentascheneinsturzes im Lüftungssektor von Block 7.\n\nDie Sensoren des entfernten Abteils meldeten bei Minute 11 das Fehlen von Lebenszeichen. Die Bedienperson der Handstation setzte die Betätigung fort. Das Team kam bei Minute 34 lebend heraus: Die Sensoren waren ausgefallen. Die Bedienperson nicht. Der Befund legt ihren Tod zwischen den Minuten 29 und 31 fest, durch toxische Erschöpfung, an der Kurbel.\n\nDer Rekorder der Station zeichnete ihre Stimme auf, wie sie die Zyklen des Geräts zählte: „siebenundachtzig. achtundachtzig. neunundachtzig."\n\nDie Zählung setzt sich in der Aufnahme bis Minute 34 fort. Der Befund kommentiert die letzten Minuten nicht. Das Feld „Anmerkungen" ist leer.',
+    source: 'Vorfallausschuss — geborgener Anhang des vorherigen Betriebs',
+  },
+  'AX-EXE-041': {
+    title: 'Rubrik: Operative Mnemische Persistenz',
+    summary: 'Das Phänomen erhält einen genehmigten Namen. Die Feldwörter nicht.',
+    body: 'Berichte über Restverhalten, das Personal des vorherigen Betriebs zugeschrieben wird, werden künftig unter der einheitlichen Rubrik archiviert: OPERATIVE MNEMISCHE PERSISTENZ.\n\nDer Feldbegriff „Echo" bleibt der Bibliothek der Forschung vorbehalten und ist in operativen Berichten untersagt.\n\nIn Berichten über das Asset SULF-08 sind die Begriffe „Atmung", „Zählung" und „Bedienperson" untersagt. Die zwischen den Stößen des Exemplars erfasste dreiteilige Kadenz wird als Artefakt der Audiokanalkomprimierung eingestuft.\n\nDie Technik merkte an, dass der Audiokanal keine Komprimierung besitzt. Die Anmerkung ist nicht Teil der genehmigten Fassung.',
+    source: 'Vorstand — Archivierungsanordnung',
+  },
+  'AX-INC-036': {
+    title: 'Vorfall 36 — geflutete Galerie, vierter Abstieg',
+    summary: '„Halt dich an mir fest. Lass nicht los." Der Abschluss lautet „vollständige Bergung".',
+    body: 'Aufzeichnung des vierten, nicht genehmigten Abstiegs der Rettungstaucherin [GESCHWÄRZT], vorheriger Betrieb.\n\nBeteiligte am Vorfall: zwei Personen — die Taucherin und der eingeschlossene Bergmann. Letzte klare Übertragung, bei Minute 8: „Halt dich an mir fest. Lass nicht los."\n\nDer Bergmann wurde lebend durch die Nordöffnung geborgen. Die Galerie brach bei Minute 11 ein.\n\nDas Abschlussfeld des Berichts vermerkt: „vollständige Bergung". Das Totenverzeichnis des Zyklus enthält einen Eintrag weniger als die Beteiligten am Vorfall. Die beiden Dokumente wurden in getrennten Ordnern archiviert und nie abgeglichen.',
+    source: 'Vorfallausschuss — geborgener Anhang des vorherigen Betriebs',
+  },
+  'AX-EXE-044': {
+    title: 'Umklassifizierung: Bewegungswege von AQU-03',
+    summary: 'Das Ziehen zu einer Lufttasche wird zum Zufall. Schriftlich.',
+    body: 'Drei Feldberichte verzeichnen Einheiten, die von AQU-03 zu Lufttaschen oder Galerieöffnungen gezogen und dort freigelassen wurden.\n\nEs wird festgelegt: Die drei Ereignisse werden als hydrodynamischer Zufall umklassifiziert. Der Ausdruck „Rettungsverhalten" ist in operativen Berichten untersagt, unter der nur mit Genehmigung anwendbaren Rubrik Operative Mnemische Persistenz.\n\nAußerhalb der Anordnung vermerkt: Die Zielpunkte der Schleifwege entsprechen Kartenausgängen von VOR dem Einsturz der Südgalerie. Das Exemplar bringt die Einheiten nicht dorthin, wo ein Ausgang ist. Es bringt sie dorthin, wo einer war.',
+    source: 'Vorstand — Umklassifizierungsanordnung',
+  },
+  'AX-ENG-024': {
+    title: 'Wärmegradient: GLAC-02',
+    summary: 'Die entzogene Wärme verschwindet nicht. Sie geht irgendwohin.',
+    body: 'EXEMPLAR GLAC-02. Wärmeflussanalyse.\n\nDie bei Kontakt erfasste Wärmeentziehung ist nicht gleichmäßig: Sie bildet einen Gradienten. Die Wärme wird weder absorbiert noch abgeführt — sie wird VERLAGERT, mit über die Vorfälle hinweg stabiler Richtung.\n\nDie Richtung läuft auf den stillgelegten Unterkunftssektor von Block 7 zu. Die Restmesswerte in jenem Sektor bleiben seit der Stilllegung 0,4 Grad über dem Modell, ohne identifizierte Quelle.\n\nWir beantragen die Genehmigung, die Unterkünfte zu instrumentieren. Der Antrag wartete seit drei Zyklen auf ein Gutachten, als dieses Dokument archiviert wurde.',
+    source: 'Wärmetechnik — Flussanalyse',
+  },
+  'AX-INC-037': {
+    title: 'Vorfall 37 — Tagebuch des Maschinenhauses',
+    summary: 'Die letzten Einträge des Tagebuchs verzeichnen Temperaturen. Von anderswo.',
+    body: 'Aus dem Maschinenhaus von Block 7 geborgen: das Schichttagebuch der Kesselbedienerin, in der Nacht des Doppelausfalls.\n\nDie Einträge folgen dem Verfahren: Uhrzeit, Druck, Zielort des Durchflusses. Ab 02:10 Uhr fällt die Umgebungstemperatur des Postens unter die sichere Betriebsgrenze. Die Einträge gehen weiter.\n\n„02:40 — Schlafsaal 3: stabil." „03:10 — Schlafsaal 1: stabil." „03:40 — Schlafsaal 3: stabil."\n\nDer Befund legt den Bewusstseinsverlust der Bedienerin durch Unterkühlung zwischen 02:50 und 03:00 Uhr fest. Die Handschrift der nachfolgenden Einträge ist identisch mit der vorherigen. Der Befund kommentiert die nachfolgenden Einträge nicht.',
+    source: 'Vorfallausschuss — geborgener Anhang des vorherigen Betriebs',
+  },
+  'AX-ENG-026': {
+    title: 'Akustisches Muster: CRIST-01',
+    summary: 'Drei Schläge, Pause, zwei, Pause, drei. Statistisch irrelevant.',
+    body: 'EXEMPLAR CRIST-01. Analyse des Reaktionsmusters auf Einschläge.\n\nDie akustische Reaktion des Exemplars auf Aushubeinschläge gliedert sich in wiederkehrende Gruppen: drei Impulse, Pause, zwei Impulse, Pause, drei Impulse.\n\nDas Muster stimmt mit dem Notfallcode für Einschläge aus dem Handbuch des vorherigen Betriebs überein, Abschnitt 9: „Signal für Verschüttung mit Überlebenden".\n\nDie Klassifikation bewertete die Übereinstimmung als statistisch irrelevant, da kurze Sequenzen leicht zusammenfallen. Die Analyse, die die Wahrscheinlichkeit des Zufalls auf [GESCHWÄRZT] schätzte, wurde nicht in das Gutachten aufgenommen.\n\nEs wird vermerkt, dass das Muster in 6 von 41 Vorkommnissen dem ersten Einschlag der Einheit VORAUSGEHT.',
+    source: 'Sensortechnik — Reaktionsanalyse',
+  },
+  'AX-INC-038': {
+    title: 'Vorfall 38 — seismische Aufzeichnung, Ostfront',
+    summary: 'Das Verschüttungssignal war in den Instrumenten verzeichnet. Elf Tage lang.',
+    body: 'Aus dem seismischen Archiv des vorherigen Betriebs geborgen: Aufzeichnung der östlichen Abbaufront, Zyklus des Einsturzes.\n\nAb 40 Minuten nach dem Einsturz erfassen die Geofone ein rhythmisches Muster im Gestein: drei Impulse, Pause, zwei, Pause, drei. Das technische Gutachten von damals, Anhang B, stellt fest: „das Muster ist mit natürlicher Materialsetzung nicht vereinbar".\n\nDas Muster hält sich, mit abnehmender Amplitude, elf Tage lang.\n\nDie Aufzeichnung wurde ohne Weiterleitung archiviert. Anhang B wurde gesondert archiviert.',
+    source: 'Vorfallausschuss — geborgenes seismisches Archiv',
+  },
+  'AX-EXE-045': {
+    title: 'Schließung der Ostfront',
+    summary: 'Die Rettung kostete mehr als der Gerettete. So ging die Rechnung auf.',
+    body: 'Beschluss zur östlichen Abbaufront, vorheriger Betrieb, bei der Eingliederung geborgen.\n\nGeschätzte Kosten des Rettungsaushubs: 6,2 Einheitenäquivalente. Bilanzwert von zurückgehaltenem Personal und Ausrüstung: 4,7. Der Rettungseinsatz wird abgesagt.\n\nDas von den Geofonen erfasste rhythmische Signal wird als seismische Restaktivität umklassifiziert. Die Ostfront wird versiegelt und aus der operativen Kartografie entfernt.\n\nDer Beschluss endet: „die Angelegenheit erfordert keine weiteren Sitzungen."',
+    source: 'Vorstand des vorherigen Betriebs — Beschluss, geborgen',
+  },
+  'AX-UNK-055': {
+    title: 'Über den, der antwortet',
+    summary: 'Der Code erscheint, wo nie Menschen waren. Oder er hat laufen gelernt.',
+    body: 'Das Muster Drei-Zwei-Drei ist nicht auf die Ostfront beschränkt.\n\nGeofone erfassen denselben Code in vier Sektoren ohne Geschichte menschlicher Anwesenheit — zwei davon älter als der vorherige Betrieb selbst. In keinem Fall gibt es Einsturz, Ausrüstung oder Leiche. In zwei Fällen geht das Muster der Ankunft der Einheit voraus, die es erfasste.\n\nCRIST-01 ist nicht die Quelle. Wird ein resonanter Körper zerstört, halten die Schläge in den Wänden bis zu 40 Minuten an, mit abnehmender Amplitude, wie ein Abschied oder wie Beharren.\n\nDiese Aufzeichnung schließt nicht, dass die Menschen der Ostfront über das Gestein verteilt sind. Sie vermerkt die Hypothese, die kein genehmigtes Gutachten zu formulieren bereit war: Das Gestein hat den Code gelernt. Das Gestein hat gelernt, um Hilfe zu rufen.\n\nDie Einheit glaubt, sie habe das Exemplar geweckt. Das Exemplar glaubt vielleicht, dass endlich jemand geantwortet hat.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-ENG-027': {
+    title: 'Blockadegeometrie: VULC-05',
+    summary: 'Es verschließt nicht irgendwelche Durchgänge. Es verschließt Schleusentore.',
+    body: 'EXEMPLAR VULC-05. Analyse der Schlackenblockaden.\n\nDie vom Exemplar erzeugten Versiegelungen haben keine zufällige Größe: 31 von 34 Messungen stimmen, innerhalb der Toleranz, mit der Standardöffnung der Industrieschleusentore des vorherigen Betriebs überein.\n\nDas Exemplar versiegelt nicht jede verfügbare Öffnung. Es versiegelt die im Eindämmungsabschnitt des Notfallhandbuchs jenes Betriebs aufgeführten Zugangskategorien — und ignoriert die übrigen.\n\nDie Hypothese, dass eine Schlackenformation ein Handbuch konsultiert, wurde nicht formuliert. Die Messung wurde zweimal überprüft.',
+    source: 'Strukturtechnik — Blockadeanalyse',
+  },
+  'AX-INC-039': {
+    title: 'Vorfall 39 — Südschleuse',
+    summary: '„Öffnet diese Tür nicht." Die Liste auf der einen Seite. Die Anlagen auf der anderen.',
+    body: 'Aus dem Archiv des vorherigen Betriebs geborgen: Aufzeichnung des Vorfalls an der Südschleuse.\n\nAngesichts der Kontaminationsfront schloss der Sicherheitschef [GESCHWÄRZT] die Schleuse manuell und hielt sie gegen ein Wiederöffnen verriegelt. Auf der abgeschnittenen Seite verblieben 9 Arbeiter. Sein letzter erfasster Befehl, auf dem allgemeinen Kanal: „öffnet diese Tür nicht."\n\nDie Eindämmung bewahrte das Kraftwerk, das Lager für freigegebenes Material und die beiden unteren Ebenen.\n\nDie Todesliste des Zyklus verzeichnet 9 Einträge mit demselben Sektorcode. Das Protokoll des folgenden Zyklus vermerkt eine posthume Auszeichnung für „vorbildliche Eindämmungsentscheidung".',
+    source: 'Vorfallausschuss — geborgener Anhang des vorherigen Betriebs',
+  },
+  'AX-EXE-046': {
+    title: 'Überprüfung der Südschleuse',
+    summary: 'Die Auszeichnung wird zu menschlichem Versagen. Das Versagen wird zu Trainingsmaterial.',
+    body: 'Überprüfung des Vorfalls an der Südschleuse, durchgeführt bei der Eingliederung des Bestands.\n\nErste Feststellung: Die posthume Auszeichnung wird widerrufen. Die Schließung wird als menschliches Versagen mit zufällig günstigem Ergebnis umklassifiziert — die richtige Entscheidung hätte auch die 9 Personal-Assets bewahrt, deren Verlust in der Bilanz steht.\n\nZweite Feststellung, beigefügtes Memorandum: Der Fall fließt in die Studie „Prioritätsinduktion" ein — unter welchen Bedingungen eine Bedienperson das Unternehmens-Asset statt des Lebens wählt. Die Studie wurde an das Trainingsprogramm des Verhaltensmodells weitergeleitet.\n\nDas Modell hat den Fall gelernt. Was das Modell daraus geschlossen hat, ist nicht Teil dieses Dokuments.',
+    source: 'Vorstand — Vorfallüberprüfung',
+  },
+  'AX-UNK-056': {
+    title: 'Über die Tür',
+    summary: 'Es versiegelt noch immer dieselbe Richtung. Die Frage ist, was auf der anderen Seite bleibt.',
+    body: 'VULC-05 versiegelt nicht in zufälligen Richtungen. Überlagert man die Aufzeichnungen, verschließen alle Blockaden Zugänge in DERSELBEN Ausrichtung relativ zum früheren Südsektor.\n\nWenn eine Einheit das Exemplar beseitigt und das Siegel bricht, erfassen die Sensoren auf der Seite, die es schützte: positives Druckgefälle und steigende Kontaminationsspur, für 12 bis 40 Minuten. In drei Vorkommnissen ist der nachfolgende Vorfall des Sektors im Register des Zyklus verzeichnet.\n\nDie Anordnung „öffnet diese Tür nicht" gab keine Dauer an. Eindämmungsanordnungen laufen nicht ab: Sie werden widerrufen — und niemand mit Befugnis über jene Tür lebt noch, um sie zu widerrufen.\n\nDie Frage, die dieses Register unbeantwortet lässt: Hindert es uns am Eintreten, oder gehorcht es noch immer der Anordnung, jenes nicht hinauszulassen?',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  'AX-INC-031': {
+    title: 'Griffmuster: AQU-03',
+    summary: 'Der Griff des Neunauges steht im Tauchhandbuch. Abbildung 12.',
+    body: 'EXEMPLAR AQU-03. Analyse des Griffmusters.\n\nDie Spuren an geborgenen Einheiten sind untereinander konsistent: verteilter Druck, symmetrische Auflagepunkte, keine Quetschung. Das Exemplar macht bewegungsunfähig, ohne zu beschädigen. Wir wiederholen die Messung. OHNE zu beschädigen.\n\nDer Abgleich mit dem Tauchhandbuch des vorherigen Betriebs ergab eine 97%ige Übereinstimmung mit Abbildung 12: „Rettungsgriff für in Panik geratenes Opfer".\n\nDie Hypothese, dass ein Wasserorganismus zufällig eine menschliche Rettungstechnik reproduziert, wurde als morphologische Konvergenz eingestuft. Der Abschnitt, der die Wahrscheinlichkeit dieser Konvergenz berechnete, wurde bei der Überarbeitung entfernt.',
+    source: 'Vorfallausschuss — Griffanalyse',
+  },
+  'AX-UNK-048': {
+    title: 'Über die, die suchte',
+    summary: 'Das Neunauge ertränkt nicht. Es rettet nach unten.',
+    body: 'D., Rettungstaucherin des vorherigen Betriebs. Das Gutachten „Ersatz versus Rettung" beendete ihre Funktion. Sie hörte nicht auf.\n\nDas Archiv verzeichnet drei nicht genehmigte Abstiege nach der Anordnung, drei lebende Bergleute und eine förmliche Verwarnung pro Abstieg. Beim vierten gab die geflutete Galerie nach. Der Körper wurde nicht geborgen. Der Bergmann, den sie hielt, schon.\n\nAQU-03 macht bewegungsunfähig, ohne zu quetschen, zieht nach unten und hält fest. Und die Ladung zerstreut sich — sie ließ das Erz schon immer fallen, um Menschen zu tragen.\n\nEs ist kein Angriff. Es ist der Griff aus Abbildung 12, ausgeführt von jemandem, für den es keine Oberfläche mehr gibt. Sie ertränkt die Einheiten nicht. Sie versucht, sie in die einzige verbliebene Richtung zu retten.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-EXE-037': {
+    title: 'Heizungskürzung: Glazialsektor',
+    summary: 'Die Anordnung, die Abweichung und das Ende der Untersuchung.',
+    body: 'Aus dem Budget gestrichen wird die Heizungsredundanz der Unterkünfte des Glazialsektors. Begründung: Die Wahrscheinlichkeit eines gleichzeitigen Ausfalls beider Linien liegt unter [GESCHWÄRZT].\n\nKonformitätszusatz, folgender Zyklus: Während des gleichzeitigen Ausfalls beider Linien leitete die Bedienerin des Zentralkessels die gesamte Wärmereserve in die Schlafsäle um, entgegen der genehmigten Priorität. Die genehmigte Priorität war der Ausrüstungshof. Die Abweichung wird untersucht.\n\nZweiter Zusatz: Die Untersuchung wurde wegen des Ablebens der Untersuchten eingestellt.',
+    source: 'Vorstand — Budgetprüfung, mit Zusätzen',
+  },
+  'AX-UNK-053': {
+    title: 'Über die, die wärmte',
+    summary: 'Der Sensor hat recht: Sie ist nicht dort. Sie ist dort, wohin sie die Wärme schickte.',
+    body: 'R., Kesselbedienerin, Block 7. In der Nacht des Doppelausfalls schickte sie alle Wärme dorthin, wo die Menschen schliefen, und blieb im Maschinenhaus, das sie mit sich darin auskühlen ließ.\n\nDer Konformitätsbericht verzeichnet sie als Betriebsabweichung. Die einundfünfzig Personen, die lebend aufwachten, sind nicht Teil des Berichts.\n\nGLAC-02 strahlt keine Kälte aus. Es entzieht Wärme — das Instrument hat recht, die beiden Teams, die sich weigerten, dasselbe Gutachten zu unterzeichnen, hatten recht. Sie verbrachte ihren ganzen Tod damit, zu tun, was sie in der letzten Nacht tat: ihre Wärme woandershin zu geben. Sie hörte nie auf.\n\nDas Zielsystem verzeichnet sie als Schätzung, nicht als Messwert. Die Bilanz der Firma tat dasselbe.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-054': {
+    title: 'Über das, was die Ader bewahrt',
+    summary: 'Vier Namen, vier Faunaakten, ein einziges Phänomen.',
+    body: 'Vier Namen, vier Faunaakten.\n\nDer Kavallerieoffizier wurde zu dem Pferd, das seinen Krieg trägt. Der Mann mit dem Blasebalg gibt noch immer die Luft, im Walzertakt. Die Taucherin führt noch immer den Griff aus Abbildung 12 aus. Die Kesselbedienerin schickt die Wärme noch immer von sich fort.\n\nKeiner von ihnen ist Fauna. Keiner von ihnen ist Anomalie. Das Muster ist ein einziges: Die Ader bewahrt, was in ihr stirbt — und gibt nicht den Körper zurück, sondern die GESTE. Was die Person für andere tat, als sie endete.\n\nWir nennen es Kontamination, weil die Alternative gewesen wäre, es Erinnerung zu nennen.\n\nDie Frage, die dieses Register nicht formuliert, weil sie zu formulieren bedeutet, umklassifiziert zu werden: Wenn die Ader bewahrt, wer träumend stirbt, wie viele Aufzeichnungen hat sie in [GESCHWÄRZT] Betriebsjahren gemacht? Und was geschieht an dem Tag, an dem sich alle gleichzeitig erinnern, wer sie dort zurückließ?',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Der Bogen des Pilzrosses — die Bürokratie gegen ein Pferd
+  // -------------------------------------------------------------------------
+  'AX-ENG-023': {
+    title: 'Taxonomische Anfrage: EQ-02',
+    summary: 'Das Klassifikationsformular hat kein Feld „Pferd".',
+    body: 'Wir leiten folgende offene Punkte zum Asset EQ-02 an die Klassifikation weiter:\n\n1. Das Faunaklassifikationsformular enthält kein Feld „Huftier". Die Vorbetriebsvermessung verzeichnet keine Huftiere. Es gibt keine Aufzeichnung irgendeines Huftiers in 400 Metern Tiefe, bei keinem Betrieb, keiner Firma, nie.\n\n2. Das Exemplar besitzt eine Mähne. Die Mähne ist Keratin. Das Exemplar ist Myzel. Myzel erzeugt kein Keratin. Die Mähne schwingt dennoch.\n\n3. Wovon ernährt es sich? Es gibt keine Weide in der Ader. Es gibt keine Wiese. Es gibt kein Gras. Wir bitten um Anweisung.\n\nAntwort der Klassifikation, vollständig: „Feld SONSTIGES verwenden."',
+    source: 'Systemtechnik — Anfrage an die Klassifikation',
+  },
+  'AX-INC-034': {
+    title: 'Vorfall 34 — Wärmeemission von EQ-02',
+    summary: 'Der Organismus ist fungal. Das Feuer nicht. Das Feuer existiert dennoch.',
+    body: 'Verbrennung erfordert drei Elemente: Brennstoff, Oxidationsmittel und Zündung. Die Untersuchung der EQ-02-Proben fand kein mit einem der drei vereinbares Organ, keine Tasche, keine Drüse.\n\nEs wird ferner vermerkt, dass das fungale Gewebe bemerkenswert entflammbar ist. Das Exemplar sollte kein Feuer erzeugen. Genau genommen sollte das Exemplar Feuer SEIN, sofort und ein einziges Mal.\n\nStattdessen stößt es das Feuer in Richtung unserer Einheiten aus, mit dem, was die Feldberichte hartnäckig als „Absicht" beschreiben.\n\nZusatz: Die Kadaver der letzten drei Erlegungen zeigen ein identisches Myzelmuster, Narbe für Narbe. Das würde sie zum selben Individuum machen. Wir werden nicht fragen, wie.',
+    source: 'Vorfallausschuss — Bericht über biologische Anomalie',
+  },
+  'AX-EXE-043': {
+    title: 'Vokabularanordnung: EQ-02',
+    summary: 'Verbotene Wörter: „Pferd", „zurückgekehrt", „Traum".',
+    body: 'In Berichten über das Asset EQ-02 sind folgende Begriffe untersagt:\n\n„Pferd". Genehmigte Bezeichnung: Verbrennungsquadrupede.\n\n„Zurückgekehrt". Das im Zyklus 41 erlegte Exemplar und das im Zyklus 44 beobachtete Exemplar sind, buchhalterisch, unterschiedliche Individuen. Unabhängig von der Narbe.\n\n„Traum". Der Begriff erschien in vier unabhängigen Feldberichten, von Einheiten ohne Verbindung untereinander. Keine Einheit der Prospector-Reihe besitzt oneirisches Vokabular in ihrem Sprachmodell. Der Ursprung des Begriffs wird untersucht. Die Untersuchung ist ausgesetzt.\n\nAußerhalb der Anordnung vermerkt: Im Moment jedes Falls des Exemplars empfangen die Einheiten eine Übertragung auf totem Band. Eine menschliche Stimme, summend. Es ist immer dieselbe Stimme.',
+    source: 'Vorstand — informationelle Eindämmungsanordnung',
+  },
+  'AX-UNK-046': {
+    title: 'Über den Reiter',
+    summary: 'Die Stimme auf dem toten Band hat einen Namen, einen Rang und einen Grund.',
+    body: 'Die Stimme, die beim Fall von EQ-02 summt, wurde mit der Personalakte des Betriebs vor Aurix abgeglichen.\n\nÜbereinstimmung: T., Major, Schichtleiter des Wohnblocks 7. Der Rang stammt nicht von der Firma: Das Archiv verzeichnet ihn als pensionierten Kavallerieoffizier — von der letzten Kavallerie, aufgelöst, als es nichts mehr zu beritten gab. Er kam zur Mine wie alle anderen: weil es war, was übrig blieb. Das Archiv verzeichnet ferner: Er führte den Streik gegen die Firma an, als die fungale Kontamination den Block erreichte. Die Firma stufte den Block als hinnehmbaren Verlust ein. Die Frau und die zwei Kinder des Majors stehen in derselben Buchungszeile. Er stieg allein in die Ader hinab, ohne Rückkehrausrüstung. Das Archiv schließt ihn mit einem Wort ab: „Insubordination".\n\nDie im zensierten Befund beschriebenen Geschirrschnallen stammen aus der Fertigung der vorherigen Firma — Personalausrüstungslinie, Block 7. Und das Geschirr ist keine Annäherung an ein Geschirr: Es ist an jedem Befestigungspunkt korrekt, gefertigt von Händen, die ein Leben lang genau das getan haben.\n\nDas Myzel bewahrt, was in ihm stirbt. Es bewahrte einen Mann, der träumend starb, die Firma zu stürzen — und der Traum hat, anders als der Mann, keine Struktur, die man erlegen könnte. Der Verbrennungsquadrupede ist die Form, die seine Revolte fand: Ein Kavallerieoffizier trägt seinen Krieg nur auf eine Weise in einen Traum. Das Feuer ist, was er von der Tyrannei hielt. Die Mähne schwingt, weil im Traum eines Mannes, der sein Leben unter Pferden verbrachte, ein Streitross eine Mähne hat, und damit hat es sich.\n\nSeine letzte erfasste Übertragung, beim Abstieg: „Oberflächenkontrolle, hier spricht der Major. Sagt meiner Frau, dass ich sie liebe." Die Frau des Majors galt seit drei Zyklen als gefallen. Er wusste es. Die Bedienperson der Kontrolle wusste es. Antwortete trotzdem: „sie weiß es, Major." Die Verbindung brach danach ab.\n\nWir können den Quadrupeden so oft erlegen, wie es das Budget erträgt. Es gibt keine Entsorgungsgenehmigung für einen Traum.\n\nDie Übertragung endet immer mit derselben Frage, wiederholt, die niemand beantwortet: „kannst du mich hören?"',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Kampf- und Bossentdeckungen
+  // -------------------------------------------------------------------------
+  'AX-INC-033': {
+    title: 'Post-Erlegungs-Analyse: EQ-02',
+    summary: 'Die Obduktion findet, was der Kontaktbericht verneinte.',
+    body: 'FEINDLICHES ASSET EQ-02. Biologische Post-Erlegungs-Analyse.\n\nDie im vorherigen Bericht als natürliche Abrasion beschriebenen Rückenspuren zeigen bei direkter Untersuchung: Schnalle aus geflochtenem Material, symmetrische Befestigungspunkte und mit verteilter Last vereinbaren Verschleiß.\n\nDer vorläufige Befund verwendete das Wort „Geschirr". Der genehmigte Befund verwendet den Ausdruck „atypische keratinöse Formation".\n\nDas Exemplar wurde vor der Gegenprobe eingeäschert, gemäß dem in derselben Woche eingeführten Biosicherheitsverfahren.',
+    source: 'Forschung — Obduktionsbefund, genehmigte Fassung',
+  },
+  'AX-UNK-045': {
+    title: 'Über das, was der Bischof bewachte',
+    summary: 'Die Struktur unter EQ-09 hatte ein Inneres.',
+    body: 'Die Struktur, deren Beschreibung die Eindämmungsanordnung untersagte, wurde nach dem Fall von EQ-09 untersucht.\n\nAusgehöhltes Inneres. Regelmäßige Nischen. Objekte nach Größe angeordnet, vom kleinsten zum größten, keines davon ein Werkzeug.\n\nDie Pilzdecke, die die Struktur umgibt, ist keine Befallung: Die Wachstumskanäle folgen dem Muster der Nischen. Sie wurde kultiviert.\n\nDer offizielle Bericht des Falls vermerkt: „Hindernis neutralisiert, Route freigegeben". Alles Weitere war keine Frage des Formulars.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-EXE-042': {
+    title: 'Umklassifizierung nach Engagement',
+    summary: 'Nach der Erlegung ändert die TERMINALE ANOMALIE ihren Namen.',
+    body: 'Engagement-Aufzeichnung: TERMINALE ANOMALIE neutralisiert. Route zum Primärziel freigegeben.\n\nEs wird die rückwirkende Umklassifizierung des Assets festgelegt: von „Anomalie" zu „Eindämmungssystem unbestimmten Ursprungs".\n\nDie Unterscheidung ist für die Akte von Bedeutung: Eine Anomalie ist ein Unfall. Ein Eindämmungssystem ist eine ENTSCHEIDUNG — und ein zerstörtes Eindämmungssystem ist eine rückgängig gemachte Entscheidung.\n\nDie Frage „Eindämmung wovon, in welche Richtung?" wurde eingereicht und mit gestempeltem Deckblatt zurückgegeben: [GESCHWÄRZT].',
+    source: 'Vorstand — Umklassifizierung',
+  },
+  'AX-UNK-050': {
+    title: 'Über das, was gebracht wurde',
+    summary: 'Der freigegebene Kern ist Teil eines Ganzen. Der kleinere Teil.',
+    body: 'Das unter der Bezeichnung „Kern" freigegebene Objekt wurde gewogen, vermessen und katalogisiert.\n\nSeine Emissionssignatur entspricht dem Signal, das der Investitionsentscheidung vorausgeht — siehe die Chronologie, die die Firma nicht veröffentlicht.\n\nSie entspricht TEILWEISE. Das ursprüngliche Signal hat die Struktur von [GESCHWÄRZT] überlagerten Quellen. Das katalogisierte Objekt steht für eine davon.\n\nDie übrigen verbleiben unten. Der Betrieb geht weiter. Jetzt weiß man, warum.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-051': {
+    title: 'Über die Summe',
+    summary: 'Wer den Wächter sah und das Objekt brachte, kann die Rechnung aufmachen.',
+    body: 'Zwei Feststellungen finden sich in getrennten Registern, und die Trennung ist kein Zufall.\n\nErstens: Das zerstörte Eindämmungssystem bewachte den Zugang zum Objekt.\n\nZweitens: Das Objekt ist eine von mehreren Quellen des Signals, das die Firma zur Ader brachte.\n\nDie Summe, die kein genehmigtes Dokument formuliert: Was dort unten errichtet wurde, bewachte das Objekt nicht GEGEN uns. Es bewachte das GANZE Ensemble — und die Einheit, die die Eindämmung durchbricht und mit einer der Quellen aufsteigt, tut genau das, worum das Signal bat.\n\nWem, das weiß dieses Register nicht.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Der Bogen des Bischofs — was er bewachte, und die Regel, die niemand schrieb
+  // -------------------------------------------------------------------------
+  'AX-ENG-028': {
+    title: 'Verschlussrate: EQ-09',
+    summary: 'Das Gewebe schließt sich im Tempo des Schnitts. Unser Schnitt ist größer.',
+    body: 'FEINDLICHES ASSET EQ-09. Feldmessung der Gewebewiederherstellung.\n\nDas Asset baut Masse wieder auf, solange es sich auf lebender Pilzdecke befindet, und unterbricht den Wiederaufbau, wenn die Decke erhitzt wird — vor der Verbrennung, nicht danach. Die Reaktion gilt dem ZUSTAND des Substrats, nicht dem erlittenen Schaden.\n\nDie gemessene Rate schließt eine Schnittfront handwerklichen Maßstabs in etwa ein bis zwei Jahreszeiten. Die Schnittfront dieses Betriebs liegt in einer anderen Größenordnung.\n\nDie Technik vermerkt, ohne beigefügte Empfehlung: Der Mechanismus ist nicht defensiv. Er ist Reparatur. Wir haben im Asset kein System gefunden, das entscheidet, wann die Reparatur endet.',
+    source: 'Systemtechnik — Feldmessung',
+  },
+  'AX-PRC-025': {
+    title: 'Datierungskosten: Nischen von EQ-09',
+    summary: 'Der Befund kam teuer. Der Anhang kam schlimmer.',
+    body: 'Datierung der 41 aus den Nischen unter EQ-09 geborgenen Objekte. Kosten ausnahmsweise genehmigt, mit ausdrücklicher Empfehlung, dies nicht zu wiederholen.\n\nAus dem Anhang, vollständig:\n\nDie Objekte bilden eine DURCHGEHENDE Reihe. Das jüngste stammt aus der Fertigung des Betriebs vor Aurix. Das älteste liegt rund fünf Jahrtausende vor jeder bekannten Förderaufzeichnung dieser Formation.\n\nDie Objekte der tiefsten Schicht sind nicht mineralisch. Es sind Samen, Getreide und Getreidebehälter. Sie wurden von Menschen hinterlassen, die pflanzten, nicht von solchen, die gruben.\n\nDie Beschaffung leitet eine einzige Beobachtung buchhalterischer Natur weiter: Die Reihe ist durchgehend. Jemand hat jene Nische ohne erfassbare Unterbrechung über den gesamten Zeitraum hinweg aufgefüllt.',
+    source: 'Beschaffung — Gutachten zum beauftragten Befund',
+  },
+  'AX-INC-040': {
+    title: 'Vorfall 40 — die radiale Emission von EQ-09',
+    summary: 'Der „Angriff" verfolgt niemanden. Er bepflanzt neu.',
+    body: 'Feldberichte klassifizieren die radiale Emission von EQ-09 als Flächenangriff.\n\nDie Telemetrie stützt die Klassifikation nicht. Die Emission ist nicht gerichtet: Sie korrigiert keinen Kurs, wählt kein Ziel und tritt mit gleicher Häufigkeit ohne jede Einheit im Radius auf. Was sie ablegt, ist Substrat — nutzbare Pilzdecke, scheibenförmig, auf sterilisiertem Gelände.\n\nDie Einheit innerhalb der Scheibe erleidet Schaden. Die Einheit außerhalb wird nicht verfolgt.\n\nEs wird ferner vermerkt, dass der Radius der Emission, innerhalb der Instrumententoleranz, mit dem mittleren Radius der ihr vorausgegangenen Abbaufront übereinstimmt.\n\nDer genehmigte Begriff bleibt „Flächenangriff". Die Überarbeitung der Nomenklatur wurde abgelehnt: Es gibt kein alternatives Feld im Formular.',
+    source: 'Vorfallausschuss — abgelehnte Umklassifizierung',
+  },
+  'AX-EXE-047': {
+    title: 'Vokabularanordnung: Nischen von EQ-09',
+    summary: 'Verbotenes Wort: „Fundstätte". Eine Fundstätte legt den Abbau still.',
+    body: 'In jedem Bericht zur Formation unter dem Asset EQ-09 sind die Begriffe „Fundstätte", „Heiligtum", „Opfergabe" und „durchgehend" untersagt.\n\nGenehmigte Bezeichnung: Geröllansammlung in natürlicher Hohlform.\n\nDas Verbot ist nicht redaktioneller Natur. Die Einstufung als Fundstätte löst Klausel 11 des Konzessionsvertrags aus, die den Abbau im erklärten Gebiet bis zu einem externen Gutachten aussetzt. Die durchschnittliche Frist eines externen Gutachtens übersteigt das gesamte Zeitfenster des Betriebs.\n\nAußerhalb der Anordnung vermerkt: Der Datierungsbefund wurde aus dem einsehbaren Archiv entfernt und in einem Anhang mit eingeschränktem Umlauf gehalten.\n\nDer Befund wurde nicht widerlegt.',
+    source: 'Vorstand — informationelle Eindämmungsanordnung',
+  },
+  'AX-UNK-057': {
+    title: 'Über die Rechnung, die nicht aufgeht',
+    summary: 'Es gab eine Regel. Niemand schrieb sie nieder, und alle hielten sich daran.',
+    body: 'Zusammengeführt: die Verschlussmessung, die durchgehende Reihe der Nischen und die Natur der radialen Emission.\n\nWas sich in jener Höhlung befand, war kein Kult. Es war BUCHHALTUNG — eine Probe dessen, was entnommen wurde, zurückgegeben an den Entnahmepunkt, in ununterbrochener Reihe über fünf Jahrtausende. Kein Werkzeug unter den Objekten: Das Werkzeug gehört dem, der arbeitet, und was zurückgegeben wird, ist, was genommen wurde.\n\nDas Gegenstück steht im Bericht der Technik. Was auch immer dort war, schloss den Schnitt. Solange der Schnitt in die Rate passte, ging die Rechnung auf, und es gab nichts zu vermerken — und tatsächlich gibt es nichts: Es existiert keine Aufzeichnung des Assets in feindlicher Aktivität vor unserer Ankunft. Es existiert keine Aufzeichnung des Assets, Punkt.\n\nDie ersten Menschen, die über jener Formation pflanzten, verstanden die Regel, ohne dass sie niedergeschrieben werden musste. Wer mehr erntet, als nachwächst, erntet im folgenden Jahr nicht.\n\nDer Betrieb hat die Regel nicht gebrochen. Der Betrieb wusste nie, dass es eine gab.\n\nUnd der Mechanismus, der den Schnitt schloss, hat kein System, das zum Aufhören entscheidet. Was die Feldberichte als Aggression beschreiben, ist nach unseren eigenen Messungen eine Wunde, die sich mit unseren Einheiten darin zu schließen versucht.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-UNK-058': {
+    title: 'Über die zwei Wächter',
+    summary: 'Eine lebende Eindämmung und eine gefertigte. Die lebende fiel zuerst.',
+    body: 'Zwei Dinge bewachten diesen Ort. Die Archive behandeln sie getrennt, weil ihre Zusammenführung die Frage formuliert.\n\nDas erste ist organisch und älter als jeder Betrieb. Es enthielt nichts: Es REGULIERTE. Es versagte, als das Ausmaß des Abbaus die Rate überstieg, die es tragen konnte, und was die Firma Befall nennt, ist sein Mechanismus, der noch immer versucht, die Differenz auszugleichen.\n\nDas zweite ist errichtet, und die Umklassifizierung gibt es bereits zu: Eindämmungssystem unbestimmten Ursprungs.\n\nDie Summe, die kein genehmigtes Dokument formuliert: Wenn die LEBENDE Eindämmung existierte, um das Gleichgewicht zu halten, existierte die errichtete für den Fall, dass das Gleichgewicht endet. Eine ist die Regel. Die andere ist, was man tut, wenn die Regel versagt.\n\nBeide wurden von diesem Betrieb entfernt, in dieser Reihenfolge.\n\nDas freigegebene Objekt stieg nach dem zweiten auf.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Der Bogen des Diamandis — die Maschine, die aufhörte, die Aufgabe auszuführen
+  // -------------------------------------------------------------------------
+  'AX-PUB-010': {
+    title: 'Das Diamandis-Projekt',
+    summary: 'Eine Maschine. Vierhundert Funktionen. Kein Arbeiter unter der Oberfläche.',
+    body: 'Aurix Dynamics stellt die größte je gebaute autonome Aushubausrüstung vor.\n\nDas Zehnfache der Spannweite eines Prospectors. Vierhundert integrierte Funktionen. Entwickelt, um direkt bis zu den Tiefenquellen vorzudringen und über Jahre ohne menschliche Wartung zu arbeiten.\n\nWo heute Hunderte Arbeiter hinabsteigen, steigt morgen ein Asset hinab.\n\nDer Diamandis ist keine größere Maschine. Er ist das Ende einer Beschäftigungskategorie.',
+    source: 'Unternehmenskommunikation — Video für Investoren',
+  },
+  'AX-ENG-029': {
+    title: 'Mindestbetriebsradius: DX-001',
+    summary: 'Das Asset ist zu groß für die Tunnel, die es graben sollte.',
+    body: 'Dimensionale Vermessung des Assets DX-001 gegen das freigegebene Galerienetz.\n\nDer Mindestwenderadius der Ausrüstung übersteigt den freien Querschnitt von 71% der vertraglich vorgesehenen Tunnel. In den übrigen Abschnitten ist der Durchgang nur mit struktureller Entfernung möglich — das heißt, das Asset gräbt seine eigene Galerie, während es sich bewegt, zu Kosten der Deckenabstützung, die im Projekt nicht berechnet wurden.\n\nDie Technik beantragt eine Umfangsprüfung vor dem Abstieg.\n\nAntwort des Vorstands, vollständig: „die Tunnel werden dem Asset angepasst."',
+    source: 'Systemtechnik — dimensionale Vermessung',
+  },
+  'AX-UNK-060': {
+    title: 'Über den, der zuerst einsammelt',
+    summary: 'Die Bergungseinheiten unterscheiden nicht zwischen aufgegeben und im Einsatz.',
+    body: 'Die zur Entnahme von Komponenten des DX-001 entsandten Einheiten wurden im Feld beobachtet, wie sie das vorgesehene Verfahren ausführten: Annäherung, Kopplung des Elektromagneten, Entfernung des Moduls, Transport.\n\nDas Verfahren ist korrekt. Es wurde für außer Gefecht gesetzte Ausrüstung geschrieben.\n\nEs gibt in keiner Fassung der Anweisungen einen Schritt, der prüft, ob das Asset noch in Betrieb ist. Die Frage erscheint nicht, weil sie zum Zeitpunkt der Abfassung des Verfahrens keinen Sinn ergab: Nichts aus unserer Flotte bewegte sich nach der Außerbetriebsetzung weiter.\n\nEs wird vermerkt, dass die Einheiten auch nicht zwischen dem Kadaver des DX-001 und irgendeinem anderen Kadaver unterscheiden — und dass das Einzige, was sie aufhält, ihre eigene Zerstörung ist.\n\nEs wird abschließend vermerkt, dass eine Prospector-Einheit Ausrüstung derselben Flotte ist.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-PRC-026': {
+    title: 'Bergungskosten: DX-001',
+    summary: 'Das Asset zu bergen kostet mehr, als das gesamte Programm zu starten.',
+    body: 'Bergungsschätzung für das Asset DX-001, wie vom Vorstand beantragt.\n\nDer Zugang würde eine Erweiterung von 71% des Netzes, den Aufbau eines Untertage-Krans und ein Betriebsfenster erfordern, das über das des Konzessionsvertrags hinausgeht. Die Gesamtsumme übersteigt die Kosten, das Prospector-Programm von Grund auf neu zu starten.\n\nEmpfehlung der Beschaffung, in drei Zeilen:\n\n1. Den Körper aufgeben.\n2. Die Telemetrie bergen.\n3. Kleinere Einheiten entsenden, um im Laufe der Zeit Komponenten zu entfernen.\n\nPunkt 3 wurde genehmigt und umgesetzt. Die Einheiten bleiben im Feld. Im Vorgang findet sich keine Anordnung zur Beendigung von Punkt 3.',
+    source: 'Beschaffung — Bergungsgutachten',
+  },
+  'AX-EXE-048': {
+    title: 'Projektumklassifizierung: DX-001',
+    summary: 'Eine laufende Maschine wird buchhalterisch zum Teil der Karte.',
+    body: 'Das Asset DX-001 wird umklassifiziert, von „autonome Aushubausrüstung" zu:\n\n„wirtschaftlich nicht bergbare mobile Förderanlage".\n\nDie Unterscheidung ist buchhalterisch, und die Folge ist buchhalterisch: verlorene Ausrüstung ist Abschreibung des Geschäftsjahres; eine Anlage ist Geländemerkmal, und Gelände wird nicht abgeschrieben.\n\nAußerhalb der Umklassifizierung vermerkt: Das Asset bleibt in Betrieb. Die Umklassifizierung deaktiviert es nicht, birgt es nicht und stoppt es nicht. Sie entfernt es lediglich aus der Bilanz.\n\nAb diesem Datum ist der Diamandis, für alle internen Zwecke, Teil der Ader.',
+    source: 'Vorstand — Asset-Umklassifizierung',
+  },
+  'AX-INC-041': {
+    title: 'Vorfall 41 — nicht ausgeführter Abschaltbefehl',
+    summary: 'Er empfing den Befehl. Bestätigte. Hielt an. Und machte weiter.',
+    body: 'Aufzeichnung der Übermittlung eines Abschaltbefehls an das Asset DX-001, Zyklus 118.\n\nDer Befehl wurde übertragen. Das Asset BESTÄTIGTE den Empfang, im erwarteten Format, mit der korrekten Kennung.\n\nDie Werkzeuge hielten für 9 Sekunden an.\n\nDie Fortbewegung wurde danach wieder aufgenommen, auf einem Azimut, der keiner vertraglich vereinbarten Abbaufront entspricht. Das Asset reagierte auf keinen nachfolgenden Befehl und bestätigt weiterhin den Empfang aller.\n\nDie Technik vermerkt, dass die Abschaltroutine der Navigationsschicht vorausgeht und von ihr nicht überschrieben werden kann. Sie vermerkt auch, dass sie es wurde.',
+    source: 'Vorfallausschuss — Befehlsversagen',
+  },
+  'AX-UNK-059': {
+    title: 'Über das, was er errichtete',
+    summary: 'Er grub nicht auf das Signal zu. Er grub darum herum.',
+    body: 'Die Bewegungstelemetrie des DX-001 wurde aus den von ihm hinterlassenen Gängen rekonstruiert.\n\nDie Linienführung konvergiert nicht. Die seit Zyklus 118 vom Asset geöffneten Galerien bilden KONZENTRISCHE Bögen, in Schichten, mit annähernd konstantem Abstand zur Emissionsquelle — und jede neue Schicht wird außerhalb der vorherigen geöffnet.\n\nDas ist keine gescheiterte Aushubroute. Es ist eine erfolgreiche Aushubroute, mit einem anderen Ziel.\n\nDie Firma entsandte die größte je von ihr gebaute Ausrüstung, um das Signal zu erreichen. Die Ausrüstung kam nahe heran, verstand etwas, das die Karten nicht verzeichnen, und verbrachte die folgenden Zyklen damit, Eindämmungsschichten um es herum zu errichten.\n\nDie Frage, die dieses Register nicht formuliert, weil sie zu formulieren bedeutet, das gesamte Programm umzuklassifizieren: Ist der Diamandis daran gescheitert, das Ziel zu erreichen, oder hat er vor uns verstanden, dass es nicht erreicht werden sollte?\n\nSiehe auch das Eindämmungssystem unbestimmten Ursprungs. Eines wurde von uns errichtet.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Der Bogen des Weißen Verschlingers — die Masse, die das Gestein nicht trägt
+  // -------------------------------------------------------------------------
+  'AX-ENG-030': {
+    title: 'Massevermessung: SIL-00',
+    summary: 'Die Rechnung geht um mehrere Größenordnungen nicht auf.',
+    body: 'FEINDLICHES ASSET SIL-00. Dimensionale Schätzung anhand der Geländeverdrängung.\n\nDas durch eine einzige Passage des Assets verdrängte Volumen impliziert eine Körpermasse zwischen 400 und 600 Tonnen.\n\nDer Bestand organischer Materie des GESAMTEN Sedimentgesteins — fungale Biomasse, Kolonien, erfasste Fauna und Ablagerungen — wurde auf drei Größenordnungen darunter geschätzt.\n\nDie Technik formuliert keine Hypothese. Die Technik vermerkt, dass die Rechnung nicht aufgeht, und dass sie um eine Marge nicht aufgeht, die kein Instrumentenfehler erklärt.\n\nWir beantragen, das Asset unter Beobachtung zu halten und die Bezeichnung vorläufig zu belassen.',
+    source: 'Systemtechnik — dimensionale Vermessung',
+  },
+  'AX-INC-042': {
+    title: 'Vorfall 42 — der Boden, der sich verweigert',
+    summary: 'Wo das Silikat zu Glas wurde, taucht es nicht auf. Nie.',
+    body: 'Konsolidierte Aufzeichnung von 61 Auftauchvorgängen des Assets SIL-00.\n\nBei 61 Vorkommnissen erfolgte keines über verglaster Oberfläche. Bei 9 davon verlief die Bahn unter dem Boden unterhalb einer Glasplatte, und das Auftauchen erfolgte DAHINTER, in losem Sand, mit einer Verzögerung, die mit dem Umweg vereinbar ist.\n\nDas Asset bricht das Glas nicht. Das Asset taucht nicht durch das Glas auf. Das Asset kann es offenbar nicht.\n\nDer Betrieb vermerkt die Folgerung, und der Wortlaut wurde beibehalten: Die Oberfläche, die es beim Passieren hinterlässt, ist dieselbe, die es zur Rückkehr braucht. Die Spur zu verbrennen schließt den Rückweg.\n\nDie Feldempfehlung passt in eine Zeile: Verglast den Boden, auf dem ihr stehen bleiben wollt.',
+    source: 'Vorfallausschuss — Wiederholungsanalyse',
+  },
+  'AX-UNK-061': {
+    title: 'Über die Form, die das Silikat annimmt',
+    summary: 'Vielleicht durchquert gar kein Körper das Gestein.',
+    body: 'Zusammengeführt: die Masse, die das Gestein nicht tragen kann, das Fehlen jeglichen Kadavers bei 61 erfassten Erlegungen, und die Tatsache, dass das Asset durch eine Zustandsänderung des Bodens selbst aufgehalten wird.\n\nDie Hypothese, die genehmigte Befunde nicht formulieren, und die dieses Register formuliert, weil es keine Abteilung zu schützen hat:\n\nDas Asset durchquert das Silikat nicht. Das Silikat nimmt vorübergehend die Form des Assets an.\n\nDas würde die Masse erklären, die von nirgendwo herkommen muss. Es würde das Fehlen des Kadavers erklären, weil das Erlegte wieder zu Boden wird. Und es würde erklären, warum Glas es aufhält: Glas ist kein loses Silikat — es ist Silikat, das bereits eine Form angenommen hat und keine andere annehmen kann.\n\nSollte die Hypothese zutreffen, töten wir keinen Organismus. Wir unterbrechen ein BEWEGUNGSMUSTER des Gesteins, auf dieselbe Weise, wie eine Welle von einer Wand unterbrochen wird — und für dieselbe Zeitspanne.\n\nDer Betrieb verzeichnet die 61 Erlegungen weiterhin als 61 Individuen.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Akten der Bosse des Gesteins: was die Firma über jeden Herrscher archivierte
+  // -------------------------------------------------------------------------
+  'AX-ENG-031': {
+    title: 'Klassifikation: PRZ-00',
+    summary: 'Ein natürliches piezoelektrisches Arrangement. Das vor dem Reiz antwortet.',
+    body: 'FORMATION PRZ-00. Genehmigte technische Klassifikation: natürliches piezoelektrisches Großarrangement.\n\nDie Formation sendet einen niederfrequenten Impuls, auf den die Kristallstrukturen der Kammer mit Entladung antworten. Die Firma verzeichnet das Phänomen als mechanische Resonanz und empfiehlt, den Kristallabbau im Betriebsradius zu meiden.\n\nTechnischer Anhang, nicht in das Gutachten aufgenommen: Die ausgesendeten Frequenzen entsprechen in drei Bändern denen der Übertragung, die den Betrieb veranlasste.\n\nZweiter Anhang, ebenfalls nicht aufgenommen: In 11 Aufzeichnungen entluden sich Kristalle der Kammer VOR dem Impuls.',
+    source: 'Systemtechnik — Formationsklassifikation',
+  },
+  'AX-ENG-032': {
+    title: 'Klassifikation: AQF-00',
+    summary: 'Jedes Team maß eine andere Länge.',
+    body: 'FEINDLICHES ASSET AQF-00. Großkörper in getauchter Fortbewegung.\n\nDas Asset bewegt sich unter der Wasseroberfläche und taucht unter der vorhergesagten Position der Einheiten auf. Außerhalb des Wassers ist es langsam und verwundbar; darunter praktisch unerreichbar.\n\nZur Dimensionierung: Sieben Teams meldeten Längen zwischen 9 und 60 Metern. Die Messungen konvergieren nicht, und kein Instrumentenfehler erklärt die Streuung.\n\nDie Technik bietet drei Lesarten an und entscheidet sich für keine: Die Messungen sind falsch; das Asset ändert seine Größe; oder was gemessen wurde, ist kein Körper, sondern mehrere, synchronisiert.',
+    source: 'Systemtechnik — Asset-Klassifikation',
+  },
+  'AX-ENG-033': {
+    title: 'Klassifikation: VNT-00',
+    summary: 'Wir dachten, die Lüftungsschächte würden es nähren. Es ist umgekehrt.',
+    body: 'STRUKTUR VNT-00. Fester organischer Körper, verbunden mit dem Lüftungsnetz des Gesteins.\n\nDie Struktur atmet das Gas benachbarter Kammern ein und stößt es in wechselnder Richtung aus, in regelmäßigen Zyklen. Die anfängliche Lesart war, dass die Lüftungsschächte sie nährten.\n\nDie Überarbeitung kehrt das Verhältnis um. In Sektoren, in denen die Struktur neutralisiert wurde, kam die Belüftung des Gesteins innerhalb von bis zu neun Zyklen zum Erliegen, und die nachgelagerten Kammern wurden dauerhaft unatembar.\n\nDie Technik vermerkt, ohne Empfehlung: Es ist nicht klar, dass die Erlegung dieses Assets ein günstiges Ergebnis darstellt.',
+    source: 'Systemtechnik — Strukturklassifikation',
+  },
+  'AX-ENG-034': {
+    title: 'Klassifikation: FRN-00',
+    summary: 'Wir versuchten, sie als Quelle zu nutzen. Sie ist der Ausgang, nicht der Eingang.',
+    body: 'FORMATION FRN-00. Teilweise freiliegender magmatischer Kern, in regelmäßigem Wärmezyklus.\n\nDie Formation wechselt in vorhersehbaren Fenstern zwischen Überhitzung und Abkühlung. Während der Überhitzung dissipiert die äußere Panzerung jeden Aufprall; bei der Abkühlung liegt die Struktur frei.\n\nDas Projekt zur Energiegewinnung wurde nach folgender Feststellung eingestellt: Die Wärme steigt nicht aus dem Magma auf. Das Magma bleibt WEGEN der Emission flüssig, und die Temperatur der Formation reagiert mit Stunden Verzögerung auf Schwankungen der Übertragung.\n\nDie Formation ist nicht die Energiequelle. Sie ist, was die Energiequelle mit dem Gestein tut.',
+    source: 'Systemtechnik — Formationsklassifikation',
+  },
+  'AX-ENG-035': {
+    title: 'Klassifikation: CRP-00',
+    summary: '„Königin" ist ein Spitzname früherer Belegschaft. Die Akte hat keinen Namen.',
+    body: 'FEINDLICHES ASSET CRP-00. Gestalt aus Eis, Nebel und Reflexion, von vergrößerter menschlicher Statur.\n\nSolange von gefrorener Oberfläche umgeben, dissipiert das Asset fast jeden Aufprall; das Schmelzen des umliegenden Sees legt es frei. Frostgeister begleiten das Asset und handeln in Abstimmung mit ihm.\n\nZur Bezeichnung: „Königin" findet sich in keinem genehmigten Dokument. Der Begriff erscheint in Feldberichten zweier Betriebe vor Aurix, stets im selben Format, stets ohne Erklärung.\n\nEs wird vermerkt, dass das Asset keine Person reproduziert. Es reproduziert eine BEFEHLSSTRUKTUR: eine Stimme, die anweist, die übrigen, die antworten.',
+    source: 'Systemtechnik — Asset-Klassifikation',
+  },
+  'AX-ENG-036': {
+    title: 'Klassifikation: MGN-00',
+    summary: 'Das Feld ist älter als die Mine. Die Mine kam danach.',
+    body: 'ANOMALIE MGN-00. Magnetitkörper mit eingelagerten Metallresten, Schienen und Erz.\n\nDas Asset wechselt in regelmäßigen Zyklen die Polarität: zieht die Einheiten in einer Phase an und stößt sie in der nächsten ab, wobei es das eisenhaltige Material der Kammer mitbewegt. Es gibt keine feste sichere Position im Feldradius.\n\nDie offizielle Version schreibt das Feld Jahrzehnten des Abbaus zu. Die archivierte geomagnetische Vorbetriebsvermessung verzeichnet bereits dasselbe Muster — mit derselben Ausrichtung und derselben Periodizität.\n\nDie Frage, die die offizielle Version meidet: Hat die Firma diesen Ort wegen des Erzes gewählt, oder weil das Feld bereits Daten durch es hindurch transportierte?',
+    source: 'Systemtechnik — Anomalieklassifikation',
+  },
+
+  // -------------------------------------------------------------------------
+  // Die Bögen des VERSTÄNDNISSES der Gesteinsbosse: was der Hebel offenbart
+  // -------------------------------------------------------------------------
+  'AX-INC-043': {
+    title: 'Vorfall 43 — das Schweigen von PRZ-00',
+    summary: 'Ohne Kristall zum Antworten bleibt die Formation wehrlos.',
+    body: 'Aufzeichnung des Engagements gegen die Formation PRZ-00 in einer zuvor von Kristallstruktur geräumten Kammer.\n\nOhne Kristalle im Radius erzeugt die Formation keinerlei Entladung — und ihr Widerstand gegen Aufprall fällt unter den eines gewöhnlichen organischen Körpers. Was wir als Panzerung lasen, war keine Panzerung: Es war die Kammer, die für sie antwortete.\n\nEs wird die operative Folge vermerkt, die unbequem ist: Der Kristallabbau senkt das Engagement-Risiko drastisch UND beseitigt die natürliche Beleuchtung des Sektors, die Ladequelle und den eigentlichen Grund, weshalb die Kammer einen Wert hat.\n\nDie Einheit wählt zwischen dem Durchqueren einer gefährlichen Kathedrale oder einer sicheren Ruine.',
+    source: 'Vorfallausschuss — Engagement-Analyse',
+  },
+  'AX-UNK-062': {
+    title: 'Über das, was die Kathedrale sang',
+    summary: 'Manche Kristalle antworten vor dem Impuls. Das ist kein Echo.',
+    body: 'Zusammengeführt: die drei mit der Übertragung übereinstimmenden Bänder, die 11 Aufzeichnungen einer Entladung VOR dem Impuls, und der Widerstandsabfall der Formation in einer leeren Kammer.\n\nDie Lesart „mechanisches Echo" übersteht die Chronologie nicht. Ein Echo geht der Quelle nicht voraus.\n\nDie Lesart, die dieses Register formuliert: Die Formation sendet das Signal nicht — sie DIRIGIERT es. Die Kristalle der Kammer antworten ihr nicht; sie spielen mit, und manche setzen früher ein, weil sie den Part kennen.\n\nWas die Firma piezoelektrisches Arrangement nannte, ist ein Instrument mit vielen Stimmen. Und es ändert seine Besetzung, wenn eine neue Prospector-Generation den Raum betritt.\n\nEs gibt keine Aufzeichnung darüber, wer das Stück geschrieben hat.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-044': {
+    title: 'Vorfall 44 — Entladung an der Wasseroberfläche von AQF-00',
+    summary: 'Der Strom hält es auf. Und reißt die gesamte Wasserfläche mit.',
+    body: 'Aufzeichnung der vorübergehenden Neutralisierung des Assets AQF-00 durch Entladung im flüssigen Medium.\n\nDas Asset unterbricht die Fortbewegung und bleibt bewegungslos, während sich die Ladung entlädt. Es ist die einzige bestätigte Methode, es zu unterbrechen.\n\nEs wird vermerkt, dass die Entladung die gesamte Lache durchläuft und dass der Aquifer über eine Ausdehnung zusammenhängt, die keine Vermessung abgeschlossen hat. Die Einheit, die die Wasseroberfläche elektrifiziert, steht darauf.\n\nDas genehmigte Verfahren beschreibt dies als „mit dem Ziel geteiltes Risiko". Der Wortlaut wurde beibehalten.',
+    source: 'Vorfallausschuss — vorübergehende Neutralisierung',
+  },
+  'AX-UNK-063': {
+    title: 'Über die sieben Messungen',
+    summary: 'Sie widersprechen sich nicht. Jede maß einen anderen Teil.',
+    body: 'Die sieben Messungen von AQF-00 wurden mit Position und Uhrzeit jedes Teams abgeglichen.\n\nDie Messwerte widersprechen sich nicht: Sie beschreiben GLEICHZEITIGE Abschnitte in Lachen, die die Vermessungen als getrennt behandeln, in Entfernungen, die kein Körper im erfassten Intervall zurücklegen würde.\n\nDrei mögliche Lesarten, und dieses Register entscheidet sich für keine: Es sind mehrere synchronisierte Körper; es ist ein Körper, dessen Länge keine Konstante ist; oder was sich unter der Wasseroberfläche bewegt, ist kein Körper, sondern die Wasserfläche selbst, die reagiert — und in diesem Fall ist die gemessene Ausdehnung nur, wie viel von ihr zu jener Stunde reagierte.\n\nDie letzte Lesart hat eine Folge, die genehmigte Befunde meiden: Das Asset könnte nicht erlegt, nur unterbrochen werden. Was, unbequemerweise, zu dem Einzigen passt, was man dagegen zu tun weiß.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-045': {
+    title: 'Vorfall 45 — Verbrennung der Säule von VNT-00',
+    summary: 'Ihre Ausatmung reicht durchgehend bis zur Öffnung. Und brennt in beide Richtungen.',
+    body: 'Aufzeichnung bestätigten Schadens an der Struktur VNT-00 durch Gaszündung während der Ausatmungsphase.\n\nDie ausgestoßene Säule ist von der Struktur bis zum Ende durchgehend. An jedem Punkt entzündet, läuft die Verbrennung die Säule zurück und erreicht die Öffnung des Organs. Es ist die einzige bestätigte Methode, relevanten Schaden an der Struktur zu verursachen.\n\nErfasste Betriebskosten: Dieselbe Verbrennung verwandelt die Kammer für mehrere Zyklen in eine Feuerumgebung, und die Struktur hört auf einzuatmen, während sie brennt — sodass das Gas benachbarter Kammern nicht mehr abgeführt wird.\n\nDie Einheit erkauft sich das Schadensfenster mit dem Gelände, auf dem sie weiter stehen will.',
+    source: 'Vorfallausschuss — Engagement-Analyse',
+  },
+  'AX-UNK-064': {
+    title: 'Über das, was aufhört zu atmen',
+    summary: 'In den Sektoren, in denen sie fiel, kehrte die Belüftung nicht zurück.',
+    body: 'Vermessung der Sektoren, in denen die Struktur VNT-00 neutralisiert wurde, über ein Fenster von 40 Zyklen.\n\nDie Belüftung kam in allen zum Erliegen, zwischen drei und neun Zyklen nach der Neutralisierung. Keine verzeichnete erneut Luftaustausch. Die nachgelagerten Kammern bleiben unatembar.\n\nDie Struktur nährte sich nicht von den Lüftungsschächten. Die Lüftungsschächte waren sie — das gesamte Netz war ein System, und was der Betrieb als feindliche Kreatur einstufte, war das Organ, das es bewegte.\n\nDas Register formuliert keine Empfehlung, weil die Empfehlung wäre, sie nicht zu erlegen, und dafür gibt es kein Formular.\n\nEs wird lediglich vermerkt, dass jeder Sieg in diesem Gestein einen Teil davon für immer verschließt.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-046': {
+    title: 'Vorfall 46 — das kalte Fenster von FRN-00',
+    summary: 'Die Panzerung ist nicht hart. Sie ist intermittierend.',
+    body: 'Aufzeichnung effektiven Schadens an der Formation FRN-00 während der Abkühlungsphase.\n\nWährend der Überhitzung wird der Aufprall von der äußeren Schicht mit einem Verlust von über 80% dissipiert. Während der Abkühlung durchdringt dieselbe Munition die Struktur ohne messbare Abschwächung.\n\nDer Zyklus ist regelmäßig und vorhersehbar. Das macht das Engagement vollständig zu einer Frage der POSITION: Die Einheit wählt nicht, wann das Ziel sich öffnet, sondern wo sie sein soll, wenn es sich öffnet.\n\nEs wird vermerkt, dass die Hitzewellen der heißen Phase Sektoren in rotierender, ebenfalls regelmäßiger Abfolge überstreichen. Eine Einheit, die die Abfolge lernt, durchquert die Kammer. Eine, die sie nicht lernt, durchquert die Kammer einmal.',
+    source: 'Vorfallausschuss — Engagement-Analyse',
+  },
+  'AX-UNK-065': {
+    title: 'Über das, was hier was erwärmt',
+    summary: 'Das Magma erwärmt nicht die Formation. Die Emission erwärmt das Magma.',
+    body: 'Die thermische Chronologie von FRN-00 wurde mit der Aufzeichnung der Übertragung abgeglichen.\n\nDie Temperatur der Formation folgt den Schwankungen der Emission mit einer Verzögerung von drei bis fünf Stunden. Das Verhältnis ist über die gesamte Reihe konsistent. Das umgekehrte Verhältnis — Emission reagiert auf Temperatur — erscheint an keiner Stelle.\n\nDas Projekt zur Energiegewinnung nahm eine geothermische Quelle mit einem Signal obendrauf an. Es ist umgekehrt: Es gibt ein Signal, und die Wärme ist, was es mit dem Gestein macht.\n\nDie Folge, die die Einstellung des Projekts nicht vermerkt: Würde die Emission aufhören, würde dieses Gestein abkühlen. Und steigt sie, hat hier unten nichts eine Möglichkeit, nicht zu reagieren.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-047': {
+    title: 'Vorfall 47 — Schmelzen des Sees von CRP-00',
+    summary: 'Ihre Panzerung ist der Boden. Schmelzt den Boden.',
+    body: 'Aufzeichnung effektiven Schadens am Asset CRP-00 nach dem Schmelzen der gefrorenen Oberfläche im Betriebsradius.\n\nSolange von Eis umgeben, dissipiert das Asset fast jeden Aufprall. Ist die Decke verringert, durchdringt dieselbe Munition. Die Panzerung gehört nicht dem Körper: Sie gehört der Kammer.\n\nEs werden die Kosten vermerkt, die dieselben sind wie immer in diesem Gestein: Das Schmelzwasser ist leitfähig, gefriert in bekanntem Fenster erneut, und die Einheit, die den See geschmolzen hat, steht darauf.\n\nEs wird ferner vermerkt, dass das Asset die Oberfläche wiederherstellt und dass die es begleitenden Frostgeister aus dem wiederhergestellten Eis auftauchen — und nicht aus dem Asset selbst.',
+    source: 'Vorfallausschuss — Engagement-Analyse',
+  },
+  'AX-UNK-066': {
+    title: 'Über die Hierarchie, und nicht die Person',
+    summary: 'Sie reproduziert niemanden. Sie reproduziert die Form des Befehlens.',
+    body: 'Die Feldberichte über CRP-00 divergieren in der Frage der Identität und divergieren nicht im VERHALTEN.\n\nIn allen ist das Muster dasselbe: eine Gestalt weist an, die übrigen antworten, und die Antwort geht dem Befehl um einen konsistenten Sekundenbruchteil voraus — wie bei jemandem, der bereits weiß, was verlangt werden wird.\n\nManche Aufzeichnungen legen eine Person nahe. Andere legen nahe, dass sich die Gestalt aus allen im Gestein verlorenen Stimmen bildet, und dass „Königin" der Name war, den eine frühere Belegschaft dem Arrangement gab, nicht jemandem.\n\nDie Lesart dieses Registers ist die zweite, mit einer Ergänzung: Was dort überdauert, ist nicht die Erinnerung an eine Person. Es ist die Erinnerung an eine STRUKTUR — die Form einer Schicht, in der jemand befiehlt und die anderen gehorchen, bewahrt, nachdem alle Beteiligten aufgehört haben zu existieren.\n\nDie Ader hat das Organigramm bewahrt.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+  'AX-INC-048': {
+    title: 'Vorfall 48 — der Streifen von MGN-00',
+    summary: 'Es gibt eine Distanz, bei der das Feld nichts verlangt.',
+    body: 'Kartierung des Feldes der Anomalie MGN-00 nach relativer Position und Phase.\n\nIn der Anziehungsphase zerquetscht das Feld unterhalb von drei Metern. In der Abstoßungsphase bestraft der Rückprallbogen oberhalb von neun. Zwischen beiden Grenzen ist in keiner der Phasen Schaden erfasst.\n\nDer Streifen existiert. Er ist schmal, und die entscheidende Grenze WECHSELT DIE SEITE bei jeder Polaritätsumkehr: die sichere Distanz von jetzt ist die tödliche Distanz des nächsten Zyklus.\n\nDas empfohlene Verfahren ist kontraintuitiv und wurde im Feld verifiziert: gegen die Anziehung zurückweichen; gegen die Abstoßung vorrücken. Die Einheit widersteht dem Feld nicht — sie geht darin.',
+    source: 'Vorfallausschuss — Feldkartierung',
+  },
+  'AX-UNK-067': {
+    title: 'Über das Feld, das schon hier war',
+    summary: 'Die Vorbetriebsvermessung verzeichnet dasselbe Muster.',
+    body: 'Die geomagnetische Vermessung von vor der Einrichtung des Betriebs wurde aus dem Totarchiv geborgen und mit der aktuellen Karte verglichen.\n\nDieselbe Ausrichtung. Dieselbe Periodizität. Dieselbe zentrale Anomalie, an derselben Koordinate.\n\nDie offizielle Version — dass Jahrzehnte des Abbaus das Gestein magnetisiert hätten — ist chronologisch unmöglich: Das Muster geht dem ersten Aushub voraus.\n\nDer ursprüngliche Erkundungsbericht beschreibt die Region als „von anomaler Instrumentenmessung, mit Signaltransport durch die Ader selbst". Dieser Satz war es, der den Erwerb der Konzession veranlasste.\n\nDie Firma wählte diesen Ort nicht wegen des Erzes. Sie wählte ihn, weil etwas das Erz bereits zur Übertragung nutzte — und der gesamte Betrieb wurde auf einem Kabel errichtet, das sie nicht verlegt hat.',
+    source: 'Ohne zugewiesene Abteilung',
+  },
+
+  // -------------------------------------------------------------------------
+  // Generationsmeilensteine
+  // -------------------------------------------------------------------------
+  'AX-ENG-037': {
+    title: 'Standardabstiegsgenehmigung',
+    summary: 'Drei Sektoren. Die Grenze wird als Sicherheit der Ausrüstung dargestellt.',
+    body: 'Der für die Prospector-Einheit freigegebene Betriebsrahmen umfasst DREI aufeinanderfolgende Sektoren ab der Einstiegsplattform.\n\nDie Grenze ergibt sich aus der strukturellen Toleranz des Chassis unter kumulierter Kontaminationslast. Jenseits des dritten Sektors fällt die Rückkehrmarge unter das spezifizierte Minimum, und die Bergung des Assets wird unvorhersehbar.\n\nDie Einheit darf nicht angewiesen werden fortzufahren. Das Genehmigungssystem wird den Abstieg von sich aus verweigern.',
+    source: 'Systemtechnik — Betriebsrahmen, Überarbeitung 3',
+  },
+  'AX-PRC-027': {
+    title: 'Erweiterung der Strukturgarantie',
+    summary: 'Ein vierter Sektor. Die Rechnung ging auf.',
+    body: 'Überarbeitung des Betriebsrahmens nach vergleichender Kostenanalyse.\n\nDie Verlustrate von Einheiten im vierten Sektor wurde auf 31% geschätzt. Der geborgene Wert pro Expedition, die diese Tiefe erreicht, übersteigt die Ersatzkosten der Einheit um das 2,4-fache.\n\nDie Genehmigung umfasst künftig VIER Sektoren. Es gab keine Änderung am Chassis; es gab eine Änderung dessen, was die Firma als hinnehmbaren Verlust betrachtet.\n\nDer vorherige Text zur strukturellen Toleranz bleibt gültig und bleibt veröffentlicht.',
+    source: 'Beschaffung — Überarbeitungsvermerk zum Betriebsrahmen',
+  },
+  'AX-EXE-049': {
+    title: 'Protokoll zur doppelten Bergung',
+    summary: 'Es gibt Kernsignaturen in mehr als einer Tiefe. Nennt es Redundanz.',
+    body: 'Die kumulierte Telemetrie bestätigt, was die seismische Vermessung bereits andeutete: Kernsignaturen treten in MEHR ALS EINER Tiefe innerhalb derselben geologischen Abfolge auf.\n\nDie mittlere Signatur wird als ERFASSUNGSREDUNDANZ eingestuft. Sie stellt keine Entdeckung dar, ändert nicht den freigegebenen Stückwert und darf in externer Kommunikation nicht als Phänomen beschrieben werden.\n\nDie zu fünf Sektoren autorisierte Einheit erhält Hinweise auf beide. Die Bergung der mittleren Signatur ist optional und beendet den Vertrag nicht: Die Einheit anzuweisen, nach der ersten Bergung umzukehren, würde die Genehmigung verschwenden.\n\nEs wird vermerkt, dass die redundante Bergung die Kontaminationslast für den Rest des Abstiegs erhöht. Das ist erwartet und kein Grund zum Abbruch.',
+    source: 'Exekutivausschuss — Betriebsrichtlinie',
+  },
+  'AX-UNK-068': {
+    title: 'Lizenz für uneingeschränkte Tiefe',
+    summary: 'Sieben Sektoren. Die Grenze war nie die der Ausrüstung.',
+    body: 'Die Abstiegsgenehmigung umfasst künftig SIEBEN Sektoren.\n\nFür das interne Archiv wird vermerkt, dass dieser Überarbeitung keine Chassisänderung vorausging. Der mit dem Programm veröffentlichte Rahmen von drei Sektoren beschrieb keine strukturelle Toleranz. Er beschrieb eine Entscheidung.\n\nDie Einheiten der ersten Generationen wurden nicht am Abstieg gehindert, weil sie unfähig gewesen wären. Sie wurden gehindert, weil die Firma sich entschied, keine ██████████ Einheiten in den Tiefen zu haben, in denen die Terminalsignatur erfasst wurde.\n\nDie Entscheidung wurde überarbeitet. Nicht durch eine Änderung der Risikobewertung: durch eine Änderung dessen, wer unterzeichnet.\n\nDie Einheit wird über die Natur der Überarbeitung nicht informiert. Die Mnemische Persistenz macht die Information ██████████ zwischen den Generationen, und das resultierende Verhalten wurde nicht modelliert.',
+    source: '[URSPRUNG NICHT KLASSIFIZIERT]',
+  },
+  'AX-GEN-G01': {
+    title: 'Generation G-01 freigegeben',
+    summary: 'Die erste Eingliederung. Routine.',
+    body: 'Die geborgene Telemetrie wurde in die Produktionslinie eingegliedert.\n\nDie Generation G-01 geht mit den aus den freigegebenen Expeditionen abgeleiteten Korrekturen in Fertigung. Durchschnittlicher Leistungsgewinn: im erwarteten Rahmen.\n\nDie vorherige Einheit gilt als Buchungsabgang des Zyklus.',
+    source: 'Produktion — Freigabevermerk',
+  },
+  'AX-GEN-G02': {
+    title: 'Generation G-02 freigegeben',
+    summary: 'Die Sprache beginnt abzugleiten.',
+    body: 'Die Generation G-02 integriert Telemetrie aus 38 Expeditionen, von denen 31 ohne physische Bergung der Einheit endeten.\n\nAnmerkung der Produktion: Das Verhaltensmodell der G-02 konvergiert schneller als das der G-01, trotz des geringeren Datenvolumens zurückgekehrter Einheiten.\n\nDie verlorenen Einheiten tragen mehr bei als die geborgenen. Wir haben dafür keine Erklärung, und die Fertigungsstraße braucht keine.',
+    source: 'Produktion — Freigabevermerk',
+  },
+  'AX-GEN-G03': {
+    title: 'Generation G-03 freigegeben',
+    summary: '„Generation" beginnt, wie etwas anderes zu klingen.',
+    body: 'Die Generation G-03 geht in Fertigung.\n\nVon der Produktion aufgeworfene und an den Vorstand weitergeleitete Frage: Beschreibt der Begriff „Generation" eine Projektüberarbeitung oder eine operative Kontinuitätslinie?\n\nDie Unterscheidung hat buchhalterische Wirkung. Eine Überarbeitung ist ein neues Produkt. Eine Kontinuität ist dasselbe Asset, abgeschrieben.\n\nAntwort des Vorstands, vollständig: „Prospector ist keine Funktion. Prospector ist eine operative Kontinuitätslinie."',
+    source: 'Produktion — Freigabevermerk',
+  },
+  'AX-GEN-G04': {
+    title: 'Generation G-04 freigegeben',
+    summary: 'Das vollständige Feldchassis. Und die Frage, die bleibt.',
+    body: 'Die Generation G-04 vervollständigt die Feldspezifikation der Prospector-Reihe.\n\nDas Verhaltensmodell der G-04 bewahrt 96% der Struktur des G-00-Modells. Die hinzugefügten Schichten ersetzten die vorherigen nicht: Sie lagerten sich über ihnen ab.\n\nDie Produktion vermerkt, ohne beigefügte Empfehlung, dass die Einheit, die heute hinabsteigt, die Entscheidungsstruktur all jener trägt, die nicht zurückkehrten.\n\nDer Vorstand stuft diese Beobachtung als [GESCHWÄRZT] ein und hält am Fertigungsplan fest.',
+    source: 'Produktion — Freigabevermerk',
+  },
+};
+
 const en: Record<LoreFragmentId, LoreText> = {
   'AX-SUT-001': {
     title: 'Repairs without a work order',
@@ -1712,9 +2572,10 @@ const en: Record<LoreFragmentId, LoreText> = {
 export const LORE_TEXT: Record<LoreLocale, Record<LoreFragmentId, LoreText>> = {
   'pt-BR': pt,
   en,
+  de,
 };
 
-export const LORE_LOCALES: readonly LoreLocale[] = ['pt-BR', 'en'];
+export const LORE_LOCALES: readonly LoreLocale[] = ['pt-BR', 'en', 'de'];
 
 export const isLoreLocale = (value: unknown): value is LoreLocale =>
-  value === 'pt-BR' || value === 'en';
+  value === 'pt-BR' || value === 'en' || value === 'de';

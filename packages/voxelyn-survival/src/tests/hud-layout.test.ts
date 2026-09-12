@@ -38,7 +38,7 @@ const OBJECTIVE_KEYS = [
 ] as const;
 
 describe('a diretiva cabe no painel', () => {
-  it.each(['pt-BR', 'en'] as const)(
+  it.each(['pt-BR', 'en', 'de'] as const)(
     'em %s, cada diretiva quebra em linhas que cabem na largura mais estreita',
     (locale) => {
       setLocale(locale);
