@@ -82,6 +82,13 @@ export const validateClientMessage = (raw: unknown): ValidationResult<ClientMess
       };
       return { ok: true, value: hello };
     }
+    case 'name_run': {
+      if (typeof m.name !== 'string') return { ok: false, reason: 'name_run.name nao e texto' };
+      // Corte de anti-abuso, e so isso: quem decide o que o nome VIRA e o
+      // `sanitizeName` do servidor, o mesmo que ja atende o placar solo. Aqui
+      // a unica pergunta e se cabe numa mensagem.
+      return { ok: true, value: { t: 'name_run', name: m.name.slice(0, 64) } };
+    }
     case 'cmd': {
       if (!isFiniteNumber(m.seq) || !isFiniteNumber(m.clientTick)) {
         return { ok: false, reason: 'cmd.seq/clientTick invalido' };

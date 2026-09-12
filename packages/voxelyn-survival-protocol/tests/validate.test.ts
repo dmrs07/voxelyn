@@ -130,3 +130,33 @@ describe('limites de payload: ingresso vs egresso', () => {
     expect(decodeMessage(absurd)).toBeNull();
   });
 });
+
+describe('assinatura da run (name_run)', () => {
+  it('aceita o nome e o corta no limite de mensagem', () => {
+    const ok = validateClientMessage({ t: 'name_run', name: 'Os Barrigudos' });
+    expect(ok).toEqual({ ok: true, value: { t: 'name_run', name: 'Os Barrigudos' } });
+
+    // O corte aqui e ANTI-ABUSO, e nao formatacao: quem decide o que o nome
+    // vira e o `sanitizeName` do servidor, o mesmo do placar solo. Esta camada
+    // so garante que nao chegue uma string de um megabyte.
+    const longo = validateClientMessage({ t: 'name_run', name: 'a'.repeat(5000) });
+    expect(longo.ok).toBe(true);
+    if (longo.ok && longo.value.t === 'name_run') expect(longo.value.name.length).toBe(64);
+  });
+
+  it('recusa nome que nao e texto', () => {
+    for (const name of [undefined, 42, null, { toString: () => 'esperto' }, ['a']]) {
+      expect(validateClientMessage({ t: 'name_run', name }).ok).toBe(false);
+    }
+  });
+
+  it('sobrevive a ida e volta pelo transporte', () => {
+    const raw = encodeMessage({ t: 'name_run', name: 'Equipe' });
+    const decoded = decodeClientMessage(raw);
+    expect(decoded).not.toBeNull();
+    expect(validateClientMessage(decoded)).toEqual({
+      ok: true,
+      value: { t: 'name_run', name: 'Equipe' },
+    });
+  });
+});

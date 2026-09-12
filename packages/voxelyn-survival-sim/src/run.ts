@@ -1225,10 +1225,17 @@ const settleBreathChannel = (state: SurvivalState, slot: number, events: Semanti
 
 /**
  * Quantos raios de amostra viajam no evento `flame_cone.reach`, de `-arc` a
- * `+arc`. Cinco cobrem o cone visual sem inflar o snapshot; o GAMEPLAY nao usa
- * isto — as celulas sao varridas uma a uma com linha-de-visada propria.
+ * `+arc`. O GAMEPLAY nao usa isto — as celulas sao varridas uma a uma com
+ * linha-de-visada propria; estes raios sao para o cliente saber ate onde
+ * desenhar a chama em cada rumo.
+ *
+ * SETE e nao cinco desde que o cone abriu para 0,8 rad. A conta e por ANGULO
+ * ENTRE AMOSTRAS e nao por numero redondo: cinco raios cobriam 70 graus a um
+ * raio cada 17,5; os mesmos cinco em 92 graus dariam 23, e um pilar de um tile
+ * cabe nesse vao — a chama desenhada atravessaria a coluna que a de verdade
+ * nao atravessa. Sete devolvem o passo para 15,3 graus.
  */
-const FLAME_REACH_LANES = 5;
+const FLAME_REACH_LANES = 7;
 
 /**
  * Ate onde o sopro alcanca na direcao (dx,dy) antes de bater em solido ou na

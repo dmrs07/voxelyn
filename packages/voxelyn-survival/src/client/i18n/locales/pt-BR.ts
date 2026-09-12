@@ -151,6 +151,18 @@ export const PT_BR = {
   'options.title': 'OPÇÕES',
   'options.name': 'Nome',
   'options.name.placeholder': 'anônimo',
+
+  // A assinatura do relatório, na tela de fim. Ver `run-name-prompt.ts`.
+  //
+  // "Assine" e não "digite seu nome": a tela inteira é um documento da Aurix, e
+  // o que se pede ali é a assinatura de quem cumpriu o contrato. A dica abaixo
+  // é que diz, em português direto, para onde o nome vai.
+  'runname.label.solo': 'ASSINE O RELATÓRIO',
+  'runname.label.team': 'NOME DA EQUIPE',
+  'runname.hint.solo': 'É com este nome que a run entra no ranking.',
+  'runname.hint.team': 'Você abriu a sala: o nome da dupla no ranking é o que você escrever.',
+  'runname.confirm': 'ASSINAR',
+  'runname.skip': 'PULAR',
   'options.language': 'Idioma',
   'options.quality': 'Qualidade',
   'options.quality.high': 'Alta',

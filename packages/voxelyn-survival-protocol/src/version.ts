@@ -280,7 +280,22 @@
 //     lado da sala. Um cliente antigo contra servidor novo nao quebraria: ele
 //     ignoraria o campo e tocaria o som errado em silencio, que e exatamente o
 //     desfecho que o handshake existe para recusar.
-export const PROTOCOL_VERSION = 45;
+// 46: `name_run` — o dono da sala assina o relatorio da run de co-op, e a linha
+//     que o servidor ja gravou com o codigo da sala e renomeada.
+//
+//     E a PRIMEIRA mensagem de cliente que nao e intencao de jogo, e ela entra
+//     como mensagem e nao como rota HTTP por uma razao so: AUTORIDADE. O socket
+//     ja prova qual sala e qual slot, e e exatamente essa prova que decide quem
+//     pode renomear o que. Um endpoint equivalente teria de aceitar o id da
+//     linha vindo do cliente — e quem sabe dizer o proprio id sabe dizer outro.
+//
+//     Quebra so num sentido, e de leve: servidor antigo recebe um `t` que nao
+//     conhece e devolve `reject` sobre essa mensagem (o `default` do switch),
+//     sem derrubar a sessao. Um cliente novo contra servidor velho perde a
+//     assinatura da equipe e nada mais. Mesmo assim o bump: o handshake e o
+//     lugar de dizer isso em voz alta, e nao a ausencia silenciosa de um nome
+//     que o jogador digitou e viu sumir.
+export const PROTOCOL_VERSION = 46;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1338,7 +1353,70 @@ export const PROTOCOL_VERSION = 45;
 //
 //     Os alvos de `BOSS_TTK_SECONDS` NAO se mexem: eles sao medidos sem modulo
 //     nenhum, porque o parafuso e o unico equipamento que toda run tem.
-export const SIMULATION_VERSION = 89;
+// 90: O SOPRO TERMICO passa a valer o que custa: 3,2 de dano por emissao (era
+//     1,2), jato de 5,5 tiles (era 4,2) e cone de 0,8 rad (era 0,61). E o jato
+//     passa a EMITIR LUZ.
+//
+//     O CUSTO DELE NUNCA FOI O COOLDOWN, e era essa a conta que faltava. O
+//     canal BLOQUEIA o disparo comum, entao usar a habilidade e abrir mao de
+//     2,5 s de parafuso. Medido em `tools/flame-probe.mjs`: 50 ticks de canal
+//     valem 140 de parafuso, e o canal inteiro entregava 30 num alvo. Era uma
+//     decisao de MENOS 110 de dano, que so empatava com CINCO bichos
+//     enfileirados dentro do cone.
+//
+//     Com 3,2 o ponto de virada sai de CINCO alvos para DOIS. Cinco
+//     enfileirados e uma situacao que o jogo quase nao serve; dois colados
+//     acontece o tempo todo, e e ai que a habilidade precisa ser a escolha
+//     obvia. Ela continua perdendo num alvo so (80 contra 140), que e a regra
+//     escrita no bloco das habilidades: nenhuma pode ser melhor que o tiro
+//     comum em DPS sustentado.
+//
+//     O TETO da constante fica registrado junto com ela: em 5,6 por emissao o
+//     canal entregaria os mesmos 140 do parafuso e a habilidade passaria a ser
+//     melhor que o tiro comum ate contra um alvo. Ha teste cobrando essa folga
+//     em numero, e nao so em comentario.
+//
+//     O JATO em 5,5 poe a ponta FORA do alcance de bote do Espreitador (5,0):
+//     com 4,2 era preciso entrar na distancia em que o bicho ja bate, e a
+//     habilidade que devia resolver "o grupo colado" so servia depois que o
+//     grupo tinha colado. Nao mais que isso porque a area do cone cresce com o
+//     QUADRADO do alcance — de 4,2 para 5,5 ja sao 71% mais chao por emissao.
+//
+//     O CONE ABRE de 70 para 92 graus, e essa e a metade que faltava: "o grupo
+//     colado" nao chega enfileirado no eixo da mira, chega espalhado, e com 70
+//     graus era preciso ACERTAR o grupo como se o sopro fosse um tiro. Medido
+//     com sete bonecos lado a lado a tres tiles: 5 de 7 com 0,61, e 7 de 7 com
+//     0,8. Abrir e o jeito barato de cobrir mais chao — a area cresce com o
+//     alcance ao QUADRADO e so linearmente com o angulo.
+//
+//     `FLAME_REACH_LANES` vai de 5 para 7 junto, e a conta e por ANGULO ENTRE
+//     AMOSTRAS: cinco raios em 92 graus dariam um a cada 23, e um pilar de um
+//     tile cabe nesse vao — a chama desenhada atravessaria a coluna que a de
+//     verdade nao atravessa. Sete devolvem o passo para 15,3 graus. O array tem
+//     tamanho livre no wire, entao nao ha quebra de protocolo.
+//
+//     E O JATO EMITE LUZ. As particulas sempre foram voxel opaco: `ember` e
+//     `spark` sao FONTE (queimando, em arco) e desenhavam-se como materia
+//     iluminada, iguais a poeira. Agora ha uma passada aditiva (`lighter`) por
+//     BAIXO dos corpos, com o halo assado uma vez e reaproveitado escalado.
+//     Embaixo e nao em cima porque halo sobre o corpo lavaria o facetado que a
+//     particula voxel existe para ter; e `lighter` e nao um circulo opaco
+//     porque luz SOMA — duas brasas vizinhas clareiam mais que uma, que e o que
+//     faz o bocal do jato ficar branco no centro sem ninguem desenhar um centro
+//     branco.
+//
+//     E `FLAMETHROWER_DAMAGE` (9) sai: era o golpe unico de antes da
+//     canalizacao, nao era lido por ninguem desde entao, e uma constante morta
+//     com nome de dano mente para quem for ajustar a habilidade amanha.
+//
+//     FICA REGISTRADO o que a sonda mostrou de lado: em chao SEM combustivel o
+//     sopro nao deixa fogo nenhum (`igniteCell` exige materia), entao os 80 sao
+//     o total contra um alvo em rocha nua. O fogo de chao e bonus de terreno, e
+//     nao parte da conta base — o comentario do cone dizia "deixa fogo no chao"
+//     sem essa ressalva.
+//
+//     Dano e alcance entram no hash: replays de 89 nao batem.
+export const SIMULATION_VERSION = 90;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

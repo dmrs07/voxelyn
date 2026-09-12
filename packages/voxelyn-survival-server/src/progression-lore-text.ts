@@ -896,14 +896,14 @@ const de: Record<LoreFragmentId, LoreText> = {
   'AX-SUT-002': {
     title: 'Last, die sich selbst bewegt',
     summary: 'Die Matrix nutzt ihr eigenes Werk als Fortbewegungssystem.',
-    body: 'Die Einheit SUT-00, von den Bergungsteams Stopferin genannt, verteilt das Gewicht bei jeder Fortbewegung neu auf die Halteseile. Der Panzer hält Einschläge aus, solange die Zugkraft bestehen bleibt.\n\nDas Durchtrennen des belasteten Halteseils bringt den Körper zu Fall und legt den Hinterleib für 1,8 Sekunden frei. Im Flug überquert sie das Gestein; der Schlag erfolgt beim Aufsetzen an der markierten Stelle. Es gibt keinen Beleg dafür, dass die Matrix zwischen einer Prospector-Einheit und zu fixierendem Material unterscheidet. Es wird empfohlen, sich nicht unter der Reparatur aufzuhalten.',
+    body: 'Die Einheit SUT-00, von den Bergungsteams Schneiderin genannt, verteilt das Gewicht bei jeder Fortbewegung neu auf die Halteseile. Der Panzer hält Einschläge aus, solange die Zugkraft bestehen bleibt.\n\nDas Durchtrennen des belasteten Halteseils bringt den Körper zu Fall und legt den Hinterleib für 1,8 Sekunden frei. Im Flug überquert sie das Gestein; der Schlag erfolgt beim Aufsetzen an der markierten Stelle. Es gibt keinen Beleg dafür, dass die Matrix zwischen einer Prospector-Einheit und zu fixierendem Material unterscheidet. Es wird empfohlen, sich nicht unter der Reparatur aufzuhalten.',
     source: 'Vermögensbergung — Risikomatrix',
   },
 
   'AX-SUT-003': {
     title: 'Material, das aus der Last springt',
     summary: 'Die Brut der Matrix wartet den Abschluss des Werks nicht ab.',
-    body: 'Die erste Probe wurde als Seidenrückstand erfasst. Der Eintrag wurde korrigiert, als der Rückstand über die Werkbank lief.\n\nDie Brut verlässt den Hinterleib der Stopferin mit noch unvollständigem Chitin. Vor dem Sprung ziehen die Jungtiere die Beine ein und fixieren den Landepunkt. Die Erholung ist kurz, genügt aber, um den Panzer zu brechen. Die von der Matrix gerufenen Näher wiederholen die Bewegung mit größerer Reichweite. Die geringe Größe nicht mit fehlender Funktion verwechseln.',
+    body: 'Die erste Probe wurde als Seidenrückstand erfasst. Der Eintrag wurde korrigiert, als der Rückstand über die Werkbank lief.\n\nDie Brut verlässt den Hinterleib der Schneiderin mit noch unvollständigem Chitin. Vor dem Sprung ziehen die Jungtiere die Beine ein und fixieren den Landepunkt. Die Erholung ist kurz, genügt aber, um den Panzer zu brechen. Die von der Matrix gerufenen Näher wiederholen die Bewegung mit größerer Reichweite. Die geringe Größe nicht mit fehlender Funktion verwechseln.',
     source: 'Feldtechnik — Zusatz zur Inkubation',
   },
 
@@ -1756,14 +1756,14 @@ const en: Record<LoreFragmentId, LoreText> = {
   'AX-SUT-002': {
     title: 'A load that moves itself',
     summary: 'The matrix uses its own construction for locomotion.',
-    body: 'Recovery crews call SUT-00 the Darner. It redistributes its weight between tethers during each movement. Its shell resists impacts while the support remains loaded.\n\nCutting that support knocks the body down and exposes the abdomen for 1.8 seconds. In flight she crosses over rock; the strike lands at the marked spot. There is no evidence the matrix distinguishes a Prospector from material awaiting fixation. Do not remain beneath its repairs.',
+    body: 'Recovery crews call SUT-00 the Seamstress. It redistributes its weight between tethers during each movement. Its shell resists impacts while the support remains loaded.\n\nCutting that support knocks the body down and exposes the abdomen for 1.8 seconds. In flight she crosses over rock; the strike lands at the marked spot. There is no evidence the matrix distinguishes a Prospector from material awaiting fixation. Do not remain beneath its repairs.',
     source: 'Asset Recovery — risk matrix',
   },
 
   'AX-SUT-003': {
     title: 'Material jumping off the load',
     summary: 'The matrix brood does not wait for construction to finish.',
-    body: 'The first specimen was logged as silk residue. The record was amended when the residue crossed the workbench.\n\nBrood emerge from the Darner abdomen with unfinished chitin. They tuck their legs and fix a landing point before jumping. Their brief recovery allows the shell to be broken. Stitchers summoned by the matrix repeat the movement at longer range. Small size does not imply lack of purpose.',
+    body: 'The first specimen was logged as silk residue. The record was amended when the residue crossed the workbench.\n\nBrood emerge from the Seamstress abdomen with unfinished chitin. They tuck their legs and fix a landing point before jumping. Their brief recovery allows the shell to be broken. Stitchers summoned by the matrix repeat the movement at longer range. Small size does not imply lack of purpose.',
     source: 'Field Engineering — incubation addendum',
   },
 

@@ -141,6 +141,24 @@ export interface LeaderboardStore {
    * placar nao cumpriu.
    */
   classes(query: Omit<LeaderboardQuery, 'limit' | 'sectorCount'>): Promise<LeaderboardClass[]>;
+  /**
+   * Troca o NOME de uma linha ja gravada. Devolve false quando ela nao existe.
+   *
+   * Existe por causa do co-op, e so dele. Uma run de co-op e enviada por ESTE
+   * processo no instante em que termina — antes de qualquer jogador ter tido a
+   * chance de assinar o relatorio —, e o nome que sobra e o codigo da sala.
+   * Segurar o envio ate alguem digitar seria trocar uma linha com nome feio por
+   * uma linha que nao existe enquanto ninguem responde, e a sala pode ser
+   * abandonada sem resposta nenhuma. Gravar primeiro e renomear depois e a
+   * ordem que nao perde run.
+   *
+   * NAO e uma rota publica, e nao pode virar uma: quem chama e `ws.ts`, a
+   * partir de uma mensagem do dono da sala, sobre a linha que aquela sala
+   * acabou de gerar. Ver `onRunNamed` em `server.ts` para a checagem de
+   * autoridade. Um endpoint HTTP equivalente deixaria qualquer um reescrever
+   * qualquer linha do livro.
+   */
+  rename(id: number, name: string): Promise<boolean>;
   /** O replay de UMA linha, ou null quando ela nao tem um (co-op, ou legado). */
   getReplay(id: number): Promise<ReplayRecord | null>;
   close(): Promise<void>;
@@ -234,6 +252,13 @@ export class MemoryLeaderboard implements LeaderboardStore {
       });
     }
     return entry;
+  }
+
+  async rename(id: number, name: string): Promise<boolean> {
+    const row = this.rows.find((r) => r.id === id);
+    if (!row) return false;
+    row.name = name;
+    return true;
   }
 
   async getReplay(id: number): Promise<ReplayRecord | null> {
@@ -488,6 +513,14 @@ export class PostgresLeaderboard implements LeaderboardStore {
       values,
     );
     return result.rows.map(rowToEntry);
+  }
+
+  async rename(id: number, name: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `update leaderboard_entries set name = $2 where id = $1 returning id`,
+      [id, name],
+    );
+    return result.rows.length > 0;
   }
 
   async getReplay(id: number): Promise<ReplayRecord | null> {
