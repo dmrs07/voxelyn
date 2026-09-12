@@ -64,6 +64,18 @@ export type PlayerDeath = {
 export type PlayerDeathHook = (room: GameRoom, death: PlayerDeath) => void;
 
 /**
+ * O dono da sala assinou o relatorio: renomeie a linha que esta sala gerou.
+ *
+ * Chamado DEPOIS de `onRunFinished`, e possivelmente muito depois — o jogador
+ * esta lendo a tela de resultado e digitando. Quem implementa o gancho e quem
+ * guarda qual linha e a desta sala; o servidor de jogo nao conhece o ranking.
+ *
+ * A AUTORIDADE e resolvida aqui, e nao no gancho: quando este gancho dispara, o
+ * remetente ja foi conferido como sendo o slot 0 de uma sala com run terminada.
+ */
+export type RunNamedHook = (room: GameRoom, name: string) => void;
+
+/**
  * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
  * Generosa o bastante para cobrir reconexao por resume token (~90s).
  */
@@ -84,6 +96,7 @@ export type ServerOptions = {
   logger?: (line: Record<string, unknown>) => void;
   onRunFinished?: RunFinishedHook;
   onPlayerDeath?: PlayerDeathHook;
+  onRunNamed?: RunNamedHook;
   /**
    * A profundidade que TODA sala de co-op deste processo usa. Padrao: G-00,
    * tres setores. Ver a atribuicao no construtor para a politica e o porque.
@@ -116,6 +129,7 @@ export class SurvivalServer {
   private readonly log: (line: Record<string, unknown>) => void;
   private readonly onRunFinished: RunFinishedHook | null;
   private readonly onPlayerDeath: PlayerDeathHook | null;
+  private readonly onRunNamed: RunNamedHook | null;
   private readonly coopDepth: RunDepthConfig;
 
   constructor(opts: ServerOptions = {}) {
@@ -127,6 +141,7 @@ export class SurvivalServer {
     this.log = opts.logger ?? (() => {});
     this.onRunFinished = opts.onRunFinished ?? null;
     this.onPlayerDeath = opts.onPlayerDeath ?? null;
+    this.onRunNamed = opts.onRunNamed ?? null;
     // A POLITICA DE PROFUNDIDADE DO CO-OP, escolhida aqui e nao por sala.
     //
     // Uma sala de co-op nao tem perfil: o handshake e anonimo e nao ha ticket.
@@ -299,6 +314,33 @@ export class SurvivalServer {
 
       case 'cmd': {
         if (conn.room) conn.room.applyCommand(clientId, msg.seq, msg.commands);
+        return [];
+      }
+
+      /**
+       * O dono da sala assina o relatorio da run que acabou.
+       *
+       * Tres condicoes, e as tres sao de AUTORIDADE, nao de conveniencia:
+       *
+       *   - a sala existe e a run dela terminou (`resultReported`): fora disso
+       *     nao ha linha no livro para renomear, e aceitar o nome agora seria
+       *     guarda-lo para carimbar uma run que ainda nem aconteceu;
+       *   - quem manda ocupa o slot 0: e o nome da EQUIPE, e uma linha so. Com
+       *     os dois slots ouvidos, o segundo a digitar apagaria o primeiro, e
+       *     qual nome ficaria dependeria de quem tem a rede mais rapida;
+       *   - o remetente tem slot: um socket sem slot nao joga e nao assina.
+       *
+       * Silencio em todos os casos recusados, e nao `reject`. Um cliente
+       * legitimo chega aqui por motivos banais — o parceiro tambem tem o campo
+       * na tela, a sala expirou enquanto ele digitava — e nenhum deles e erro
+       * que a tela dele deva relatar.
+       */
+      case 'name_run': {
+        const room = conn.room;
+        if (!room || !room.resultReported) return [];
+        const slot = room.slotForClient(clientId);
+        if (!slot || slot.slot !== 0) return [];
+        this.onRunNamed?.(room, msg.name);
         return [];
       }
 

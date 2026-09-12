@@ -82,7 +82,33 @@ export type ClientResyncRequest = {
   reason: string;
 };
 
-export type ClientMessage = ClientHello | ClientCommand | ClientHeartbeat | ClientResyncRequest;
+/**
+ * O dono da sala assina o relatorio da run que acabou de terminar.
+ *
+ * Chega DEPOIS do fim: a linha do ranking ja foi gravada pelo servidor no tick
+ * terminal, com o codigo da sala no lugar do nome, e esta mensagem a renomeia.
+ * A ordem e essa de proposito — ver `rename` em `leaderboard.ts`.
+ *
+ * So o slot 0 e ouvido, e a checagem e do servidor (`server.ts`), nunca do
+ * cliente: o nome da linha e de uma EQUIPE, e duas pessoas digitando nomes
+ * diferentes sobre a mesma linha seria a ultima a chegar apagando a primeira.
+ * O slot 0 e quem abriu a sala, que e de quem o convite partiu.
+ *
+ * NAO carrega qual linha renomear. O cliente nao sabe o id dela e nao pode
+ * saber: se soubesse, saberia tambem inventar outro. A sala lembra a linha que
+ * ela mesma gerou.
+ */
+export type ClientNameRun = {
+  t: 'name_run';
+  name: string;
+};
+
+export type ClientMessage =
+  | ClientHello
+  | ClientCommand
+  | ClientHeartbeat
+  | ClientResyncRequest
+  | ClientNameRun;
 
 // ---------------------------------------------------------------------------
 // Servidor -> Cliente. O servidor e autoritativo sobre tudo.

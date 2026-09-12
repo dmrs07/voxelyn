@@ -134,6 +134,13 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.title': 'OPTIONS',
   'options.name': 'Name',
   'options.name.placeholder': 'anonymous',
+
+  'runname.label.solo': 'SIGN THE REPORT',
+  'runname.label.team': 'SQUAD NAME',
+  'runname.hint.solo': 'This is the name the run enters the leaderboard under.',
+  'runname.hint.team': 'You opened the room: the squad name on the leaderboard is yours to write.',
+  'runname.confirm': 'SIGN',
+  'runname.skip': 'SKIP',
   'options.language': 'Language',
   'options.quality': 'Quality',
   'options.quality.high': 'High',

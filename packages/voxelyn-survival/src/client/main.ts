@@ -81,6 +81,7 @@ import {
 import type { CodexContext, PublicLoreFragment } from '@voxelyn/survival-protocol';
 import { formatSeed, parseSeed } from './run-summary';
 import { endActionAt, type EndAction, type EndActionRegions } from './run-end-actions';
+import { RunNamePrompt } from './run-name-prompt';
 import {
   deathEchoContractLabelParts,
   isValidRoomCode,
@@ -808,17 +809,84 @@ const recordRun = (state: SurvivalState): void => {
 const submitSoloRun = (state: SurvivalState): void => {
   if (submitted || !state.summary || state.summary.phase === 'dead') return;
   submitted = true;
+  const stars = state.summary.stars;
   const url = serverInput.value.trim() || defaultServerUrl();
   // O ticket desta descida viaja junto. E dele que o servidor tira a
   // profundidade autorizada — e, portanto, em qual livro esta run compete.
-  void submitRun(url, recorder, playerName, expedition?.runId).then((outcome) => {
-    if (!outcome.ok) {
-      // Sem banner: o jogador esta lendo a tela de resultado.
-      console.info('[leaderboard] nao enviado:', outcome.reason);
-      return;
-    }
-    setBanner(t(outcome.duplicate ? 'banner.run.duplicate' : 'banner.run.verified'), 'success');
-    setTimeout(() => setBanner(null), 2600);
+  const send = (name: string): void => {
+    void submitRun(url, recorder, name, expedition?.runId).then((outcome) => {
+      if (!outcome.ok) {
+        // Sem banner: o jogador esta lendo a tela de resultado.
+        console.info('[leaderboard] nao enviado:', outcome.reason);
+        return;
+      }
+      setBanner(t(outcome.duplicate ? 'banner.run.duplicate' : 'banner.run.verified'), 'success');
+      setTimeout(() => setBanner(null), 2600);
+    });
+  };
+  /**
+   * SEM ESTRELA NENHUMA o envio sai na hora, como sempre saiu.
+   *
+   * Zero estrela e uma extracao de maos vazias que nao morreu — ela entra no
+   * livro no ultimo lugar e ninguem vai procura-la. Pedir assinatura ali seria
+   * cobrar uma decisao por uma linha que o proprio jogador nao vai reler.
+   */
+  if (stars < 1) {
+    send(playerName);
+    return;
+  }
+  /**
+   * COM ESTRELA o envio ESPERA a assinatura.
+   *
+   * Esperar e o que permite o nome viajar junto do log, numa requisicao so, sem
+   * inventar uma rota de renomear linha do solo — no solo quem envia e o
+   * cliente, entao nao ha nada a corrigir depois se o nome ja sai certo.
+   *
+   * A espera nao pode ficar pendente para sempre, e nao fica: qualquer saida da
+   * tela de fim resolve o painel (ver as chamadas a `namePrompt.settle()`), e o
+   * campo ja nasce com o nome salvo. Quem ignora o painel e sai envia
+   * exatamente o que enviaria antes de ele existir.
+   */
+  namePrompt.open('solo', playerName, (chosen) => {
+    if (chosen !== null) adoptPlayerName(chosen);
+    // `chosen` vazio e o caso "subir anonima": `adoptPlayerName` recusa o vazio,
+    // entao o nome salvo continua de pe e so ESTA run vai sem ele. Pular
+    // (`null`) envia o nome salvo, que e o comportamento de sempre.
+    send(chosen ?? playerName);
+  });
+};
+
+/** A run de co-op corrente ja pediu o nome da equipe? */
+let teamNameAsked = false;
+
+/**
+ * Pede ao DONO DA SALA o nome da equipe, no fim de uma run de co-op com estrela.
+ *
+ * O espelho do que `submitSoloRun` faz no solo, com uma diferenca que nao da
+ * para esconder: aqui a linha do ranking JA FOI GRAVADA. Quem envia uma run de
+ * co-op e o servidor, no tick em que ela termina, e ele nao tem por que esperar
+ * ninguem digitar — a sala pode ser abandonada sem resposta. A linha nasce com
+ * o codigo da sala e esta mensagem a renomeia. Ver `rename` em `leaderboard.ts`.
+ *
+ * So o slot 0. A run de co-op gera UMA linha, e o nome dela e de uma equipe:
+ * com os dois jogadores assinando, o segundo a apertar apagaria o primeiro e o
+ * nome que ficasse seria o de quem tem a rede mais rapida. O slot 0 e quem
+ * abriu a sala — de quem o convite partiu. O servidor confere isso por conta
+ * propria (`name_run` em `server.ts`); a checagem aqui e so para nao MOSTRAR um
+ * campo cujo efeito seria descartado.
+ *
+ * O nome assinado tambem e adotado como o nome deste jogador: ele digitou o
+ * nome da dupla, mas digitou no proprio cliente, e um campo de Opcoes que
+ * continuasse com o nome antigo estaria desmentindo o que ele acabou de fazer.
+ */
+const askTeamName = (net: NetClient, summary: RunSummary | null): void => {
+  if (teamNameAsked) return;
+  teamNameAsked = true;
+  if (!summary || summary.stars < 1 || net.slot !== 0) return;
+  namePrompt.open('team', playerName, (chosen) => {
+    if (chosen === null) return; // pulou: a linha fica com o codigo da sala
+    adoptPlayerName(chosen);
+    net.nameRun(chosen);
   });
 };
 
@@ -868,6 +936,7 @@ const resetRunTracking = (): void => {
   recordedSummaryKey = null;
   submitted = false;
   echoSubmitted = false;
+  teamNameAsked = false;
   poolRequestKey = '';
   // A apresentacao e do mesmo tipo de estado: nasce da run e nao pode atravessar
   // para a proxima, porque os ids de entidade sao reciclados. Ver
@@ -1062,6 +1131,41 @@ nameInput.addEventListener('change', () => {
   playerName = nameInput.value.trim();
   savePlayerName(playerName);
 });
+
+/**
+ * O campo de nome da tela de fim. Ver `run-name-prompt.ts` para o porque.
+ *
+ * Um so para o processo inteiro, e nao um por run: ele e um elemento do DOM, e
+ * criar um por descida deixaria um painel morto no `body` a cada reinicio.
+ */
+const namePrompt = new RunNamePrompt();
+document.body.append(namePrompt.element);
+// A aba esta indo embora com a assinatura aberta: fecha com o que foi digitado e
+// deixa o envio sair. Listener PROPRIO, e nao uma linha dentro de
+// `reportAbandon`: aquele desiste cedo quando a run nao e padrao, e a assinatura
+// nao tem nada a ver com o funil de abandono. E melhor-esforco de verdade — o
+// `fetch` do envio pode nao completar antes de a pagina morrer —, mas nao tentar
+// garante a perda.
+window.addEventListener('pagehide', () => namePrompt.settle());
+
+/**
+ * Adota o nome assinado na tela de fim como O nome do jogador.
+ *
+ * Os TRES lugares de uma vez: a variavel que o envio le, o campo de Opcoes e o
+ * armazenamento. Assinar numa tela e ver o nome antigo na outra seria a tela de
+ * opcoes desmentindo o que o jogador acabou de fazer — e, na descida seguinte,
+ * o campo voltaria preenchido com o nome que ele ja trocou.
+ *
+ * Nome vazio NAO e adotado. Esvaziar o campo manda esta run como anonima (o
+ * servidor resolve o vazio), mas apagar o nome salvo por causa disso faria uma
+ * decisao sobre UMA run valer para todas as proximas.
+ */
+const adoptPlayerName = (name: string): void => {
+  if (name.length === 0) return;
+  playerName = name;
+  nameInput.value = name;
+  savePlayerName(name);
+};
 
 // ---------------------------------------------------------------------------
 // Menu de campo (pausa)
@@ -1362,11 +1466,19 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
       audio.update(state, now);
       renderState(state, 1, input.state, now);
       const endRegions = renderer.renderEnd(state, vw, vh, now, { input: input.state });
+      // O painel de assinatura acompanha os botoes: ele flutua sobre o canvas e
+      // so a tela de fim sabe onde o rodape parou depois de encolher o
+      // documento para caber. Ver `anchorAbove`.
+      namePrompt.anchorAbove(endRegions?.restart ?? null);
       // `authorizing` so barra a DESCIDA: um ticket ja em voo e uma run nova a
       // caminho, e um segundo toque nao pode pedir uma terceira. Voltar ao
       // terminal continua valendo — `abandonRun` invalida o ticket em voo, que
       // e justamente o que "mudei de ideia" significa aqui.
       const action = endScreenAction(endRegions, armed);
+      // Sair da tela de fim FECHA a assinatura, com o que estiver escrito. O
+      // envio espera esse fechamento, entao sem isto quem aperta "descer de
+      // novo" sem tocar no painel nunca chegaria ao ranking.
+      if (action !== null) namePrompt.settle();
       if (action === 'restart' && !authorizing) {
         // Cada tentativa e uma expedicao NOVA: ticket novo, runId novo, tuning
         // relido do perfil. Reusar o anterior deixaria a segunda run tentando
@@ -2065,13 +2177,16 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         if (terminal) {
           recordRun(state);
           if (state.summary) telemetry.finish(state.summary, state.sector);
+          askTeamName(net, state.summary ?? null);
           const endRegions = renderer.renderEnd(state, window.innerWidth, window.innerHeight, now, {
             input: input.state,
           });
+          namePrompt.anchorAbove(endRegions?.restart ?? null);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
           const action = endScreenAction(endRegions, armed);
+          if (action !== null) namePrompt.settle();
           if (action === 'restart') {
             gate.reset();
             audio.reset();

@@ -137,6 +137,13 @@ export const DE: Record<keyof typeof PT_BR, string> = {
   'options.title': 'OPTIONEN',
   'options.name': 'Name',
   'options.name.placeholder': 'anonym',
+
+  'runname.label.solo': 'BERICHT UNTERZEICHNEN',
+  'runname.label.team': 'TEAMNAME',
+  'runname.hint.solo': 'Unter diesem Namen kommt der Lauf in die Rangliste.',
+  'runname.hint.team': 'Du hast den Raum eröffnet: Der Teamname in der Rangliste ist deiner.',
+  'runname.confirm': 'UNTERZEICHNEN',
+  'runname.skip': 'ÜBERSPRINGEN',
   'options.language': 'Sprache',
   'options.quality': 'Qualität',
   'options.quality.high': 'Hoch',

@@ -494,3 +494,62 @@ describe('replay', () => {
     expect(await store.getReplay(entry!.id)).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// RENOMEAR: a assinatura do co-op, que chega DEPOIS de a linha existir
+// ---------------------------------------------------------------------------
+// Uma run de co-op e gravada por este processo no tick em que ela termina —
+// antes de o dono da sala ter tido chance de assinar. A linha nasce com o codigo
+// da sala e e renomeada depois. Ver `rename` em `leaderboard.ts` e `name_run`.
+describe('renomear uma linha ja gravada', () => {
+  const gravada = async (store: MemoryLeaderboard): Promise<LeaderboardEntry> => {
+    const entry = await store.submit({
+      name: 'sala A7K3',
+      mode: 'coop',
+      summary: summary(),
+      digest: null,
+    });
+    expect(entry).not.toBeNull();
+    return entry!;
+  };
+
+  it('troca o nome e NAO mexe em mais nada da linha', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await gravada(store);
+
+    expect(await store.rename(entry.id, 'Os Barrigudos')).toBe(true);
+    const [row] = await store.top({ mode: 'coop' });
+    expect(row.name).toBe('Os Barrigudos');
+    // A pontuacao e a identidade da run sao FATOS dela; a assinatura nao pode
+    // tocar em nenhum deles. Comparar o resto inteiro pega qualquer campo que um
+    // rename futuro passe a reescrever por descuido.
+    expect({ ...row, name: entry.name }).toEqual(entry);
+  });
+
+  it('linha inexistente devolve false em vez de criar uma', async () => {
+    const store = new MemoryLeaderboard();
+    expect(await store.rename(4242, 'fantasma')).toBe(false);
+    expect(await store.top({})).toEqual([]);
+  });
+
+  it('assinar de novo troca outra vez: a ultima palavra do dono e a que vale', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await gravada(store);
+    await store.rename(entry.id, 'primeiro');
+    await store.rename(entry.id, 'pensei melhor');
+    expect((await store.top({ mode: 'coop' }))[0].name).toBe('pensei melhor');
+  });
+
+  it('o nome renomeado passa pelo MESMO corte que o do solo', async () => {
+    const store = new MemoryLeaderboard();
+    const entry = await gravada(store);
+    // `ws.ts` renomeia com `sanitizeName(name)`. O store nao higieniza sozinho —
+    // ele guarda e ordena, nao julga —, entao o teste percorre o caminho que a
+    // mensagem percorre de verdade, e nao um atalho que so existe no teste.
+    await store.rename(entry.id, sanitizeName('   Os   Barrigudos   '));
+    expect((await store.top({ mode: 'coop' }))[0].name).toBe('Os Barrigudos');
+
+    await store.rename(entry.id, sanitizeName('Equipe Interminavelmente Longa'));
+    expect((await store.top({ mode: 'coop' }))[0].name).toBe('Equipe Interminave');
+  });
+});

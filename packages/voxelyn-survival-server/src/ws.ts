@@ -15,8 +15,10 @@ import {
 } from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
-import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
+import type { GameRoom } from './room.js';
+import { createLeaderboard, type LeaderboardEntry, type LeaderboardStore } from './leaderboard.js';
 import { createLeaderboardHandler } from './leaderboard-http.js';
+import { sanitizeName } from './replay.js';
 import { createTelemetry, type TelemetryStore } from './telemetry.js';
 import { createTelemetryHandler } from './telemetry-http.js';
 import { createArenaTelemetry, type ArenaTelemetryStore } from './arena-telemetry.js';
@@ -93,6 +95,22 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
    */
   const instanceNonce = randomBytes(6).toString('hex');
 
+  /**
+   * A linha do ranking que cada sala gerou, para o dono poder assina-la depois.
+   *
+   * Guarda a PROMESSA, e nao o id — e o que remove a corrida sem um unico
+   * `await` no caminho do tick. O envio e assincrono, e o dono pode digitar o
+   * nome e apertar enviar antes de o insert voltar do banco; com o id, essa
+   * mensagem chegaria a um mapa ainda vazio e o nome se perderia calado, so
+   * para quem tivesse o dedo rapido. Com a promessa, `onRunNamed` espera a
+   * mesma coisa que `onRunFinished` comecou.
+   *
+   * WeakMap porque a chave e a sala: quando ela e coletada, a entrada vai
+   * junto. Nada aqui precisa sobreviver a sala, e um Map comum seria um
+   * vazamento proporcional ao numero de partidas que o processo ja serviu.
+   */
+  const runEntries = new WeakMap<GameRoom, Promise<LeaderboardEntry | null>>();
+
   const survival = new SurvivalServer({
     ...opts,
     // Runs de co-op nao passam por re-simulacao e nao precisam: elas foram
@@ -103,11 +121,40 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       if (!summary || summary.phase === 'dead' || !leaderboardStore) return;
       // Sala de um jogador so no online continua sendo 'coop' de modo: o que
       // separa os dois rankings nao e quantas pessoas jogaram, e QUEM simulou.
-      void leaderboardStore
+      // O nome aqui e PROVISORIO, e a linha nasce com ele de proposito: o dono
+      // da sala ainda esta lendo a tela de resultado e so vai assinar daqui a
+      // alguns segundos — se e que vai. Gravar agora com o codigo da sala e
+      // renomear depois (`name_run`) e o que garante que a run entre no livro
+      // mesmo quando ninguem responde. Ver `rename` em `leaderboard.ts`.
+      const entry = leaderboardStore
         .submit({ name: `sala ${room.code}`, mode: 'coop', summary, digest: null })
-        .catch((err: unknown) =>
+        .catch((err: unknown) => {
           log({
             ev: 'leaderboard_submit_failed',
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
+      runEntries.set(room, entry);
+      void entry;
+    },
+    /**
+     * O dono assinou. A sala ja disse que ele e o dono; aqui so falta a linha.
+     *
+     * `sanitizeName` e o MESMO do placar solo: um nome digitado no co-op passa
+     * pelo mesmo corte de controle, espaco e comprimento que um digitado no
+     * solo, senao o livro teria duas politicas de nome dependendo de por onde a
+     * run entrou.
+     */
+    onRunNamed: (room, name) => {
+      const pending = runEntries.get(room);
+      if (!pending || !leaderboardStore) return;
+      const store = leaderboardStore;
+      void pending
+        .then((entry) => (entry ? store.rename(entry.id, sanitizeName(name)) : false))
+        .catch((err: unknown) =>
+          log({
+            ev: 'leaderboard_rename_failed',
             error: err instanceof Error ? err.message : String(err),
           }),
         );

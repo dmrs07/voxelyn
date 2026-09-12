@@ -1,0 +1,100 @@
+/*
+ * A paleta aqui e a AURIX do documento de fim (`renderEnd`), e nao a do jogo:
+ * dourado sobre papel escuro. O painel flutua por cima daquele documento, e
+ * duas paletas encostadas leriam como duas telas sobrepostas em vez de uma.
+ */
+.run-name {
+  position: fixed;
+  z-index: 26;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: 8px;
+  width: auto;
+  max-width: 460px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #4a3a1e;
+  background: linear-gradient(150deg, #14120df5, #0a0a0bfa 60%);
+  box-shadow:
+    0 10px 40px #000a,
+    inset 0 0 0 3px #0b0a08;
+  color: #cfc6b4;
+  font-family: ui-monospace, monospace;
+  text-align: left;
+}
+.run-name[hidden] {
+  display: none !important;
+}
+.run-name * {
+  box-sizing: border-box;
+}
+.run-name-label {
+  display: block;
+  color: #c9a35a;
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin-bottom: 7px;
+}
+.run-name input {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #4a3a1e;
+  background: #0a0a0b;
+  color: #e2d9c6;
+  font-family: inherit;
+  /*
+   * 16px cravado, e nao `clamp`. Abaixo disso o Safari do iPhone dá ZOOM na
+   * página ao focar o campo — e a página aqui é um canvas em tela cheia, que
+   * volta do zoom deslocado. O teclado subindo já mexe bastante na tela.
+   */
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+.run-name input:focus-visible {
+  outline: 2px solid #c9a35a;
+  outline-offset: 1px;
+}
+.run-name-hint {
+  margin: 7px 0 0;
+  color: #9a9184;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.run-name-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.run-name button {
+  flex: 1 1 0;
+  padding: 9px 10px;
+  border: 1px solid #4a3a1e;
+  background: #16140f;
+  color: #cfc6b4;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  /* O alvo minimo de um dedo, mesmo quando o rotulo e curto. */
+  min-height: 40px;
+}
+.run-name button:hover {
+  background: #1e1b14;
+}
+.run-name button:focus-visible {
+  outline: 2px solid #c9a35a;
+  outline-offset: 1px;
+}
+/* Enviar e a acao esperada; pular e a saida. O peso visual diz qual e qual. */
+.run-name-confirm {
+  flex-grow: 1.6;
+  border-color: #c9a35a;
+  color: #0a0a0b;
+  background: #c9a35a;
+  font-weight: 700;
+}
+.run-name-confirm:hover {
+  background: #dcb877;
+}

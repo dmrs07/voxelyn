@@ -283,6 +283,18 @@ export class NetClient {
   }
 
   /**
+   * Assina o relatorio da run que acabou: o nome da EQUIPE no livro.
+   *
+   * So o slot 0 e ouvido do outro lado (ver `name_run` em `server.ts`), e este
+   * cliente nem oferece o campo quando nao e ele — mas a checagem que VALE e a
+   * do servidor. Aqui nao ha guarda de proposito: duplicar a regra em dois
+   * lugares e o jeito de as duas discordarem no dia em que uma mudar.
+   */
+  nameRun(name: string): void {
+    this.send(encodeMessage({ t: 'name_run', name }));
+  }
+
+  /**
    * Divergencia detectada: pede o mundo autoritativo. Estrangulado porque o
    * servidor coalesce resyncs num cooldown — insistir a cada snapshot so
    * geraria trafego sem acelerar a recuperacao.

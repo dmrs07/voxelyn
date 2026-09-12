@@ -280,7 +280,22 @@
 //     lado da sala. Um cliente antigo contra servidor novo nao quebraria: ele
 //     ignoraria o campo e tocaria o som errado em silencio, que e exatamente o
 //     desfecho que o handshake existe para recusar.
-export const PROTOCOL_VERSION = 45;
+// 46: `name_run` — o dono da sala assina o relatorio da run de co-op, e a linha
+//     que o servidor ja gravou com o codigo da sala e renomeada.
+//
+//     E a PRIMEIRA mensagem de cliente que nao e intencao de jogo, e ela entra
+//     como mensagem e nao como rota HTTP por uma razao so: AUTORIDADE. O socket
+//     ja prova qual sala e qual slot, e e exatamente essa prova que decide quem
+//     pode renomear o que. Um endpoint equivalente teria de aceitar o id da
+//     linha vindo do cliente — e quem sabe dizer o proprio id sabe dizer outro.
+//
+//     Quebra so num sentido, e de leve: servidor antigo recebe um `t` que nao
+//     conhece e devolve `reject` sobre essa mensagem (o `default` do switch),
+//     sem derrubar a sessao. Um cliente novo contra servidor velho perde a
+//     assinatura da equipe e nada mais. Mesmo assim o bump: o handshake e o
+//     lugar de dizer isso em voz alta, e nao a ausencia silenciosa de um nome
+//     que o jogador digitou e viu sumir.
+export const PROTOCOL_VERSION = 46;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
