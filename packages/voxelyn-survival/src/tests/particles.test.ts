@@ -28,6 +28,20 @@ describe('particulas voxel', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
+  // A celula que vira tapete fungico sopra esporos, e o sopro e deterministico
+  // como todo o resto: dois clientes veem a mesma nuvem na mesma celula.
+  it('sopra esporos quando uma celula vira tapete fungico', () => {
+    const spread = (x: number, y: number): SemanticEvent => ({ t: 'fungal_spread', x, y });
+    const a = new VoxelParticles();
+    const b = new VoxelParticles();
+    a.ingest([spread(12.5, 8.5)], 96, 1);
+    b.ingest([spread(12.5, 8.5)], 96, 1);
+    expect(a.count).toBeGreaterThan(0);
+    a.step(120);
+    b.step(120);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+
   it('da bursts diferentes em lugares diferentes', () => {
     const a = new VoxelParticles();
     const b = new VoxelParticles();

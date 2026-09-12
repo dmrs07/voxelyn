@@ -445,6 +445,78 @@ const gasModel = (variant, frame) => {
   return boxes;
 };
 
+/**
+ * COGUMELOS DO TAPETE.
+ *
+ * O tapete sozinho — colunas finas de meio voxel com pontos claros pulsando —
+ * lia como GRAMA: textura verde uniforme, sem nenhuma silhueta que dissesse
+ * "fungo". O que separa colonia de relva nao e a cor, e a FORMA: um pe claro
+ * com um chapeu em domo por cima. Entao alguns tiles ganham cogumelos pequenos,
+ * em posicoes sorteadas, e o campo passa a ler como tapete micelial com corpos
+ * de frutificacao brotando dele.
+ *
+ * "Alguns" e literal: a variante 0 continua tapete nu, a 1 leva um cogumelo e
+ * a 2 leva um trio (um medio e dois pequenos). Como o cliente escolhe a
+ * variante pela POSICAO da celula, um campo de tapete fica com cerca de dois
+ * tercos das celulas com cogumelo, em lugares que nao rimam de uma celula para
+ * a vizinha — o padrao de repeticao do atlas some no tamanho de tres celulas.
+ * O trio existe para a variante cheia se separar da de um cogumelo so: com um
+ * par, de longe, "um" e "dois" liam como a mesma densidade.
+ *
+ * Sao PEQUENOS de proposito. O cogumelo grande ja existe como objeto de mundo
+ * (a Matriz Micelial, em `decor-props.mjs`, com talo de 8 voxels), e e uma
+ * ocupacao com significado de jogo; estes tem dois voxels de altura e nao podem
+ * ser confundidos com ele. Ficam afastados da borda do tile para o chapeu nao
+ * invadir a celula vizinha, e afastados entre si para os chapeus nao fundirem
+ * numa mancha so.
+ */
+const MUSHROOM_COUNT_BY_VARIANT = [0, 1, 3];
+
+/** Posicoes (coluna fina, raio do chapeu, altura do pe) dos cogumelos de uma variante. */
+const mushroomSpots = (variant) => {
+  const count = MUSHROOM_COUNT_BY_VARIANT[variant % VARIANTS] ?? 0;
+  const spots = [];
+  for (let attempt = 0; spots.length < count && attempt < 64; attempt++) {
+    const h = hash3d(attempt, spots.length, 7, variant);
+    // O primeiro cogumelo de um grupo e o medio; todos os outros sao pequenos.
+    const r = spots.length === 0 && count > 1 ? 2 : 1;
+    const margin = r + 1;
+    const span = FINE_COLS - 2 * margin;
+    const cx = margin + (h % span);
+    const cy = margin + ((h >>> 8) % span);
+    const crowded = spots.some(
+      (s) => Math.max(Math.abs(s.cx - cx), Math.abs(s.cy - cy)) < s.r + r + 3,
+    );
+    if (crowded) continue;
+    spots.push({ cx, cy, r, stem: 1.5 + ((h >>> 16) & 1) * 0.5 });
+  }
+  return spots;
+};
+
+/**
+ * Um cogumelo em caixas: pe de uma coluna fina, chapeu em dois degraus. O
+ * chapeu e uma cruz (r = 1) ou um quadrado sem as quinas (r = 2) — na grade
+ * fina isso e o mais perto de um domo que existe, e o degrau de cima estreito
+ * e o que impede a projecao de achatar o chapeu num ladrilho em cima do pe.
+ * A pinta de osso no chapeu medio e a mesma linguagem da Matriz Micelial.
+ */
+const mushroom = (boxes, spot, variant, stemMat, capMat) => {
+  const half = SURFACE_COLS / 2;
+  const { cx, cy, r, stem } = spot;
+  const x = cx / F - half;
+  const y = cy / F - half;
+  const base = slabTop(cx, cy, variant);
+  // O pe nasce na laje, atravessa o tapete e sobe `stem` acima dele.
+  boxes.push(box(x, y, base, 1 / F, 1 / F, 0.5 + stem, stemMat));
+  const capZ = base + 0.5 + stem;
+  const wide = (2 * r + 1) / F;
+  const narrow = (2 * r - 1) / F;
+  boxes.push(box(x - r / F, y - (r - 1) / F, capZ, wide, narrow, 0.5, capMat));
+  boxes.push(box(x - (r - 1) / F, y - r / F, capZ, narrow, wide, 0.5, capMat));
+  boxes.push(box(x - (r - 1) / F, y - (r - 1) / F, capZ + 0.5, narrow, narrow, 0.5, capMat));
+  if (r > 1) boxes.push(box(x - 1 / F, y + 1 / F, capZ + 1, 1 / F, 1 / F, 0.25, stemMat));
+};
+
 /** Modelo de um tipo num quadro de animacao. */
 export const surfaceModel = (kind, variant, frame) => {
   if (kind === 'mineral-silk') {
@@ -475,6 +547,12 @@ export const surfaceModel = (kind, variant, frame) => {
       if ((h >>> 4) % 9 === (frame % 2) * 3)
         boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'fungus'));
     });
+    // Os corpos de frutificacao: pe de osso, chapeu BIOLUMINESCENTE. O chapeu
+    // tem de sair da familia de cor do tapete — em `fungus` ele sumia no meio
+    // dos pontos vivos, e so o pe aparecia. Estaticos entre os quadros: o que
+    // pulsa e o tapete; um cogumelo que piscasse leria como erro de animacao,
+    // nao como vida.
+    for (const spot of mushroomSpots(variant)) mushroom(boxes, spot, variant, 'bone', 'biolum');
     return boxes;
   }
 
@@ -490,6 +568,11 @@ export const surfaceModel = (kind, variant, frame) => {
         boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, dry ? 'rust' : 'fungus'));
       }
     });
+    // Os MESMOS cogumelos, nos mesmos lugares: a celula que aquece nao pode
+    // ver o cogumelo sumir de um quadro para o outro. So a cor muda — o chapeu
+    // seca para a familia quente (`ferrite`: osso em cima, latao e ferrugem
+    // dos lados), que e o que uma colonia perdendo agua faz antes de queimar.
+    for (const spot of mushroomSpots(variant)) mushroom(boxes, spot, variant, 'bone', 'ferrite');
     return boxes;
   }
 

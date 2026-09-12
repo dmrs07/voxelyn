@@ -2011,6 +2011,16 @@ export type SemanticEvent =
   | { t: 'leyline_circuit'; closed: boolean; lit: number; total: number }
   | { t: 'ignite'; x: number; y: number }
   /**
+   * Uma celula que NAO era tapete fungico passou a ser: o acido do cuspidor
+   * avancando a colonia, ou o anel da Supernova do Bispo plantando fungo.
+   *
+   * Pela mesma razao de `ice_crack`: o ESTADO viaja no diff de chunk, mas o
+   * diff nao diz o instante — e o puff de esporos precisa sair na celula e no
+   * quadro em que ela virou, inclusive para quem assiste de outra maquina. A
+   * reidratacao de uma colonia secando nao conta: ela ja era tapete.
+   */
+  | { t: 'fungal_spread'; x: number; y: number }
+  /**
    * UMA placa de gelo desceu um degrau do ciclo de rachaduras. `stage` e o
    * degrau NOVO: 1 rachadura fina, 2 fraturado, 3 critico.
    *
