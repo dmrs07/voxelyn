@@ -36,6 +36,46 @@ describe('traducao de evento para som', () => {
     expect(voices.size).toBeGreaterThanOrEqual(6);
   });
 
+  /**
+   * CADA ARMA TEM VOZ PROPRIA, e ela sai do EVENTO.
+   *
+   * A parte que este teste existe para trancar nao e "a Lanca soa diferente" —
+   * e o co-op. O cliente que ouve so tem a lista de modulos do PROPRIO viewer,
+   * entao inferir a arma dali faria quem carrega o Bacamarte ouvir o estouro
+   * dele a cada parafuso que o parceiro dispara. O evento e quem sabe.
+   */
+  it('da voz propria a cada arma, e le a arma do EVENTO e nao do viewer', () => {
+    const shot = (weapon?: 'prospect_lance' | 'blunderbuss'): SemanticEvent => ({
+      t: 'shot',
+      x: 5,
+      y: 5,
+      dx: 1,
+      dy: 0,
+      owner: 2,
+      ...(weapon ? { weapon } : {}),
+    });
+    const voiceOf = (weapon?: 'prospect_lance' | 'blunderbuss') =>
+      cuesForEvent(shot(weapon), ctx)[0].voice;
+
+    // Sem arma no evento e o Cravador — o caso da fauna e do Prospector sem
+    // modulo de arma equipado.
+    expect(voiceOf()).toBe('shot');
+    expect(voiceOf('prospect_lance')).toBe('shotLance');
+    expect(voiceOf('blunderbuss')).toBe('shotBlunderbuss');
+    // As tres tem de ser distinguiveis de ouvido, que e o pedido original.
+    expect(new Set([voiceOf(), voiceOf('prospect_lance'), voiceOf('blunderbuss')]).size).toBe(3);
+    // E o dono do tiro nao muda nada: o tiro do PARCEIRO soa pela arma DELE.
+    const partner = { ...shot('blunderbuss'), owner: 99 };
+    expect(cuesForEvent(partner, ctx)[0].voice).toBe('shotBlunderbuss');
+  });
+
+  it('toda voz de arma tem spec e renderizador', () => {
+    for (const voice of ['shot', 'shotLance', 'shotBlunderbuss'] as const) {
+      expect(VOICE_SPECS[voice], `${voice} sem spec`).toBeDefined();
+      expect(VOICE_RENDERERS[voice], `${voice} sem renderizador`).toBeTypeOf('function');
+    }
+  });
+
   // O disparo do proprio jogador ja soa por `shot`; um telegrafo aqui daria
   // dois sons por tiro e dobraria a densidade do canal mais usado do jogo.
   it('nao telegrafa o disparo do proprio jogador', () => {

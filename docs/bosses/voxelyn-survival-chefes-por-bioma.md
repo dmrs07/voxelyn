@@ -1973,6 +1973,172 @@ carrega o sotaque do estrato e é funcional.
 número é um teto e não um desejo: tentei 4 primeiro, para o anel de raio 3 também caber
 sempre, e a maioria das tentativas passou a ser recusada — a geração inteira desabou.
 
+## A faixa de duração dos chefes (`SIMULATION_VERSION` 87)
+
+Onze chefes, e nenhuma escala em que eles se comparassem. Medido com o mesmo
+instrumento, o Bispo caía em **5,0 s** e o Leviatã pedia **126,2 s** — vinte e cinco
+vezes de diferença entre o encontro mais curto e o mais longo do mesmo jogo. Cada vida
+tinha sido escolhida por uma medição própria, contra a luta dela, sem nada do lado de
+fora para conferir o resultado.
+
+Os dois extremos são o **mesmo defeito visto de dois lados**. Curto demais, o
+contra-jogo não chega a ser exercido — o chefe é resolvido pelo dano que o jogador já
+trazia, e duas runs seguidas contra ele são a mesma run. Longo demais, o encontro passa
+a se repetir em vez de progredir: o ciclo que era leitura vira espera.
+
+### A primeira versão desta faixa errou a premissa
+
+Ela ordenou os alvos pela **profundidade**: o Guardião no piso porque "é o primeiro
+chefe que quase toda run encontra", o Leviatã no teto porque fecha o último estrato.
+Isso não descreve o jogo. A linhagem sai da **seed** (`lineageOf`), então o dono do
+setor final de uma run de três setores é sorteado junto com o mapa — não existe chefe
+inicial. Contado em 20 mil seeds, o **primeiro** chefe de uma run:
+
+| Geração          | 1º chefe mais provável | 2º               | 3º               | Cada dono de estrato |
+| ---------------- | ---------------------- | ---------------- | ---------------- | -------------------- |
+| G-00 (3 setores) | Bispo 27,4%            | Diamandis 18,0%  | Cerzideira 15,1% | ~6,5%                |
+| G-02 (4 setores) | Diamandis 20,5%        | Cerzideira 17,9% | Bispo 15,3%      | ~6,6%                |
+| G-04 (7 setores) | Bispo 40,6%            | Diamandis 13,6%  | Cerzideira 12,3% | ~5,0%                |
+
+O Guardião abre a run em **6,5%** delas — a mesma fatia do Devorador, da Rainha e do
+Magnetarca. Quem lidera a conta são as três **ocupações**, porque ocupação forte toma
+qualquer estrato.
+
+Com um chefe qualquer podendo ser o primeiro, uma rampa larga não é progressão: é
+loteria. O grosso da lista ficou **estreito de propósito — oito chefes entre 36 e 50 s**,
+com uma **cauda deliberada de três** (Leviatã 60 s, Cerzideira 72 s, Devorador 83 s) — e a
+ordem dentro dela passou a ser a da **dificuldade**, lida em três eixos declarados:
+
+1. **Pressão de dano** — quanto o encontro cobra por segundo, medido. Um chefe que já
+   cobra caro não deve também durar muito: as duas coisas multiplicam.
+2. **O que a luta tem para mostrar** — fases, janelas, contra-jogo. Uma luta de duas
+   metades precisa de tempo para as duas acontecerem; uma luta de um gesto só não fica
+   melhor esticada.
+3. **Frequência** — o encontro que aparece em metade das runs cansa antes do que aparece
+   em uma a cada dez.
+
+### O instrumento
+
+`packages/voxelyn-survival-sim/tools/boss-ttk.mjs` mede o **teto** de cada encontro: um
+agente imortal, de mira perfeita (com antecipação de tempo de voo), armado **só com o
+parafuso básico** e sem nenhuma decisão além de manter a distância de tiro. A cena é a
+mesma dos testes de estrato — clareira limpa no meio do mapa, chefe a seis tiles,
+`bossRuntime.awake` ligado, fauna fora.
+
+Ninguém joga assim, e é exatamente por isso que ele serve: tudo o que um jogador de
+verdade acrescenta — erro de mira, esquiva, recuo, morte — só pode fazer o encontro
+**durar mais**. O teto é o piso do encontro, e é o único número comparável entre onze
+contra-jogos diferentes. A arma é o parafuso básico e mais nada porque é o único
+equipamento que toda run tem: comparar com míssil e Minigun seria comparar builds.
+
+A geometria do engajamento **varia por seed**: o corpo nasce a seis tiles num rumo
+derivado da seed, e não sempre a leste. Sem isso, um agente de regra fixa numa cena fixa
+produz doze cópias da mesma partida — e um P90 que só repete a mediana. Foi essa
+correção que desfez o pior número da primeira leva: a cauda de 79 s da Rainha era **uma
+geometria** repetida doze vezes, a única em que o gelo nunca sai de perto dela.
+
+Três concessões ficam registradas, porque são elas que tornam o número discutível:
+
+- **O agente não morre, e a run não termina.** Uma queda em água profunda encerra a run
+  inteira, e `stepRun` numa run encerrada não avança o tick — sem restaurar a fase, um
+  afogamento apareceria como "chefe eterno", que é o diagnóstico oposto.
+- **Ele não pisa no buraco.** A única leitura de terreno que faz é sair da coluna
+  marcada da Sondagem e não entrar em água profunda. É o que o telégrafo pede.
+- **O tapete do Bispo entra resolvido.** Sobre micélio vivo ele cura 64/s — mais que o
+  disparo básico sustentado, por decisão de desenho (`BISHOP_REGEN_PER_TICK`), e nenhum
+  valor de vida muda isso. O chão aquece por fora, no mesmo tick em que o micélio
+  aparece sob o corpo: é o efeito exato da resposta certa, e o número que sai é o do
+  encontro **depois** de resolvido o quebra-cabeça territorial.
+
+### A tabela
+
+Doze seeds por chefe, e o que se reporta é **mediana, P90 e dano tomado** — não um número
+só. Um alvo cumprido na mediana e estourado no P90 não é um alvo cumprido, e a coluna de
+dano é o outro lado da duração: alongar um encontro sem olhar quanto ele cobra é alongar
+a exposição do jogador às cegas.
+
+| Chefe               | Vida            | Alvo | Mediana            | P90    | Dano tomado (antes → depois) |
+| ------------------- | --------------- | ---- | ------------------ | ------ | ---------------------------- |
+| Magnetarca          | 1200 → **1400** | 36 s | 30,1 → **35,6 s**  | 35,6 s | 72 → 90                      |
+| Guardião            | 420 → **1450**  | 38 s | 10,7 → **38,8 s**  | 39,6 s | 300 → **1538**               |
+| Bispo               | 260 → **1450**  | 38 s | 5,0 → **38,5 s**   | 38,9 s | 16 → 48                      |
+| Pulmão-Matriz       | 700 → **1620**  | 42 s | 16,1 → **41,9 s**  | 41,9 s | 77 → 231                     |
+| Rainha da Geada     | 640 → **950**   | 44 s | 23,9 → **43,5 s**  | 46,6 s | 0 → 442                      |
+| Arquicantor         | 620 → **1650**  | 46 s | 15,6 → **45,6 s**  | 46,9 s | 52 → 120                     |
+| Diamandis           | 1400 → **1700** | 46 s | 38,3 → **46,3 s**  | 48,9 s | 295 → 437                    |
+| Coração da Fornalha | 900 → **1000**  | 50 s | 43,4 → **50,5 s**  | 54,0 s | 938 → **1161**               |
+| Leviatã do Lençol   | 4000 → **2000** | 60 s | 126,2 → **60,0 s** | 60,8 s | 22 → 22                      |
+| Cerzideira          | 900 → **1000**  | 72 s | 68,2 → **72,1 s**  | 77,2 s | 504 → **854**                |
+| Devorador Branco    | 1500 → **1400** | 83 s | 85,7 → **83,0 s**  | 83,8 s | 310 → 280                    |
+
+**A cauda dos três é leitura de desenho, e não sobra da faixa antiga.** Leviatã,
+Cerzideira e Devorador são os chefes de **janela e blindagem** do lote: o corpo passa a
+maior parte do encontro fora de alcance ou couraçado. O dano efetivo por segundo mede isso
+direto — ~38/s nos chefes abertos contra 19,8/s na Fornalha, 16,9/s no Devorador e 13,9/s
+na Cerzideira —, então o relógio deles conta muito tempo em que não há luta acontecendo.
+Comparar os 83 s do Devorador com os 38 s do Guardião é comparar duas coisas diferentes: o
+primeiro mede um ciclo, o segundo mede uma luta.
+
+Duas vidas **desceram**, as duas no topo: o Devorador de 1500 para 1400, e o Leviatã de
+4000 para 2000 — este porque os 4000 vinham de uma correção legítima (com 800 ele cruzava
+o limiar do Dilúvio **antes do primeiro mergulho**) aplicada sem uma faixa contra a qual
+conferir o resultado. Nenhum perdeu estrutura: `DELUGE_HP_FRACTION` e
+`DEVOURER_HUNGER_HP_FRACTION` leem fração, e as duas pontas se mexeram juntas.
+
+O dano tomado é de um agente que **não esquiva** — é um teto de exposição e não uma
+previsão —, mas a comparação antes/depois é da mesma postura nos dois lados. E ela
+mostra por que o Guardião não pode subir mais: **4,25× de exposição** (300 → 1538) para
+durar 3,6×, superlinear porque a fase de fúria passa a ocupar o dobro de tempo absoluto.
+É o eixo que o segura perto do piso, junto com o fato de a luta dele não ter segunda
+metade nenhuma para mostrar.
+
+### O ciclo do ferro segurou o Magnetarca no piso
+
+A luta mais rica do lote é a mais curta da lista, e não por descuido: o teto dele não é a
+vida, é a **economia de ferro**. O material é finito e não repovoa, então vida maior com
+o mesmo estoque não alonga a luta inteira — alonga o **trecho final sem ferro**, que é o
+único pedaço do encontro sem decisão nenhuma. Medido no bot mortal, 12 câmaras:
+
+| Vida         | Massas | Cauda sem material | Vida restante do bot | Dano tomado |
+| ------------ | ------ | ------------------ | -------------------- | ----------- |
+| 1200 (antes) | 3      | 3,1 s              | 57/100               | —           |
+| **1400**     | **3**  | **6,1 s**          | **59/100**           | **36**      |
+| 1620         | 3      | 10,2 s             | 59/100               | 36–47       |
+| 1620         | 4      | 3,8 s              | 93/100               | 7           |
+
+A última linha é a tentação, e foi ela que a revisão pegou: uma **quarta massa** entrou
+primeiro de carona no aumento de vida, como se fosse reposição neutra de material. Ela
+resolve a cauda, mas o bot mortal termina com 93/100 de vida contra 59 e toma 7 de dano
+contra 36 — isso é **queda de dificuldade**, não ajuste de estoque. Mudança de mecânica
+pede medição e revisão próprias: `MAGNETARCH_SHARDS` fica em três, e quem desceu foi a
+vida.
+
+### O que a medição deixou em aberto
+
+- **O Pulmão-Matriz quase não spawna.** O Sulfuroso só é dono de um setor de chefe quando
+  cai numa posição que a geração carimba, e nas tabelas atuais isso acontece em **0% das
+  runs de G-00, G-02 e G-04** e em 6,4% das de G-03. Tunar a duração de um encontro que
+  ninguém encontra é arrumar a sala errada — é o mesmo defeito de tabela que já aposentou
+  o Guardião, o Devorador e o Magnetarca antes (ver a linhagem árida e a industrial), e a
+  correção é de **linhagem**, não de vida. Fora desta mudança, e registrada aqui.
+- **A Rainha é a de leitura mais frágil.** A couraça dela é o terreno (enquanto há gelo em
+  volta entra 22% do golpe, e ela recongela a placa a cada 14 s), então o número depende
+  de quanto gelo sobrou por perto — mediana 43,5 s, P90 46,6 s, mínimo 35,7 s. É por isso
+  que ela fica no meio da faixa e não perto do teto.
+- **`GUARDIAN_HP` não era lido por ninguém.** A ficha do arquétipo trazia um `420` escrito
+  à mão — a única vida de chefe fora de `constants.ts` —, então a constante existia e
+  mudá-la não mudava nada no jogo. Agora a ficha lê a constante.
+- **A cauda é o que o playtest tem de conferir primeiro**, e dentro dela a Cerzideira: 72 s
+  de encontro, 854 de dano tomado e o terceiro chefe mais frequente do jogo (15% das runs
+  de G-00) é a única combinação da lista em que _longo_, _caro_ e _frequente_ aparecem
+  juntos. A Fornalha vem logo atrás em versão menor — 50 s e a segunda maior pressão da
+  lista (1161), o chefe em que duração e exposição andam mais juntas.
+- **Nada disto é playtest.** São cenários simulados com um agente que segue regras fixas.
+  O que a faixa garante é que os onze encontros passaram a ser comparáveis entre si e que
+  nenhum deles acaba antes de cobrar a própria mecânica. Se a **ordem** dentro da faixa
+  está certa, quem responde é gente jogando — e os três eixos acima são leitura de quem
+  tunou, não medição.
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔

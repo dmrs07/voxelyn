@@ -162,6 +162,120 @@ export const BOSS_OF_STRATUM: Record<StratumId, BossId> = {
   ferric: 'magnetarch',
 };
 
+/**
+ * QUANTO DURA CADA ENCONTRO, em segundos, e por que um dura mais que o outro.
+ *
+ * O NUMERO E UM TETO, nao uma previsao: e o que `tools/boss-ttk.mjs` mede com
+ * um agente imortal, de mira perfeita, armado so com o parafuso basico e sem
+ * outra decisao alem de manter a distancia de tiro. Ninguem joga assim — e por
+ * isso ele serve: tudo o que um jogador de verdade acrescenta (erro de mira,
+ * esquiva, recuo, morte) so pode fazer o encontro DURAR MAIS. O teto e o piso
+ * do encontro.
+ *
+ * ---------------------------------------------------------------------------
+ * NAO EXISTE CHEFE INICIAL, e esta tabela ja foi escrita uma vez como se
+ * existisse.
+ * ---------------------------------------------------------------------------
+ *
+ * A primeira versao ordenou os alvos pela PROFUNDIDADE — o Guardiao no piso
+ * porque "e o primeiro que quase toda run encontra", o Leviata no teto porque
+ * fecha o ultimo estrato. A premissa esta errada, e a contagem diz por que: a
+ * linhagem sai da SEED (ver `lineageOf`), entao o dono do setor final de uma
+ * run de tres setores e sorteado junto com o mapa. Medido em 20 mil seeds, o
+ * PRIMEIRO chefe de uma run de G-00:
+ *
+ *   Bispo 27,4%  ·  Diamandis 18,0%  ·  Cerzideira 15,1%  ·  cada dono de
+ *   estrato ~6,5% (Guardiao inclusive)
+ *
+ * O Guardiao nao e o primeiro chefe do jogo: ele e o primeiro chefe de uma run
+ * em 6,5% delas, exatamente como o Devorador e a Rainha. Quem lidera a conta
+ * sao as tres OCUPACOES, porque ocupacao forte toma qualquer estrato.
+ *
+ * Entao a ordem nao pode ser a da descida. Ela e a da DIFICULDADE, e a
+ * dificuldade aqui e lida em tres eixos declarados:
+ *
+ * 1. PRESSAO DE DANO — quanto o encontro cobra por segundo, medido. E um teto
+ *    (o agente nao esquiva), entao vale como comparacao entre chefes e nao
+ *    como previsao. Um chefe que ja cobra caro nao deve tambem durar muito: as
+ *    duas coisas multiplicam.
+ * 2. O QUE A LUTA TEM PARA MOSTRAR — fases, janelas, contra-jogo. Uma luta com
+ *    duas metades precisa de tempo para as duas acontecerem; uma luta de um
+ *    gesto so nao fica melhor esticada.
+ * 3. FREQUENCIA — com que frequencia alguem a encontra (a conta acima). O
+ *    encontro que aparece em metade das runs cansa antes do que aparece em uma
+ *    a cada dez, e o teto dele tem de refletir isso.
+ *
+ * O GROSSO DA LISTA E ESTREITO, E A CAUDA E DELIBERADA. Oito chefes cabem
+ * entre 36 e 50 segundos; tres — Leviata, Cerzideira e Devorador — ficam em 60,
+ * 72 e 83. A cauda nao e sobra da faixa antiga: e a leitura de que esses tres
+ * sao os chefes de JANELA e BLINDAGEM do lote, onde o corpo passa a maior parte
+ * do encontro fora de alcance ou couraçado. O dano efetivo por segundo mede
+ * isso direto — ~38/s nos chefes abertos contra 17/s no Devorador e 14/s na
+ * Cerzideira —, entao o relogio deles conta muito tempo em que nao ha luta
+ * acontecendo, e comparar 83 s de Devorador com 38 s de Guardiao e comparar
+ * duas coisas diferentes.
+ *
+ * O que a faixa tem de impedir continua sendo os dois defeitos das pontas: o
+ * encontro que acaba antes de cobrar a fase que o distingue (o Bispo caia em
+ * 5 s, o Guardiao em 10,7 s) e o que mostra a mesma fase seis vezes (o Leviata
+ * pedia 126,2 s). A cauda esta do lado certo dos dois — e e o pedaco da tabela
+ * que o playtest tem de conferir primeiro.
+ *
+ * COMO CADA UM FOI PARAR ONDE ESTA:
+ *
+ *   36  Magnetarca — a luta mais rica do lote, e mesmo assim a mais curta: o
+ *       teto dele nao e a vida, e a ECONOMIA DE FERRO. Material finito com
+ *       vida alta alonga o trecho final sem massa, que e o unico pedaco da
+ *       luta sem decisao nenhuma (ver MAGNETARCH_HP).
+ *   38  Guardiao — a luta mais simples do jogo (nao ha janela para abrir nem
+ *       blindagem para derrubar) e a maior pressao de dano da lista. Os dois
+ *       eixos apontam para o piso.
+ *   38  Bispo — o chefe mais encontrado de todos (27% a 56% das runs) e, uma
+ *       vez resolvido o tapete, uma luta plana. A dificuldade dele e o
+ *       quebra-cabeca territorial, e quebra-cabeca nao fica melhor mais longo.
+ *   42  Pulmao-Matriz — o ciclo de respiracao, e a unica janela do jogo que o
+ *       JOGADOR abre.
+ *   44  Rainha da Geada — couraça de terreno, congelamento e Espectros.
+ *   46  Arquicantor — duas metades (apagar a rede, desmontar o coro).
+ *   46  Diamandis — quatro atos, e o segundo mais encontrado do lote.
+ *   50  Coracao da Fornalha — blindado metade do tempo, e a SEGUNDA MAIOR
+ *       pressao de dano da lista (1161 tomados). E onde duracao e exposicao
+ *       andam mais juntas, e o primeiro a reconsiderar se o playtest reclamar.
+ *       Fecha o grosso da lista.
+ *   60  Leviata do Lencol — duas fases inteiras, metade do encontro fora de
+ *       alcance, e a MENOR pressao de dano da lista (22 de dano tomado). Um
+ *       minuto de leitura, e nao um minuto de exposicao.
+ *   72  Cerzideira — a teia lida, cortada e refeita. A que mais pede
+ *       confirmacao de playtest: longa, cara (854 de dano tomado) e o terceiro
+ *       encontro mais frequente do jogo.
+ *   83  Devorador Branco — o mais longo, e o que menos tempo passa alcancavel:
+ *       fora da boca aberta ele esta enterrado. O numero mede o ciclo, nao a
+ *       luta.
+ *
+ * O QUE ESTA TABELA NAO E: ela nao entra na simulacao. Nenhum passo a le, e o
+ * que cobra o alvo e a VIDA de cada chefe (`*_HP` em constants.ts), escolhida
+ * medindo. Ela esta aqui — e nao num documento — porque foi a falta de um alvo
+ * escrito que deixou a lista abrir de 5 a 126 segundos: quem for mexer numa
+ * vida amanha precisa ver, no mesmo repositorio, contra o que aquele numero
+ * foi escolhido.
+ *
+ * E ELA NAO E FINAL. Os tres eixos sao leitura de quem tunou, e o instrumento
+ * e um bot. Falta playtest humano, e ele pode reordenar a lista.
+ */
+export const BOSS_TTK_SECONDS: Record<BossId, number> = {
+  magnetarch: 36,
+  guardian: 38,
+  bishop: 38,
+  lung_matrix: 42,
+  frost_queen: 44,
+  archcantor: 46,
+  diamandis: 46,
+  furnace_heart: 50,
+  sheet_leviathan: 60,
+  seamstress: 72,
+  white_devourer: 83,
+};
+
 export type BossBiome = {
   stratum: StratumId;
   occupation: OccupationId;

@@ -36,7 +36,9 @@ export type ProjectileLike = {
     | 'cart'
     | 'cyclone'
     | 'net'
-    | 'flechette';
+    | 'flechette'
+    | 'lance'
+    | 'pellet';
   /**
    * Velocidade, quando o chamador a tem.
    *
@@ -109,6 +111,12 @@ const ARMED_RAMP: FaceRamp = ['#ffd166', '#ff7a3d', '#7a2f2f'];
  * viram uma poeira cinza-esverdeada sobre o chao da caverna.
  */
 const FLECHETTE_RAMP: FaceRamp = ['#ffffff', '#a8ffe4', '#2f6b4f'];
+/**
+ * A LANCA: o mesmo plasma do parafuso, puxado. Azul frio e nao verde — ela nao
+ * e uma bala da Minigun em escala, e a cor e o que impede a leitura errada a
+ * meio segundo de distancia.
+ */
+const LANCE_RAMP: FaceRamp = ['#ffffff', '#9fd8ff', '#2b5c86'];
 
 /**
  * Raio de colisao de um projetil pequeno, em tiles — o mesmo fallback que a
@@ -473,6 +481,50 @@ const drawFlechette = (
   ctx.fillRect(Math.round(sx - body / 2), Math.round(sy - body / 2), body, body);
 };
 
+/**
+ * A LANCA: um risco COMPRIDO com um corpo pequeno na ponta.
+ *
+ * E o inverso da flechette, e de proposito. A flechette e um tracante fino
+ * porque dezesseis por segundo nao podem ocupar pixel; a Lanca sai uma vez por
+ * segundo e tem de anunciar que custou isso — o traco vai a dois tiles e meio
+ * atras do corpo (contra os 0,55 da flechette), que a 26 tiles/s e o que o olho
+ * le como "aquilo passou", e nao como "aquilo esta indo".
+ */
+const drawLance = (
+  ctx: CanvasRenderingContext2D,
+  project: (x: number, y: number) => [number, number],
+  ox: number,
+  oy: number,
+  heading: { dx: number; dy: number } | null,
+  sx: number,
+  sy: number,
+  lift: number,
+  size: number,
+): void => {
+  if (heading) {
+    const [tx, ty] = project(ox - heading.dx * 2.5, oy - heading.dy * 2.5);
+    const gradient = ctx.createLinearGradient(tx, ty - lift, sx, sy);
+    // O rastro APAGA para tras: a cauda de um tiro de energia nao tem fim, tem
+    // desvanecimento. Um traco de alfa constante leria como uma barra solida
+    // ligando a arma ao alvo, e a leitura viraria "um feixe", que e outra arma.
+    gradient.addColorStop(0, 'rgba(159, 216, 255, 0)');
+    gradient.addColorStop(1, LANCE_RAMP[1]);
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = Math.max(1, size * 0.42);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - lift);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+    ctx.restore();
+  }
+  const body = Math.max(2, Math.round(size * 0.8));
+  ctx.fillStyle = LANCE_RAMP[0];
+  ctx.fillRect(Math.round(sx - body / 2), Math.round(sy - body / 2), body, body);
+};
+
 const drawSpitGlob = (
   ctx: CanvasRenderingContext2D,
   sx: number,
@@ -672,21 +724,24 @@ export class ProjectileView {
     // O ARMADO vence o sifao de proposito: risco fala mais alto que cura, e o
     // aviso laranja do explosivo nao pode ser pintado de verde por cima.
     const flechette = projectile.kind === 'flechette';
-    const ramp = rock
-      ? ROCK_RAMP
-      : disc
-        ? DISC_RAMP
-        : seeker
-          ? SEEKER_RAMP
-          : flechette
-            ? FLECHETTE_RAMP
-            : armed
-              ? ARMED_RAMP
-              : projectile.hostile
-                ? HOSTILE_RAMP
-                : projectile.modules?.siphon
-                  ? SIPHON_RAMP
-                  : PLAYER_RAMP;
+    const lance = projectile.kind === 'lance';
+    const ramp = lance
+      ? LANCE_RAMP
+      : rock
+        ? ROCK_RAMP
+        : disc
+          ? DISC_RAMP
+          : seeker
+            ? SEEKER_RAMP
+            : flechette
+              ? FLECHETTE_RAMP
+              : armed
+                ? ARMED_RAMP
+                : projectile.hostile
+                  ? HOSTILE_RAMP
+                  : projectile.modules?.siphon
+                    ? SIPHON_RAMP
+                    : PLAYER_RAMP;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
     // A flechette e MENOR que o bolt de proposito — 60% do corpo. O calibre e
@@ -696,7 +751,23 @@ export class ProjectileView {
     const size =
       VOXEL_PX *
       zoom *
-      (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : flechette ? 0.6 : 1);
+      (rock
+        ? ROCK_PROJECTILE_SCALE
+        : disc
+          ? 1.45
+          : seeker
+            ? 1.25
+            : flechette
+              ? 0.6
+              : lance
+                ? 0.95
+                : // O GRAO e o menor corpo do arsenal do jogador. Cinco por
+                  // disparo no calibre do parafuso seriam uma parede de
+                  // estilhacos, e a leitura "um punhado de chumbo" — que e o
+                  // que diz ao jogador por que ele precisa encostar — sumiria.
+                  projectile.kind === 'pellet'
+                  ? 0.5
+                  : 1);
 
     // ALTURA. Tudo o que nao e hostil saiu da arma do Prospector — estilhaco,
     // disco e drone —, e por isso PARTE da altura do cano; o estilhaco e o disco
@@ -846,6 +917,18 @@ export class ProjectileView {
     const heading = track && (track.dx !== 0 || track.dy !== 0) ? track : null;
 
     if (projectile.kind === 'flechette') {
+      drawFlechette(ctx, project, ox, oy, heading, sx, sy - lift, lift, size);
+      return;
+    }
+
+    if (projectile.kind === 'lance') {
+      drawLance(ctx, project, ox, oy, heading, sx, sy - lift, lift, size);
+      return;
+    }
+
+    // O GRAO usa a forma da flechette com o corpo menor: e um tracante curto, e
+    // o rastro de 0,55 tile dela e mais longo que a vida util do chumbo.
+    if (projectile.kind === 'pellet') {
       drawFlechette(ctx, project, ox, oy, heading, sx, sy - lift, lift, size);
       return;
     }

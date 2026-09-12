@@ -3,7 +3,9 @@ import {
   ATTACHMENT_IDS,
   MINIGUN_FAN_FRAMES,
   MODULE_ATTACHMENTS,
+  blunderbussGun,
   minigunGun,
+  prospectLanceGun,
 } from './prospector-modules.mjs';
 import {
   ANCHOR_X,
@@ -111,8 +113,18 @@ const poseArgsFor = (anim, frame) => {
  * perde: `recoilScreenOffset` desloca a arma inteira e e aplicado fora da
  * escolha de quadro.
  */
-const moduleBoxes = (id, anim, frame) => {
+/**
+ * As ARMAS recebem a pose inteira; os ACOPLADOS recebem so o ancoramento.
+ *
+ * A diferenca nao e arbitraria: um acoplado e uma peca parafusada no cano e
+ * so precisa saber ONDE o cano esta, enquanto uma arma E o cano — ela desenha o
+ * coice, a inclinacao e o agachamento por conta propria. A Minigun ainda recebe
+ * `fan`, que e a posicao da ventoinha; as outras duas nao tem peca que gire.
+ */
+export const moduleBoxes = (id, anim, frame) => {
   if (id === 'minigun') return minigunGun({ fan: frame });
+  if (id === 'prospect_lance') return prospectLanceGun(poseArgsFor(anim, frame));
+  if (id === 'blunderbuss') return blunderbussGun(poseArgsFor(anim, frame));
   return MODULE_ATTACHMENTS[id](gunAnchor(poseArgsFor(anim, frame)));
 };
 
@@ -123,7 +135,7 @@ const renderModule = (dir, anim, frame, id) =>
     FRAME_WIDTH,
     FRAME_HEIGHT,
     RENDER_ANCHOR_X,
-    RENDER_ANCHOR_Y
+    RENDER_ANCHOR_Y,
   );
 
 const renderPart = (dir, anim, frame, part) =>
@@ -133,11 +145,12 @@ const renderPart = (dir, anim, frame, part) =>
     FRAME_WIDTH,
     FRAME_HEIGHT,
     RENDER_ANCHOR_X,
-    RENDER_ANCHOR_Y
+    RENDER_ANCHOR_Y,
   );
 
-/** Todo modulo que tem camada propria: os seis acoplados mais a Minigun. */
-export const ALL_MODULE_IDS = [...ATTACHMENT_IDS, 'minigun'];
+/** Todo modulo que tem camada propria: os acoplados mais as TRES armas. */
+export const WEAPON_LAYER_IDS = ['minigun', 'prospect_lance', 'blunderbuss'];
+export const ALL_MODULE_IDS = [...ATTACHMENT_IDS, ...WEAPON_LAYER_IDS];
 
 /** O id de atlas de um modulo. Uma funcao so, lida pelo gerador e pelo cliente. */
 export const moduleLayerId = (id) => `layer-module-${id.replace(/_/g, '-')}`;
@@ -169,17 +182,17 @@ const fitReference = () => {
         // Incluir tudo aqui custa nada em bytes (a referencia e descartada) e
         // troca um desalinhamento silencioso por um enquadramento comum. Ha
         // teste conferindo que a ancora declarada nao se mexeu com isso.
-        const withModules = [
-          ...ALL_MODULE_IDS.flatMap((id) => moduleBoxes(id, anim, frame)),
-        ];
-        frames.push(renderVoxels(
-          [...pose.lower, ...pose.upper, ...pose.gun, ...withModules],
-          DIR_INDEX[dir],
-          FRAME_WIDTH,
-          FRAME_HEIGHT,
-          RENDER_ANCHOR_X,
-          RENDER_ANCHOR_Y
-        ));
+        const withModules = [...ALL_MODULE_IDS.flatMap((id) => moduleBoxes(id, anim, frame))];
+        frames.push(
+          renderVoxels(
+            [...pose.lower, ...pose.upper, ...pose.gun, ...withModules],
+            DIR_INDEX[dir],
+            FRAME_WIDTH,
+            FRAME_HEIGHT,
+            RENDER_ANCHOR_X,
+            RENDER_ANCHOR_Y,
+          ),
+        );
       }
     }
   }
@@ -213,7 +226,7 @@ export const PLAYER_LAYER_SPECS = [
       walk: { frames: WALK_FRAMES, fps: WALK_FPS, loop: true },
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'lower'),
-    'digitigrade locomotion layer for the Aurix PX prospector bot'
+    'digitigrade locomotion layer for the Aurix PX prospector bot',
   ),
   // O tronco tem `walk` desde que os bracos existem: o braco de extracao
   // balanca com a passada (ver `prospectorParts`), e sem quadros proprios ele
@@ -227,7 +240,7 @@ export const PLAYER_LAYER_SPECS = [
       attack: { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'upper'),
-    'chassis, back hardpoint and sensor head layer for the Aurix PX prospector bot'
+    'chassis, back hardpoint and sensor head layer for the Aurix PX prospector bot',
   ),
   // Mesmas animações do tronco, quadro a quadro: a arma acompanha o coice, e
   // qualquer divergência de contagem faria o cano descolar do braço no disparo.
@@ -245,7 +258,7 @@ export const PLAYER_LAYER_SPECS = [
       attack: { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'gun'),
-    'shard driver weapon layer for the Aurix PX prospector bot, tinted by barrel heat at runtime'
+    'shard driver weapon layer for the Aurix PX prospector bot, tinted by barrel heat at runtime',
   ),
 ];
 
@@ -271,15 +284,42 @@ export const MODULE_LAYER_SPECS = ALL_MODULE_IDS.map((id) =>
       // contrario: o quadro dela e a posicao da ventoinha, que o cliente
       // escolhe pelo angulo em QUALQUER animacao, entao o `walk` dela precisa
       // das quatro posicoes — e de nenhuma a mais.
+      // A Minigun continua sendo a unica excecao, e por um motivo que so vale
+      // para ela: o quadro de `walk` dela e a POSICAO DA VENTOINHA, que o
+      // cliente escolhe pelo angulo em qualquer animacao. A Lanca e o Bacamarte
+      // nao tem peca que gire, entao voltam ao quadro unico dos acoplados.
       walk:
         id === 'minigun'
           ? { frames: MINIGUN_FAN_FRAMES, fps: WALK_FPS, loop: true }
           : { frames: 1, fps: WALK_FPS, loop: true },
-      attack: { frames: attackKick.length, fps: 12, loop: false },
+      // O COICE das duas armas NOVAS nao e assado, e nao por economia: e a
+      // mesma razao que a Minigun ja registrou uma versao atras —
+      // `recoilScreenOffset` desloca a arma INTEIRA no cliente, fora da escolha
+      // de quadro. Assar cinco quadros de coice numa camada que o cliente ja
+      // empurra pela tela e pagar memoria de video por um movimento que
+      // acontece duas vezes.
+      //
+      // A MINIGUN E A EXCECAO, e a primeira versao disto a incluiu por engano —
+      // o teste da ventoinha pegou. Os quadros de `attack` dela NAO sao coice:
+      // sao as quatro posicoes da ventoinha, que o cliente escolhe por
+      // `barrelPhase` em QUALQUER animacao. Cortar para um quadro nao economiza
+      // um coice, para a ventoinha.
+      //
+      // Os ACOPLADOS continuam com os cinco: eles nao substituem o Cravador,
+      // entao quem os empurra e a camada da arma embaixo, e o quadro deles tem
+      // de casar com ela.
+      attack:
+        WEAPON_LAYER_IDS.includes(id) && id !== 'minigun'
+          ? { frames: 1, fps: 12, loop: false }
+          : { frames: attackKick.length, fps: 12, loop: false },
     },
     (dir, anim, frame) => renderModule(dir, anim, frame, id),
     id === 'minigun'
       ? 'rotary cannon weapon layer replacing the shard driver on the Aurix PX prospector bot'
-      : `${id.replace(/_/g, ' ')} module hardware bolted onto the shard driver of the Aurix PX prospector bot`
-  )
+      : id === 'prospect_lance'
+        ? 'long barrelled prospecting lance weapon layer replacing the shard driver on the Aurix PX prospector bot'
+        : id === 'blunderbuss'
+          ? 'short flared blunderbuss weapon layer replacing the shard driver on the Aurix PX prospector bot'
+          : `${id.replace(/_/g, ' ')} module hardware bolted onto the shard driver of the Aurix PX prospector bot`,
+  ),
 );

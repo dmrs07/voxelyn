@@ -1,3 +1,4 @@
+import { isWeaponModule, type ModuleId } from '@voxelyn/survival-sim';
 import silkBroodManifest from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.json';
 import silkBroodUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.png?url';
 import silkBroodNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-seamstress-brood.normal.png?url';
@@ -30,6 +31,7 @@ import {
   type PropManifest,
   type TerrainManifest,
   EMISSIVE_HEX,
+  MODULE_LAYER_SPRITE_IDS,
   moduleLayerSpriteId,
 } from '@voxelyn/survival-content';
 import { armFaceLight, orderFacesForDraw } from './face-light';
@@ -347,10 +349,21 @@ export const fanFrameFor = (barrelPhase: number): number =>
 export const weaponComposition = (
   mounted: readonly string[] = [],
 ): { weapon: string | null; attachments: readonly string[] } => {
-  const weapon = mounted.includes('minigun') ? 'minigun' : null;
+  // A REGRA E A ETIQUETA `weapon`, e nao o literal 'minigun'.
+  //
+  // Enquanto havia uma arma so, comparar com o literal era honesto e mais
+  // curto. Com a Lanca e o Bacamarte na bancada ele passaria a mentir em
+  // silencio: as duas trocam o Cravador na simulacao e continuariam desenhadas
+  // como um Cravador com acessorios, que e exatamente a promessa falsa que o
+  // bloco da Minigun existe para evitar.
+  //
+  // A ORDEM vem de `activeWeaponModule` (tier primeiro): quem entrega a lista
+  // ja resolveu quem esta com o gatilho, entao aqui o primeiro com a etiqueta e
+  // o certo por construcao.
+  const weapon = mounted.find((id) => isWeaponModule(id as ModuleId)) ?? null;
   return {
     weapon,
-    attachments: weapon ? [] : mounted.filter((id) => id !== 'minigun'),
+    attachments: weapon ? [] : mounted.filter((id) => !isWeaponModule(id as ModuleId)),
   };
 };
 
@@ -687,6 +700,20 @@ export const ON_DEMAND_ATLASES: ReadonlySet<string> = new Set([
   // A massa de ferro: pedida em `requestPart` assim que o corpo do Magnetarca
   // entra na cena, e liberada com o grupo `magnetarch`.
   MAGNET_SHARD_ATLAS,
+  // AS CAMADAS DE MODULO, e esta entrada e uma CORRECAO DE CONTABILIDADE e nao
+  // uma mudanca de carregamento.
+  //
+  // Elas nunca estiveram em `SOURCES`: `MODULE_SOURCES` e pedido por
+  // `requestModule`, no laco de desenho, quando a peca esta equipada. Ou seja,
+  // ja se comportavam como sob demanda desde que existem — mas nao estavam
+  // NESTA lista, e por isso o validador do pacote as cobrava do orcamento de
+  // BOOT. Doze MiB de atlas que ninguem carrega no boot estavam ocupando o teto
+  // que aperta, e o defeito so apareceu quando a Lanca e o Bacamarte
+  // encostaram nele.
+  //
+  // Um modulo que a run nao oferece nao custa um byte, que e a regra escrita em
+  // `validate.mjs`. Agora a conta diz isso.
+  ...MODULE_LAYER_SPRITE_IDS,
 ]);
 const PART_SOURCES: Record<string, { manifest: SpriteManifestEntry; url: string }> = {
   'fx-magnet-shard': {

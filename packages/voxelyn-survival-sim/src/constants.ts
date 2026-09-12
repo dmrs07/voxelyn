@@ -812,11 +812,21 @@ export const GUARDIAN_STRAIN_INTERVAL_TICKS = 40;
  * ESTRAGO que ele deixa, nunca no raio de colisao.
  */
 /**
- * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta agora tem quatro
- * atos e nao tres: as tres ferramentas mais o corpo que sobra quando elas
- * acabam. 880 fechava antes de o quarto ato existir.
+ * A vida do Diamandis. Ela paga a LUTA INTEIRA, e a luta tem quatro atos e nao
+ * tres: as tres ferramentas mais o corpo que sobra quando elas acabam. 880
+ * fechava antes de o quarto ato existir.
+ *
+ * 46 s (ver BOSS_TTK_SECONDS em bosses.ts). Eram 1400, que davam 38,3 s — dos
+ * numeros antigos, o que estava mais perto de certo, porque quatro atos ja eram
+ * quatro atos.
+ *
+ * Na metade de cima da faixa porque a luta TEM o que mostrar, e nao mais alto
+ * porque ele e o segundo chefe mais encontrado do jogo: a Cicatriz Aurix toma
+ * qualquer estrato, e ele abre 18% das runs de G-00 (a contagem esta em
+ * BOSS_TTK_SECONDS). Quatro atos justificam 46 s; a frequencia nao deixa passar
+ * disso.
  */
-export const DIAMANDIS_HP = 1400;
+export const DIAMANDIS_HP = 1700;
 export const DIAMANDIS_SPEED = 1.5;
 export const DIAMANDIS_RADIUS = 0.9;
 
@@ -1108,20 +1118,24 @@ export const DIAMANDIS_SALVAGE_CREW_CAP = 4;
  * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
  */
 /**
- * Era 760. Com 760 o encontro cabia em DUAS janelas: 7,5 s de boca a 56 de
- * DPS do bolt basico (14 a cada 5 ticks) sao 420 por janela, e a segunda ja
- * fechava a conta com folga. Uma luta de duas janelas nao tem onde pendurar
- * uma virada — a fase 2 (ver DEVOURER_HUNGER_HP_FRACTION) chegaria no meio da
- * segunda janela e acabaria antes de ensinar alguma coisa.
+ * 83 s (ver BOSS_TTK_SECONDS em bosses.ts): o mais longo do jogo, e a ponta da
+ * cauda da lista. Eram 1500, que davam 85,7 s — ele praticamente nao se mexeu.
  *
- * 1500 poe a metade em 750, que e uma janela e meia de dano limpo: a Fome
- * abre no fim do segundo ciclo e a luta ainda pede mais dois inteiros dela.
- * Fica entre o Coracao (900) e o Diamandis (1400), que sao os dois chefes com
- * escada de fim de luta, e abaixo do Leviata (4000), que compensa a couraça
- * de submerso com massa. `hp`/`maxHp` viajam no snapshot e no hash: um replay
- * anterior nao bate.
+ * E um chefe de JANELAS, e as janelas sao curtas: fora da boca aberta ele esta
+ * enterrado, e vida aqui compra muito menos luta que em qualquer chefe exposto
+ * (~17 de dano efetivo por segundo, contra ~38 nos abertos). Boa parte dos 83 s
+ * e tempo em que ele NAO ESTA LA — e e por isso que a duracao dele nao se
+ * compara de frente com a de um chefe aberto.
+ *
+ * A conta que a vida antiga defendia continua valendo: 7,5 s de boca ao dps do
+ * parafuso basico sao ~420 de dano por janela, e o encontro nao pode caber em
+ * duas. Com 1400, a metade fica em 700 — a Fome (ver
+ * DEVOURER_HUNGER_HP_FRACTION) abre com mais de uma janela inteira ja gasta e a
+ * luta ainda pede outras tres.
+ *
+ * `hp`/`maxHp` viajam no snapshot e no hash: um replay anterior nao bate.
  */
-export const DEVOURER_HP = 1500;
+export const DEVOURER_HP = 1400;
 /** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
 export const DEVOURER_BURROW_SPEED = 4.6;
 /**
@@ -1746,6 +1760,116 @@ export const DEVOURER_TRAIL_WIDTH = 1;
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;
+/**
+ * ATE ONDE O PARAFUSO CHEGA, em tiles. Eram 18,2, e 18,2 resolviam luta demais.
+ *
+ * O numero nao existia: o alcance era um `ttl: Math.ceil(TICK_HZ * 1.4)` escrito
+ * dentro do disparo, e o cliente tinha o mesmo 1,4 copiado a mao em
+ * `ACQUIRE_RANGE_TILES`. Alcance e uma decisao de desenho e nao um detalhe de
+ * projetil, entao ele vira um numero com nome, em TILES, e o tempo de voo passa
+ * a ser derivado dele.
+ *
+ * POR QUE 13. O aggro dos chefes e o que a medicao encontrou: Bispo 14,
+ * Devorador 11, Arquicantor 10, Guardiao 7. Com 18 de alcance dava para ficar
+ * FORA do problema e resolver a luta sem exercer o contra-jogo dela — medido no
+ * `tools/boss-ttk.mjs`, a 11 tiles o Bispo cobra ZERO de dano por encontro
+ * (contra 48 a seis), o Devorador cai de 280 para 46, o Arquicantor de 120 para
+ * 26 e a Rainha de 442 para 60. Quatro encontros eram neutralizaveis por
+ * posicao.
+ *
+ * Nao e um nerf cego, e os numeros que sobem dizem isso: contra chefe de ataque
+ * a distancia, recuar ja custava caro (o Pulmao cobra 329 a onze tiles contra
+ * 231 a seis, a Cerzideira 1026 contra 854, o Diamandis 620 contra 437). O que
+ * 13 tira e a opcao de ignorar a metade do bestiario que precisa chegar perto.
+ *
+ * A TABELA DE CHEFES NAO SE MEXE: `BOSS_TTK_SECONDS` e medida com o agente a
+ * seis tiles, e seis continua dentro de treze. O que muda e o dano tomado por
+ * quem jogava recuado.
+ *
+ * E o alcance de ontem nao sumiu — virou um modulo. Ver PROSPECT_LANCE_RANGE.
+ */
+export const BOLT_RANGE = 13;
+
+/**
+ * ---------------------------------------------------------------------------
+ * LANCA DE PROSPECCAO — o alcance de ontem, agora comprado.
+ * ---------------------------------------------------------------------------
+ *
+ * O terceiro modulo que OCUPA o gatilho em vez de modifica-lo (ver a matriz em
+ * `modules.ts`), e o primeiro que anda na direcao oposta da Minigun: um tiro de
+ * cada vez, mais lento que o comum, mais forte, e enxergando mais longe.
+ *
+ * OS 16 TILES SAO O DESENHO INTEIRO. A base caiu para 13 porque 18 deixavam
+ * quatro chefes neutralizaveis por posicao (ver BOLT_RANGE), e devolver 18 num
+ * modulo reabriria exatamente o que o corte fechou. Dezesseis dao uma vantagem
+ * que se sente — tres tiles sao a diferenca entre trocar tiro com um Corcel e
+ * abate-lo antes da investida — sem devolver a opcao de ignorar a posicao do
+ * chefe: o alcance de ameaca do Bispo, da Rainha e do Magnetarca fica perto de
+ * 9, e nem 13 nem 16 mudam quem esta dentro dele.
+ *
+ * O CALOR E QUE PAGA A CADENCIA, e sem ele o modulo seria um upgrade puro.
+ * `HEAT_DECAY_PER_TICK` devolve 23/s; o parafuso comum gasta 36/s e por isso
+ * satura em 2,56 tiros/s (dos 4 que a cadencia permitiria). Uma arma lenta com
+ * o calor do parafuso NUNCA esquentaria, e a "cadencia reduzida" se pagaria
+ * sozinha em uptime. Os 19 por tiro poem o teto termico em 1,21 tiros/s, logo
+ * acima da cadencia de 1,11 — a arma e limitada pelo proprio ritmo, e nao ganha
+ * disparo de graca.
+ *
+ * A conta que sobra: 42,2 de dano sustentado por segundo contra os 35,8 do
+ * parafuso (+18%), e NENHUMA janela de burst. O parafuso comum cospe 56/s por
+ * uns quatro segundos antes de saturar; a Lanca nunca passa dos 42,2. Quem a
+ * escolhe troca o pico pela regularidade e pelos tres tiles.
+ */
+export const PROSPECT_LANCE_RANGE = 16;
+export const PROSPECT_LANCE_SPEED = 26;
+export const PROSPECT_LANCE_TTL_TICKS = Math.ceil(
+  (PROSPECT_LANCE_RANGE / PROSPECT_LANCE_SPEED) * TICK_HZ,
+);
+export const PROSPECT_LANCE_DAMAGE = 38;
+export const PROSPECT_LANCE_COOLDOWN_TICKS = 18;
+export const PROSPECT_LANCE_HEAT_PER_SHOT = 19;
+
+/**
+ * ---------------------------------------------------------------------------
+ * BACAMARTE — a carga de chumbo.
+ * ---------------------------------------------------------------------------
+ *
+ * Cinco graos num leque de rumos FIXOS. Fixos e nao sorteados de proposito: a
+ * simulacao e deterministica e o padrao de um bacamarte e coisa que se aprende
+ * — um leque que muda a cada tiro seria um erro de mira disfarcado de arma, e
+ * ainda consumiria a RNG da run para desenhar chumbo.
+ *
+ * O ARCO SAI DA GEOMETRIA, e nao de uma conta de cone. Os graos partem juntos e
+ * ABREM: encostado, os cinco cabem num corpo de chefe e cobram 50; a tres
+ * tiles, dois ou tres acertam; a cinco, o chumbo morre no ar. Nao ha regra de
+ * queda de dano em lugar nenhum — o alcance se resolve sozinho, do mesmo jeito
+ * que se resolve para quem atira de verdade.
+ *
+ * O PRECO ESTA MEDIDO, e e a razao de ele nao ser um upgrade: os 50 exigem
+ * estar a dois tiles de coisas que cobram caro. O `tools/boss-ttk.mjs` mede o
+ * Guardiao em 1538 de dano tomado por encontro a SEIS tiles, e a Fornalha em
+ * 1161. A dois, o bacamarte nao e uma arma melhor: e uma aposta.
+ *
+ * Calor 22 poe o teto termico em 1,05 tiros/s contra a cadencia de 0,91 — a
+ * mesma regra da Lanca, pelo mesmo motivo (ver PROSPECT_LANCE_HEAT_PER_SHOT).
+ * Sustentado encostado: 45,5/s. A oito tiles: zero.
+ */
+export const BLUNDERBUSS_PELLETS = 5;
+export const BLUNDERBUSS_DAMAGE = 10;
+/** Meia-abertura do leque, em radianos: ~48 graus de ponta a ponta. */
+export const BLUNDERBUSS_SPREAD = 0.42;
+export const BLUNDERBUSS_RANGE = 5;
+export const BLUNDERBUSS_SPEED = 15;
+export const BLUNDERBUSS_TTL_TICKS = Math.ceil((BLUNDERBUSS_RANGE / BLUNDERBUSS_SPEED) * TICK_HZ);
+export const BLUNDERBUSS_COOLDOWN_TICKS = 22;
+export const BLUNDERBUSS_HEAT_PER_SHOT = 22;
+
+/**
+ * A vida util do projetil, DERIVADA do alcance. Um tick a mais por seguranca de
+ * arredondamento seria alcance a mais; `floor` deixaria o ultimo meio tile
+ * inalcancavel. `ceil` sobre a divisao exata da 20 ticks redondos a 13/13.
+ */
+export const BOLT_TTL_TICKS = Math.ceil((BOLT_RANGE / BOLT_SPEED) * TICK_HZ);
 
 export const ABILITY_COOLDOWN_TICKS = 120; // pulso cinetico
 export const ABILITY_RADIUS = 2.6;
@@ -2042,7 +2166,33 @@ export const CONTAMINATION_SURGE_COUNT = 3;
  * "de que chao eu o tiro", e usa fungo, fogo e propagacao que ja existem, sem
  * mecanica nova nenhuma.
  */
-export const BISHOP_HP = 260;
+/**
+ * 38 s (ver BOSS_TTK_SECONDS), medidos DEPOIS de resolvido o tapete.
+ *
+ * A vida dele e a unica da lista que nao responde sozinha pela duracao: sobre
+ * micelio vivo ele cura 64/s e nenhum numero aqui muda isso (ver
+ * BISHOP_REGEN_PER_TICK). O alvo e do encontro que a resposta certa produz —
+ * chao aceso debaixo dele, cura e couraça desligadas —, e e esse que 1450
+ * entrega.
+ *
+ * Eram 260: cinco segundos para quem resolvia o quebra-cabeca territorial, e
+ * uma eternidade para quem nao resolvia. A distancia entre as duas respostas
+ * continua enorme, que e o desenho; o que muda e que o lado certo dela agora e
+ * uma luta, e nao a execucao de um chefe ja vencido.
+ *
+ * Ele fica perto do PISO da faixa por um motivo que nenhum outro chefe tem: e o
+ * mais encontrado do jogo, de longe. Ocupacao forte toma qualquer estrato, e o
+ * micelio aparece em 27% das runs de G-00 e em 56% das de G-04 (a contagem esta
+ * em BOSS_TTK_SECONDS). O encontro que se repete em metade das descidas cansa
+ * antes do que aparece em uma a cada dez, e depois de resolvido o tapete a luta
+ * dele e plana — quebra-cabeca nao fica melhor mais longo.
+ *
+ * A cura NAO acompanhou a vida de proposito: 64/s continuam suplantando o
+ * disparo basico sustentado, que e a promessa inteira do encontro. O que a vida
+ * maior muda e o preco de UM deslize — com 260, meio segundo de tapete devolvia
+ * um oitavo da luta.
+ */
+export const BISHOP_HP = 1450;
 /**
  * Cura por tick sobre fungo. A 20 Hz sao 64 de vida por segundo.
  *
@@ -2221,7 +2371,27 @@ export const HORSE_SPAWN_CHANCE = 0.34;
 export const HORSE_TURN_RATE = 0.12;
 
 export const ENEMY_MIN_SPAWN_DIST = 12;
-export const GUARDIAN_HP = 420;
+/**
+ * 38 s (ver BOSS_TTK_SECONDS em bosses.ts), perto do piso da faixa.
+ *
+ * Eram 420, e 420 nao davam encontro: o parafuso basico sustentado cobra ~38/s,
+ * entao ele caia em 10,7 s — menos que dois ciclos de investida e recuo. A fase
+ * de furia (abaixo de metade da vida) existia no codigo e quase nunca na
+ * partida.
+ *
+ * Perto do piso por DOIS motivos que apontam para o mesmo lugar. A luta dele e
+ * a mais simples do jogo, de proposito: nao ha janela para abrir nem blindagem
+ * para derrubar, e uma luta de um gesto so nao fica melhor esticada. E ele tem
+ * a MAIOR PRESSAO DE DANO da lista — medido, o teto sem esquiva sai de 300 para
+ * 1538 quando a luta vai de 10,7 s para 38,8 s, e a conta e superlinear porque
+ * a furia passa a ocupar o dobro de tempo absoluto.
+ *
+ * O que ele NAO e: o chefe inicial do jogo. Ele abre a run em 6,5% delas, a
+ * mesma fatia de qualquer outro dono de estrato (ver a contagem em
+ * BOSS_TTK_SECONDS) — a primeira versao desta faixa o tratou como tutorial e
+ * errou a premissa.
+ */
+export const GUARDIAN_HP = 1450;
 
 // Co-op: estado abatido, revive e extracao coletiva.
 export const MAX_PLAYERS = 2;
@@ -2355,7 +2525,20 @@ export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: numb
  * recurso do setor. O jogador decide quanto da catedral apagar para sobreviver
  * a ela.
  */
-export const ARCHCANTOR_HP = 620;
+/**
+ * 46 s (ver BOSS_TTK_SECONDS), na metade de cima da faixa. Eram 620, que davam
+ * 15,6 s.
+ *
+ * A luta dele tem duas metades — apagar a rede de cristal e desmontar o coro —
+ * e com 15 s a segunda era opcional: dava para derrubar o corpo com a Catedral
+ * ainda cantando. Quarenta e seis segundos e o tempo de a formacao girar, ser
+ * quebrada e ser RECRUTADA de novo, que e quando o coro deixa de ser cenario.
+ *
+ * Ele aguenta ficar em cima porque quase nao cobra: 104 de dano tomado por
+ * encontro no teto sem esquiva, contra os 1538 do Guardiao. Duracao alta com
+ * pressao baixa e tempo de leitura; com pressao alta seria so exposicao.
+ */
+export const ARCHCANTOR_HP = 1650;
 /**
  * Ate onde o canto alcanca cristal. Era 9, e nove era a mesma falha que a
  * varredura do Coracao tinha com 8.
@@ -2612,21 +2795,30 @@ export const ARCHCANTOR_SOLOIST_BURST_RADIUS = 1.6;
  * nada aqui e inferido do humor compartilhado com o Devorador.
  */
 /**
- * A VIDA e o que faz o encontro durar o ciclo que ele conta.
+ * 60 s (ver BOSS_TTK_SECONDS em bosses.ts): a entrada da CAUDA LONGA da lista.
  *
- * Medido sem cliente, com o Prospector parado a sete tiles atirando o
- * parafuso basico (14 de dano a cada 5 ticks) sempre que ele e alvo: com 800
- * ele morria em 19 s e cruzava o limiar do Diluvio aos 13 — antes do primeiro
- * mergulho. A primeira fase inteira (ancorar, sondar, mergulhar, reaparecer)
- * nunca aparecia, e a segunda durava seis segundos. Com 4000, na mesma
- * medida (tiro perfeito, sem errar um parafuso, o atirador sempre a seis
- * tiles), o Diluvio sai aos 61 s depois de quatro mergulhos e ele morre aos
- * 105 s; um jogador de verdade erra, desvia e recua, e o encontro com a arma
- * basica fica em dois ou tres minutos — com missil, Minigun e modulos, bem
- * menos. E o chefe do ultimo estrato, e passa boa parte do tempo fora de
- * alcance: a vida alta e o preco de ter janelas de dano de verdade.
+ * Ele ganha o tempo pelos tres eixos ao mesmo tempo: tem duas fases inteiras,
+ * passa metade do encontro fora de alcance e tem a MENOR pressao de dano da
+ * lista (22 no teto sem esquiva, contra 1538 do Guardiao). Duracao alta com
+ * pressao baixa e tempo de leitura; com pressao alta seria so exposicao — e e
+ * essa combinacao que autoriza um minuto de encontro sem que ele vire espera.
+ *
+ * Medido em `tools/boss-ttk.mjs` (agente imortal, mira perfeita, parafuso
+ * basico, sete tiles), 4000 davam 126,2 s: o dobro do chefe seguinte da lista e
+ * doze vezes o Bispo de entao. O que 126 s acrescentavam sobre 60 nao era fase
+ * nova, era o mesmo ciclo de ancorar, sondar e mergulhar mais quatro vezes.
+ *
+ * 2000 entregam 60,0 s com a estrutura intacta: o Diluvio continua caindo no
+ * mesmo ponto da vida (DELUGE_HP_FRACTION le fracao, e as duas pontas desceram
+ * juntas), a primeira fase continua com mergulhos suficientes para o ciclo ser
+ * lido, e a segunda continua sendo a metade que persegue.
+ *
+ * O historico, porque explica por que o numero ja foi tao alto: com 800 ele
+ * morria em 19 s e cruzava o limiar do Diluvio aos 13 — antes do primeiro
+ * mergulho —, e a correcao da epoca foi multiplicar a vida por cinco sem uma
+ * faixa contra a qual conferir o resultado.
  */
-export const LEVIATHAN_HP = 4000;
+export const LEVIATHAN_HP = 2000;
 /** Velocidade de PERSEGUICAO, na segunda fase. Ele nada; nao ha chao seco. */
 export const LEVIATHAN_SWIM_SPEED = 5;
 /**
@@ -2897,10 +3089,14 @@ export const AQUIFER_PIPE_COUNT = 10;
  * tick zero, atravessando parede e agua. O jogador entrava no mapa e o chefe ja
  * estava a caminho.
  *
- * Dezesseis e um raio de CAMARA: bem alem do alcance do bolt (18 e o limite
- * util dele, e um chefe que so acorda depois de apanhar seria um chefe morto de
- * graca), e curto o bastante para a descida ate ele continuar sendo a descida
- * ate ele, e nao uma fuga do comeco ao fim.
+ * Dezesseis e um raio de CAMARA: alem do alcance do bolt (13 desde
+ * `BOLT_RANGE`, e um chefe que so acorda depois de apanhar seria um chefe morto
+ * de graca), e curto o bastante para a descida ate ele continuar sendo a
+ * descida ate ele, e nao uma fuga do comeco ao fim.
+ *
+ * A margem CRESCEU com o corte de alcance, e na direcao certa: com 18 de bolt
+ * contra 16 de aggro, quem mirasse do limite acertava antes de ser notado. Com
+ * 13 contra 16, ele nota primeiro — que e o que esta linha sempre quis dizer.
  */
 export const DIVER_BOSS_AGGRO_RANGE = 16;
 
@@ -2916,7 +3112,23 @@ export const DIVER_BOSS_AGGRO_RANGE = 16;
  * ele e machuca de verdade — e transforma parte da arena em fogo. Ele e o unico
  * chefe do jogo cuja janela de dano o JOGADOR abre, e ela custa terreno.
  */
-export const LUNG_MATRIX_HP = 700;
+/**
+ * 42 s (ver BOSS_TTK_SECONDS): meio da faixa, porque a janela de dano dele e a
+ * unica do jogo que o JOGADOR abre — e isso e coisa que precisa de tempo para
+ * ser aprendida dentro da propria luta.
+ *
+ * Eram 700, que davam 16 s. Com 16 s a respiracao completa — inspirar, expelir,
+ * incendiar a coluna — cabia duas vezes na luta inteira, e a segunda ja era a
+ * ultima: o ciclo que e a identidade do encontro nao chegava a ser um ciclo.
+ *
+ * RESSALVA QUE VALE MAIS QUE O NUMERO: hoje ele quase nao spawna. O Sulfuroso
+ * so e dono de um setor de chefe quando cai numa posicao que a geracao carimba,
+ * e nas tabelas atuais isso acontece em 0% das runs de G-00, G-02 e G-04 e em
+ * 6,4% das de G-03. Tunar a duracao de um encontro que ninguem encontra e
+ * arrumar a sala errada — a correcao e de linhagem, nao de vida, e esta fora
+ * desta mudanca.
+ */
+export const LUNG_MATRIX_HP = 1620;
 export const LUNG_MATRIX_RADIUS = 0.9;
 export const LUNG_MATRIX_CYCLE_TICKS = 130;
 export const LUNG_MATRIX_BREATH_INTERVAL_TICKS = 10;
@@ -2947,7 +3159,22 @@ export const LUNG_MATRIX_HOLD_TICKS = 12;
  * So fica vulneravel no resfriamento, e essa e a leitura inteira: o jogador nao
  * escolhe quando bater, escolhe onde estar quando puder.
  */
-export const FURNACE_HEART_HP = 900;
+/**
+ * 50 s (ver BOSS_TTK_SECONDS), e a vida sobe pouco (eram 900).
+ *
+ * Ele so aceita dano no RESFRIAMENTO, entao a vida aqui compra menos tempo de
+ * luta que em qualquer chefe aberto: 1000 sao ~50 s de encontro e pouco mais de
+ * vinte de janela. O numero ja estava quase certo — o que faltava a ele nao era
+ * massa, era o resto da lista ter parado de cair em dez segundos.
+ *
+ * O QUE ELE COBRA POR ESSE TEMPO esta medido e nao e pouco: 1161 de dano tomado
+ * no teto sem esquiva (pior partida 1472), a segunda maior pressao da lista
+ * atras so do Guardiao — a sala inteira acende no superaquecimento, e cada
+ * segundo a mais de luta e um segundo a mais de sala acesa. E o chefe em que
+ * duracao e exposicao andam mais juntas, e o primeiro a reconsiderar se o
+ * playtest disser que a Fornalha cansa.
+ */
+export const FURNACE_HEART_HP = 1000;
 export const FURNACE_HEART_RADIUS = 1;
 export const FURNACE_HEART_CYCLE_TICKS = 150;
 export const FURNACE_HEART_HOT_ARMOR = 0.2;
@@ -3144,7 +3371,21 @@ export const FURNACE_HEART_CYCLONE_CAP = 3;
  * Os Espectros nao sao invocados como matilha: sao EXTENSOES dela, e por isso
  * saem do gelo em volta e nao dela.
  */
-export const FROST_QUEEN_HP = 640;
+/**
+ * 44 s (ver BOSS_TTK_SECONDS em bosses.ts). Eram 640, que davam 23,9 s.
+ *
+ * Ela sobe pouco em numero absoluto e muito em tempo, e a razao e a couraça: o
+ * dano dela nao e linear na vida. Enquanto ha gelo em volta entra 22% do golpe
+ * (FROST_QUEEN_ICE_ARMOR), e como ela RECONGELA a placa a cada 14 s, cada
+ * pedaco de vida a mais compra mais de um pedaco de tempo. Medido, a subida de
+ * 640 para 950 vale de 23,9 s para 43,5 s; 1100 passariam de 60 s.
+ *
+ * Ela e a de LEITURA MAIS FRAGIL da lista, e por isso fica no meio da faixa e
+ * nao perto do teto: o numero depende de quanto gelo sobrou perto dela quando o
+ * encontro comeca, e o que a empurraria para cima seria sorte de terreno e nao
+ * desenho.
+ */
+export const FROST_QUEEN_HP = 950;
 export const FROST_QUEEN_SPEED = 2.4;
 export const FROST_QUEEN_RADIUS = 0.7;
 export const FROST_QUEEN_ICE_ARMOR = 0.22;
@@ -3190,49 +3431,51 @@ export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
  * contra-jogo geometrico do campo.
  */
 /**
- * A VARREDURA QUE FIXOU OS DOIS NUMEROS ABAIXO ESTA VENCIDA.
+ * O QUE A VARREDURA DO CICLO DO FERRO AINDA RESPONDE, E O QUE NAO RESPONDE MAIS.
  *
- * `MAGNETARCH_HP` e `MAGNETARCH_CYCLE_TICKS` foram escolhidos medindo o
- * encontro na camara que a geracao dava na epoca — a natural, que nascia onde o
- * mapa levasse e costumava ser um canto. Da SIMULATION_VERSION 86 em diante o
- * Magnetarca tem CAMARA CENTRAL com cobertura na faixa (`bossArena` e
- * `BAND_COVER` em worldgen.ts).
+ * Ela mediu o encontro na camara que a geracao dava na epoca — a natural, que
+ * nascia onde o mapa levasse e costumava ser um canto. Da SIMULATION_VERSION 86
+ * em diante o Magnetarca tem CAMARA CENTRAL com cobertura na faixa (`bossArena`
+ * e `BAND_COVER` em worldgen.ts), e da 87 em diante a vida responde tambem a
+ * faixa de duracao da lista inteira (ver BOSS_TTK_SECONDS).
  *
  * A sala nova nao ficou mais facil que a antiga — com os pilares de volta, o
  * mesmo bot mortal nas mesmas 24 seeds termina com 57 de vida em media contra os
- * 56 de la —, e isso e um argumento a favor de deixar os dois numeros em paz.
+ * 56 de la.
  * (A versao intermediaria, o disco vazio de raio 11 da 85, media 88: foi ela que
  * mostrou que faixa sem cobertura nao e "ampla", e sim vazia.)
  *
- * O que NAO vale mais e usar as tabelas abaixo como PROVA de que 1.200 e 120 sao
- * as escolhas certas: elas continuam sendo o registro do que foi medido e por
- * que, mas a sala mudou embaixo delas. Re-tunar e uma decisao separada.
+ * O que continua valendo das tabelas abaixo e a RELACAO que elas medem: o que
+ * custa subir a vida sem mexer no estoque de ferro. O que nao vale mais e
+ * le-las como prova de que 1.200 e a escolha certa — a sala mudou embaixo
+ * delas, e depois a pergunta mudou.
  */
 /**
- * A vida, MEDIDA e nao escolhida.
+ * 36 s (ver BOSS_TTK_SECONDS em bosses.ts) — o PISO da faixa, e a luta mais
+ * rica do lote esta nele. Isso nao e contradicao: o teto do encontro dele nao e
+ * a vida, e a ECONOMIA DE FERRO.
  *
- * Com 720 o chefe morria aos 19,8 s — meio segundo ANTES de a primeira massa
- * fraturada chegar nele. O contra-jogo caracteristico da luta nao cabia na luta.
- *
- * A varredura abaixo foi REFEITA depois de tres correcoes que mudaram os
- * numeros (a sabotagem passou a valer durante o telegrafo, o estilhaco deixou
- * de amplificar a si mesmo e a morte deixou de ser desfeita pelo passo das
- * massas). Medida na polaridade de 6 s, com bot imortal e mira perfeita:
+ * O material e finito e nao repovoa (ver MAGNETARCH_SHARDS), entao vida maior
+ * com o mesmo estoque nao alonga a luta inteira — alonga o TRECHO FINAL SEM
+ * FERRO, que e o unico pedaco do encontro sem decisao nenhuma. A varredura que
+ * fixou 1200 ja media isso, e continua valendo:
  *
  *   vida  ignorando  sabotando  1o estilhaco  sem material no fim
  *    900    19,8 s     14,7 s    aos 14,2 s (4% de vida)      0,5 s
- *   1050    22,3 s     18,5 s    aos 14,2 s (18%)             4,3 s
  *   1200    26,6 s     21,2 s    aos 14,2 s (28%)             7,0 s
  *   1400    30,1 s     26,3 s    aos 14,2 s (38%)            12,1 s
  *
- * 1200 e o ponto de equilibrio entre as tres colunas que importam: saber a luta
- * vale 20% do tempo dela; o pagamento chega com 28% de vida pela frente (ou
- * seja, como janela e nao como golpe de misericordia); e o trecho final sem
- * material fica em 7 s — uma conclusao, e nao um vazio. Em 1400 esse trecho
- * dobra para doze segundos, que e onde "acabou o ferro" vira problema de
- * verdade.
+ * 1400 e onde as duas pressoes se encontram: 35,6 s de teto de encontro, dentro
+ * da faixa, e uma cauda sem massa de 6,1 s medida no bot mortal (contra 10,2 s
+ * a 1620, e 3,1 s na era dos 1200). Subir mais exige mexer no ferro.
+ *
+ * E MEXER NO FERRO E OUTRA MUDANCA. A tentativa de subir para 1620 com uma
+ * QUARTA massa foi medida e revertida: ela resolvia a cauda (3,8 s), mas o bot
+ * mortal terminava com 93/100 de vida contra 59 e tomava 7 de dano contra 36 —
+ * ou seja, a quarta massa nao e reposicao neutra de material, e uma queda de
+ * dificuldade com medicao propria a fazer. O ciclo do ferro fica como esta.
  */
-export const MAGNETARCH_HP = 1200;
+export const MAGNETARCH_HP = 1400;
 /**
  * FIXO, como o Pulmao e o Coracao — e pelo mesmo motivo dos dois: a luta nao e
  * contra um corpo, e contra a sala.
@@ -3279,6 +3522,12 @@ export const MAGNETARCH_RADIUS = 0.8;
  * De quebra, seis segundos respondem ao outro defeito do encontro — "voce
  * resolve a distancia e repete o movimento": a faixa troca de lado 42% mais
  * vezes que antes.
+ *
+ * As FRACOES DE VIDA da tabela sao de quando a vida era 1.200. Com 1.400
+ * (SIMULATION_VERSION 87) o pagamento continua caindo na mesma hora do relogio
+ * — quem o marca e a polaridade, nao a vida —, mas cai com um pouco mais de
+ * luta pela frente. A escolha da polaridade nao depende disso: ela e sobre
+ * QUANDO o ciclo fecha, e o ciclo nao mudou.
  */
 export const MAGNETARCH_CYCLE_TICKS = 120;
 /**
@@ -3338,6 +3587,14 @@ export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;
  * ler antes de sair. Elas nao repovoam — a que se despedaca acabou. Uma luta
  * curta com material infinito seria farm; com material finito, ela e uma
  * conta: quantas voce consegue preparar antes que ele caia.
+ *
+ * UMA QUARTA MASSA JA FOI TENTADA, e a medicao a mandou de volta. Ela entrou de
+ * carona num aumento de vida, como se fosse reposicao neutra de material; o bot
+ * mortal, nas mesmas 12 camaras e com a mesma sequencia de erro de mira, disse
+ * outra coisa — com quatro ele termina com 93/100 de vida contra 59 e toma 7 de
+ * dano contra 36. Isso e uma queda de dificuldade, nao um ajuste de estoque, e
+ * uma mudanca de mecanica precisa da propria medicao e da propria revisao.
+ * Ficou de fora; a vida e que desceu para caber no ferro (ver MAGNETARCH_HP).
  */
 export const MAGNETARCH_SHARDS = 3;
 /**

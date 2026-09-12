@@ -284,6 +284,8 @@ export const MODULE_LAYER_SPRITE_IDS = [
   'layer-module-ricochet',
   'layer-module-siphon',
   'layer-module-minigun',
+  'layer-module-prospect-lance',
+  'layer-module-blunderbuss',
 ] as const;
 
 /** O atlas de camada de um modulo, a partir do `ModuleId` da simulacao. */

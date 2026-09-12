@@ -264,7 +264,23 @@
 //     `BossMoment` aceita `crack` e `shatter`. Um cliente de 42 nao desenharia
 //     nem as massas nem as rotas marcadas no chao — e as rotas SAO o telegrafo:
 //     sem elas o ferro atravessa a arena sem sinal.
-export const PROTOCOL_VERSION = 43;
+// 44: dois `ProjectileKind` novos no wire — `lance` e `pellet` — e dois
+//     `ModuleId` novos em `activeModules`. E quebra nos dois sentidos: um
+//     cliente antigo contra servidor novo recebe um `kind` que nao conhece e
+//     cai no desenho padrao (um parafuso comum no lugar de uma lanca, cinco
+//     deles no lugar do chumbo), e a HUD dele nao tem rotulo para um modulo
+//     cujo id ela nunca viu.
+// 45: o evento `shot` ganha `weapon` OPCIONAL — qual arma disparou, ausente
+//     para o Cravador (o tiro comum e toda a fauna).
+//
+//     Aditivo, mas com bump mesmo assim, e a razao e co-op: o cliente que ouve
+//     so tem a lista de modulos do PROPRIO viewer, entao sem este campo a unica
+//     alternativa era inferir a arma dali — e quem carregasse o Bacamarte
+//     ouviria o estouro dele a cada parafuso disparado pelo parceiro do outro
+//     lado da sala. Um cliente antigo contra servidor novo nao quebraria: ele
+//     ignoraria o campo e tocaria o som errado em silencio, que e exatamente o
+//     desfecho que o handshake existe para recusar.
+export const PROTOCOL_VERSION = 45;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -1207,7 +1223,122 @@ export const PROTOCOL_VERSION = 43;
 //     65% da faixa mantem linha para o corpo (pior camara 61%), a vida restante
 //     volta a 57 e a vantagem da sabotagem sobe para 25%. Replays de 85 num
 //     setor com Magnetarca nao batem.
-export const SIMULATION_VERSION = 86;
+// 87: A DURACAO DOS ONZE CHEFES, escolhida contra uma escala em vez de contra a
+//     propria luta.
+//
+//     Cada vida tinha sido fixada por uma medicao propria, sem nada do lado de
+//     fora para conferir o resultado, e o efeito acumulado era um intervalo de
+//     VINTE E CINCO VEZES entre o encontro mais curto e o mais longo do mesmo
+//     jogo: medido com o mesmo instrumento (`tools/boss-ttk.mjs` — agente
+//     imortal, mira perfeita, parafuso basico e nada mais), o Bispo caia em
+//     5,0 s e o Leviata pedia 126,2 s.
+//
+//     NAO EXISTE CHEFE INICIAL, e e isso que define a ordem. A linhagem sai da
+//     seed, entao o dono do setor final de uma run de tres setores e sorteado
+//     junto com o mapa: contado em 20 mil seeds, o PRIMEIRO chefe de uma run de
+//     G-00 e o Bispo em 27,4% delas, o Diamandis em 18,0%, a Cerzideira em
+//     15,1% — e cada dono de estrato, Guardiao inclusive, em ~6,5%. Com um
+//     chefe qualquer podendo ser o primeiro, uma rampa larga nao e progressao,
+//     e loteria: o grosso da lista fica entre 36 e 50 s, com uma cauda
+//     deliberada de tres (Leviata 60, Cerzideira 72, Devorador 83), e a ordem
+//     dentro dela e a da DIFICULDADE — pressao de dano medida, o que a luta tem
+//     para mostrar, e com que frequencia alguem a encontra.
+//
+//     A CAUDA e leitura de desenho: os tres sao os chefes de JANELA e
+//     BLINDAGEM do lote, e o dano efetivo por segundo mede isso — ~38/s nos
+//     chefes abertos contra 16,9/s no Devorador e 13,9/s na Cerzideira. O
+//     relogio deles conta muito tempo em que o corpo nao esta alcancavel, entao
+//     83 s de Devorador e 38 s de Guardiao nao medem a mesma coisa.
+//
+//     O alvo de cada chefe passa a viver em `BOSS_TTK_SECONDS` (bosses.ts), que
+//     nenhum passo da simulacao le — quem cobra continua sendo a vida:
+//
+//       Magnetarca 1200 -> 1400 (36 s)   Diamandis   1400 -> 1700 (46 s)
+//       Guardiao    420 -> 1450 (38 s)   Fornalha     900 -> 1000 (50 s)
+//       Bispo       260 -> 1450 (38 s)   Leviata     4000 -> 2000 (60 s)
+//       Pulmao      700 -> 1620 (42 s)   Cerzideira   900 -> 1000 (72 s)
+//       Rainha      640 ->  950 (44 s)   Devorador   1500 -> 1400 (83 s)
+//       Arquicantor 620 -> 1650 (46 s)
+//
+//     Duas descem, as duas no topo: o Devorador de 1500 para 1400 e o Leviata
+//     de 4000 para 2000 — este porque os 4000 vinham de uma correcao legitima
+//     (com 800 ele cruzava o limiar do Diluvio antes do primeiro mergulho)
+//     aplicada sem faixa contra a qual conferir. Nenhum perde estrutura:
+//     DELUGE_HP_FRACTION e DEVOURER_HUNGER_HP_FRACTION leem fracao, e as duas
+//     pontas se mexem juntas.
+//
+//     `MAGNETARCH_SHARDS` FICA EM TRES. A tentativa de subir a vida dele para
+//     1620 com uma quarta massa foi medida e revertida: ela resolve a cauda sem
+//     material (3,8 s contra 10,2 s), mas o bot mortal termina com 93/100 de
+//     vida contra 59 e toma 7 de dano contra 36 — e queda de dificuldade, nao
+//     reposicao de estoque, e mudanca de mecanica pede medicao propria. Quem
+//     desceu foi a vida, para 1400, onde a cauda fica em 6,1 s.
+//
+//     E `GUARDIAN_HP` passa a ser LIDO: a ficha do arquetipo trazia um 420
+//     escrito a mao — a unica vida de chefe fora de constants.ts —, entao a
+//     constante existia e mudar o valor dela nao mudava nada no jogo.
+//
+//     `hp`/`maxHp` viajam no snapshot e no hash: replays de 86 nao batem.
+// 88: O ALCANCE DO PARAFUSO cai de 18,2 para 13 tiles, e vira um numero com
+//     nome (`BOLT_RANGE`, em tiles) em vez de um `ttl` de 1,4 s escrito dentro
+//     do disparo — com o mesmo 1,4 copiado a mao no cliente
+//     (`ACQUIRE_RANGE_TILES`), que agora le a constante.
+//
+//     O MOTIVO esta medido. O aggro dos chefes e curto (Bispo 14, Devorador 11,
+//     Arquicantor 10, Guardiao 7) e o parafuso alcancava 18: dava para ficar
+//     FORA do problema e resolver a luta sem exercer o contra-jogo dela. No
+//     `tools/boss-ttk.mjs`, com o alcance antigo e o agente a 15 tiles, o Bispo
+//     cobrava ZERO de dano por encontro, e o mesmo valia para a Rainha, o
+//     Pulmao e o Magnetarca. A 13 tiles o Pulmao volta a cobrar (152), e os 15
+//     deixam de existir como posicao de tiro.
+//
+//     NAO E UM NERF CEGO: contra chefe de ataque a distancia, recuar ja custava
+//     caro (a Cerzideira cobrava 1078 a quinze tiles contra 810 a seis, o
+//     Diamandis 580 contra 437). O que o corte tira e a opcao de ignorar a
+//     metade do bestiario que precisa chegar perto.
+//
+//     A TABELA DE CHEFES NAO SE MEXE, e isso e verificado: `BOSS_TTK_SECONDS` e
+//     medida com o agente a seis tiles, e seis continua dentro de treze. As onze
+//     medianas saem iguais as da 87.
+//
+//     O ttl viaja no hash dos projeteis: replays de 87 nao batem.
+// 89: AS DUAS ARMAS DE TIER 2 — a Lanca de Prospeccao e o Bacamarte.
+//
+//     Os dois OCUPAM o gatilho em vez de modifica-lo, como a Minigun, e andam
+//     em direcoes opostas a ela e entre si: a Lanca e um tiro por vez, mais
+//     forte e tres tiles alem do parafuso; o Bacamarte sao cinco graos num
+//     leque que morre a cinco tiles.
+//
+//     A LANCA E O ALCANCE DE ONTEM, COMPRADO. A base caiu para 13 na 88 porque
+//     18 deixavam quatro chefes neutralizaveis por posicao, e devolver 18 num
+//     modulo reabriria o que o corte fechou. Dezesseis dao vantagem que se
+//     sente sem devolver a opcao de ignorar a posicao do chefe.
+//
+//     O CALOR E QUE PAGA A CADENCIA. `HEAT_DECAY_PER_TICK` devolve 23/s; uma
+//     arma lenta com o calor do parafuso (9) nunca esquentaria, e a "cadencia
+//     reduzida" se pagaria sozinha em uptime. 19 e 22 por tiro poem o teto
+//     termico logo acima da cadencia de cada uma.
+//
+//     A MATRIZ DE COMPATIBILIDADE passou a ser sobre VOLUME e nao sobre a
+//     etiqueta `weapon`, e isso so ficou visivel com tres armas na bancada: a
+//     Lanca ACEITA modificadores (1,11 tiro/s e menos que os 4/s do parafuso,
+//     que ja aceita tudo), o Bacamarte RECUSA (cinco graos por tiro sao a
+//     versao curta do problema da Minigun) e a Minigun recusa por 16/s.
+//
+//     E `activeWeaponModule` passa a escolher por TIER e nao por ordem de id.
+//     Com uma arma so o criterio era inocente; com tres, a ordem alfabetica
+//     entregaria o gatilho ao Bacamarte por cima de uma Minigun carregada.
+//
+//     Medido (bot imortal, 6 tiles salvo onde dito): a Lanca encurta tudo
+//     (Guardiao 38,8 -> 35,1 s; Rainha 45,1 -> 31,6; Devorador 83,0 -> 66,6) e
+//     protege (dano tomado da Rainha 482 -> 140). O Bacamarte a DOIS tiles
+//     bate mais forte que o parafuso na mesma distancia (Guardiao 30,9 s a 47
+//     de dps contra 36,9 s a 39,3) e cobra a posicao: 2307 de dano tomado
+//     contra os 1248 a seis tiles.
+//
+//     Os alvos de `BOSS_TTK_SECONDS` NAO se mexem: eles sao medidos sem modulo
+//     nenhum, porque o parafuso e o unico equipamento que toda run tem.
+export const SIMULATION_VERSION = 89;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -25,6 +25,7 @@ import type {
   BossMoment,
   EnemyArchetype,
   EntityActionKind,
+  ModuleId,
   SemanticEvent,
 } from '@voxelyn/survival-sim';
 import type { VoiceId } from './voices';
@@ -57,6 +58,18 @@ const BOSS_BAR_VOICE: Record<BossBarTail, VoiceId> = {
 };
 export const bossBarVoice = (archetype: EnemyArchetype | undefined): VoiceId =>
   BOSS_BAR_VOICE[bossBarAccent(archetype).tail];
+
+/**
+ * A voz de cada ARMA no disparo. Fora da tabela = o Cravador.
+ *
+ * Tabela e nao `if`, pelo mesmo motivo que o cartucho do card virou `Record`: a
+ * arma que entrar amanha aparece aqui como uma linha que falta, e nao como um
+ * tiro que soa igual ao de todo mundo.
+ */
+const SHOT_VOICE: Partial<Record<ModuleId | 'none', VoiceId>> = {
+  prospect_lance: 'shotLance',
+  blunderbuss: 'shotBlunderbuss',
+};
 
 /**
  * Telegrafo de cada acao.
@@ -601,8 +614,18 @@ const cuesForEventBody = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // So a fala ("UNIDADE NAO RECUPERAVEL"), pela tabela das falas abaixo.
       return [];
 
+    // A VOZ SAI DA ARMA QUE O EVENTO CARREGA, e nao dos modulos deste viewer.
+    //
+    // Inferir pelos proprios modulos teria sido mais curto e estaria errado em
+    // co-op: quem carrega o Bacamarte ouviria o estouro dele a cada parafuso
+    // que o parceiro dispara do outro lado da sala. `ev.weapon` ausente e o
+    // Cravador, que e o caso do tiro comum e de toda a fauna.
+    //
+    // A Minigun nao entra aqui: ela tem barramento continuo proprio
+    // (`minigun-bus`), porque dezesseis vozes por segundo nao sao dezesseis
+    // tiros, sao uma textura.
     case 'shot':
-      return [{ voice: 'shot', x: ev.x, y: ev.y, scale: 1 }];
+      return [{ voice: SHOT_VOICE[ev.weapon ?? 'none'] ?? 'shot', x: ev.x, y: ev.y, scale: 1 }];
 
     case 'hit': {
       const mine = ev.target === ctx.localPlayerId;

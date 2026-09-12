@@ -114,9 +114,27 @@ const drawChassis = (d: Draw): void => {
   // Face frontal.
   rect(d, 4, 11, 24, 10, HW.steel);
   // Tampo (levemente recuado para tras): a luz vem de cima-esquerda.
-  poly(d, [[4, 11], [28, 11], [30, 8], [6, 8]], HW.steelLight);
+  poly(
+    d,
+    [
+      [4, 11],
+      [28, 11],
+      [30, 8],
+      [6, 8],
+    ],
+    HW.steelLight,
+  );
   // Lateral direita, mais escura.
-  poly(d, [[28, 11], [30, 8], [30, 18], [28, 21]], HW.steelDark);
+  poly(
+    d,
+    [
+      [28, 11],
+      [30, 8],
+      [30, 18],
+      [28, 21],
+    ],
+    HW.steelDark,
+  );
   // Costura inferior + desgaste.
   rect(d, 4, 19, 24, 1, HW.steelDark);
   rect(d, 5, 12, 2, 1, HW.rust);
@@ -221,7 +239,14 @@ const drawSiphon = (d: Draw): void => {
   rect(d, 9, 6, 1, 3, accent(d, HW.fungusLight));
   // A serpente: segmentos 2×2 ondulando do emissor ate a cabeca.
   const wave: Array<[number, number]> = [
-    [12, 6], [14, 4], [16, 3], [18, 4], [20, 6], [22, 7], [24, 6], [26, 4],
+    [12, 6],
+    [14, 4],
+    [16, 3],
+    [18, 4],
+    [20, 6],
+    [22, 7],
+    [24, 6],
+    [26, 4],
   ];
   wave.forEach(([x, y], i) => {
     rect(d, x, y, 2, 2, accent(d, i % 2 === 0 ? HW.acid : HW.fungusLight));
@@ -242,8 +267,26 @@ const drawRicochet = (d: Draw): void => {
   rect(d, 24, 8, 2, 4, HW.rust);
   rect(d, 23, 11, 4, 1, HW.bone);
   // A placa refletiva inclinada — a geometria do rebote.
-  poly(d, [[21, 8], [27, 2], [29, 4], [23, 10]], HW.bone);
-  poly(d, [[22, 8], [27, 3], [28, 4], [23, 9]], accent(d, HW.cyan));
+  poly(
+    d,
+    [
+      [21, 8],
+      [27, 2],
+      [29, 4],
+      [23, 10],
+    ],
+    HW.bone,
+  );
+  poly(
+    d,
+    [
+      [22, 8],
+      [27, 3],
+      [28, 4],
+      [23, 9],
+    ],
+    accent(d, HW.cyan),
+  );
   // O feixe: chega baixo, quica no espelho e sobe.
   const beam = accent(d, HW.cyan);
   rect(d, 18, 8, 2, 1, beam);
@@ -389,6 +432,81 @@ const drawMinigun = (d: Draw, spin: number, heat: number): void => {
  * Desenha o cartucho de um modulo centrado em (cx, cy), com `size` de largura.
  * Retorna a altura ocupada em pixels (para quem empilha texto embaixo).
  */
+/**
+ * LANCA DE PROSPECCAO: um cano LONGO e fino, com o trilho de mira por cima.
+ *
+ * O cartucho tem de dizer a mesma coisa que a silhueta do bot diz — e a leitura
+ * e por COMPRIMENTO. O Perfurante tambem e comprido, e a diferenca entre os
+ * dois mora no que esta EM CIMA: ele nao tem trilho, e o trilho e a unica peca
+ * daqui que sobe acima da linha do cano.
+ */
+const drawProspectLance = (d: Draw): void => {
+  // Culatra curta: tudo o que ela tem a dizer esta na frente.
+  rect(d, 6, 4, 6, 7, HW.steel);
+  rect(d, 6, 10, 6, 1, HW.steelDark);
+  // O cano, em dois trechos com a cinta entre eles — a cinta parte o
+  // comprimento em duas leituras e devolve a escala, como no modelo voxel.
+  rect(d, 12, 6, 7, 3, HW.bone);
+  rect(d, 19, 5, 2, 5, HW.steelDark);
+  rect(d, 21, 6, 8, 3, HW.bone);
+  rect(d, 12, 9, 17, 1, HW.steelDark);
+  // O TRILHO DE MIRA, e a lente acesa nele: a peca que distingue do Perfurante.
+  rect(d, 10, 1, 13, 2, HW.steelDark);
+  rect(d, 15, 0, 3, 2, accent(d, HW.electric));
+  // Bipe dobrado sob a boca — o contrapeso que impede o conjunto de ler como
+  // antena.
+  rect(d, 25, 10, 2, 4, HW.rust);
+  // Boca: aro claro com o FURO escuro dentro, pelo mesmo motivo do Bacamarte —
+  // um cano que termina num bloco chapado nao tem cano. O ponto aceso fica no
+  // FUNDO do furo, e nao sobre ele: e a carga la dentro que brilha.
+  rect(d, 29, 4, 2, 7, HW.bone);
+  rect(d, 29, 6, 3, 3, HW.dark);
+  rect(d, 30, 7, 2, 1, accent(d, HW.electric));
+  drawStatusLed(d, HW.electric);
+};
+
+/**
+ * BACAMARTE: a boca em FUNIL, e mais nada.
+ *
+ * E o unico cartucho do catalogo que fica mais largo na ponta, e e so isso que
+ * ele precisa fazer — nenhum outro modulo tem essa forma, entao ela sozinha
+ * identifica a peca antes de o jogador ler o nome.
+ */
+const drawBlunderbuss = (d: Draw): void => {
+  // Culatra GROSSA: ela ocupa quase todo o comprimento, que e o que sobra
+  // quando o cano nao existe.
+  rect(d, 6, 5, 11, 9, HW.rust);
+  rect(d, 6, 4, 11, 1, HW.steelLight);
+  rect(d, 6, 14, 11, 1, HW.steelDark);
+  // Cartucheira sob a culatra: a massa que diz que a municao e grossa.
+  rect(d, 8, 15, 6, 3, accent(d, HW.amber));
+  // O FUNIL, em dois degraus que ABREM. Dois e nao um: um so degrau le como
+  // "cano mais gordo", e sao os dois que contam a forma de trompete.
+  rect(d, 16, 4, 5, 11, HW.steel);
+  rect(d, 21, 2, 4, 15, HW.steelLight);
+  // O FURO DO CANO, e ele e o assunto da peca inteira.
+  //
+  // A primeira versao fechou a boca com uma chapa escura e pos os graos POR
+  // FORA dela, na borda direita. Lia como um bloco solido com cinco luzes
+  // grudadas — sem cano, e portanto sem arma. Um bacamarte e uma BOCA: o que o
+  // cartucho tem de mostrar e o vazio, nao o metal em volta dele.
+  //
+  // Agora o aro e um ANEL de duas unidades em volta de um furo preto, e o preto
+  // e `dark` e nao `steelDark`: o furo tem de ser mais escuro que qualquer
+  // sombra da peca, ou vira so mais uma face do mesmo metal.
+  // O ARO tem de aparecer nos QUATRO lados, ou o furo vira um corte na borda
+  // da peca em vez de uma boca. Ele e uma moldura de duas unidades; o vazio
+  // dentro dela e o maior campo escuro do cartucho inteiro.
+  rect(d, 24, 1, 7, 17, HW.steelLight);
+  rect(d, 25, 2, 5, 15, HW.steelDark);
+  rect(d, 26, 3, 3, 13, HW.dark);
+  // Os cinco GRAOS DENTRO do furo, pequenos e com preto em volta: e o preto que
+  // diz "cano", e os graos que dizem "cinco de cada vez". Se eles enchem a
+  // cavidade, some o cano e volta o bloco solido.
+  for (const gy of [3.6, 6, 8.4, 10.8, 13.2]) rect(d, 27, gy, 1, 1.4, accent(d, HW.fire));
+  drawStatusLed(d, HW.fire);
+};
+
 export const drawModuleHardware = (
   ctx: CanvasRenderingContext2D,
   id: ModuleId,
@@ -412,17 +530,35 @@ export const drawModuleHardware = (
   };
   ctx.save();
   drawChassis(d);
-  if (id === 'piercing') drawPiercing(d);
-  else if (id === 'conductive') drawConductive(d);
-  else if (id === 'explosive') {
-    // Batimento lento (~1.6 s) e contido: maquina morna, nao alarme.
-    const heartbeat = lit * (0.5 + 0.5 * Math.sin((nowMs % 1600) * ((Math.PI * 2) / 1600)));
-    drawExplosive(d, heartbeat);
-  } else if (id === 'siphon') drawSiphon(d);
-  else if (id === 'ricochet') drawRicochet(d);
-  else if (id === 'minigun') {
-    drawMinigun(d, options.spin ?? 0, Math.max(0, Math.min(1, options.heat ?? 0)) * lit);
-  } else drawReturnDisc(d);
+  // O DESPACHO E EXAUSTIVO, e isto ja mentiu uma vez.
+  //
+  // Ele era uma cadeia terminada em `else drawReturnDisc(d)`, e um `else` final
+  // nao e um caso: e um buraco com a forma de qualquer id que ninguem tenha
+  // escrito. Quando a Lanca e o Bacamarte entraram, o card de escolha passou a
+  // desenhar o DISCO DE RETORNO para as duas — e o compilador nao viu nada,
+  // porque uma cadeia de `if` nao tem cobertura para conferir.
+  //
+  // Com o `Record`, o modulo novo que chegar amanha quebra a compilacao aqui,
+  // que e o unico lugar onde ele pode quebrar de graca. O card e o momento em
+  // que o jogador ESCOLHE: desenhar a peca errada ali nao e um defeito
+  // cosmetico, e uma escolha tomada com a informacao trocada.
+  const DRAW: Record<ModuleId, (d: Draw) => void> = {
+    piercing: drawPiercing,
+    conductive: drawConductive,
+    explosive: (dd) => {
+      // Batimento lento (~1.6 s) e contido: maquina morna, nao alarme.
+      const heartbeat = lit * (0.5 + 0.5 * Math.sin((nowMs % 1600) * ((Math.PI * 2) / 1600)));
+      drawExplosive(dd, heartbeat);
+    },
+    siphon: drawSiphon,
+    ricochet: drawRicochet,
+    minigun: (dd) =>
+      drawMinigun(dd, options.spin ?? 0, Math.max(0, Math.min(1, options.heat ?? 0)) * lit),
+    return_disc: drawReturnDisc,
+    prospect_lance: drawProspectLance,
+    blunderbuss: drawBlunderbuss,
+  };
+  DRAW[id](d);
   ctx.restore();
   return height;
 };

@@ -23,6 +23,8 @@ export type VoiceId =
   | 'telegraphPulse'
   // --- acoes do jogador ---------------------------------------------------
   | 'shot'
+  | 'shotLance'
+  | 'shotBlunderbuss'
   | 'dodge'
   | 'pulse'
   | 'overheat'
@@ -331,6 +333,17 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   telegraphPulse: { priority: 9, gain: 0.5, minIntervalMs: 90, spatial: true },
 
   shot: { priority: 6, gain: 0.3, minIntervalMs: 0, spatial: true },
+  // As duas armas de tier 2 sobem um degrau de prioridade sobre o parafuso, e
+  // nao por serem mais importantes: elas disparam um QUARTO das vezes que ele
+  // dispara, entao num tumulto o tiro raro e o que corre risco de ser cortado
+  // pelo teto de vozes — e justamente o que o jogador precisa ouvir para saber
+  // que a arma saiu. `minIntervalMs` continua em zero porque a cadencia ja
+  // limita: nao ha rajada para engasgar.
+  shotLance: { priority: 7, gain: 0.32, minIntervalMs: 0, spatial: true },
+  // Ganho um pouco menor que o da Lanca apesar de soar MAIOR: o estouro tem
+  // energia concentrada no grave, onde o ouvido ja e generoso, e igualar os
+  // dois numeros faria o Bacamarte abafar o resto da cena a cada tiro.
+  shotBlunderbuss: { priority: 7, gain: 0.28, minIntervalMs: 0, spatial: true },
   dodge: { priority: 6, gain: 0.35, minIntervalMs: 60, spatial: true },
   pulse: { priority: 7, gain: 0.5, minIntervalMs: 60, spatial: true },
   overheat: { priority: 8, gain: 0.6, minIntervalMs: 400, spatial: false },

@@ -915,6 +915,14 @@ export const PT_BR = {
   'module.minigun.description':
     'Os canos precisam pegar no tranco. Depois disso, despeja balas fracas até o cano travar.',
   'module.minigun.proc': 'BALAS',
+  'module.prospect_lance.label': 'LANÇA DE PROSPECÇÃO',
+  'module.prospect_lance.description':
+    'Ocupa o gatilho: um tiro por vez, mais forte e três tiles além do parafuso. Sem janela de pico — o que ela dá é regularidade e distância.',
+  'module.prospect_lance.proc': 'TIROS',
+  'module.blunderbuss.label': 'BACAMARTE',
+  'module.blunderbuss.description':
+    'Ocupa o gatilho: cinco grãos num leque curto. Encostado, os cinco entram; a cinco tiles, o chumbo morre no ar.',
+  'module.blunderbuss.proc': 'CARGAS',
   'hud.minigun.spinup': 'GIRANDO',
   'hud.minigun.overheated': 'CANO TRAVADO',
   'hud.freeze.label': 'GELO',

@@ -65,6 +65,7 @@ import {
   FURNACE_HEART_CYCLE_TICKS,
   FURNACE_HEART_HOT_ARMOR,
   FURNACE_HEART_HP,
+  GUARDIAN_HP,
   FURNACE_HEART_RADIUS,
   FURNACE_HEART_WAVE_ARC,
   FURNACE_HEART_WAVE_TURN,
@@ -500,9 +501,21 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     aggroRange: 0,
   },
   seamstress: {
-    // 900, e nao 780: a segunda fase e blindada pela teia (WEB_ARMOR), e a
-    // luta tem de durar o bastante para a teia ser lida, cortada e refeita.
-    hp: 900,
+    // 1000: 72 s (ver BOSS_TTK_SECONDS em bosses.ts), na cauda longa da lista
+    // junto com o Devorador e o Leviata. Eram 900, que davam 68,2 s.
+    //
+    // A razao continua sendo a de sempre: a segunda fase e blindada pela teia
+    // (WEB_ARMOR), e a luta tem de durar o bastante para a teia ser lida,
+    // cortada e refeita. A blindagem faz a vida render muito mais tempo que num
+    // chefe aberto — ~14 de dano efetivo por segundo, contra ~38 —, entao boa
+    // parte dos 72 s e tempo com a teia no caminho e nao com o corpo exposto.
+    //
+    // O CONTRAPONTO, medido e registrado: ela e o terceiro chefe mais
+    // encontrado do jogo (a ocupacao dos Cerzidores toma qualquer estrato, e
+    // ela abre 15% das runs de G-00), e cobra 854 de dano tomado no teto sem
+    // esquiva. Encontro longo, frequente e caro e a combinacao que o playtest
+    // tem de olhar primeiro.
+    hp: 1000,
     speed: 4,
     radius: 0.72,
     contactDamage: 20,
@@ -539,17 +552,21 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
   guardian: {
-    hp: 420,
+    // A vida vem de `GUARDIAN_HP`, e nao de um 420 escrito aqui. O literal era
+    // a unica vida de chefe fora de constants.ts: a constante existia, ninguem
+    // a lia, e um rebalanceamento que a mudasse nao mudava nada no jogo.
+    hp: GUARDIAN_HP,
     speed: 2.1,
     radius: 0.68,
     contactDamage: 24,
     contactCooldown: 14,
     aggroRange: 7,
   },
-  // Vida MENOR que a do guardiao de proposito. A dificuldade do bispo nao mora
-  // na barra: em cima do fungo ele se cura mais rapido do que se leva dano, e
-  // fora dele cai depressa. Somar vida grande a cura seria cobrar as duas coisas
-  // pelo mesmo problema e transformar a luta em espera.
+  // Vida MENOR que a do guardiao de proposito, e continua menor depois de as
+  // duas subirem. A dificuldade do bispo nao mora na barra: em cima do fungo ele
+  // se cura mais rapido do que se leva dano, e fora dele cai depressa. Somar
+  // vida grande a cura seria cobrar as duas coisas pelo mesmo problema e
+  // transformar a luta em espera.
   bishop: {
     hp: BISHOP_HP,
     speed: 2.6,

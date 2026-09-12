@@ -877,6 +877,14 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'module.minigun.description':
     'The barrels take a moment to wind up. After that, it dumps weak rounds until the barrel jams.',
   'module.minigun.proc': 'ROUNDS',
+  'module.prospect_lance.label': 'PROSPECTING LANCE',
+  'module.prospect_lance.description':
+    'Takes the trigger: one shot at a time, harder, and three tiles past the bolt. No burst window — what it gives you is steadiness and reach.',
+  'module.prospect_lance.proc': 'SHOTS',
+  'module.blunderbuss.label': 'BLUNDERBUSS',
+  'module.blunderbuss.description':
+    'Takes the trigger: five pellets in a short fan. Point blank all five land; at five tiles the shot dies in the air.',
+  'module.blunderbuss.proc': 'LOADS',
   'hud.minigun.spinup': 'SPINNING',
   'hud.minigun.overheated': 'BARREL JAMMED',
   'hud.freeze.label': 'ICE',

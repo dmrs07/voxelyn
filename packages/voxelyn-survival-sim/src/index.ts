@@ -87,6 +87,7 @@ export {
   BOSS_ARCHETYPES,
   BOSS_OF_OCCUPATION,
   BOSS_OF_STRATUM,
+  BOSS_TTK_SECONDS,
   IMPLEMENTED_BOSS,
   bossArchetypeForBiome,
   bossForBiome,

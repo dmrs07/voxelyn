@@ -478,6 +478,94 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     tone(ctx, out, t0, { type: 'square', from: 760, to: 200, peak: 0.34, decay: 0.075 });
     burst(ctx, out, t0, noise, { peak: 0.16, decay: 0.05, type: 'highpass', from: 2200 });
   },
+  /**
+   * A LANCA: um ESTALO com CAUDA. E a cauda que faz "rifle".
+   *
+   * Um tiro curto e seco le como pistola por mais agudo que seja — o que o
+   * ouvido reconhece num fuzil e o anel que sobra depois do estalo, o cano
+   * ressoando enquanto a frente de pressao ja foi embora. Por isso as tres
+   * camadas em ordem de duracao: estalo (35 ms), corpo (110 ms), anel (420 ms).
+   *
+   * O ANEL e passa-banda com Q alto e centro DESCENDO de 1600 para 900: um
+   * filtro parado soaria como um apito colado no fim do tiro, e o que se quer e
+   * uma ressonancia que perde energia e afunda. Ele entra 20 ms atrasado porque
+   * o cano so comeca a ressoar depois de a carga passar — rente ao estalo, as
+   * duas camadas viram uma so e o efeito some.
+   *
+   * E o estalo comeca em 4200 Hz contra os 2200 do parafuso: a diferenca de
+   * brilho e o que diz, antes de qualquer outra coisa, que a arma e outra.
+   */
+  shotLance: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.34,
+      decay: 0.035,
+      type: 'highpass',
+      from: 4200,
+      attack: 0.001,
+    });
+    tone(ctx, out, t0, { type: 'sawtooth', from: 1500, to: 120, peak: 0.28, decay: 0.11 });
+    // O ANEL, em DUAS camadas — e precisou das duas.
+    //
+    // A primeira versao tinha so a de ruido, com Q 6, e medida ela nao existia:
+    // 0,0013 de RMS na janela de cauda contra 0,0896 no estalo, uma razao de
+    // 1%. Passa-banda estreito deixa passar pouca energia de ruido branco, e o
+    // que sobrou era teoria e nao som.
+    //
+    // Q cai para 2,5 e o pico dobra: o ruido volta a ter corpo. E entra um TOM
+    // junto, quase inaudivel sozinho (0,07), porque o que o ouvido le como
+    // "cano de metal" e altura definida, nao chiado filtrado — o ruido da a
+    // textura, o tom da a nota, e nenhum dos dois faz o trabalho do outro.
+    burst(ctx, out, t0 + 0.02, noise, {
+      peak: 0.22,
+      decay: 0.5,
+      type: 'bandpass',
+      from: 1600,
+      to: 900,
+      q: 2.5,
+    });
+    tone(ctx, out, t0 + 0.02, {
+      type: 'triangle',
+      from: 1400,
+      to: 1080,
+      peak: 0.07,
+      decay: 0.38,
+      attack: 0.012,
+    });
+  },
+  /**
+   * O BACAMARTE: um ESTOURO sem cauda. E a ausencia de anel que faz "escopeta".
+   *
+   * O oposto exato da Lanca, camada por camada. La o ruido e agudo e curto e a
+   * cauda e longa e afinada; aqui o ruido e GRAVE e LARGO (passa-baixa varrendo
+   * de 2600 para 220) e nao sobra anel nenhum — uma escopeta e uma nuvem de
+   * pressao, nao um tubo ressoando, e um Q alto aqui devolveria a arma para a
+   * familia do rifle.
+   *
+   * O SOCO em 190 Hz descendo para 42 e a unica camada que o parafuso nao tem
+   * em nenhuma versao: e a massa da carga inteira saindo de uma vez, e e o que
+   * da peso sem precisar de volume. `sine` e nao `square` porque quadrada
+   * nesta faixa vira zumbido de motor.
+   *
+   * E o CHIADO curto 30 ms depois: cinco graos nao saem no mesmo instante. Sem
+   * ele o tiro soa como um soco de porta; com ele, soa como chumbo.
+   */
+  shotBlunderbuss: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.42,
+      decay: 0.26,
+      type: 'lowpass',
+      from: 2600,
+      to: 220,
+      attack: 0.004,
+    });
+    tone(ctx, out, t0, { type: 'sine', from: 190, to: 42, peak: 0.48, decay: 0.2 });
+    burst(ctx, out, t0 + 0.03, noise, {
+      peak: 0.14,
+      decay: 0.1,
+      type: 'highpass',
+      from: 3000,
+    });
+  },
   dodge: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, {
       peak: 0.4,
