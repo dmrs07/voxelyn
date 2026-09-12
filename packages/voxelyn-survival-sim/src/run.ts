@@ -2363,6 +2363,10 @@ const stepPlayer = (
       dx: extra.aim.x,
       dy: extra.aim.y,
       owner: player.id,
+      // A ARMA viaja no evento para o som do PARCEIRO sair certo em co-op: o
+      // cliente que ouve so tem os modulos do proprio viewer. Ausente = o
+      // Cravador, que e o caso do tiro comum e de toda a fauna.
+      ...(trigger ? { weapon: trigger } : {}),
     });
     state.stats.shotsFired += 1;
     settleOverheat(state, slot, events);

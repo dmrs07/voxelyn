@@ -270,7 +270,17 @@
 //     cai no desenho padrao (um parafuso comum no lugar de uma lanca, cinco
 //     deles no lugar do chumbo), e a HUD dele nao tem rotulo para um modulo
 //     cujo id ela nunca viu.
-export const PROTOCOL_VERSION = 44;
+// 45: o evento `shot` ganha `weapon` OPCIONAL — qual arma disparou, ausente
+//     para o Cravador (o tiro comum e toda a fauna).
+//
+//     Aditivo, mas com bump mesmo assim, e a razao e co-op: o cliente que ouve
+//     so tem a lista de modulos do PROPRIO viewer, entao sem este campo a unica
+//     alternativa era inferir a arma dali — e quem carregasse o Bacamarte
+//     ouviria o estouro dele a cada parafuso disparado pelo parceiro do outro
+//     lado da sala. Um cliente antigo contra servidor novo nao quebraria: ele
+//     ignoraria o campo e tocaria o som errado em silencio, que e exatamente o
+//     desfecho que o handshake existe para recusar.
+export const PROTOCOL_VERSION = 45;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de

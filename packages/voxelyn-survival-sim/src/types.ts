@@ -2099,7 +2099,25 @@ export type SemanticEvent =
    * descobriria que o chao e a causa.
    */
   | { t: 'heal'; x: number; y: number; entity: number; amount: number }
-  | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }
+  /**
+   * Um disparo saiu. `weapon` diz de QUAL arma, e so aparece quando ela nao e
+   * o Cravador — ausente significa o tiro comum, que e o caso da fauna inteira
+   * e do Prospector sem modulo de arma.
+   *
+   * Viaja no evento e nao e inferido no cliente por um motivo de co-op: quem
+   * ouve o tiro do PARCEIRO so tem a lista de modulos do proprio viewer. Sem
+   * este campo, um jogador com Bacamarte ouviria o estouro dele a cada parafuso
+   * que o parceiro dispara do outro lado da sala.
+   */
+  | {
+      t: 'shot';
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      owner: number;
+      weapon?: ModuleId;
+    }
   | { t: 'dodge'; x: number; y: number }
   /**
    * Frente circular sem fogo. Carrega o RAIO porque agora tem duas fontes com
