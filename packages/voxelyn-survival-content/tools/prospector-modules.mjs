@@ -326,8 +326,12 @@ export const prospectLanceGun = ({
     // que impede o conjunto de ler como uma antena.
     box(a.x + 0.5, a.y - 5.25, a.z - 0.5, 1, 0.5, 1, 'rust'),
 
-    // BOCA, acesa no mesmo quadro em que o Cravador acenderia.
-    box(a.x + 0.5, a.y - 5.5, a.z + 0.5, 1, 1, 1, flash ? 'loot' : 'rockDeep'),
+    // BOCA: aro fino e o FURO recuado atras dele, pelo mesmo motivo do
+    // Bacamarte — um cano que termina num bloco escuro chapado nao tem cano.
+    // Aqui o anel e de meio voxel em volta de um furo de meio, que e tudo o que
+    // cabe num cano de 1 de largura, e mesmo assim separa "tubo" de "vareta".
+    box(a.x + 0.5, a.y - 5.7, a.z + 0.5, 1, 0.4, 1, 'rockDeep'),
+    box(a.x + 0.5, a.y - 5.2, a.z + 0.5, 0.5, 0.8, 0.5, flash ? 'loot' : 'scorch'),
   ];
 };
 
@@ -360,18 +364,38 @@ export const blunderbussGun = ({ bob = 0, kick = 0, lean = 0, crouch = 0, flash 
     // direita — e havia folga vertical de sobra. Abrindo em z, o trompete se le
     // igual nesta isometria e nao empurra ninguem.
     box(a.x, a.y - 4.5, a.z + 0.25, 2, 1.5, 2.5, 'rust'),
-    box(a.x, a.y - 5.5, a.z + 0.25, 2, 1, 3.2, 'rust'),
+    box(a.x, a.y - 5.3, a.z + 0.25, 2, 1, 3.2, 'rust'),
 
-    // O ARO da boca, escuro, fechando o funil. Sem ele a ponta mais aberta da
-    // arma e tambem a mais clara, e o volume inteiro le como um bloco chapado.
-    box(a.x, a.y - 5.5, a.z + 0.25, 2, 0.5, 3.2, 'rockDeep'),
+    // O ARO da boca e um ANEL, e nao uma placa.
+    //
+    // A primeira versao fechou o funil com uma chapa escura inteira, e o
+    // resultado foi o defeito que o playtest apontou: a arma lia como um bloco
+    // solido, sem furo de cano. Um bacamarte e uma BOCA — tapa-la com metal
+    // apaga a unica coisa que a peca tem para dizer.
+    //
+    // Quatro barras em volta de um vazio, entao, e o furo por tras delas. As
+    // barras de cima e de baixo sao o que sobra do aro em z (onde o funil abre);
+    // as dos lados sao meio voxel cada, que e tudo o que 2 de largura permite —
+    // e o suficiente para o buraco ter borda em vez de virar um corte na
+    // silhueta.
+    box(a.x, a.y - 5.6, a.z + 1.65, 2, 0.4, 0.5, 'rockDeep'),
+    box(a.x, a.y - 5.6, a.z - 1.15, 2, 0.4, 0.5, 'rockDeep'),
+    box(a.x - 0.75, a.y - 5.6, a.z + 0.25, 0.5, 0.4, 3.2, 'rockDeep'),
+    box(a.x + 0.75, a.y - 5.6, a.z + 0.25, 0.5, 0.4, 3.2, 'rockDeep'),
 
-    // CARTUCHEIRA sob a culatra: a massa que diz que a munição dele e grossa,
+    // O FURO, RECUADO atras do aro. `scorch` e o unico material da paleta com
+    // as tres faces escuras — ele nao tem lado iluminado, entao le como cavidade
+    // de qualquer um dos quatro rumos, que e exatamente o que um buraco precisa
+    // fazer. Recuado e nao rente: rente ele viraria um disco preto pintado na
+    // ponta, e o que se quer e profundidade.
+    box(a.x, a.y - 5.0, a.z + 0.25, 1, 1.1, 2.4, 'scorch'),
+
+    // CARTUCHEIRA sob a culatra: a massa que diz que a municao dele e grossa,
     // e o contrapeso que impede a arma de parecer so uma boca flutuando.
     box(a.x + 0.25, a.y - 2.5, a.z - 1, 1.5, 1.5, 1, 'loot'),
 
-    // BOCA acesa no centro do funil, mais larga que a dos outros dois canos —
-    // o clarao de um bacamarte e a coisa mais larga que o bot produz.
-    box(a.x, a.y - 5.75, a.z + 0.5, 2, 0.5, 1.2, flash ? 'loot' : 'rockDeep'),
+    // O CLARAO nasce DENTRO do furo, e nao sobre ele: e o fundo do cano que
+    // acende, entao o aro continua escuro e a boca vira uma luz emoldurada.
+    ...(flash ? [box(a.x, a.y - 5.0, a.z + 0.25, 1, 1.1, 2.4, 'loot')] : []),
   ];
 };

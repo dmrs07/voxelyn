@@ -456,9 +456,12 @@ const drawProspectLance = (d: Draw): void => {
   // Bipe dobrado sob a boca — o contrapeso que impede o conjunto de ler como
   // antena.
   rect(d, 25, 10, 2, 4, HW.rust);
-  // Boca.
-  rect(d, 29, 5, 2, 5, HW.bone);
-  rect(d, 30, 6, 2, 3, accent(d, HW.electric));
+  // Boca: aro claro com o FURO escuro dentro, pelo mesmo motivo do Bacamarte —
+  // um cano que termina num bloco chapado nao tem cano. O ponto aceso fica no
+  // FUNDO do furo, e nao sobre ele: e a carga la dentro que brilha.
+  rect(d, 29, 4, 2, 7, HW.bone);
+  rect(d, 29, 6, 3, 3, HW.dark);
+  rect(d, 30, 7, 2, 1, accent(d, HW.electric));
   drawStatusLed(d, HW.electric);
 };
 
@@ -479,14 +482,28 @@ const drawBlunderbuss = (d: Draw): void => {
   rect(d, 8, 15, 6, 3, accent(d, HW.amber));
   // O FUNIL, em dois degraus que ABREM. Dois e nao um: um so degrau le como
   // "cano mais gordo", e sao os dois que contam a forma de trompete.
-  rect(d, 17, 4, 5, 11, HW.steel);
-  rect(d, 22, 2, 5, 15, HW.steelLight);
-  // O ARO escuro fechando a boca — sem ele a ponta mais aberta e tambem a mais
-  // clara, e o volume inteiro le como um bloco chapado.
-  rect(d, 27, 1, 2, 17, HW.steelDark);
-  // Os cinco GRAOS na boca, que e a unica coisa que conta quantos saem por
-  // tiro sem uma linha de texto.
-  for (const gy of [3, 6, 9, 12, 15]) rect(d, 29, gy, 2, 2, accent(d, HW.fire));
+  rect(d, 16, 4, 5, 11, HW.steel);
+  rect(d, 21, 2, 4, 15, HW.steelLight);
+  // O FURO DO CANO, e ele e o assunto da peca inteira.
+  //
+  // A primeira versao fechou a boca com uma chapa escura e pos os graos POR
+  // FORA dela, na borda direita. Lia como um bloco solido com cinco luzes
+  // grudadas — sem cano, e portanto sem arma. Um bacamarte e uma BOCA: o que o
+  // cartucho tem de mostrar e o vazio, nao o metal em volta dele.
+  //
+  // Agora o aro e um ANEL de duas unidades em volta de um furo preto, e o preto
+  // e `dark` e nao `steelDark`: o furo tem de ser mais escuro que qualquer
+  // sombra da peca, ou vira so mais uma face do mesmo metal.
+  // O ARO tem de aparecer nos QUATRO lados, ou o furo vira um corte na borda
+  // da peca em vez de uma boca. Ele e uma moldura de duas unidades; o vazio
+  // dentro dela e o maior campo escuro do cartucho inteiro.
+  rect(d, 24, 1, 7, 17, HW.steelLight);
+  rect(d, 25, 2, 5, 15, HW.steelDark);
+  rect(d, 26, 3, 3, 13, HW.dark);
+  // Os cinco GRAOS DENTRO do furo, pequenos e com preto em volta: e o preto que
+  // diz "cano", e os graos que dizem "cinco de cada vez". Se eles enchem a
+  // cavidade, some o cano e volta o bloco solido.
+  for (const gy of [3.6, 6, 8.4, 10.8, 13.2]) rect(d, 27, gy, 1, 1.4, accent(d, HW.fire));
   drawStatusLed(d, HW.fire);
 };
 
