@@ -1338,7 +1338,40 @@ export const PROTOCOL_VERSION = 45;
 //
 //     Os alvos de `BOSS_TTK_SECONDS` NAO se mexem: eles sao medidos sem modulo
 //     nenhum, porque o parafuso e o unico equipamento que toda run tem.
-export const SIMULATION_VERSION = 89;
+// 90: O SOPRO TERMICO passa a valer o que custa: 2,4 de dano por emissao (era
+//     1,2) e jato de 5,5 tiles (era 4,2).
+//
+//     O CUSTO DELE NUNCA FOI O COOLDOWN, e era essa a conta que faltava. O
+//     canal BLOQUEIA o disparo comum, entao usar a habilidade e abrir mao de
+//     2,5 s de parafuso. Medido em `tools/flame-probe.mjs`: 50 ticks de canal
+//     valem 140 de parafuso, e o canal inteiro entregava 30 num alvo. Era uma
+//     decisao de MENOS 110 de dano, que so empatava com CINCO bichos
+//     enfileirados dentro do cone.
+//
+//     Com 2,4 o ponto de virada sai de cinco alvos para TRES — a diferenca
+//     entre uma habilidade para uma situacao rara e uma para a situacao que o
+//     jogo serve. E ela continua perdendo feio num alvo so (60 contra 140), que
+//     e a regra escrita no bloco das habilidades: nenhuma pode ser melhor que o
+//     tiro comum em DPS sustentado.
+//
+//     O JATO em 5,5 poe a ponta FORA do alcance de bote do Espreitador (5,0):
+//     com 4,2 era preciso entrar na distancia em que o bicho ja bate, e a
+//     habilidade que devia resolver "o grupo colado" so servia depois que o
+//     grupo tinha colado. Nao mais que isso porque a area do cone cresce com o
+//     QUADRADO do alcance — de 4,2 para 5,5 ja sao 71% mais chao por emissao.
+//
+//     E `FLAMETHROWER_DAMAGE` (9) sai: era o golpe unico de antes da
+//     canalizacao, nao era lido por ninguem desde entao, e uma constante morta
+//     com nome de dano mente para quem for ajustar a habilidade amanha.
+//
+//     FICA REGISTRADO o que a sonda mostrou de lado: em chao SEM combustivel o
+//     sopro nao deixa fogo nenhum (`igniteCell` exige materia), entao os 60 sao
+//     o total contra um alvo em rocha nua. O fogo de chao e bonus de terreno, e
+//     nao parte da conta base — o comentario do cone dizia "deixa fogo no chao"
+//     sem essa ressalva.
+//
+//     Dano e alcance entram no hash: replays de 89 nao batem.
+export const SIMULATION_VERSION = 90;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

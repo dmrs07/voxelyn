@@ -1886,12 +1886,26 @@ export const ABILITY_RADIUS = 2.6;
 // que fugiu, a poca cheia de bicho —, e o custo de resolver e nao ter a resposta
 // pronta de novo pelos proximos seis a nove segundos.
 
-/** Cone de chamas: curto, largo e deixa fogo no chao. */
+/** Cone de chamas: curto, largo e deixa fogo no chao COMBUSTIVEL. */
 export const FLAMETHROWER_COOLDOWN_TICKS = 160; // 8 s
-export const FLAMETHROWER_RANGE = 4.2;
+/**
+ * O JATO, em tiles. Eram 4,2.
+ *
+ * Quatro tiles era menos que o alcance de contato de metade do bestiario: para
+ * usar o sopro era preciso entrar na distancia em que o bicho ja bate, e a
+ * habilidade que devia resolver "o grupo colado" so funcionava depois que o
+ * grupo ja tinha colado. Cinco e meio poe a ponta do jato FORA do alcance de
+ * bote do Espreitador (5,0) — a habilidade passa a ser usavel antes do
+ * problema, e nao no meio dele.
+ *
+ * Nao mais que isso: o cone tem meia-abertura de 0,61 rad, entao a area cresce
+ * com o QUADRADO do alcance. De 4,2 para 5,5 ja sao 71% mais chao coberto por
+ * emissao, e um jato longo com cone largo deixa de ser um sopro e vira um setor
+ * do mapa.
+ */
+export const FLAMETHROWER_RANGE = 5.5;
 /** Meia-abertura do cone, em radianos. ~35 graus para cada lado. */
 export const FLAMETHROWER_ARC = 0.61;
-export const FLAMETHROWER_DAMAGE = 9;
 /**
  * Duracao da CANALIZACAO do sopro. O lanca-chamas nao e mais um cast de tick
  * unico: ele expele chama continuamente por esta janela, seguindo a mira a cada
@@ -1902,12 +1916,29 @@ export const FLAMETHROWER_CHANNEL_TICKS = Math.round(2.5 * TICK_HZ); // 2,5 s
 /** Intervalo entre emissoes durante a canalizacao. */
 export const FLAMETHROWER_EMIT_INTERVAL_TICKS = 2;
 /**
- * Dano POR EMISSAO em criaturas dentro do cone. O total sustentado (canal
- * inteiro, alvo parado no fogo) fica em ~`CHANNEL/INTERVAL * este valor`, alem
- * do fogo que persiste no chao — mais que os 9 do antigo golpe unico, mas pago
- * em 2,5 s de compromisso com a postura.
+ * Dano POR EMISSAO em criaturas dentro do cone. Eram 1,2, e 1,2 nao fechava a
+ * conta em nenhum cenario.
+ *
+ * O CUSTO DO SOPRO NAO E O COOLDOWN, e sim o gatilho: o canal BLOQUEIA o
+ * disparo comum (ver `!channeling` em `stepPlayer`). Medido em
+ * `tools/flame-probe.mjs`, os 50 ticks de canal valem 140 de parafuso — e o
+ * canal inteiro entregava 30 num alvo (25 emissoes x 1,2). Usar a habilidade
+ * era uma decisao de MENOS 110 de dano, e so empatava com CINCO bichos
+ * enfileirados dentro do cone.
+ *
+ * 2,4 poe o total em 60 por alvo e deixa a curva onde o desenho sempre disse
+ * que ela devia estar (ver o bloco das habilidades acima: "nenhuma pode ser
+ * melhor que o tiro comum em DPS sustentado; elas resolvem SITUACOES"):
+ *
+ *   1 alvo    60 contra 140 de parafuso  -> perde feio, como tem de perder
+ *   2 alvos  120 contra 140              -> quase empata
+ *   3 alvos  180 contra 140              -> compensa
+ *   4 alvos  240 contra 140              -> e a resposta certa
+ *
+ * O ponto de virada sai de cinco bichos para tres, que e a diferenca entre uma
+ * habilidade para uma situacao rara e uma para a situacao que o jogo serve.
  */
-export const FLAMETHROWER_EMISSION_DAMAGE = 1.2;
+export const FLAMETHROWER_EMISSION_DAMAGE = 2.4;
 /**
  * Passo, em tiles, da amostragem de linha-de-visada do sopro. Menor que meia
  * celula para uma parede de um tile nunca ser saltada entre duas amostras.
