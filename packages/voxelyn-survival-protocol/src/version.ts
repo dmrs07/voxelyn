@@ -1338,8 +1338,9 @@ export const PROTOCOL_VERSION = 45;
 //
 //     Os alvos de `BOSS_TTK_SECONDS` NAO se mexem: eles sao medidos sem modulo
 //     nenhum, porque o parafuso e o unico equipamento que toda run tem.
-// 90: O SOPRO TERMICO passa a valer o que custa: 2,4 de dano por emissao (era
-//     1,2) e jato de 5,5 tiles (era 4,2).
+// 90: O SOPRO TERMICO passa a valer o que custa: 3,2 de dano por emissao (era
+//     1,2), jato de 5,5 tiles (era 4,2) e cone de 0,8 rad (era 0,61). E o jato
+//     passa a EMITIR LUZ.
 //
 //     O CUSTO DELE NUNCA FOI O COOLDOWN, e era essa a conta que faltava. O
 //     canal BLOQUEIA o disparo comum, entao usar a habilidade e abrir mao de
@@ -1348,11 +1349,17 @@ export const PROTOCOL_VERSION = 45;
 //     decisao de MENOS 110 de dano, que so empatava com CINCO bichos
 //     enfileirados dentro do cone.
 //
-//     Com 2,4 o ponto de virada sai de cinco alvos para TRES — a diferenca
-//     entre uma habilidade para uma situacao rara e uma para a situacao que o
-//     jogo serve. E ela continua perdendo feio num alvo so (60 contra 140), que
-//     e a regra escrita no bloco das habilidades: nenhuma pode ser melhor que o
-//     tiro comum em DPS sustentado.
+//     Com 3,2 o ponto de virada sai de CINCO alvos para DOIS. Cinco
+//     enfileirados e uma situacao que o jogo quase nao serve; dois colados
+//     acontece o tempo todo, e e ai que a habilidade precisa ser a escolha
+//     obvia. Ela continua perdendo num alvo so (80 contra 140), que e a regra
+//     escrita no bloco das habilidades: nenhuma pode ser melhor que o tiro
+//     comum em DPS sustentado.
+//
+//     O TETO da constante fica registrado junto com ela: em 5,6 por emissao o
+//     canal entregaria os mesmos 140 do parafuso e a habilidade passaria a ser
+//     melhor que o tiro comum ate contra um alvo. Ha teste cobrando essa folga
+//     em numero, e nao so em comentario.
 //
 //     O JATO em 5,5 poe a ponta FORA do alcance de bote do Espreitador (5,0):
 //     com 4,2 era preciso entrar na distancia em que o bicho ja bate, e a
@@ -1360,12 +1367,35 @@ export const PROTOCOL_VERSION = 45;
 //     grupo tinha colado. Nao mais que isso porque a area do cone cresce com o
 //     QUADRADO do alcance — de 4,2 para 5,5 ja sao 71% mais chao por emissao.
 //
+//     O CONE ABRE de 70 para 92 graus, e essa e a metade que faltava: "o grupo
+//     colado" nao chega enfileirado no eixo da mira, chega espalhado, e com 70
+//     graus era preciso ACERTAR o grupo como se o sopro fosse um tiro. Medido
+//     com sete bonecos lado a lado a tres tiles: 5 de 7 com 0,61, e 7 de 7 com
+//     0,8. Abrir e o jeito barato de cobrir mais chao — a area cresce com o
+//     alcance ao QUADRADO e so linearmente com o angulo.
+//
+//     `FLAME_REACH_LANES` vai de 5 para 7 junto, e a conta e por ANGULO ENTRE
+//     AMOSTRAS: cinco raios em 92 graus dariam um a cada 23, e um pilar de um
+//     tile cabe nesse vao — a chama desenhada atravessaria a coluna que a de
+//     verdade nao atravessa. Sete devolvem o passo para 15,3 graus. O array tem
+//     tamanho livre no wire, entao nao ha quebra de protocolo.
+//
+//     E O JATO EMITE LUZ. As particulas sempre foram voxel opaco: `ember` e
+//     `spark` sao FONTE (queimando, em arco) e desenhavam-se como materia
+//     iluminada, iguais a poeira. Agora ha uma passada aditiva (`lighter`) por
+//     BAIXO dos corpos, com o halo assado uma vez e reaproveitado escalado.
+//     Embaixo e nao em cima porque halo sobre o corpo lavaria o facetado que a
+//     particula voxel existe para ter; e `lighter` e nao um circulo opaco
+//     porque luz SOMA — duas brasas vizinhas clareiam mais que uma, que e o que
+//     faz o bocal do jato ficar branco no centro sem ninguem desenhar um centro
+//     branco.
+//
 //     E `FLAMETHROWER_DAMAGE` (9) sai: era o golpe unico de antes da
 //     canalizacao, nao era lido por ninguem desde entao, e uma constante morta
 //     com nome de dano mente para quem for ajustar a habilidade amanha.
 //
 //     FICA REGISTRADO o que a sonda mostrou de lado: em chao SEM combustivel o
-//     sopro nao deixa fogo nenhum (`igniteCell` exige materia), entao os 60 sao
+//     sopro nao deixa fogo nenhum (`igniteCell` exige materia), entao os 80 sao
 //     o total contra um alvo em rocha nua. O fogo de chao e bonus de terreno, e
 //     nao parte da conta base — o comentario do cone dizia "deixa fogo no chao"
 //     sem essa ressalva.

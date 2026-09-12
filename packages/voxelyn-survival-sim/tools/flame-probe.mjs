@@ -4,6 +4,7 @@
 // dele nao e so o cooldown: sao 2,5 s de tiro que nao acontece. Esta sonda mede
 // os dois lados no mesmo cenario.
 import {
+  FLAMETHROWER_ARC,
   FLAMETHROWER_CHANNEL_TICKS,
   FLAMETHROWER_EMISSION_DAMAGE,
   FLAMETHROWER_EMIT_INTERVAL_TICKS,
@@ -77,6 +78,37 @@ const bolt = (ticks) => {
   return before - dummies[0].hp;
 };
 
+/**
+ * LATERAL: bonecos lado a lado a tres tiles, perpendiculares a mira.
+ *
+ * E a medida do ANGULO, e nao do alcance: quantos o cone pega quando o grupo
+ * NAO chega enfileirado no eixo — que e como grupo chega de verdade. A medida
+ * em fila mede o jato; esta mede a abertura.
+ */
+const lateral = () => {
+  const { state } = arena(0, 3);
+  const px = Math.floor(state.config.width / 2);
+  const py = Math.floor(state.config.height / 2);
+  const spread = [];
+  for (let off = -3; off <= 3; off++) {
+    const e = spawnEnemy(state, 'stalker', px + 3, py + off, false);
+    e.hp = 100000;
+    e.maxHp = 100000;
+    e.speed = 0;
+    spread.push({ e, off, hp: e.hp });
+  }
+  const cmd = { ...emptyCommand(), aim: { x: 1, y: 0 }, ability: true };
+  for (let t = 0; t < FLAMETHROWER_CHANNEL_TICKS; t++) {
+    stepRun(state, [t === 0 ? cmd : { ...emptyCommand(), aim: { x: 1, y: 0 } }]);
+    spread.forEach((d) => {
+      d.e.x = state.player.x + 3;
+      d.e.y = state.player.y + d.off;
+      d.e.speed = 0;
+    });
+  }
+  return spread.map((d) => ({ off: d.off, dmg: d.hp - d.e.hp }));
+};
+
 const CHANNEL = FLAMETHROWER_CHANNEL_TICKS;
 const TAIL = 120; // o fogo de chao continua cobrando depois do canal
 console.log('');
@@ -98,4 +130,10 @@ console.log('');
 console.log(
   `O QUE O CANAL CUSTA: ${bolt(CHANNEL).toFixed(0)} de parafuso nos mesmos ${CHANNEL} ticks (o canal BLOQUEIA o tiro)`,
 );
+console.log('');
+const hits = lateral();
+console.log('LATERAL a 3 tiles (o grupo que NAO chega enfileirado):');
+console.log('  desvio ' + hits.map((h) => String(h.off).padStart(5)).join(''));
+console.log('  dano   ' + hits.map((h) => (h.dmg ? h.dmg.toFixed(0) : '-').padStart(5)).join(''));
+console.log(`  pegos: ${hits.filter((h) => h.dmg > 0).length} de ${hits.length}`);
 console.log('');

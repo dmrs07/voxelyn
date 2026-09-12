@@ -92,18 +92,24 @@ describe('o sopro termico contra o custo dele', () => {
     expect(single).toBeLessThan(boltDamage());
   });
 
-  it('GANHA do parafuso a partir de tres alvos no cone — e a situacao que ele resolve', () => {
-    const three = channelDamage(3, 1).reduce((a, b) => a + b, 0);
-    expect(three).toBeGreaterThan(boltDamage());
+  it('GANHA do parafuso a partir de DOIS alvos no cone — a virada nao e em cinco', () => {
+    // O numero velho (1,2 por emissao) so empatava com CINCO enfileirados: uma
+    // situacao que o jogo quase nao serve. Dois colados acontece o tempo todo, e
+    // e ai que a habilidade precisa ser a escolha obvia.
+    const two = channelDamage(2, 1).reduce((a, b) => a + b, 0);
+    expect(two).toBeGreaterThan(boltDamage());
   });
 
-  it('dois alvos ficam PERTO do empate: a virada e em tres, e nao em cinco', () => {
-    // O numero velho (1,2 por emissao) so empatava com CINCO enfileirados, o que
-    // fazia a habilidade responder a uma situacao que o jogo quase nao serve.
-    const two = channelDamage(2, 1).reduce((a, b) => a + b, 0);
+  it('o TETO: um alvo nunca pode alcancar o parafuso, por mais que o dano suba', () => {
+    // Esta e a regra do bloco das habilidades em constants.ts, e e a unica que
+    // nao se negocia. Ela existe aqui como NUMERO e nao como comentario porque
+    // e o proximo ajuste de dano que vai encostar nela: em 5,6 por emissao o
+    // canal entregaria exatamente os 140 do parafuso.
+    const [single] = channelDamage(1, 2);
     const bolt = boltDamage();
-    expect(two).toBeGreaterThan(bolt * 0.7);
-    expect(two).toBeLessThanOrEqual(bolt);
+    expect(single).toBeLessThan(bolt);
+    // E com folga: encostar no teto ja seria um defeito, nao um alvo.
+    expect(single).toBeLessThan(bolt * 0.85);
   });
 
   it('o jato alcanca o que a ficha promete, e para depois disso', () => {

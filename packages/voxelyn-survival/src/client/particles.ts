@@ -95,6 +95,20 @@ type Particle = {
  * no ar tem o mesmo volume facetado que o bloco e a criatura — o retangulo liso
  * denunciava o truque justamente nos momentos de maior atencao, a explosao.
  */
+/**
+ * As particulas que EMITEM luz, e nao apenas a recebem.
+ *
+ * Brasa e faisca sao FONTE: o que sai do bocal do sopro esta queimando, e o que
+ * salta de um curto esta em arco. Todo o resto do catalogo — poeira, entulho,
+ * caco, esporo — e materia iluminada por outra coisa, e desenha-la acesa
+ * apagaria a diferenca entre "isto brilha" e "isto esta no claro", que e a
+ * unica informacao que um halo carrega numa cena escura.
+ *
+ * Este conjunto e por isso curto e fechado: uma particula so entra aqui se a
+ * resposta a "ela ilumina o chao em volta?" for sim.
+ */
+const EMISSIVE: ReadonlySet<ParticleKind> = new Set<ParticleKind>(['ember', 'spark']);
+
 const RAMP: Record<ParticleKind, FaceRamp> = {
   ember: ['#ffd166', '#ff7a2f', '#d93b4c'],
   // Enxofre, e nao mais verde-limao: o mote sobe DE DENTRO da crosta de gas, e
@@ -1342,6 +1356,9 @@ export class VoxelParticles {
    * Desenha os cubinhos. `project` converte (tile x, tile y) em pixel de tela;
    * `zoom` da o tamanho do voxel, entao a particula cresce junto com o mundo.
    */
+  /** Halo assado uma vez. Ver `glowSprite`. */
+  private glow: HTMLCanvasElement | null = null;
+
   draw(
     ctx: CanvasRenderingContext2D,
     project: (x: number, y: number) => [number, number],
@@ -1356,6 +1373,14 @@ export class VoxelParticles {
     // a ser tamanho e alpha, que e o que faz brasa parecer brasa apagando.
     const base = 4 * zoom;
     ctx.save();
+    // O HALO vem ANTES dos corpos, e numa passada so.
+    //
+    // Duas razoes para nao intercalar: trocar `globalCompositeOperation` por
+    // particula custa caro num sistema que desenha centenas por quadro, e um
+    // halo desenhado DEPOIS do corpo laveria o proprio voxel — o facetado que
+    // este arquivo defende sumiria dentro da propria luz. Embaixo, ele acende o
+    // chao e o corpo continua legivel em cima.
+    this.drawGlow(ctx, sorted, project, zoom, tileH);
     for (const p of sorted) {
       const [sx, sy] = project(p.x, p.y);
       const life = Math.max(0, Math.min(1, p.life / p.maxLife));
@@ -1370,5 +1395,74 @@ export class VoxelParticles {
     }
     ctx.globalAlpha = 1;
     ctx.restore();
+  }
+
+  /**
+   * O halo aditivo das particulas emissivas.
+   *
+   * `lighter` e nao um circulo opaco: luz SOMA. Dois embers vizinhos tem de
+   * clarear mais que um sozinho, que e o que faz o bocal do sopro ficar branco
+   * no centro do jato sem ninguem desenhar um centro branco.
+   *
+   * O gradiente e assado UMA vez num canvas proprio e reaproveitado escalado.
+   * Um `createRadialGradient` por particula por quadro e o caminho mais curto
+   * para derrubar o quadro num sistema que ja desenha centenas delas — e a
+   * forma do halo nao depende da particula, so o tamanho e a cor.
+   */
+  private drawGlow(
+    ctx: CanvasRenderingContext2D,
+    sorted: readonly Particle[],
+    project: (x: number, y: number) => [number, number],
+    zoom: number,
+    tileH: number,
+  ): void {
+    const sprite = this.glowSprite();
+    if (!sprite) return;
+    let drew = false;
+    for (const p of sorted) {
+      if (!EMISSIVE.has(p.kind)) continue;
+      if (!drew) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        drew = true;
+      }
+      const [sx, sy] = project(p.x, p.y);
+      const py = sy - p.z * tileH * zoom;
+      const life = Math.max(0, Math.min(1, p.life / p.maxLife));
+      // O halo MORRE antes do corpo: uma brasa que ainda se ve mas ja nao
+      // ilumina e o fim natural de uma faisca, e segurar a luz ate o ultimo
+      // quadro faria o jato terminar num piscar.
+      ctx.globalAlpha = 0.5 * life * life;
+      const r = 13 * zoom * (0.55 + life * 0.75);
+      ctx.drawImage(sprite, sx - r, py - r, r * 2, r * 2);
+    }
+    if (drew) {
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
+  /** O halo assado: branco no centro, caindo a zero na borda. */
+  private glowSprite(): HTMLCanvasElement | null {
+    if (this.glow) return this.glow;
+    if (typeof document === 'undefined') return null;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const g = canvas.getContext('2d');
+    if (!g) return null;
+    const half = size / 2;
+    const gradient = g.createRadialGradient(half, half, 0, half, half, half);
+    // O NUCLEO e branco e nao laranja: no somatorio de `lighter` a cor vem das
+    // brasas empilhadas, e um nucleo ja alaranjado saturaria para vermelho no
+    // meio do jato, que e a direcao errada — fogo quente clareia, nao avermelha.
+    gradient.addColorStop(0, 'rgba(255,245,214,0.95)');
+    gradient.addColorStop(0.35, 'rgba(255,164,71,0.5)');
+    gradient.addColorStop(1, 'rgba(255,122,47,0)');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, size, size);
+    this.glow = canvas;
+    return canvas;
   }
 }

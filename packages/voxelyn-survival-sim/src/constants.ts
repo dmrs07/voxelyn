@@ -1904,8 +1904,22 @@ export const FLAMETHROWER_COOLDOWN_TICKS = 160; // 8 s
  * do mapa.
  */
 export const FLAMETHROWER_RANGE = 5.5;
-/** Meia-abertura do cone, em radianos. ~35 graus para cada lado. */
-export const FLAMETHROWER_ARC = 0.61;
+/**
+ * Meia-abertura do cone, em radianos: ~46 graus para cada lado, 92 no total.
+ *
+ * Eram 0,61 (35 por lado). Um cone de 70 graus e estreito demais para o que a
+ * habilidade promete resolver — "o grupo colado" nao chega enfileirado no eixo
+ * da mira, chega espalhado, e com 70 graus era preciso ACERTAR o grupo como se
+ * o sopro fosse um tiro. Uma arma de area que exige pontaria fina e uma arma de
+ * area pela metade.
+ *
+ * O alcance NAO acompanhou de proposito. A area do setor cresce com o alcance
+ * ao quadrado e so LINEARMENTE com o angulo, entao abrir o cone e o jeito barato
+ * de cobrir mais chao sem transformar o sopro num setor do mapa: de 0,61 para
+ * 0,8 sao 31% mais area; os mesmos 31% pelo alcance custariam mais dois tiles de
+ * jato.
+ */
+export const FLAMETHROWER_ARC = 0.8;
 /**
  * Duracao da CANALIZACAO do sopro. O lanca-chamas nao e mais um cast de tick
  * unico: ele expele chama continuamente por esta janela, seguindo a mira a cada
@@ -1926,19 +1940,25 @@ export const FLAMETHROWER_EMIT_INTERVAL_TICKS = 2;
  * era uma decisao de MENOS 110 de dano, e so empatava com CINCO bichos
  * enfileirados dentro do cone.
  *
- * 2,4 poe o total em 60 por alvo e deixa a curva onde o desenho sempre disse
+ * 3,2 poe o total em 80 por alvo e deixa a curva onde o desenho sempre disse
  * que ela devia estar (ver o bloco das habilidades acima: "nenhuma pode ser
  * melhor que o tiro comum em DPS sustentado; elas resolvem SITUACOES"):
  *
- *   1 alvo    60 contra 140 de parafuso  -> perde feio, como tem de perder
- *   2 alvos  120 contra 140              -> quase empata
- *   3 alvos  180 contra 140              -> compensa
- *   4 alvos  240 contra 140              -> e a resposta certa
+ *   1 alvo    80 contra 140 de parafuso  -> perde, como tem de perder
+ *   2 alvos  160 contra 140              -> ja compensa
+ *   3 alvos  240 contra 140              -> e a resposta certa
+ *   4 alvos  320 contra 140              -> e a unica resposta
  *
- * O ponto de virada sai de cinco bichos para tres, que e a diferenca entre uma
- * habilidade para uma situacao rara e uma para a situacao que o jogo serve.
+ * O ponto de virada sai de CINCO bichos para DOIS. Cinco enfileirados e uma
+ * situacao que o jogo quase nao serve; dois colados e o que acontece o tempo
+ * todo, e e ai que a habilidade precisa ser a escolha obvia.
+ *
+ * O TETO desta constante e 5,6 e nao e negociavel: em 5,6 o canal entrega 140,
+ * exatamente o que o parafuso faria nos mesmos ticks, e a habilidade passaria a
+ * ser melhor que o tiro comum ate contra um alvo — que e a unica coisa que o
+ * bloco das habilidades proibe. 3,2 deixa 40% de folga ate la.
  */
-export const FLAMETHROWER_EMISSION_DAMAGE = 2.4;
+export const FLAMETHROWER_EMISSION_DAMAGE = 3.2;
 /**
  * Passo, em tiles, da amostragem de linha-de-visada do sopro. Menor que meia
  * celula para uma parede de um tile nunca ser saltada entre duas amostras.
