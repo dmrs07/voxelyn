@@ -96,12 +96,31 @@ describe('assinatura da run de co-op', () => {
     expect(send('b', { t: 'ping', seq: 1, clientTimeMs: 7 }).map((m) => m.t)).toEqual(['pong']);
   });
 
-  it('reassinar troca o nome: a ultima palavra do dono e a que vale', () => {
+  it('UMA assinatura por run: a segunda nao chega ao livro', () => {
     const { server, room, named, send } = salaDeDois();
     terminar(server, room);
 
     send('a', { t: 'name_run', name: 'primeiro' });
     send('a', { t: 'name_run', name: 'pensei melhor' });
-    expect(named.map((n) => n.name)).toEqual(['primeiro', 'pensei melhor']);
+    // A interface nao permite reassinar — o painel fecha e nao reabre —, entao
+    // quem manda a segunda nao e a interface. E `name_run` e a unica mensagem de
+    // cliente do protocolo que provoca escrita no banco: sem a trava, o slot 0
+    // sustentaria uma escrita por mensagem no teto do limitador.
+    expect(named.map((n) => n.name)).toEqual(['primeiro']);
+    expect(room.runNamed).toBe(true);
+  });
+
+  it('a trava e por SALA: a recusa ao parceiro nao queima a assinatura do dono', () => {
+    const { server, room, named, send } = salaDeDois();
+    terminar(server, room);
+
+    // O parceiro tenta primeiro e e recusado por nao ser o slot 0. Se a trava
+    // fosse ligada antes da checagem de autoridade, ele gastaria a unica
+    // assinatura da sala e o dono ficaria sem nenhuma.
+    send('b', { t: 'name_run', name: 'roubado' });
+    expect(room.runNamed).toBe(false);
+
+    send('a', { t: 'name_run', name: 'legitimo' });
+    expect(named.map((n) => n.name)).toEqual(['legitimo']);
   });
 });

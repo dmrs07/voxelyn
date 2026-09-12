@@ -95,6 +95,16 @@ export class GameRoom {
   worldReplaced = false;
   /** O resultado desta sala ja foi entregue ao ranking? */
   resultReported = false;
+  /**
+   * O dono ja assinou o relatorio desta run?
+   *
+   * UMA assinatura por run, e a interface nao permite mais que isso: o painel
+   * fecha ao assinar e nao ha como reabri-lo. O limite existe contra o cliente
+   * que NAO e a interface — `name_run` e a primeira mensagem de cliente do
+   * protocolo que provoca escrita no banco, e sem esta trava o slot 0 podia
+   * sustenta-las no teto do limitador de mensagens enquanto o socket vivesse.
+   */
+  runNamed = false;
   private tracker: ChunkTracker;
   private prevAliveEnemies = new Set<number>();
 

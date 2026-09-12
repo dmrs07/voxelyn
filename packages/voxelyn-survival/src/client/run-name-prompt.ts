@@ -40,14 +40,31 @@ import './run-name-prompt.css';
 export type NamePromptKind = 'solo' | 'team';
 
 /**
- * Como o campo foi resolvido.
+ * COMO o campo foi resolvido — e nao so COM O QUE.
  *
- * `null` significa "nao mexi no nome salvo" e nasce so do botao de pular. Uma
- * string — INCLUSIVE vazia — significa "e este": esvaziar o campo de proposito
- * e uma escolha (subir anonimo), e trata-la como desistencia devolveria ao
- * jogador o nome que ele acabou de apagar.
+ * Os tres casos existem porque quem chama precisa distinguir uma ASSINATURA de
+ * uma saida, e os dois lados do jogo tiram conclusoes opostas disso:
+ *
+ *   signed   o jogador apertou assinar (ou Enter). O nome e uma decisao dele.
+ *   skipped  apertou pular: nao mexa em nome nenhum.
+ *   left     saiu da tela de fim sem responder. `name` e o que estava no campo
+ *            — em geral o proprio nome salvo, porque e com ele que o campo
+ *            nasce.
+ *
+ * No SOLO, `left` e inofensivo: o envio usa o texto do campo, que sem
+ * intervencao e exatamente o nome que seria enviado antes de este painel
+ * existir. No CO-OP, `left` NAO pode valer como assinatura — a linha do ranking
+ * ja existe com o codigo da sala, e sobrescreve-la com um prefill que ninguem
+ * confirmou troca `sala QW3R` por um nome que o jogador nao escolheu (ou, com o
+ * campo de Opcoes ainda vazio, por "anonimo", que e estritamente pior).
+ *
+ * `name` vem aparado e ja no limite; string vazia significa "sem nome", que no
+ * solo e a escolha legitima de subir anonimo.
  */
-export type NameChoice = string | null;
+export type NameOutcome =
+  | { kind: 'signed'; name: string }
+  | { kind: 'skipped' }
+  | { kind: 'left'; name: string };
 
 const MAX_NAME = 18;
 
@@ -58,7 +75,7 @@ export class RunNamePrompt {
   private readonly hint = document.createElement('p');
   private readonly confirm = document.createElement('button');
   private readonly skip = document.createElement('button');
-  private done: ((choice: NameChoice) => void) | null = null;
+  private done: ((outcome: NameOutcome) => void) | null = null;
   /** Ultimo `bottom` aplicado, para nao reescrever estilo a 60 Hz. */
   private anchored = -1;
 
@@ -86,7 +103,7 @@ export class RunNamePrompt {
       event.stopPropagation();
       if (event.key === 'Enter') {
         event.preventDefault();
-        this.resolve(this.typed());
+        this.resolve({ kind: 'signed', name: this.typed() });
       }
     });
   }
@@ -96,10 +113,12 @@ export class RunNamePrompt {
     row.className = 'run-name-actions';
     this.skip.type = 'button';
     this.skip.className = 'run-name-skip';
-    this.skip.addEventListener('click', () => this.resolve(null));
+    this.skip.addEventListener('click', () => this.resolve({ kind: 'skipped' }));
     this.confirm.type = 'button';
     this.confirm.className = 'run-name-confirm';
-    this.confirm.addEventListener('click', () => this.resolve(this.typed()));
+    this.confirm.addEventListener('click', () =>
+      this.resolve({ kind: 'signed', name: this.typed() }),
+    );
     row.append(this.skip, this.confirm);
     return row;
   }
@@ -127,7 +146,7 @@ export class RunNamePrompt {
    * nome chegaria a um socket ja fechado, que o `NetClient` descarta calado. Com
    * callback o nome sai antes de o socket cair.
    */
-  open(kind: NamePromptKind, prefill: string, done: (choice: NameChoice) => void): void {
+  open(kind: NamePromptKind, prefill: string, done: (outcome: NameOutcome) => void): void {
     // Uma abertura por vez. Se ainda havia uma pendente (a run anterior, numa
     // sequencia rapida de reinicios), ela resolve com o que estava no campo em
     // vez de vazar uma promessa que ninguem mais aguarda.
@@ -143,14 +162,14 @@ export class RunNamePrompt {
     this.done = done;
   }
 
-  private resolve(choice: NameChoice): void {
+  private resolve(outcome: NameOutcome): void {
     const done = this.done;
     this.done = null;
     this.element.hidden = true;
     // Devolve o foco ao documento. Sem isto o campo escondido continua sendo o
     // elemento focado e as teclas da run seguinte iriam todas para dentro dele.
     if (this.element.contains(document.activeElement)) this.field.blur();
-    done?.(choice);
+    done?.(outcome);
   }
 
   /**
@@ -163,7 +182,7 @@ export class RunNamePrompt {
    * digitou e saiu sem apertar nada nao perde o que digitou.
    */
   settle(): void {
-    if (this.done) this.resolve(this.typed());
+    if (this.done) this.resolve({ kind: 'left', name: this.typed() });
   }
 
   /**

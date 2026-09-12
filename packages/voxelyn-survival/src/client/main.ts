@@ -810,10 +810,19 @@ const submitSoloRun = (state: SurvivalState): void => {
   if (submitted || !state.summary || state.summary.phase === 'dead') return;
   submitted = true;
   const stars = state.summary.stars;
+  const seed = state.summary.seed;
   const url = serverInput.value.trim() || defaultServerUrl();
   // O ticket desta descida viaja junto. E dele que o servidor tira a
   // profundidade autorizada — e, portanto, em qual livro esta run compete.
   const send = (name: string): void => {
+    // O ENVIO E DESTA RUN, ou nao acontece.
+    //
+    // `recorder` e um so para o processo inteiro e a proxima descida o
+    // reinicia. Este `send` fica pendurado num callback enquanto o jogador
+    // decide o nome, entao um caminho de saida esquecido faria a run SEGUINTE
+    // subir com o `runId` desta — a mesma guarda que `keepLocalReplay` ja faz,
+    // e pelo mesmo motivo.
+    if (recorder.recordedSeed !== seed) return;
     void submitRun(url, recorder, name, expedition?.runId).then((outcome) => {
       if (!outcome.ok) {
         // Sem banner: o jogador esta lendo a tela de resultado.
@@ -847,12 +856,21 @@ const submitSoloRun = (state: SurvivalState): void => {
    * campo ja nasce com o nome salvo. Quem ignora o painel e sai envia
    * exatamente o que enviaria antes de ele existir.
    */
-  namePrompt.open('solo', playerName, (chosen) => {
-    if (chosen !== null) adoptPlayerName(chosen);
-    // `chosen` vazio e o caso "subir anonima": `adoptPlayerName` recusa o vazio,
-    // entao o nome salvo continua de pe e so ESTA run vai sem ele. Pular
-    // (`null`) envia o nome salvo, que e o comportamento de sempre.
-    send(chosen ?? playerName);
+  namePrompt.open('solo', playerName, (outcome) => {
+    // PULAR mantem tudo como estava: o nome salvo sobe, que e o comportamento
+    // de sempre.
+    if (outcome.kind === 'skipped') {
+      send(playerName);
+      return;
+    }
+    // Assinar ADOTA o nome; sair da tela sem responder, nao. Persistir exige um
+    // ato explicito — e, no caso comum (campo intocado), os dois caminhos
+    // enviam exatamente a mesma coisa, porque o campo nasce com o nome salvo.
+    //
+    // Nome vazio e o caso "subir anonima": `adoptPlayerName` recusa o vazio,
+    // entao o nome salvo continua de pe e so ESTA run vai sem ele.
+    if (outcome.kind === 'signed') adoptPlayerName(outcome.name);
+    send(outcome.name);
   });
 };
 
@@ -883,10 +901,18 @@ const askTeamName = (net: NetClient, summary: RunSummary | null): void => {
   if (teamNameAsked) return;
   teamNameAsked = true;
   if (!summary || summary.stars < 1 || net.slot !== 0) return;
-  namePrompt.open('team', playerName, (chosen) => {
-    if (chosen === null) return; // pulou: a linha fica com o codigo da sala
-    adoptPlayerName(chosen);
-    net.nameRun(chosen);
+  namePrompt.open('team', playerName, (outcome) => {
+    // SO A ASSINATURA VALE AQUI, e e onde o co-op se separa do solo.
+    //
+    // No solo, sair sem responder envia o texto do campo e isso e inofensivo:
+    // sem intervencao ele e o proprio nome salvo, exatamente o que subiria
+    // antes de este painel existir. No co-op a linha JA EXISTE, com o codigo da
+    // sala, e sobrescreve-la com um prefill que ninguem confirmou troca
+    // `sala QW3R` por um nome que o jogador nao escolheu — ou, com o campo de
+    // Opcoes ainda vazio, por "anonimo", que e pior que o codigo da sala.
+    if (outcome.kind !== 'signed') return;
+    adoptPlayerName(outcome.name);
+    net.nameRun(outcome.name);
   });
 };
 
@@ -1208,6 +1234,17 @@ const mountOptions = (slot: HTMLDivElement): void => {
  */
 const abandonRun = (): void => {
   echoChoice.hide();
+  // A assinatura sai junto, pelo mesmo motivo que a escolha de Eco: sao as duas
+  // overlays que flutuam sobre o canvas e sobrevivem ao fim da run.
+  //
+  // E AQUI, e nao so na tela de fim, porque este e o unico ponto por onde TODA
+  // saida passa — o botao de terminal, o menu de campo (Esc/P, o gesto do topo)
+  // e o botao voltar do celular. O menu de campo era o furo: com ele aberto,
+  // `endScreenAction` devolve null de proposito, entao o `settle()` de la nunca
+  // disparava. O envio da run ficava pendurado para sempre (com `submitted` ja
+  // travado, sem segunda chance), o painel continuava desenhado por cima do
+  // menu principal, e a run seguinte herdava o callback.
+  namePrompt.settle();
   const state = liveRun;
   // So run de verdade entra no funil de abandono; ver `activeRunKind`.
   if (activeRunKind === 'standard' && state && state.phase === 'running' && state.tick >= 20) {

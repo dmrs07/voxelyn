@@ -322,9 +322,12 @@ export class SurvivalServer {
        *
        * Tres condicoes, e as tres sao de AUTORIDADE, nao de conveniencia:
        *
-       *   - a sala existe e a run dela terminou (`resultReported`): fora disso
-       *     nao ha linha no livro para renomear, e aceitar o nome agora seria
-       *     guarda-lo para carimbar uma run que ainda nem aconteceu;
+       *   - a sala existe, a run dela terminou (`resultReported`) e ninguem
+       *     assinou ainda: fora do primeiro caso nao ha linha no livro para
+       *     renomear, e aceitar o nome antes seria guarda-lo para carimbar uma
+       *     run que ainda nem aconteceu. A assinatura unica (`runNamed`) fecha
+       *     a unica mensagem de cliente do protocolo que escreve no banco —
+       *     ver o campo em `room.ts`;
        *   - quem manda ocupa o slot 0: e o nome da EQUIPE, e uma linha so. Com
        *     os dois slots ouvidos, o segundo a digitar apagaria o primeiro, e
        *     qual nome ficaria dependeria de quem tem a rede mais rapida;
@@ -337,9 +340,10 @@ export class SurvivalServer {
        */
       case 'name_run': {
         const room = conn.room;
-        if (!room || !room.resultReported) return [];
+        if (!room || !room.resultReported || room.runNamed) return [];
         const slot = room.slotForClient(clientId);
         if (!slot || slot.slot !== 0) return [];
+        room.runNamed = true;
         this.onRunNamed?.(room, msg.name);
         return [];
       }
